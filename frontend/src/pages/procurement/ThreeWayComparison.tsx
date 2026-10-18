@@ -81,7 +81,8 @@ export const ThreeWayComparison: React.FC = () => {
   const [dialog, setDialog] = useState<"approve" | "dispute" | null>(null);
   const [reason, setReason] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
-  const [rescoreQueued, setRescoreQueued] = useState(false);
+  // idle -> queued (the server was asked) -> done (long enough for the worker; read the case again).
+  const [rescore, setRescoreState] = useState<"idle" | "queued" | "done">("idle");
 
   const rowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
 
@@ -90,6 +91,8 @@ export const ThreeWayComparison: React.FC = () => {
     queryFn: () => getCase(workspaceId, caseId),
     enabled: Boolean(workspaceId && caseId) && capability.granted,
     staleTime: 15_000,
+    // While a re-score is queued, look again every few seconds: it may replace this case.
+    refetchInterval: rescore === "queued" ? 3_000 : false,
   });
 
   const detail = caseQuery.data ?? null;
@@ -160,16 +163,25 @@ export const ThreeWayComparison: React.FC = () => {
   });
 
   // Re-score: score the invoice again against the documents now on file (a late receipt, a corrected PO).
-  // The server queues it and replaces this case with a new one; nothing here changes until that finishes.
-  const rescore = useMutation({
+  // The server queues it. If anything it reads has changed, this case is replaced by a new one; if not,
+  // this stays the current case.
+  const rescoreRequest = useMutation({
     mutationFn: () => rematchCase(workspaceId, caseId, {}),
     onSuccess: async () => {
       setActionError(null);
-      setRescoreQueued(true);
+      setRescoreState("queued");
       await queryClient.invalidateQueries({ queryKey: procurementKeys.all(workspaceId) });
     },
     onError: (error) => setActionError(describeFailure(error)),
   });
+
+  useEffect(() => {
+    if (rescore !== "queued") {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setRescoreState("done"), 30_000);
+    return () => window.clearTimeout(timer);
+  }, [rescore]);
 
   const openEvidence = useCallback(
     (line: CaseLine | null) => {
@@ -320,11 +332,11 @@ export const ThreeWayComparison: React.FC = () => {
           <button
             type="button"
             className={BUTTON_SECONDARY}
-            disabled={!live || !canDecide || rescore.isPending || rescoreQueued || !detail.invoice_work_item_id}
+            disabled={!live || !canDecide || rescoreRequest.isPending || rescore === "queued" || !detail.invoice_work_item_id}
             title="Score this invoice again against the documents now on file"
-            onClick={() => rescore.mutate()}
+            onClick={() => rescoreRequest.mutate()}
           >
-            {rescore.isPending ? "Queuing…" : "Re-score"}
+            {rescoreRequest.isPending ? "Queuing…" : "Re-score"}
           </button>
         </div>
       </header>
@@ -347,15 +359,21 @@ export const ThreeWayComparison: React.FC = () => {
         </section>
       ) : null}
 
-      {rescoreQueued && !superseded ? (
+      {rescore === "queued" && !superseded ? (
         <p role="status" className="rounded-md border border-border bg-muted/40 p-3 text-sm">
-          Re-scoring is queued. This case is replaced by a new one when it finishes; the queue shows it.
+          Re-scoring is queued. If the documents on file have changed since this case was scored, it is replaced by
+          a new case; if not, nothing changes.
+        </p>
+      ) : null}
+      {rescore === "done" && live ? (
+        <p role="status" className="rounded-md border border-border bg-muted/40 p-3 text-sm">
+          Scored again against the documents on file. Nothing had changed, so this is still the current case.
         </p>
       ) : null}
 
       {superseded ? (
         <p role="status" className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-          This case was replaced by a re-score and can no longer be decided. Open the current case for this invoice
+          This case was replaced by a newer score (a re-score, or a changed document or policy) and can no longer be decided. Open the current case for this invoice
           from the match queue.
         </p>
       ) : null}

@@ -462,29 +462,44 @@ test.describe("Procurement case actions — a tenant of its own, real three-way 
     expect((await caseDetail(id)).status).toBe("NEEDS_REVIEW");
   });
 
-  test("Re-score queues a new score; the case it replaces says so and takes no more decisions; a current case exists", async ({ page }) => {
+  test("Re-score scores again: unchanged documents leave the case as it is; a changed policy replaces it, and the old one is history", async ({ page }) => {
     const id = caseIds.watched;
+    const liveCases = async (): Promise<CaseRow[]> => {
+      const listed = await api<CaseRow[]>(proc.session, "GET", procApi("/cases?limit=100"));
+      return (Array.isArray(listed.body) ? listed.body : [])
+        .filter((c) => c.invoice_number === SETS.watched.invoice && c.status !== "SUPERSEDED");
+    };
     await signInAs(page, proc.email);
     await page.goto(proc.ws(`procurement/${id}`));
     await expect(page.getByRole("heading", { name: `Three-way match · ${SETS.watched.invoice}`, level: 1 })).toBeVisible();
     await expect(page.getByRole("button", { name: "Re-score" })).toBeEnabled();
+
+    // Nothing on file has changed: the page says it is queued, then that this is still the current case.
     await page.getByRole("button", { name: "Re-score" }).click();
     await expect(page.getByText("Re-scoring is queued.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Re-score" })).toBeDisabled();
+    await expect(page.getByText("Nothing had changed, so this is still the current case.")).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("button", { name: "Re-score" })).toBeEnabled();
+    expect((await caseDetail(id)).status).toBe("NEEDS_REVIEW");
+    expect((await liveCases()).map((c) => c.id)).toEqual([id]);
 
-    // The worker scores again: this case becomes history and exactly one live case holds the invoice.
+    // The inputs change (a new tolerance is published): the next score replaces this case with a new one,
+    // and the open page, which looks again while the score is queued, says so.
+    const published = await api(proc.session, "POST", procApi("/policies"), { price_tolerance_bps: 700 });
+    expect(published.status, published.text.slice(0, 200)).toBeLessThan(300);
+    await page.reload();
+    await page.getByRole("button", { name: "Re-score" }).click();
+    await expect(page.getByText("This case was replaced by a newer score")).toBeVisible({ timeout: 90_000 });
     await expect
       .poll(async () => (await caseDetail(id)).status, { timeout: 90_000, intervals: [1_000, 2_000, 3_000] })
       .toBe("SUPERSEDED");
-    const listed = await api<CaseRow[]>(proc.session, "GET", procApi("/cases?limit=100"));
-    const live = (Array.isArray(listed.body) ? listed.body : [])
-      .filter((c) => c.invoice_number === SETS.watched.invoice && c.status !== "SUPERSEDED");
-    expect(live).toHaveLength(1);
+    await expect.poll(async () => (await liveCases()).length, { timeout: 30_000 }).toBe(1);
+    const live = await liveCases();
     expect(live[0]?.id).not.toBe(id);
 
     // The old case, opened again, is plainly history: no decision is offered, and the server would refuse one.
     await page.goto(proc.ws(`procurement/${id}`));
-    await expect(page.getByText("This case was replaced by a re-score")).toBeVisible();
+    await expect(page.getByText("This case was replaced by a newer score")).toBeVisible();
     for (const name of ["Approve match", "Flag dispute", "Re-score"]) {
       await expect(page.getByRole("button", { name })).toBeDisabled();
     }
