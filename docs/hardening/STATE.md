@@ -29,7 +29,12 @@ Local stack: Postgres 16 + pgvector 0.8.0 (built from source) on :5433, Redis, A
   - [x] 3. `docs/billing/DODO-LOCAL-TEST.md`, linked from DODO.md §6, RUNBOOK §9, the owner launch checklist (step 9)
 - [ ] Finish: full browser suite, `pytest -q`, `campaign_slices.py --check all` 0, one Alembic head, records (FINDINGS, COVERAGE.csv, STATE, HANDOFF "Session C → next sessions" incl. exactly what Session D must run, NEEDS-OWNER), CI green, PR description for a non-engineer, mark ready, stop.
 
-**Next action:** the full browser suite and the full `pytest -q` are running; records are written (FINDINGS, NEEDS-OWNER, COVERAGE.csv, HANDOFF). Then: commit, push, mark PR #28 ready, check CI, stop.
+**Final verification (Session C, 2026-10-18).**
+- Full browser suite, 966 tests, local: 958 passed, 2 skipped (as before), 5 failed while the full backend suite ran on the same machine (specs 17, 60, 64, 68, 85: the worker was too busy to finish a document or the page in time). Re-run alone on an idle machine, twice each: 24 of 24 passed. None of them is a Session C spec.
+- Full backend suite: CI's four shards pass. Locally, `test_free_trial.py::test_after_the_trial_queued_engine_work_is_skipped` (3 cases) and two tests in `test_helm_snapshot_consistency_live.py` fail in this sandbox, and fail identically on `main` at `9d0fa4e` (before this session), so they are a property of this machine, not of the branch; unverified locally, green in CI.
+- `campaign_slices.py --check all` exits 0; one Alembic head (`h1a5_helm_ledger_incremental`); encoding check clean; frontend typecheck and e2e typecheck clean.
+
+**Next action:** none for Session C once CI is green and PR #28 is marked ready. Session D: see HANDOFF "Session C → next sessions".
 
 ## Previous phase — Session B: finish the rename, fix the carried-over defects, make the ledger fast
 Branch `claude/new-session-zo5d98` (the session's assigned branch), based on `main` at `682c9d5` (PR #26
