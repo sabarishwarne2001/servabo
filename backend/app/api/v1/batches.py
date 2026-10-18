@@ -100,6 +100,16 @@ def _batch_or_404(db: Session, workspace_id: uuid.UUID, batch_id: uuid.UUID) -> 
     return batch
 
 
+def _active_or_409(batch: ProcessingBatch) -> None:
+    """An archived batch is kept for reference: it is read, restored or deleted, not acted on."""
+    if batch.status == "ARCHIVED":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "BATCH_ARCHIVED",
+                    "message": "This batch is archived. Restore it to make changes."},
+        )
+
+
 def _package_or_404(db: Session, workspace_id: uuid.UUID, package_id: uuid.UUID) -> ExportPackage:
     package = db.execute(
         select(ExportPackage).where(ExportPackage.id == package_id, ExportPackage.workspace_id == workspace_id)
@@ -257,6 +267,8 @@ def update_batch(
     _ws(context, workspace_id)
     _gate(db, context, "batches.update")
     batch = _batch_or_404(db, workspace_id, batch_id)
+    if payload.status != "ACTIVE" and (payload.name is not None or payload.description is not None):
+        _active_or_409(batch)  # an archived batch can be restored (with a new name), not renamed in place
     changed: dict[str, Any] = {}
     if payload.name is not None:
         name = " ".join(payload.name.split())
@@ -308,6 +320,7 @@ def add_batch_documents(
     _ws(context, workspace_id)
     _gate(db, context, "batches.add_documents")
     batch = _batch_or_404(db, workspace_id, batch_id)
+    _active_or_409(batch)
     try:
         added = service.add_documents(db, batch=batch, work_item_ids=payload.work_item_ids)
     except BatchError as exc:
@@ -334,6 +347,7 @@ def remove_batch_document(
     _ws(context, workspace_id)
     _gate(db, context, "batches.remove_document")
     batch = _batch_or_404(db, workspace_id, batch_id)
+    _active_or_409(batch)
     if not service.remove_document(db, batch=batch, work_item_id=work_item_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="That document is not in this batch.")
     _audit(db, context, resource_type=AuditResourceType.PROCESSING_BATCH, resource_id=batch.id,
@@ -366,6 +380,7 @@ def heal_batch(
     _ws(context, workspace_id)
     _gate(db, context, "batches.heal")
     batch = _batch_or_404(db, workspace_id, batch_id)
+    _active_or_409(batch)
     result = service.heal(db, batch=batch, user_id=context.user_id, work_item_ids=payload.work_item_ids or None)
     _audit(db, context, resource_type=AuditResourceType.PROCESSING_BATCH, resource_id=batch.id,
            action=AuditAction.UPDATED,
@@ -384,6 +399,7 @@ def dispatch_batch(
     _ws(context, workspace_id)
     _gate(db, context, "batches.dispatch")
     batch = _batch_or_404(db, workspace_id, batch_id)
+    _active_or_409(batch)
     result = service.dispatch(db, batch=batch, user_id=context.user_id)
     _audit(db, context, resource_type=AuditResourceType.PROCESSING_BATCH, resource_id=batch.id,
            action=AuditAction.UPDATED, details={"operation": "dispatch", **{k: val for k, val in result.items()
@@ -402,6 +418,7 @@ def retry_failed(
     _ws(context, workspace_id)
     _gate(db, context, "batches.retry_failed")
     batch = _batch_or_404(db, workspace_id, batch_id)
+    _active_or_409(batch)
     result = service.retry_failed(db, batch=batch)
     _audit(db, context, resource_type=AuditResourceType.PROCESSING_BATCH, resource_id=batch.id,
            action=AuditAction.UPDATED, details={"operation": "retry_failed", "requeued": result["requeued"]})
