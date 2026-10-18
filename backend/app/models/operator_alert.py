@@ -28,6 +28,8 @@ OPERATOR_ALERT_KINDS: tuple[str, ...] = (
     # Website and payments session (C5): a chargeback, and a payment the bank reversed.
     "PAYMENT_DISPUTED",
     "PAYMENT_REVERSED",
+    # Session B: the nightly check found stored Helm promises a full recomputation does not produce.
+    "HELM_LEDGER_DRIFT",
 )
 
 

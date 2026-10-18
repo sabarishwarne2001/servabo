@@ -274,7 +274,7 @@ def dispatch_in_session(
     from app.services.helm import hooks as helm_hooks
 
     helm_hooks.document_changed(db, workspace_id=workspace_id, organization_id=organization_id,
-                                reason="document processed")
+                                reason="document processed", work_item_ids=[work_item_id])
 
     return {"dispatched": True, "role": role.as_details(), "enqueued": enqueued, "stale_comparisons": stale}
 
