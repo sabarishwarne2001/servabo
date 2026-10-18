@@ -86,6 +86,16 @@ DOCUMENTS: dict[tuple[str, str], list[str]] = {
         "Date of expiry: 14/03/2033",
         "P<INDRAMAN<<PRIYA<<<<<<<<<<<<<<<<<<<<<<<<<<<<",
     ],
+    # A real PAN card carries "Permanent Account Number" and the department that issues it, but not the
+    # words of an Aadhaar card (F-400: the pack's three phrases once matched only one of them).
+    ("india_id_card", "pan"): [
+        "INCOME TAX DEPARTMENT",
+        "GOVT. OF INDIA",
+        "Permanent Account Number Card",
+        "ABCDE1234F",
+        "PRIYA RAMAN   14/03/1990",
+        "Signature",
+    ],
     ("india_id_card", "aadhaar"): [
         "Unique Identification Authority of India",
         "Government of India",

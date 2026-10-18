@@ -53,6 +53,11 @@ def platform_presets(engines: Engines) -> None:
             "label": preset["label"], "description": preset["description"], "schema": json.dumps(preset["schema"]),
             "assertions": json.dumps(preset["assertions"]), "hints": json.dumps(preset["classifier_hints"]),
             "redaction_profile": preset["redaction_profile"]})
+    # Data migrations after the first seed (b1a1: the PAN card phrase).
+    later = importlib.util.spec_from_file_location("b1a1_pan_card_phrase", path.with_name("b1a1_pan_card_phrase.py"))
+    pan = importlib.util.module_from_spec(later)
+    later.loader.exec_module(pan)
+    pan.add_hints(engines.db.connection())
     engines.db.commit()
 
 

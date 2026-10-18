@@ -58,6 +58,11 @@ def _catalogue() -> list[dict[str, Any]]:
     arch38_step1 seeds them and arch42_step1 adds the entity annotations to their fields."""
     packs = [copy.deepcopy(dict(p)) for p in _migration("arch38_step1_batches").PLATFORM_PRESETS]
     annotations = json.loads(_migration("arch42_step1_entity_graph").PRESET_ANNOTATIONS_JSON)
+    # b1a1_pan_card_phrase adds a recognising phrase to the Aadhaar / PAN card pack.
+    for pack in packs:
+        pack["classifier_hints"] = [*pack["classifier_hints"], *(
+            h for h in _migration("b1a1_pan_card_phrase").ADDED_HINTS.get(pack["document_type"], ())
+            if h not in pack["classifier_hints"])]
     for pack in packs:
         entry = annotations.get(pack["document_type"])
         if not entry:
