@@ -2,9 +2,41 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-17 (Helm visual session)_
+_Last updated: 2026-10-18 (Session B)_
 
-## Current phase — Helm visual session: Night Bridge, the switch, Lumen and the website's Helm page
+## Current phase — Session B: finish the rename, fix the carried-over defects, make the ledger fast
+Branch `claude/new-session-zo5d98` (the session's assigned branch), based on `main` at `682c9d5` (PR #26
+merged). Draft PR opened at the start. Founder authority: decisions are built and recorded in
+NEEDS-OWNER.md as `DECIDED (Session B)` (next free number N-118); new findings start at F-469.
+**If cut off, paste the prompt again: continue on this branch and PR from the first unticked box. Never
+restart.**
+
+- [ ] 0. Start-up: docs read; Postgres 16 + pgvector on :5433 (e2e) and :5434 (backend tests), Redis,
+  API, worker, model stand-in (`E2E_LLM=1`); this plan; draft PR.
+- [ ] B1. The old name, gone for good
+  - [ ] B1a. Remove the aliases: `legacy_names.py`, `fp_` key prefixes, `LOOP_ALIASES`, `ROLE_ALIASES`,
+    the `Use-PreRenameDockerData` shims, the `deploy/bin` fallbacks, `.gitignore` lines.
+  - [ ] B1b. README "Local data from before the rename" (two lines), clone URL, repository URL elsewhere,
+    "Servabo … renamed … Servabo" comment damage, `.env.production.template` section 2.
+  - [ ] B1c. Compose binds Postgres, Redis, MinIO and its console to `127.0.0.1` (test reads the file).
+  - [ ] B1d. Guard test tightened; CHANGELOG line (operators must use `SERVABO_*`).
+- [ ] B2. The carried-over defects (each with its failing test first)
+  - [ ] Task 1 batch operations (6 items)
+  - [ ] Task 1 TruthMesh (6 items)
+  - [ ] Task 1 document packs (4 items, F-400 migration)
+  - [ ] Task 2 the N-077 rules
+  - [ ] Task 3 the session-3 leftovers
+  - [ ] Task 4b the first-run tier-ordering oddity
+  - [ ] NEXT-SESSION-PROMPT.md top line
+- [ ] B3. Helm's ledger truly incremental (failing budget test, incremental path, equivalence property
+  test, nightly check that repairs and alerts, PERFORMANCE.md and ARCHITECTURE §13)
+- [ ] B4. Decisions recorded (Dodo hard limits, Tailwind 4 deferred, N-074 deferred, aliases removed)
+- [ ] B5. Task 5 deferred (recorded in NEEDS-OWNER) and Task 4 handed to Session C
+- [ ] Finish: full backend suite, full browser suite, `campaign_slices.py --check all`, one Alembic head
+  (up/down/up), records (FINDINGS, COVERAGE, STATE, HANDOFF "Session B → next sessions", NEEDS-OWNER,
+  CHANGELOG, README), CI green, PR description for a non-engineer, mark ready.
+
+## Previous phase — Helm visual session: Night Bridge, the switch, Lumen and the website's Helm page
 Branch `claude/beautiful-dijkstra-yvlspo` (the session's assigned branch), based on `main` at `5e4366d`
 (PR #25 merged). PR sabarishwarne2001/servabo#26. Founder authority on design: decisions in NEEDS-OWNER.md as
 `DECIDED (Helm visual session)` (N-111 to N-116). The owner also asked for Documents to be upgraded in
