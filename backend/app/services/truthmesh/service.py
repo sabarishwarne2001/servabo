@@ -659,6 +659,7 @@ def overview(db: Session, workspace_id: uuid.UUID) -> dict[str, Any]:
             "build_ms": current.build_ms if current else None,
             "engine_version": current.engine_version if current else None,
             "error": current.error if current else None,
+            "since": current.updated_at if current else None,
         },
         "documents": len(nodes),
         "links": len(links),
