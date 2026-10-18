@@ -13,6 +13,55 @@ import { LaneChip } from "@/components/batches/shared";
 
 const toPercent = (value: number): number => Math.round(value * 100);
 
+const ThresholdRow: React.FC<{
+  readonly lane: "STRAIGHT_THROUGH" | "EXCEPTION";
+  readonly relation: string;
+  readonly value: number;
+  readonly min: number;
+  readonly ariaLabel: string;
+  readonly accent: string;
+  readonly disabled: boolean;
+  readonly onChange: (next: number) => void;
+}> = ({ lane, relation, value, min, ariaLabel, accent, disabled, onChange }) => (
+  <label className="block space-y-2">
+    <span className="flex items-center justify-between gap-3">
+      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        <LaneChip lane={lane} />
+        <span className="text-xs font-medium text-muted-foreground">{relation}</span>
+      </span>
+      <span className="fp-num shrink-0 rounded-md border border-border bg-muted/50 px-2 py-0.5 text-sm font-semibold tabular-nums">
+        {value}%
+      </span>
+    </span>
+    <input
+      type="range" min={min} max={100} step={1} value={value} disabled={disabled}
+      onChange={(e) => onChange(Number(e.target.value))}
+      aria-label={ariaLabel}
+      className={`block w-full min-w-0 ${accent} disabled:opacity-60`}
+    />
+  </label>
+);
+
+/** The three lanes drawn to scale on one bar, with the middle (review) range spelled out. */
+const LaneScale: React.FC<{ readonly floor: number; readonly straight: number }> = ({ floor, straight }) => {
+  const low = Math.min(floor, straight);
+  const high = Math.max(floor, straight);
+  return (
+    <div className="space-y-1.5" data-testid="dispatch-lane-scale">
+      <div aria-hidden className="flex h-2 overflow-hidden rounded-full bg-muted">
+        <span className="bg-destructive/70" style={{ width: `${low}%` }} />
+        <span className="bg-amber-500/70" style={{ width: `${high - low}%` }} />
+        <span className="flex-1 bg-emerald-500/70" />
+      </div>
+      <p className="text-xs leading-snug text-muted-foreground">
+        {low === high
+          ? "No documents fall in the review lane."
+          : `Scores from ${low}% to just under ${high}% go to human review.`}
+      </p>
+    </div>
+  );
+};
+
 export const DispatchPolicyCard: React.FC<{ readonly workspaceId: string; readonly canEdit: boolean }> = ({
   workspaceId,
   canEdit,
@@ -74,52 +123,56 @@ export const DispatchPolicyCard: React.FC<{ readonly workspaceId: string; readon
         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Loading" />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="space-y-1.5">
-              <span className="flex items-center justify-between text-xs font-medium">
-                <span className="flex items-center gap-1.5"><LaneChip lane="STRAIGHT_THROUGH" /> from</span>
-                <span className="fp-num text-sm font-semibold">{straight}%</span>
-              </span>
-              <input
-                type="range" min={50} max={100} step={1} value={straight} disabled={!canEdit}
-                onChange={(e) => setStraight(Number(e.target.value))}
-                aria-label="Straight-through threshold (percent)"
-                className="w-full accent-emerald-600 disabled:opacity-60"
-              />
-            </label>
-            <label className="space-y-1.5">
-              <span className="flex items-center justify-between text-xs font-medium">
-                <span className="flex items-center gap-1.5"><LaneChip lane="EXCEPTION" /> below</span>
-                <span className="fp-num text-sm font-semibold">{floor}%</span>
-              </span>
-              <input
-                type="range" min={0} max={100} step={1} value={floor} disabled={!canEdit}
-                onChange={(e) => setFloor(Number(e.target.value))}
-                aria-label="Exception floor (percent)"
-                className="w-full accent-red-600 disabled:opacity-60"
-              />
-            </label>
+          {/*
+           * The card sits in a narrow column beside the batch list, so its width follows the page's
+           * column and not the viewport. Each threshold therefore gets its own full-width row (never a
+           * viewport-breakpoint grid): the lane chip and its "from" / "below" wording on the left, the
+           * value on the right, the track underneath. Nothing shares a line with another control, and
+           * the label side wraps instead of running into the value.
+           */}
+          <div className="space-y-5">
+            <ThresholdRow
+              lane="STRAIGHT_THROUGH"
+              relation="from"
+              value={straight}
+              min={50}
+              ariaLabel="Straight-through threshold (percent)"
+              accent="accent-emerald-600"
+              disabled={!canEdit}
+              onChange={setStraight}
+            />
+            <ThresholdRow
+              lane="EXCEPTION"
+              relation="below"
+              value={floor}
+              min={0}
+              ariaLabel="Exception floor (percent)"
+              accent="accent-red-600"
+              disabled={!canEdit}
+              onChange={setFloor}
+            />
+            <LaneScale floor={floor} straight={straight} />
           </div>
           {invalid ? (
             <p role="alert" className="text-xs text-destructive">The exception floor cannot be above the straight-through threshold.</p>
           ) : null}
           <div className="space-y-2 text-sm">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" className="h-4 w-4 accent-primary" checked={requireFields} disabled={!canEdit}
+            <label className="flex items-start gap-2.5">
+              <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-primary" checked={requireFields} disabled={!canEdit}
                      onChange={(e) => setRequireFields(e.target.checked)} />
               A missing required field holds the document for review
             </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" className="h-4 w-4 accent-primary" checked={tag} disabled={!canEdit}
+            <label className="flex items-start gap-2.5">
+              <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-primary" checked={tag} disabled={!canEdit}
                      onChange={(e) => setTag(e.target.checked)} />
               Tag dispatched documents (dispatch-straight-through, dispatch-review, dispatch-exception)
             </label>
-            <p className="pl-6 text-xs text-muted-foreground" data-testid="tag-documents-note">
+            <p className="pl-[1.625rem] text-xs text-muted-foreground" data-testid="tag-documents-note">
               Switching this off stops new tags; the tags already written stay on their documents.
             </p>
           </div>
           {canEdit ? (
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
               {policy.data?.is_default ? <span className="text-xs text-muted-foreground">Using the defaults</span> : null}
               <button
                 type="button"
