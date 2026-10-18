@@ -237,3 +237,40 @@ Caddy (`backend/docker-compose.prod.yml`). They are not server errors.
 
 **Sizing note:** one API process served 30 requests a second at these latencies; production runs
 four (`--workers=4`) on COSTS.md's server (4 vCPU, 16 GB). Re-run this before a large customer onboards, against the real server.
+
+## Helm's Promise ledger after one document changes (Session B, 2026-10-18; F-498)
+
+- **Question:** the ledger update that follows a document change recomputed the whole workspace and took
+  2.9 s at 10,000 documents (the budget is 1 s). Can it cost what the change costs?
+- **Run (2026-10-18):** the sandbox (4-core container, Postgres 16, one run at a time, nothing else
+  running), `HELM_PERF_DOCUMENTS=10000 pytest tests/performance/test_helm_budgets.py -q -s`. One workspace
+  with a distributor's year (about 6,200 invoices, orders, receipts, credit notes, 13 bank statements, 40
+  supplier statements), the ledger built, then one invoice created and marked changed
+  (`hooks.document_changed`), then the job the worker runs for it (`handle_ledger_build`) timed from the
+  call to its return, so it includes opening the session, finding the books, the ledger update, the value
+  sweep and the re-plan request.
+- **Before (the same test, the whole workspace recomputed):** **4.07 s** through the job (2.76 s for the
+  ledger update alone). Over budget; the test failed.
+- **After:**
+
+  | | 1,000 documents | 10,000 documents |
+  |---|---|---|
+  | Update after one document changes (budget 1 s) | 0.29 to 0.33 s | **0.69 to 0.72 s** (three runs) |
+  | The first update after a worker starts (reads the bank statements; budget 2 s) | 0.27 to 0.31 s | 1.40 to 1.59 s |
+  | First full build of a workspace | 2.2 to 2.5 s | 23.3 to 23.7 s |
+
+  About half of the 0.7 s is the ledger update itself; the rest is the value sweep (it reads every payable
+  promise of the book) and the job's own sessions.
+- **Why it is that fast, and what it costs:** only the changed document, what its promises were fulfilled
+  by, the documents of its procurement cases, and the invoices that can take the same bank line are
+  re-projected (`docs/helm/ARCHITECTURE.md` §4.5). The bank statements' lines are the one thing read every
+  time; a long statement is kept in the worker's memory after its first read (24 statements), so the first
+  update in a fresh worker costs about 0.8 s more.
+- **It is the same answer as a full rebuild.** `tests/services/helm/test_ledger_incremental_equivalence.py`
+  compares them row for row after every change of 300 random runs of 40 changes (and four people changing
+  at once); the nightly job compares them again on real data and alerts the operator on a difference.
+- **What is still full:** the first update on a new day (statuses depend on today), a change of who we are
+  or of the workspace's date format or currency, a first build, and more than 200 documents changed at once
+  (a bulk import). The nightly rebuild is a full one by design (23 s at 10,000 documents, in the worker,
+  at 02:40 UTC).
+- **Decision:** N-122.

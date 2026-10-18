@@ -5,7 +5,8 @@ suppliers (most paid through the monthly bank statements, the rest open), purcha
 receipts, credit notes, twelve bank statements and one statement of account per supplier. Then each
 of Helm's steps is timed on real Postgres and held to its budget:
 
-  ledger rebuild (the job a document change runs)   <= 1 s per changed document, measured on one change
+  ledger update (the job a document change runs)    <= 1 s per changed document, measured on one change
+                                                     (the first after a worker starts: <= 2 s)
   snapshot (every input the plan reads)              recorded
   plan for the open payables over 30 days            <= 10 s for 1,000 open payables
   a what-if (snapshot and two compositions)          <= 10 s for 1,000 open payables (a person waits)
@@ -181,6 +182,18 @@ def test_helm_meets_its_budget_at_scale(db_session, tenant, test_sessions, capsy
     db_session.commit()
     result = _timed("ledger_incremental", lambda: handle_ledger_build({"workspace_id": str(ws.id)}))
     assert result["inserted"] == 1 and result["deleted"] == 0, result
+    # The first update after a worker starts reads the long bank statements again (they are kept in the
+    # process afterwards); recorded, and held to twice the budget.
+    from app.services.helm import ledger
+
+    again = factories.invoice(db_session, workspace=ws, organization_id=org, number="LATE-2", supplier=_supplier(2),
+                              amount=13_000, on=today - timedelta(days=3))
+    helm_hooks.document_changed(db_session, workspace_id=ws.id, organization_id=org, reason="document processed",
+                                work_item_ids=[again.id])
+    db_session.commit()
+    ledger._lines_cache.clear()
+    cold = _timed("ledger_incremental_cold", lambda: handle_ledger_build({"workspace_id": str(ws.id)}))
+    assert cold["inserted"] == 1 and cold["mode"] == "incremental", cold
     db_session.expire_all()
 
     from app.services.helm.mandates import registry
@@ -246,6 +259,7 @@ def test_helm_meets_its_budget_at_scale(db_session, tenant, test_sessions, capsy
     # The ledger update after one document changes: one second, raw at 10,000 documents (the brief's
     # budget; the multiplier is for the shared CI machine's smaller run).
     assert MEASURED["ledger_incremental"] <= (1.0 if DOCUMENTS >= 10_000 else 1.0 * MULTIPLIER), MEASURED
+    assert MEASURED["ledger_incremental_cold"] <= (2.0 if DOCUMENTS >= 10_000 else 2.0 * MULTIPLIER), MEASURED
     assert MEASURED["plan"] <= 10.0 * MULTIPLIER * scale, MEASURED
     assert MEASURED["what_if"] <= 10.0 * MULTIPLIER * scale, MEASURED
     assert MEASURED["simulation_1000_futures"] <= 3.0 * MULTIPLIER, MEASURED
