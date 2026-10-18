@@ -178,6 +178,17 @@ def _purge_work_items(
                     text("UPDATE uploaded_files SET deleted_at = now() WHERE id = ANY(:ids)"),
                     {"ids": [row.id for row in files]},
                 )
+            # TruthMesh: the purged documents leave the mesh and their conflicts are resolved in the
+            # same transaction (conflicts name documents by id; no foreign key does it).
+            from app.services.truthmesh import service as truthmesh_service
+
+            by_workspace: dict = {}
+            for item_id, workspace_id in db.execute(
+                text("SELECT id, workspace_id FROM work_items WHERE id = ANY(:ids)"), {"ids": ids}
+            ).fetchall():
+                by_workspace.setdefault(workspace_id, []).append(item_id)
+            for workspace_id, workspace_ids in by_workspace.items():
+                truthmesh_service.forget_documents(db, workspace_id=workspace_id, work_item_ids=workspace_ids)
             db.execute(
                 text("DELETE FROM document_chunks WHERE work_item_id = ANY(:ids)"),
                 {"ids": ids},

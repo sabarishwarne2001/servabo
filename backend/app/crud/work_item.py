@@ -351,6 +351,11 @@ def delete_work_item(db: Session, *, db_obj: WorkItem) -> None:
     # Flagship session: the deleted document's promises go with it (foreign keys); the rest of the
     # workspace's ledger (statement matches, credits) is rebuilt.
     helm_hooks.document_changed(db, workspace_id=db_obj.workspace_id, reason="document deleted")
+    # TruthMesh: the document leaves the mesh and the conflicts that name it are resolved now, not at the
+    # next rebuild (its conflicts name it by id, so no foreign key does this).
+    from app.services.truthmesh import service as truthmesh_service
+
+    truthmesh_service.forget_documents(db, workspace_id=db_obj.workspace_id, work_item_ids=[db_obj.id])
 
     keys: list[str] = []
     uploaded = (

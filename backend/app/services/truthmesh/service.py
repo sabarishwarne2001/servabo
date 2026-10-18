@@ -146,6 +146,50 @@ def _remove_missing(db: Session, workspace_id: uuid.UUID, keep: set[uuid.UUID]) 
     db.flush()
 
 
+def forget_documents(db: Session, *, workspace_id: uuid.UUID, work_item_ids: Iterable[uuid.UUID]) -> int:
+    """Take deleted documents out of the mesh now: their nodes and links go, the conflicts that name
+    them are resolved ("a document in it was deleted"), and their neighbours' risk is recomputed.
+
+    Conflicts name their documents by id (no foreign key), so before this a deleted document's
+    conflicts stayed OPEN, and in "money at risk", until somebody pressed Rebuild. Call it in the
+    transaction that deletes (or erases) the documents. Returns the conflicts it resolved.
+    """
+    ids = list(dict.fromkeys(work_item_ids))
+    if not ids:
+        return 0
+    in_mesh = db.execute(select(func.count()).select_from(MeshNode).where(
+        MeshNode.workspace_id == workspace_id, MeshNode.work_item_id.in_(ids))).scalar_one()
+    named = db.execute(select(func.count()).select_from(MeshConflict).where(
+        MeshConflict.workspace_id == workspace_id, MeshConflict.work_item_ids.overlap(ids),
+        MeshConflict.status.in_(OPEN))).scalar_one()
+    if not in_mesh and not named:
+        return 0  # not in the mesh (the plan does not carry it, or it was never indexed)
+    lock_workspace(db, workspace_id)
+    gone = set(ids)
+    neighbours = loader.neighbourhood(db, workspace_id, gone, hops=1) - gone
+    now = _now()
+    resolved = 0
+    for conflict in db.execute(select(MeshConflict).where(
+            MeshConflict.workspace_id == workspace_id, MeshConflict.work_item_ids.overlap(ids),
+            MeshConflict.status.in_(OPEN))).scalars():
+        conflict.status, conflict.auto_resolved, conflict.resolved_at = "RESOLVED", True, now
+        conflict.resolution_note = "A document in this conflict was deleted."
+        conflict.updated_at = now
+        resolved += 1
+    db.execute(delete(MeshLink).where(
+        MeshLink.workspace_id == workspace_id,
+        MeshLink.source_work_item_id.in_(ids) | MeshLink.target_work_item_id.in_(ids)))
+    db.execute(delete(MeshNode).where(MeshNode.workspace_id == workspace_id, MeshNode.work_item_id.in_(ids)))
+    db.flush()
+    _refresh_risk(db, workspace_id, neighbours)
+    current = db.get(MeshState, workspace_id)
+    if current is not None:
+        _refresh_state(db, workspace_id=workspace_id, organization_id=current.organization_id, ms=None,
+                       status=current.status if current.status in ("BUILDING", "FAILED") else "READY",
+                       error=current.error)
+    return resolved
+
+
 # --------------------------------------------------------------------------- links
 
 def _store_links(db: Session, *, organization_id: uuid.UUID, workspace_id: uuid.UUID, drafts: Sequence[L.LinkDraft],
@@ -707,5 +751,5 @@ def export_csv(db: Session, workspace_id: uuid.UUID) -> str:
 
 
 __all__ = ["BuildResult", "MeshError", "build_workspace", "conflict_out", "decide_conflict", "decide_link",
-           "document", "export_csv", "graph", "index_document", "lock_workspace", "mark_building", "matrix",
-           "overview", "simulate", "state"]
+           "document", "export_csv", "forget_documents", "graph", "index_document", "lock_workspace",
+           "mark_building", "matrix", "overview", "simulate", "state"]
