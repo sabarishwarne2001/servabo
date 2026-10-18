@@ -225,7 +225,8 @@ def _purge_conversations(
                 SELECT count(*)
                 FROM conversations c
                 JOIN workspaces w ON w.id = c.workspace_id
-                WHERE w.organization_id = :org AND c.created_at < :cutoff
+                WHERE w.organization_id = :org
+                  AND COALESCE(c.last_message_at, c.created_at) < :cutoff
                 """
             ),
             {"org": organization_id, "cutoff": cutoff},
@@ -246,7 +247,8 @@ def _purge_conversations(
                         SELECT c.id
                         FROM conversations c
                         JOIN workspaces w ON w.id = c.workspace_id
-                        WHERE w.organization_id = :org AND c.created_at < :cutoff
+                        WHERE w.organization_id = :org
+                  AND COALESCE(c.last_message_at, c.created_at) < :cutoff
                         LIMIT :batch
                         """
                     ),

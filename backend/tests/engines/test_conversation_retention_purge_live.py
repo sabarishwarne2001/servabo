@@ -29,10 +29,14 @@ from tests.engines.conftest import Engines
 from tests.engines.test_assistant_stream_provider_errors_live import _ask, _three_chunks
 
 
-def _conversation_aged(engines: Engines, days: int) -> uuid.UUID:
+def _conversation_aged(engines: Engines, days: int, *, last_message_days: int | None = None) -> uuid.UUID:
+    """A real conversation that started `days` ago; its last message was `last_message_days` ago (by
+    default the same day it started: a conversation nobody has touched since)."""
     _, conversation_id = _ask(engines)
-    engines.db.execute(text("UPDATE conversations SET created_at = :at WHERE id = :id"),
-                       {"at": datetime.now(timezone.utc) - timedelta(days=days), "id": conversation_id})
+    ended = days if last_message_days is None else last_message_days
+    now = datetime.now(timezone.utc)
+    engines.db.execute(text("UPDATE conversations SET created_at = :at, last_message_at = :last WHERE id = :id"),
+                       {"at": now - timedelta(days=days), "last": now - timedelta(days=ended), "id": conversation_id})
     engines.db.commit()
     return conversation_id
 
@@ -83,3 +87,18 @@ def test_the_sweep_deletes_conversations_older_than_the_period(engines: Engines,
     assert _messages(engines, recent) >= 2
     assert engines.get(f"/assistant/conversations/{old}").status_code == 404
     assert engines.get(f"/assistant/conversations/{recent}").status_code == 200
+
+
+def test_a_conversation_still_in_use_is_kept_whenever_it_started(engines: Engines, monkeypatch) -> None:
+    """N-077: retention counts from the last message, not from the start. A conversation begun 45 days
+    ago and answered 10 days ago is in use; the nightly purge used to delete it."""
+    monkeypatch.setattr(llm_stream, "open_stream", _three_chunks)
+    in_use = _conversation_aged(engines, 45, last_message_days=10)
+    abandoned = _conversation_aged(engines, 60, last_message_days=45)
+
+    _set_retention(engines, days=30, auto_purge=True)
+    _nightly_sweep(monkeypatch)
+
+    assert _alive(engines) == {in_use}, "the sweep must keep what was answered within the period"
+    assert _messages(engines, in_use) >= 2
+    assert _messages(engines, abandoned) == 0
