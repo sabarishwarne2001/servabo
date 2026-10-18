@@ -416,8 +416,10 @@ def decide_conflict(db: Session, *, conflict: MeshConflict, status: str, note: O
     if status in ("RESOLVED", "DISMISSED"):
         conflict.resolved_at, conflict.resolved_by_user_id, conflict.resolution_note = now, actor_id, text[:2000]
     else:
+        # Reopening keeps the reason the conflict was resolved or dismissed with (a new note replaces it):
+        # the person who reopens it, and anyone after, can still read what was decided before.
         conflict.resolved_at, conflict.resolved_by_user_id = None, None
-        conflict.resolution_note = text[:2000] or None
+        conflict.resolution_note = text[:2000] or conflict.resolution_note
     conflict.updated_at = now
     db.flush()
     _refresh_risk(db, conflict.workspace_id, set(conflict.work_item_ids))

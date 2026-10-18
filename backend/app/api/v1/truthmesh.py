@@ -223,7 +223,8 @@ def decide_conflict(
         db.rollback()
         raise _error(exc) from exc
     _audit(db, context, resource_id=conflict.id, action=AuditAction.UPDATED,
-           details={"conflict": conflict.kind, "from": previous, "to": payload.status})
+           details={"conflict": conflict.kind, "from": previous, "to": payload.status,
+                    **({"note": payload.note.strip()[:2000]} if (payload.note or "").strip() else {})})
     db.commit()
     return service.conflict_out(conflict)
 
