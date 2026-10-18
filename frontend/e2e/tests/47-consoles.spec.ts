@@ -70,6 +70,65 @@ test.describe("Unit economics (F-313)", () => {
   });
 });
 
+test.describe("Unit economics wording (Session B)", () => {
+  test.use({ user: "P.superadmin" });
+
+  const summary = (over: Record<string, unknown>) => JSON.stringify({
+    period_start: "2026-09-12T00:00:00Z", period_end: "2026-10-12T00:00:00Z", currency: "USD", organization_count: 0,
+    figures: {
+      revenue_micros: 0, attributed_revenue_micros: 0, cost_basis_micros: 0, unknown_cost_revenue_micros: 0,
+      gross_margin_micros: null, gross_margin_ratio: null, unknown_cost_share: null, soft_cost_share: null,
+      event_count: 0, known_cost_event_count: 0, unknown_cost_event_count: 0, is_trustworthy: false,
+      zero_byok_revenue_micros: 0, zero_byok_event_count: 0, zero_byok_share: null, ...over,
+    },
+  });
+
+  // "Suppressed — too little cost is known" was printed for a period with no usage at all, the same
+  // words as a real suppression: a quiet month read as a data problem.
+  test("a period with no usage says so; a suppressed margin still says why", async ({ page }) => {
+    await page.route(/\/admin\/cogs\/margins\/summary(\?|$)/, (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: summary({}) }));
+    await page.goto("/admin/margins");
+    await expect(page.getByText("No usage in this period", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(/Suppressed — too little cost is known/)).toHaveCount(0);
+
+    await page.unroute(/\/admin\/cogs\/margins\/summary(\?|$)/);
+    await page.route(/\/admin\/cogs\/margins\/summary(\?|$)/, (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: summary({
+        revenue_micros: 5_000_000, event_count: 20, unknown_cost_event_count: 20, unknown_cost_revenue_micros: 5_000_000,
+        unknown_cost_share: 1, is_trustworthy: false }) }));
+    await page.reload();
+    await expect(page.getByText(/Suppressed — too little cost is known/)).toBeVisible();
+    await expect(page.getByText("No usage in this period", { exact: true })).toHaveCount(0);
+  });
+});
+
+test.describe("RevOps promo redemptions (Session B)", () => {
+  test.use({ user: "P.superadmin" });
+
+  // The API listed each use of a promo code (F-372); the console showed only a count.
+  test("a promo code's redemptions can be opened from its row", async ({ page, session }) => {
+    const code = `RDM${Date.now().toString(36).toUpperCase()}`.slice(0, 12);
+    const made = await api(session, "POST", "/admin/revops/promo-codes", { code, percent_off: 10, duration: "ONCE" });
+    expect(made.status, made.text).toBeLessThan(300);
+    await page.route(/\/admin\/revops\/promo-codes\/[0-9a-f-]+\/redemptions(\?|$)/, (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{
+        id: "11111111-1111-4111-8111-111111111111", organization_id: "22222222-2222-4222-8222-222222222222",
+        organization_name: "Redeeming Ltd", organization_slug: "redeeming-ltd", status: "CONFIRMED",
+        tier_key: "business", billing_interval: "MONTH", currency: "USD", list_amount_micros: 99_000_000,
+        discount_micros: 9_900_000, contract_id: null, contract_number: null,
+        reserved_at: "2026-10-01T10:00:00Z", expires_at: "2026-10-02T10:00:00Z" }]) }));
+    await page.goto("/admin/revops?tab=promos");
+    const row = page.getByRole("row", { name: new RegExp(code) });
+    await row.getByRole("button", { name: "Redemptions" }).click();
+    const panel = page.getByTestId("promo-redemptions");
+    await expect(panel).toContainText("Redeeming Ltd");
+    await expect(panel).toContainText("business");
+    await expect(panel).toContainText("$9.90");
+    await expectHealthyPage(page);
+  });
+});
+
 test.describe("Unit economics refresh (F-316)", () => {
   test.use({ user: "P.superadmin" });
 

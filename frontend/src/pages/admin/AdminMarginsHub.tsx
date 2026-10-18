@@ -597,7 +597,9 @@ export const AdminMarginsHub: React.FC = () => {
               caption={
                 figures.is_trustworthy
                   ? formatRatio(figures.gross_margin_ratio)
-                  : "Suppressed — too little cost is known"
+                  : figures.event_count === 0
+                    ? "No usage in this period"
+                    : "Suppressed — too little cost is known"
               }
             />
             <Stat

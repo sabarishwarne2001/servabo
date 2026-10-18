@@ -90,6 +90,24 @@ export interface PromoCode {
   readonly redemptions: Record<string, number>;
 }
 
+/** One use of a promo code: who, for what plan, at what price and discount. */
+export interface PromoRedemption {
+  readonly id: string;
+  readonly organization_id: string;
+  readonly organization_name: string;
+  readonly organization_slug: string;
+  readonly status: string;
+  readonly tier_key: string;
+  readonly billing_interval: string;
+  readonly currency: string;
+  readonly list_amount_micros: number;
+  readonly discount_micros: number;
+  readonly contract_id: string | null;
+  readonly contract_number: string | null;
+  readonly reserved_at: string;
+  readonly expires_at: string;
+}
+
 export interface PromoCodeInput {
   readonly code: string;
   readonly description?: string | undefined;
