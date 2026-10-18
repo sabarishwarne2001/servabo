@@ -331,6 +331,8 @@ export const identityKeys = {
     [...identityKeys.all(organizationId), "domains"] as const,
   idpConfigs: (organizationId: string) =>
     [...identityKeys.all(organizationId), "idp-configs"] as const,
+  roleMappings: (organizationId: string, configId: string) =>
+    [...identityKeys.all(organizationId), "role-mappings", configId] as const,
   scimKeys: (organizationId: string) =>
     [...identityKeys.all(organizationId), "scim-keys"] as const,
   securityPolicy: (organizationId: string) =>

@@ -21,7 +21,7 @@ import { test, expect, expectHealthyPage } from "../support/fixtures";
 import { api, apiLogin, fetchOnce, type ApiSession } from "../support/api";
 import { signUpVerified, tokenOf } from "../support/accounts";
 import { API_BASE, PASSWORD, runId } from "../support/env";
-import { newCustomer, signInAs, standIn, type Customer } from "../support/journey";
+import { adoptSession, newCustomer, signInAs, standIn, type Customer } from "../support/journey";
 import { linkFrom, waitForMail } from "../support/mail";
 
 // ---------------------------------------------------------------------------------------------
@@ -331,6 +331,16 @@ interface Refusal {
 
 const refusalCode = (body: Refusal | string): string => JSON.stringify(body);
 
+/** A password sign-in as the sign-in page sends it, answered as it is (apiLogin throws on a refusal). */
+async function passwordSignIn(email: string, password = PASSWORD): Promise<{ status: number; text: string }> {
+  const response = await fetchOnce(`${API_BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ username: email, password }).toString(),
+  });
+  return { status: response.status, text: await response.text() };
+}
+
 test.describe("Single sign-on enforcement", () => {
   test.describe.configure({ mode: "serial" });
   test.setTimeout(300_000);
@@ -487,6 +497,14 @@ test.describe("Single sign-on enforcement", () => {
     // An admin may read the policy (the console's data); a plain member may not.
     expect((await api(await apiLogin(admin.email), "GET", `${base}/security-policy`)).status).toBe(200);
     expect((await api(await apiLogin(member.email), "GET", `${base}/security-policy`)).status).toBe(403);
+    // The saved mappings: an admin may read them, a member may not, and only the owner may remove one.
+    const mappingsPath = `${base}/idp-configs/${config!.id}/role-mappings`;
+    const readByAdmin = await api<Array<{ id: string }>>(await apiLogin(admin.email), "GET", mappingsPath);
+    expect(readByAdmin.status, readByAdmin.text.slice(0, 200)).toBe(200);
+    expect(readByAdmin.body.length, "the mapping the previous test saved is listed").toBeGreaterThan(0);
+    expect((await api(await apiLogin(member.email), "GET", mappingsPath)).status).toBe(403);
+    expect((await api(await apiLogin(admin.email), "DELETE", `${mappingsPath}/${readByAdmin.body[0]!.id}`)).status).toBe(403);
+    expect((await api<unknown[]>(owned, "GET", mappingsPath)).body, "an admin removed nothing").toHaveLength(readByAdmin.body.length);
     expect(await policy()).toMatchObject({ require_sso: false, sso_bypass_for_owners: true });
     const grabbed = await api<{ resolved_role: string }>(owned, "POST", `${base}/idp-configs/${config!.id}/dry-run`,
       { attributes: { groups: ["admin-grab", "member-grab"] } });
@@ -502,6 +520,10 @@ test.describe("Single sign-on enforcement", () => {
 
   test("the owner requires single sign-on; a member on a password is stopped and signs in through the provider", async ({ page, problems }) => {
     problems.allowHttp(/\/api\/v1\//, [403], "the organization requires single sign-on and this session is a password session");
+    // The member and the admin hold password sessions from before the requirement: those are what it stops.
+    // (A new password sign-in is refused at the door, below.)
+    const memberSession = await apiLogin(member.email);
+    const adminSession = await apiLogin(admin.email);
     // The owner turns it on, after being told that owners keep their password.
     const ownerPage = await page.context().newPage();
     await signInAs(ownerPage, owner.email);
@@ -517,15 +539,27 @@ test.describe("Single sign-on enforcement", () => {
     await ownerPage.close();
 
     // The server: a password session of a member or admin is refused with the SSO code; the owner's works.
-    const refusedMember = await intoOrganization(await apiLogin(member.email));
+    const refusedMember = await intoOrganization(memberSession);
     expect(refusedMember.status, refusedMember.text.slice(0, 200)).toBe(403);
     expect(refusalCode(refusedMember.body as Refusal), "the refusal names single sign-on").toContain("ORGANIZATION_SSO_REQUIRED");
-    const refusedAdmin = await intoOrganization(await apiLogin(admin.email));
+    const refusedAdmin = await intoOrganization(adminSession);
     expect(refusedAdmin.status, refusedAdmin.text.slice(0, 200)).toBe(403);
     expect((await intoOrganization(await apiLogin(owner.email))).status, "break-glass: the owner's password works").toBe(200);
 
+    // A NEW password sign-in is refused at the door, with its own code and in words, and opens no session.
+    for (const who of [member, admin]) {
+      const door = await passwordSignIn(who.email);
+      expect(door.status, door.text.slice(0, 200)).toBe(403);
+      expect(door.text).toContain("SSO_SIGN_IN_REQUIRED");
+      expect(door.text).toContain("single sign-on");
+      expect(door.text, "no session was opened").not.toContain("access_token");
+    }
+    const wrong = await passwordSignIn(member.email, "not-the-password-1A!");
+    expect(wrong.status, "a wrong password gets the plain refusal and learns nothing about SSO").toBe(401);
+    expect(wrong.text.toLowerCase()).not.toContain("single sign-on");
+
     // The browser: the member's password session meets one notice, with the way in.
-    await signInAs(page, member.email);
+    await adoptSession(page, memberSession);
     await standInProvider(page, domain, member.email, true);
     await page.goto(owner.ws());
     const notice = page.getByRole("dialog", { name: "Single sign-on required" });
@@ -571,17 +605,19 @@ test.describe("Single sign-on enforcement", () => {
     await requireSso(page).click();
     await expect(requireSso(page)).not.toBeChecked();
     await expect.poll(async () => (await policy()).require_sso).toBe(false);
-    expect((await intoOrganization(await apiLogin(member.email))).status, "passwords work again").toBe(200);
+    const memberSession = await apiLogin(member.email);
+    expect((await intoOrganization(memberSession)).status, "passwords work again").toBe(200);
     await page.reload();
     await expect(requireSso(page)).not.toBeChecked();
 
     await requireThroughTheCheckbox(page);
-    expect((await intoOrganization(await apiLogin(member.email))).status).toBe(403);
+    expect((await intoOrganization(memberSession)).status, "the session held from before is stopped again").toBe(403);
+    expect((await passwordSignIn(member.email)).status, "and a new password sign-in is refused").toBe(403);
   });
 
   test("turning the owners' bypass off is confirmed, and then stops the owner's password too", async ({ page, problems }) => {
     problems.allowHttp(/\/api\/v1\//, [403], "break-glass is off and this owner's session is a password session");
-    await signInAs(page, owner.email);
+    const ownerSession = await signInAs(page, owner.email);
     await page.goto(identity("security"));
     await expect(bypass(page)).toBeChecked();
 
@@ -602,7 +638,6 @@ test.describe("Single sign-on enforcement", () => {
 
     // The owner's password now meets the same wall as everyone's. Their address is not at the company's
     // domain, so the notice says plainly that no provider answers for it, instead of sending them nowhere.
-    const ownerSession = await apiLogin(owner.email);
     const stopped = await api<Refusal>(ownerSession, "GET", policyPath());
     expect(stopped.status, stopped.text.slice(0, 200)).toBe(403);
     expect(stopped.text).toContain("ORGANIZATION_SSO_REQUIRED");
@@ -611,6 +646,22 @@ test.describe("Single sign-on enforcement", () => {
     await expect(notice.getByRole("alert")).toContainText("No identity provider is connected for");
     await notice.getByRole("button", { name: "Choose another organization" }).click();
     await expect(page).toHaveURL(/\/workspaces/);
+  });
+
+  test("with break-glass off, the sign-in page refuses the owner's correct password in words and offers single sign-on", async ({ page, problems }) => {
+    problems.allowHttp(/\/auth\/login$/, [403], "the organization takes single sign-on only; a correct password is refused at sign-in");
+    // The previous test left the requirement on and break-glass off: the owner's password is stopped at the door.
+    expect((await passwordSignIn(owner.email)).status).toBe(403);
+    await page.goto("/login");
+    await page.getByRole("textbox", { name: "Email" }).fill(owner.email);
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+
+    await expect(page.getByRole("alert")).toContainText("requires single sign-on");
+    await expect(page, "no session was opened: the page stays on the sign-in screen").toHaveURL(/\/login/);
+    await page.getByRole("button", { name: "Sign in with single sign-on" }).click();
+    await expect(page.getByLabel("Work email")).toHaveValue(owner.email);
   });
 });
 
@@ -655,5 +706,34 @@ test.describe("Role mappings — more than one", () => {
     await page.getByRole("button", { name: "Save mapping" }).click();
     await expect.poll(() => dryRun(["fin-ops"]), { message: "the second mapping was saved" }).toBe("BILLING");
     expect(await dryRun(["servabo-admins"]), "the first mapping is still in force").toBe("ADMIN");
+
+    // Both are listed on the page, in the order they are tried, and after a reload.
+    const saved = page.getByTestId("saved-role-mappings");
+    await expect(saved.getByRole("listitem")).toHaveCount(2);
+    await expect(saved.getByRole("listitem").first()).toContainText("servabo-admins");
+    await expect(saved.getByRole("listitem").first()).toContainText("ADMIN");
+    await expect(saved.getByRole("listitem").nth(1)).toContainText("fin-");
+    await expect(saved.getByRole("listitem").nth(1)).toContainText("BILLING");
+    await page.reload();
+    await page.getByRole("button", { name: new RegExp(CONNECTION) }).click();
+    await expect(saved.getByRole("listitem")).toHaveCount(2);
+
+    // The owner removes the first. Cancel changes nothing; Remove mapping takes it out of force.
+    await saved.getByRole("button", { name: /^Remove mapping groups equals servabo-admins/ }).click();
+    const confirm = page.getByRole("alertdialog", { name: "Remove this role mapping?" });
+    await confirm.getByRole("button", { name: "Cancel" }).click();
+    await expect(confirm).toHaveCount(0);
+    await expect(saved.getByRole("listitem")).toHaveCount(2);
+    expect(await dryRun(["servabo-admins"]), "Cancel removed nothing").toBe("ADMIN");
+
+    await saved.getByRole("button", { name: /^Remove mapping groups equals servabo-admins/ }).click();
+    await confirm.getByRole("button", { name: "Remove mapping" }).click();
+    await expect(page.getByText("Role mapping removed.")).toBeVisible();
+    await expect(saved.getByRole("listitem")).toHaveCount(1);
+    await expect(saved).not.toContainText("servabo-admins");
+    expect(await dryRun(["servabo-admins"]), "the removed rule no longer decides the role").toBe("MEMBER");
+    expect(await dryRun(["fin-ops"]), "the other rule still does").toBe("BILLING");
+    const listedByServer = await api<Array<{ match_value: string }>>(session, "GET", `${base}/idp-configs/${created.body.id}/role-mappings`);
+    expect(listedByServer.body.map((row) => row.match_value)).toEqual(["fin-"]);
   });
 });
