@@ -201,3 +201,27 @@ def test_an_identity_provider_cannot_grant_owner(engines: Engines, published) ->
     response = engines.post(f"{ID}/idp-configs/{provider.config.id}/role-mappings", {
         "attribute_name": "groups", "match_value": "everyone", "organization_role": "OWNER"}, org=True)
     assert response.status_code == 422
+
+
+def test_several_role_mappings_can_be_saved_on_one_connection(engines: Engines, published) -> None:
+    """F-504: the console sends no priority; each mapping takes the next free place, after the earlier ones."""
+    engines.plan("enterprise")
+    provider = TestIdp.create()
+    provider.install(engines.db, engines.org)
+    url = f"{ID}/idp-configs/{provider.config.id}/role-mappings"
+    first = engines.post(url, {"attribute_name": "groups", "match_value": "admins", "organization_role": "ADMIN"}, org=True)
+    second = engines.post(url, {"attribute_name": "groups", "match_value": "finance", "organization_role": "BILLING"}, org=True)
+    assert (first.status_code, second.status_code) == (201, 201), (first.text, second.text)
+    assert second.json()["priority"] > first.json()["priority"]
+
+    # Both apply, the earlier one first.
+    both = engines.post(f"{ID}/idp-configs/{provider.config.id}/dry-run",
+                        {"attributes": {"groups": ["finance", "admins"]}}, org=True)
+    assert both.json()["resolved_role"] == "ADMIN"
+    only = engines.post(f"{ID}/idp-configs/{provider.config.id}/dry-run", {"attributes": {"groups": ["finance"]}}, org=True)
+    assert only.json()["resolved_role"] == "BILLING"
+
+    # A priority that is already taken is said plainly, not as a generic clash.
+    taken = engines.post(url, {"attribute_name": "groups", "match_value": "x", "organization_role": "MEMBER",
+                               "priority": first.json()["priority"]}, org=True)
+    assert taken.status_code == 409 and "priority" in str(taken.json()).lower(), taken.text

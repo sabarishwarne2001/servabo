@@ -584,7 +584,6 @@ const RoleMappingPanel: React.FC<{
         match_kind: matchKind,
         match_value: matchValue.trim(),
         organization_role: role,
-        priority: 100,
       }),
     onSuccess: () => toast.success("Role mapping saved. It applies from the next sign-in."),
     onError: (error) => toast.error(errorMessage(error, "The role mapping could not be saved.")),
