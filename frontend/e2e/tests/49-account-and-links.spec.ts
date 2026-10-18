@@ -184,16 +184,38 @@ test.describe("A document request answered without an account", () => {
   });
 });
 
-test.describe("The unavailable page", () => {
+test.describe("The unavailable page is the workspace picker (N-077)", () => {
   test.use({ user: "C.owner" });
 
-  test("says what is unavailable and leads back to the workspaces", async ({ page }) => {
-    await page.goto("/no-access?reason=workspace_archived");
-    await expect(page.getByRole("heading", { name: "This workspace is unavailable" })).toBeVisible();
-    await expect(page.locator("body")).toContainText("its documents are retained");
-    await page.goto("/no-access?reason=organization_suspended");
-    await expect(page.getByRole("heading", { name: "This organization is unavailable" })).toBeVisible();
-    await page.getByRole("link", { name: "Choose another workspace" }).click();
-    await expect(page).toHaveURL(/\/workspaces/);
+  test("/no-access leads to the workspace picker, with or without a reason", async ({ page }) => {
+    for (const reason of ["workspace_archived", "organization_suspended", "nonsense"]) {
+      await page.goto(`/no-access?reason=${reason}`);
+      await expect(page).toHaveURL(/\/workspaces$/);
+      await expect(page.getByRole("heading", { name: "Choose a workspace" })).toBeVisible();
+    }
+  });
+
+  test("an organization archived under an open page is noticed on the next request, without a reload", async ({ browser }) => {
+    test.setTimeout(150_000);
+    const { session, settings } = await freshAccount("suspended");
+    const context = await api<MeContext>(session, "GET", "/me/context");
+    const organization = context.body.organizations[0]!;
+    const { context: browserContext, page } = await openAs(browser, session);
+    try {
+      await page.goto(settings);
+      await expect(page.getByRole("heading", { name: "Settings", level: 1 })).toBeVisible();
+      // Another tab, another owner, the API: the organization is archived while this page stays open.
+      const archived = await api(session, "POST", `/organizations/${(await api<{ organizations: Array<{ organization_id: string }> }>(session, "GET", "/me/context")).body.organizations[0]!.organization_id}/archive`, {
+        confirm_slug: organization.organization_slug,
+      });
+      expect(archived.status, archived.text).toBeLessThan(300);
+      // The page asks for something; the server refuses with TENANT_SUSPENDED. The signed-in context is
+      // re-read, and the app takes the person to the picker, which says the organization is archived.
+      await page.getByRole("link", { name: "Documents", exact: true }).first().click();
+      await expect(page).toHaveURL(/\/workspaces$/, { timeout: 20_000 });
+      await expect(page.locator("body")).toContainText(/Archived: its documents are kept/);
+    } finally {
+      await browserContext.close();
+    }
   });
 });

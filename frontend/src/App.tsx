@@ -180,7 +180,6 @@ const WorkItemDetails = lazy(() => import("@/pages/WorkItems/WorkItemDetails"));
 const WorkItems = lazy(() => import("@/pages/WorkItems/WorkItems"));
 const Settings = lazy(() => import("@/pages/Settings/Settings"));
 const CreateOrganizationPage = lazy(() => import("@/pages/Tenant/CreateOrganizationPage"));
-const NoAccess = lazy(() => import("@/pages/Tenant/NoAccess"));
 const WorkspacePicker = lazy(() => import("@/pages/Tenant/WorkspacePicker"));
 const CreateWorkspacePage = lazy(() => import("@/pages/Tenant/CreateWorkspacePage"));
 
@@ -309,9 +308,11 @@ function AppRoutes() {
               path={ROUTES.WORKSPACES}
               element={<WorkspacePicker />}
             />
+            {/* N-077: there is no page of its own for an unavailable tenant. The workspace picker says, for
+                each organization, whether it is archived or suspended and who can lift it. */}
             <Route
               path={ROUTES.NO_ACCESS}
-              element={<NoAccess />}
+              element={<Navigate to={ROUTES.WORKSPACES} replace />}
             />
             <Route
               path={ROUTE_PATTERNS.organizationNewWorkspace}
