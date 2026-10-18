@@ -507,8 +507,8 @@ _2026-10-18. Branch `claude/new-session-zo5d98`, PR sabarishwarne2001/servabo#27
 findings F-469 to F-499._
 
 **What changed.**
-- *The old name is gone for good (N-121).* No `FLOWPILOT_*` setting, `fp_` key, old backup name, `--loop
-  stripe`/`worker-stripe`, Docker-volume shim or `legacy_names.py` is left; the guard test allows the old
+- *The old name is gone for good (N-121).* No old-name setting, API key prefix, backup name, `--loop
+  stripe`/`worker-stripe` alias, Docker-volume shim or `legacy_names.py` is left (N-121 lists them); the guard test allows the old
   name only in history files and in the secret values the production guard refuses. Operators use the
   `SERVABO_*` names (CHANGELOG). The README's data section is two lines; the dev compose file listens on
   127.0.0.1 only (N-123).
