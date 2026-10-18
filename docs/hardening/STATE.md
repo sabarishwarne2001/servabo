@@ -2,7 +2,26 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-18 (Session C)_
+_Last updated: 2026-10-18 (Session E)_
+
+## Session E (2026-10-18): the UI gaps and defects Session C left open
+Branch `claude/funny-sagan-n7gpqc` (the session's assigned branch), based on `main` at `b4b4c9c`. Findings F-518 to
+F-523, decisions N-131 to N-134. No migration; one Alembic head (`h1a5_helm_ledger_incremental`).
+- [x] 1. Identity console: GET + DELETE for role mappings, saved-mappings list with a confirmed Remove (F-518)
+- [x] 2. Three-way match: stored reason shown, Re-score, replaced case read as history (F-519); supplier-cost
+  "Reconcile anyway" (F-520). Case notes and a separate Reject: the API has neither, **not built, N-131 needs you**
+- [x] 3. Password sign-in refused when useless everywhere, 403 `SSO_SIGN_IN_REQUIRED` (F-521, N-132)
+- [x] 4. Last-workspace archive is 409 `LAST_WORKSPACE` (F-522)
+- [x] 5. Undo needs a fitted model by design (N-133); the history is now a tested stand-in command
+- [x] 6. Residency card lists only regions Save accepts (F-523)
+- [x] 7. Shared price-book state: rule written in `frontend/e2e/README.md` (N-134)
+- Verified: new backend tests failed against the unfixed `app/` first (5 of 5 behaviour tests) and pass now;
+  full backend suite 5,274 passed / 24 failed, of which 22 fail identically on the unmodified code (sandbox: DB
+  URL for script tests, ready check, free-trial and Helm timing) and 2 Dodo-invoice tests are order-dependent
+  (pass alone, pass on the base code alone); the 2 route-coverage tests that my new routes broke are fixed.
+  Full browser suite 967 passed / 2 skipped / 0 failed, including specs 20, 23, 26 and 43 (60 passed, 1 skipped
+  when run alone), which the UI polish pass could not run. `tsc`, `npm run lint`, `npm run check:self` clean.
+- **Next action:** you decide N-131 (build "Reject" and notes, or not). Session D (Dodo walk-through) is unchanged.
 
 ## UI polish pass (2026-10-18): Branding page and Dispatch policy card
 Branch `claude/zealous-davinci-9q2hv9`. Frontend only; no API, schema or migration change.
