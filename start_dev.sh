@@ -230,16 +230,6 @@ env_set "${FRONTEND_DEV_ENV}" VITE_API_URL "http://localhost:${API_PORT}/api/v1"
 
 step '4/8  Docker backing services'
 cd "${BACKEND_DIR}"
-# >>> one-release names: Docker data made before the rename (FlowPilot became Servabo on
-# 2026-10-16) lives in volumes named flowpilot_*. Keep using them, so nothing looks lost; README
-# "Local data from before the rename" says how to move to the new names. Remove next release.
-if [[ -z "${COMPOSE_PROJECT_NAME:-}" ]] && docker volume inspect flowpilot_postgres_data >/dev/null 2>&1 \
-   && ! docker volume inspect servabo_postgres_data >/dev/null 2>&1; then
-    export COMPOSE_PROJECT_NAME=flowpilot
-    docker rm -f flowpilot-db flowpilot-redis flowpilot-minio flowpilot-minio-init >/dev/null 2>&1 || true
-    warn 'Using your Docker data from before the rename (volumes flowpilot_*); see README.'
-fi
-# <<< one-release names
 if (( DO_RESET )); then
     docker compose down -v >/dev/null 2>&1 || true
 fi

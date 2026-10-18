@@ -25,20 +25,21 @@ and every command that starts containers is marked *(not run here)*.
 | Disk | about 15 GB free | the Python packages alone are about 6.5 GB (torch with CUDA, paddle) |
 
 Ports used: 5432 (Postgres), 6379 (Redis), 9000/9001 (MinIO), 8000 (API),
-5173 (web app).
+5173 (web app). The dev compose file publishes Postgres, Redis and MinIO on 127.0.0.1 only, so
+they are not reachable from other computers on your network.
 
 ---
 
 ## 2. Quick start: one command
 
 ```bash
-git clone https://github.com/sabarishwarne2001/flowpilot-ai.git servabo
+git clone https://github.com/sabarishwarne2001/servabo.git servabo
 cd servabo
 ./start_dev.sh            # Linux / macOS
 ```
 
 ```powershell
-git clone https://github.com/sabarishwarne2001/flowpilot-ai.git servabo
+git clone https://github.com/sabarishwarne2001/servabo.git servabo
 cd servabo
 .\start_dev.ps1           # Windows PowerShell   (not run here: no Windows in the sandbox)
 ```

@@ -73,22 +73,21 @@ def test_api_key_issuance_and_authentication(client: TestClient, tenant):
     assert client.get(f"/api/v1/organizations/{org_id}/audit-logs", headers={"Authorization": f"Bearer {new_token}"}).status_code == 401
 
 
-def test_a_key_issued_before_the_rename_still_works(client: TestClient, tenant):
-    """Website and payments session (A4). Keys were issued as `fp_live_` / `fp_test_` before the
-    rename to Servabo; an integration holding one must keep working for one release while its
-    owner rotates it (CHANGELOG). Same key and secret, the old prefix."""
+def test_a_key_issued_before_the_rename_is_refused(client: TestClient, tenant):
+    """Session B (B1). Keys were issued as `fp_live_` / `fp_test_` before the rename to Servabo and
+    were accepted for one release. No installation from before the rename remains, so the old
+    prefix is no longer a key: even the right key and secret under it answer 401."""
     org_id = tenant.organization.id
     res = client.post(
         f"/api/v1/organizations/{org_id}/api-keys",
-        json={"name": "Integration from before the rename", "scopes": ["audit_logs:read"]},
+        json={"name": "A key under the old prefix", "scopes": ["audit_logs:read"]},
         headers=tenant.org_admin.headers,
     )
     assert res.status_code == 201
     token = res.json()["token"]
+    answer = client.get(f"/api/v1/organizations/{org_id}/audit-logs", headers={"Authorization": f"Bearer {token}"})
+    assert answer.status_code == 200, answer.text
     old = "fp_" + token.removeprefix("svb_")
     assert old.startswith(("fp_live_", "fp_test_"))
-    answer = client.get(f"/api/v1/organizations/{org_id}/audit-logs", headers={"Authorization": f"Bearer {old}"})
-    assert answer.status_code == 200, answer.text
-    # A made-up secret under the old prefix is still refused.
-    forged = old[:-4] + ("AAAA" if not old.endswith("AAAA") else "BBBB")
-    assert client.get(f"/api/v1/organizations/{org_id}/audit-logs", headers={"Authorization": f"Bearer {forged}"}).status_code == 401
+    refused = client.get(f"/api/v1/organizations/{org_id}/audit-logs", headers={"Authorization": f"Bearer {old}"})
+    assert refused.status_code == 401

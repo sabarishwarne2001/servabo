@@ -23,27 +23,6 @@
 #                               pg_dump / pg_restore with PGHOST, PGPORT, PGUSER, PGPASSWORD.
 #   POSTGRES_USER, POSTGRES_DB  (default servabo)
 set -euo pipefail
-# >>> one-release names: Servabo was called FlowPilot until 2026-10-16. The old FLOWPILOT_*
-# variables and /etc/flowpilot/ still work in this release (the new name wins when both are
-# set), with one warning naming what to rename. Remove this block in the next release.
-servabo_legacy_names() {
-    local old new
-    for old in $(compgen -v | grep '^FLOWPILOT_' || true); do
-        new="SERVABO_${old#FLOWPILOT_}"
-        [[ -z "${!new+x}" ]] && export "${new}=${!old}"
-        [[ " ${SERVABO_LEGACY_SEEN:-} " == *" ${old} "* ]] && continue
-        SERVABO_LEGACY_SEEN="${SERVABO_LEGACY_SEEN:-} ${old}"
-        echo "warning: FlowPilot was renamed Servabo; rename ${old} to ${new} (the old name stops working in the next release)" >&2
-    done
-    if [[ -z "${SERVABO_SWEEPER_ENV:-}" && ! -e /etc/servabo/sweepers.env && -r /etc/flowpilot/sweepers.env ]]; then
-        SERVABO_SWEEPER_ENV=/etc/flowpilot/sweepers.env
-        echo "warning: FlowPilot was renamed Servabo; move /etc/flowpilot/ to /etc/servabo/" >&2
-    fi
-    return 0
-}
-servabo_legacy_names
-SERVABO_LEGACY_STEM=flowpilot  # backups written before the rename are still found
-# <<< one-release names
 
 BACKUP_DIR="${SERVABO_BACKUP_DIR:-/srv/servabo/backups}"
 KEY_FILE="${SERVABO_BACKUP_KEY_FILE:-}"
@@ -74,7 +53,7 @@ on_exit() {
 
 prune() {
     local -a files=()
-    mapfile -t files < <({ ls -1 "${BACKUP_DIR}"/servabo-*.dump.enc "${BACKUP_DIR}/${SERVABO_LEGACY_STEM}"-*.dump.enc 2>/dev/null || true; } | awk -F/ '{n=$NF; sub(/^[a-z]+-/, "", n); print n "\t" $0}' | sort -r | cut -f2-)
+    mapfile -t files < <({ ls -1 "${BACKUP_DIR}"/servabo-*.dump.enc 2>/dev/null || true; } | awk -F/ '{n=$NF; sub(/^[a-z]+-/, "", n); print n "\t" $0}' | sort -r | cut -f2-)
     local kept_daily=0 weeks_kept=0 f stamp week
     declare -A seen_week=()
     for f in "${files[@]}"; do

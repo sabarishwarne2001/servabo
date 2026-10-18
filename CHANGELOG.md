@@ -28,6 +28,26 @@ DNS record) must use the new ones:
 | Browser storage keys | `flowpilot_auth_session`, `flowpilot_ui_preferences`, `flowpilot_tenant_selection` | `servabo_auth_session`, `servabo_ui_preferences`, `servabo_tenant_selection` (theme and last workspace reset once) |
 | Sovereign licence format | `flowpilot-licence/1` | `servabo-licence/1` |
 
+### Removed — the old name is no longer read (Session B, 2026-10-18)
+
+There are no installations from before the rename, so the one-release compatibility is gone.
+**Operators must use the `SERVABO_*` setting names: the old `FLOWPILOT_*` names are no longer read**
+(by the API, the worker, the scripts in `backend/scripts/` and `backend/deploy/bin/`). Also gone:
+
+- API keys starting `fp_live_` / `fp_test_` (only `svb_live_` / `svb_test_` are keys);
+- backups and local backup folders written under the old name (`flowpilot-<stamp>.fpbk`, `.flowpilot_*`);
+- `--loop stripe` and the `worker-stripe` service role (use `--loop billing` and `worker-billing`);
+- old display values rewritten to Servabo (`PROJECT_NAME=FlowPilot AI` now shows as written);
+- the launchers' shim for Docker volumes named `flowpilot_*`.
+
+The values that were once published as defaults (`flowpilot_default_*` peppers) stay refused by the
+production guard for good.
+
+### Changed — the local databases are published on this computer only (Session B, 2026-10-18)
+
+`backend/docker-compose.yml` publishes Postgres (5432), Redis (6379) and MinIO (9000, console 9001)
+on `127.0.0.1` instead of every network interface.
+
 ### Planned
 
 - Backend foundation

@@ -1,18 +1,20 @@
-"""The product is Servabo: the old name appears only where it must (website and payments session, A9).
+"""The product is Servabo: the old name appears only in history and in refused secrets.
 
 FlowPilot AI was renamed Servabo on 2026-10-16. This fails when the old name comes back anywhere
 in the repository outside an explicit allowlist, in any spelling (FlowPilot, FLOWPILOT_, flowpilot),
 in a file's content or in its path. Each allowed place says why:
 
-* history: `archive/`, the Alembic migrations (a migration that ran must not change), and the
-  campaign records that keep the old name with a dated note at the top;
-* the one-release aliases: `app/core/legacy_names.py`, blocks marked `>>> one-release names` in
-  the deploy scripts and dev launchers, `.gitignore` (old local backup folders stay ignored), and
-  the tests that prove the aliases work;
+* history: `archive/`, the Alembic migrations (a migration that ran must not change), the campaign
+  records that keep the old name with a dated note at the top, and the one test that runs the
+  historical rename migration;
 * values that are evidence, not branding: the two leaked default peppers the production guard
-  refuses, the backup key fingerprint's salt (changing it would make every old backup look like it
-  used another key), the git-history scan's list of old development passwords, and the GitHub
-  repository's address until the owner renames it.
+  refuses (they were published once and stay refused forever), the backup key fingerprint's salt
+  (changing it would change every fingerprint), the git-history scan's list of old development
+  passwords, and the word the password policy will not let a password be built from.
+
+The one-release compatibility (reading the old `FLOWPILOT_*` settings, old API-key prefixes,
+old backup names, `--loop stripe`) was removed in Session B: no installation from before the
+rename remains, and there is no longer a place in the code or the scripts that spells the old name.
 """
 
 from __future__ import annotations
@@ -49,11 +51,7 @@ ALLOWED_FILES = {
     "docs/hardening/06-launch-certification.md",
     "docs/hardening/CAMPAIGN-MAP.md",
     "docs/hardening/NEXT-SESSION-PROMPT.md",
-    # The one-release aliases and the tests that prove them.
-    "backend/app/core/legacy_names.py",
-    ".gitignore",
-    "backend/tests/core/test_legacy_setting_names.py",
-    "backend/tests/scripts/test_backups_from_before_the_rename.py",
+    # The test that runs the historical rename migration (w1a1) against the old database setting.
     "backend/tests/scripts/test_database_names_say_servabo.py",
 }
 #: Lines allowed anywhere: evidence values, not the brand.
@@ -64,9 +62,9 @@ ALLOWED_LINES = (
     # The old name stays a word passwords may not be built from, and the test that proves it.
     re.compile(r'^_PRODUCT_WORDS = \("servabo", "flowpilot", "flow pilot"\)$'),
     re.compile(r'"flowpilot2026"'),
-    re.compile(r"github\.com/sabarishwarne2001/flowpilot-ai(\.git)?\b"),
+    # The README says, once, what the product was called before (and where the renames are listed).
+    re.compile("^The product was called Flow" "Pilot AI until 2026-10-16"),
 )
-BLOCK_START, BLOCK_END = ">>> one-release names", "<<< one-release names"
 
 
 def _tracked() -> list[str]:
@@ -85,14 +83,9 @@ _THIS = str(Path(__file__).resolve().relative_to(REPO))
 
 
 def _offending_lines(text: str) -> list[tuple[int, str]]:
-    found, in_block = [], False
+    found = []
     for number, line in enumerate(text.splitlines(), start=1):
-        if BLOCK_START in line:
-            in_block = True
-        if BLOCK_END in line:
-            in_block = False
-            continue
-        if in_block or not OLD.search(line):
+        if not OLD.search(line):
             continue
         if any(pattern.search(line) for pattern in ALLOWED_LINES):
             continue
@@ -130,5 +123,18 @@ def test_the_history_files_say_when_the_name_changed() -> None:
 
 
 def test_the_guard_itself_catches_the_old_name() -> None:
-    sample = "x\n# >>> one-release names\nFLOW" "PILOT_X\n# <<< one-release names\nFlow" "Pilot AI here\n"
-    assert _offending_lines(sample) == [(5, "Flow" "Pilot AI here")]
+    sample = "x\nFLOW" "PILOT_X\nFlow" "Pilot AI here\n"
+    assert _offending_lines(sample) == [(2, "FLOW" "PILOT_X"), (3, "Flow" "Pilot AI here")]
+
+
+def test_no_block_marks_a_place_where_the_old_name_is_tolerated() -> None:
+    """The `one-release names` blocks are gone: nothing is exempt from the guard by a comment."""
+    marker = ">>> one-release" + " names"
+    holders = [p for p in _tracked() if (REPO / p).is_file() and not p.startswith(ALLOWED_PREFIXES)
+               and p != _THIS and marker in (REPO / p).read_text(encoding="utf-8", errors="replace")
+               and not p.startswith("docs/hardening/")]
+    assert not holders, f"remove the one-release blocks from: {holders}"
+
+
+def test_the_file_that_read_the_old_names_is_gone() -> None:
+    assert not (REPO / "backend" / "app" / "core" / "legacy_names.py").exists()

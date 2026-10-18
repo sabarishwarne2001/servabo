@@ -48,13 +48,21 @@ def test_role_is_case_and_whitespace_insensitive():
     [
         ("worker-delivery", "worker-relay"),
         ("worker-billing", "worker-relay"),
-        ("worker-stripe", "worker-relay"),
         ("migrate", "sweeper"),
         ("cron", "sweeper"),
     ],
 )
 def test_aliases_do_not_fall_through_to_web(alias: str, target: str):
     assert db_session.resolve_role(alias) == target
+
+
+def test_the_billing_workers_old_role_name_is_not_a_role(monkeypatch):
+    """Session B (B1): `worker-stripe` was an alias of worker-relay for one release after the rename."""
+    assert "worker-stripe" not in db_session.POOL_PROFILES
+    assert not hasattr(db_session, "ROLE_ALIASES") or "worker-stripe" not in db_session.ROLE_ALIASES
+    monkeypatch.setattr(db_session.settings, "ENVIRONMENT", "production")
+    with pytest.raises(db_session.UnknownServiceRole):
+        db_session.resolve_role("worker-stripe")
 
 
 def test_unknown_role_warns_outside_production(caplog, monkeypatch):

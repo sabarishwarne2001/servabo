@@ -553,32 +553,15 @@ def run_billing_inbound_loop(
     )
 
 
-# >>> one-release names: the billing loop was `stripe` (website and payments session, C10).
-run_stripe_inbound_loop = run_billing_inbound_loop
-LOOP_ALIASES: dict[str, str] = {"stripe": "billing"}
-# <<< one-release names
-
 #: What `--loop all` runs.
 ALL_LOOPS: tuple[str, ...] = ("jobs", "relay", "delivery", "billing", "scheduler")
-
-
-def canonical_loop(name: str) -> str:
-    """The loop's current name; an old one still works, with a warning."""
-    current = LOOP_ALIASES.get(name)
-    if current is None:
-        return name
-    logger.warning(
-        f"worker: --loop {name} is now --loop {current}; it runs the same loop. "
-        f"Change the command (docker-compose service worker-billing) before the next release."
-    )
-    return current
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="app.worker")
     parser.add_argument(
         "--loop",
-        choices=["relay", "delivery", "jobs", "billing", "scheduler", "all", *LOOP_ALIASES],
+        choices=["relay", "delivery", "jobs", "billing", "scheduler", "all"],
         required=True,
         help=(
             "relay | delivery | jobs | billing | scheduler | all. "
@@ -622,11 +605,6 @@ def main(argv: Optional[list[str]] = None) -> int:
     from app.core.logging_config import setup_logging
 
     setup_logging(level=args.log_level, fmt="%(asctime)s %(levelname)s %(name)s %(message)s")
-    from app.core import legacy_names
-
-    legacy_names.warn_once()
-
-    args.loop = canonical_loop(args.loop)
     register_all()
     profile = get_profile(args.profile)
     assert_imports_match_profile(profile)

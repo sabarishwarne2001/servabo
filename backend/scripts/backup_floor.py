@@ -84,12 +84,10 @@ if hasattr(sys.stdout, "reconfigure"):
 BACKEND = Path(__file__).resolve().parents[1]
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
-from app.core import legacy_names  # noqa: E402  (standard library only; one release of the pre-rename names)
 
 FORMAT = "servabo-backup-floor/1"
-#: Formats this release can read: its own, and backups written before the rename to Servabo.
-READABLE_FORMATS = frozenset({FORMAT, legacy_names.LEGACY_BACKUP_FORMAT})
-STEMS = ("servabo", legacy_names.LEGACY_STEM)
+READABLE_FORMATS = frozenset({FORMAT})
+STEMS = ("servabo",)
 MAGIC = b"FPBK1\n"
 CHUNK = 4 * 1024 * 1024
 NONCE_PREFIX_BYTES = 7
@@ -108,14 +106,14 @@ class BackupError(RuntimeError):
 
 
 def backup_dir(explicit: Optional[str] = None) -> Path:
-    raw = explicit or legacy_names.env("BACKUP_DIR") or str(legacy_names.local_directory(BACKEND, ".servabo_backups"))
+    raw = explicit or os.environ.get("SERVABO_BACKUP_DIR") or str(BACKEND / ".servabo_backups")
     path = Path(raw).expanduser().resolve()
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def load_key() -> bytes:
-    raw = legacy_names.env("BACKUP_KEY", "").strip()
+    raw = os.environ.get("SERVABO_BACKUP_KEY", "").strip()
     if not raw:
         raise BackupError(
             "SERVABO_BACKUP_KEY is not set. Generate one with "
@@ -517,7 +515,7 @@ def verify_file(dest: Path, manifest_path: Path) -> dict[str, Any]:
 
 
 def mirror(result: BackupResult) -> Optional[str]:
-    bucket = legacy_names.env("BACKUP_S3_BUCKET", "").strip()
+    bucket = os.environ.get("SERVABO_BACKUP_S3_BUCKET", "").strip()
     if not bucket:
         return None
     import boto3
@@ -535,13 +533,13 @@ def mirror(result: BackupResult) -> Optional[str]:
             raise RuntimeError(f"the egress gate is unavailable ({exc}); refusing the off-host mirror in deny mode")
     client = boto3.client(
         "s3",
-        endpoint_url=legacy_names.env("BACKUP_S3_ENDPOINT") or None,
-        aws_access_key_id=legacy_names.env("BACKUP_S3_ACCESS_KEY") or None,
-        aws_secret_access_key=legacy_names.env("BACKUP_S3_SECRET_KEY") or None,
+        endpoint_url=os.environ.get("SERVABO_BACKUP_S3_ENDPOINT") or None,
+        aws_access_key_id=os.environ.get("SERVABO_BACKUP_S3_ACCESS_KEY") or None,
+        aws_secret_access_key=os.environ.get("SERVABO_BACKUP_S3_SECRET_KEY") or None,
     )
     if gate is not None:
         gate.attach_boto(client, gate.BACKUP)
-    prefix = legacy_names.env("BACKUP_S3_PREFIX", "servabo-backups/").lstrip("/")
+    prefix = os.environ.get("SERVABO_BACKUP_S3_PREFIX", "servabo-backups/").lstrip("/")
     for path in (result.file, result.manifest):
         client.upload_file(str(path), bucket, f"{prefix}{path.name}")
     return f"s3://{bucket}/{prefix}"

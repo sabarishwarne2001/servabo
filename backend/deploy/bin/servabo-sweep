@@ -1,29 +1,8 @@
 #!/usr/bin/env bash
 set -uo pipefail
-# >>> one-release names: Servabo was called FlowPilot until 2026-10-16. The old FLOWPILOT_*
-# variables and /etc/flowpilot/ still work in this release (the new name wins when both are
-# set), with one warning naming what to rename. Remove this block in the next release.
-servabo_legacy_names() {
-    local old new
-    for old in $(compgen -v | grep '^FLOWPILOT_' || true); do
-        new="SERVABO_${old#FLOWPILOT_}"
-        [[ -z "${!new+x}" ]] && export "${new}=${!old}"
-        [[ " ${SERVABO_LEGACY_SEEN:-} " == *" ${old} "* ]] && continue
-        SERVABO_LEGACY_SEEN="${SERVABO_LEGACY_SEEN:-} ${old}"
-        echo "warning: FlowPilot was renamed Servabo; rename ${old} to ${new} (the old name stops working in the next release)" >&2
-    done
-    if [[ -z "${SERVABO_SWEEPER_ENV:-}" && ! -e /etc/servabo/sweepers.env && -r /etc/flowpilot/sweepers.env ]]; then
-        SERVABO_SWEEPER_ENV=/etc/flowpilot/sweepers.env
-        echo "warning: FlowPilot was renamed Servabo; move /etc/flowpilot/ to /etc/servabo/" >&2
-    fi
-    return 0
-}
-servabo_legacy_names
-# <<< one-release names
 
 CONFIG_FILE="${SERVABO_SWEEPER_ENV:-/etc/servabo/sweepers.env}"
 [[ -r "${CONFIG_FILE}" ]] && source "${CONFIG_FILE}"
-servabo_legacy_names  # names the config file still spells the old way
 
 SERVABO_ROOT="${SERVABO_ROOT:-/srv/servabo}"
 SERVABO_VENV="${SERVABO_VENV:-${SERVABO_ROOT}/venv}"

@@ -57,9 +57,9 @@ def test_the_settings_they_write_are_real_settings() -> None:
 
 
 def test_the_ports_they_assume_are_the_compose_ports() -> None:
-    assert "'POSTGRES_PORT'         = '5432'" in START and "5432:5432" in DEV_COMPOSE["services"]["db"]["ports"]
-    assert "redis://localhost:6379/0" in START and "6379:6379" in DEV_COMPOSE["services"]["redis"]["ports"]
-    assert "http://localhost:9000" in START and "9000:9000" in DEV_COMPOSE["services"]["minio"]["ports"]
+    assert "'POSTGRES_PORT'         = '5432'" in START and "127.0.0.1:5432:5432" in DEV_COMPOSE["services"]["db"]["ports"]
+    assert "redis://localhost:6379/0" in START and "127.0.0.1:6379:6379" in DEV_COMPOSE["services"]["redis"]["ports"]
+    assert "http://localhost:9000" in START and "127.0.0.1:9000:9000" in DEV_COMPOSE["services"]["minio"]["ports"]
 
 
 def test_the_scripts_and_flags_they_call_exist() -> None:
