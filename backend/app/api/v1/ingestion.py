@@ -641,7 +641,10 @@ def list_holds(
     rows = list(
         db.execute(
             select(RetentionHold)
-            .where(RetentionHold.organization_id == context.organization_id)
+            .where(
+                RetentionHold.organization_id == context.organization_id,
+                retention_service.in_workspace(context.workspace_id),
+            )
             .order_by(RetentionHold.placed_at.desc())
             .limit(500)
         ).scalars()
@@ -717,6 +720,7 @@ def release_hold(
         organization_id=context.organization_id,
         hold_id=hold_id,
         user_id=context.user_id,
+        workspace_id=context.workspace_id,
     )
     if hold is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Hold not found.")

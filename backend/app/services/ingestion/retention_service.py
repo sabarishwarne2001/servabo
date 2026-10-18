@@ -36,7 +36,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Iterable, Optional
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models.compliance import RetentionPolicy
@@ -194,19 +194,31 @@ def place_hold(
     return hold
 
 
+def in_workspace(workspace_id: uuid.UUID):
+    """The SQL condition for "this hold belongs to this workspace".
+
+    A workspace hold names its workspace; a document hold names only the document, so it belongs to
+    the workspace the document is in. An organization's other workspaces neither see nor release it.
+    """
+    return or_(
+        RetentionHold.workspace_id == workspace_id,
+        RetentionHold.work_item_id.in_(select(WorkItem.id).where(WorkItem.workspace_id == workspace_id)),
+    )
+
+
 def release_hold(
     db: Session,
     *,
     organization_id: uuid.UUID,
     hold_id: uuid.UUID,
     user_id: Optional[uuid.UUID],
+    workspace_id: Optional[uuid.UUID] = None,
 ) -> Optional[RetentionHold]:
-    hold = db.execute(
-        select(RetentionHold).where(
-            RetentionHold.id == hold_id,
-            RetentionHold.organization_id == organization_id,
-        )
-    ).scalar_one_or_none()
+    """Release a hold. With `workspace_id`, only a hold of that workspace can be released (the routes)."""
+    conditions = [RetentionHold.id == hold_id, RetentionHold.organization_id == organization_id]
+    if workspace_id is not None:
+        conditions.append(in_workspace(workspace_id))
+    hold = db.execute(select(RetentionHold).where(*conditions)).scalar_one_or_none()
     if hold is None:
         return None
     if hold.released_at is None:
@@ -222,6 +234,7 @@ __all__ = [
     "POLICY_BLOCK_CODE",
     "active_holds",
     "blocking_reasons",
+    "in_workspace",
     "place_hold",
     "release_hold",
     "retention_floor_days",
