@@ -56,9 +56,11 @@ FIELD_NAME = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
 MAX_FIELDS = 60
 
 SAFE_HARBOR_NOTICE = (
-    "Removes the HIPAA Safe Harbor identifiers. This is identifier removal, "
-    "not a compliance certification: a compliant deployment also needs a "
-    "business associate agreement and administrative safeguards."
+    "Removes names of known parties, dates of birth, social security numbers, email addresses, phone "
+    "numbers and card numbers. HIPAA Safe Harbor lists eighteen kinds of identifier; the others, for "
+    "example medical record numbers and admission dates, need a manual pass. This is identifier "
+    "removal, not a compliance certification: a compliant deployment also needs a business associate "
+    "agreement and administrative safeguards."
 )
 
 INDUSTRIES: tuple[str, ...] = ("HR", "HEALTHCARE", "LEGAL", "LOGISTICS", "KYC")
@@ -241,15 +243,18 @@ def applied_presets(
     )
 
 
-def apply_to_workspace(
+def apply_preset(
     db: Session,
     *,
     organization_id: uuid.UUID,
     workspace_id: uuid.UUID,
     preset_id: uuid.UUID,
     user_id: Optional[uuid.UUID],
-) -> WorkspaceSchemaPreset:
-    """Apply a preset. It is NOT enabled: that is a second, deliberate act."""
+) -> tuple[WorkspaceSchemaPreset, bool]:
+    """Apply a preset. It is NOT enabled: that is a second, deliberate act.
+
+    Returns the workspace's row and whether this call created it (applying again changes nothing, and
+    the caller audits only a change)."""
     preset = get_preset(db, organization_id=organization_id, preset_id=preset_id)
     validate_preset(preset)
 
@@ -260,12 +265,12 @@ def apply_to_workspace(
         )
     ).scalar_one_or_none()
     if existing is not None:
-        return existing
+        return existing, False
 
     # F-398. Two applies racing (two administrators, a retried request) both
     # find no row above; a plain INSERT made the loser fail on the primary key
     # with a 500. ON CONFLICT DO NOTHING waits for the winner and keeps its row.
-    db.execute(
+    inserted = db.execute(
         pg_insert(WorkspaceSchemaPreset)
         .values(
             workspace_id=workspace_id,
@@ -274,22 +279,40 @@ def apply_to_workspace(
             applied_by_user_id=user_id,
         )
         .on_conflict_do_nothing(index_elements=["workspace_id", "preset_id"])
-    )
-    return db.execute(
+    ).rowcount
+    row = db.execute(
         select(WorkspaceSchemaPreset).where(
             WorkspaceSchemaPreset.workspace_id == workspace_id,
             WorkspaceSchemaPreset.preset_id == preset.id,
         )
     ).scalar_one()
+    return row, bool(inserted)
 
 
-def set_enabled(
+def apply_to_workspace(
+    db: Session,
+    *,
+    organization_id: uuid.UUID,
+    workspace_id: uuid.UUID,
+    preset_id: uuid.UUID,
+    user_id: Optional[uuid.UUID],
+) -> WorkspaceSchemaPreset:
+    """`apply_preset`, for a caller that only wants the row."""
+    return apply_preset(
+        db, organization_id=organization_id, workspace_id=workspace_id, preset_id=preset_id, user_id=user_id
+    )[0]
+
+
+def switch(
     db: Session,
     *,
     workspace_id: uuid.UUID,
     preset_id: uuid.UUID,
     enabled: bool,
-) -> WorkspaceSchemaPreset:
+) -> tuple[WorkspaceSchemaPreset, bool]:
+    """Switch a pack on or off. Returns the row and whether anything changed: switching on a pack that
+    is on keeps its first enabled-since time, and neither it nor switching off an off pack is a change
+    to audit."""
     from datetime import datetime, timezone
 
     row = db.execute(
@@ -302,12 +325,25 @@ def set_enabled(
         raise PresetError(
             "PRESET_NOT_APPLIED", "Apply the preset to this workspace first."
         )
+    if bool(row.enabled) == enabled:
+        return row, False
     row.enabled = enabled
     # The CHECK refuses enabled=true with no enabled_at, so the timestamp is
     # part of the state rather than an afterthought.
     row.enabled_at = datetime.now(timezone.utc) if enabled else None
     db.flush([row])
-    return row
+    return row, True
+
+
+def set_enabled(
+    db: Session,
+    *,
+    workspace_id: uuid.UUID,
+    preset_id: uuid.UUID,
+    enabled: bool,
+) -> WorkspaceSchemaPreset:
+    """`switch`, for a caller that only wants the row."""
+    return switch(db, workspace_id=workspace_id, preset_id=preset_id, enabled=enabled)[0]
 
 
 def remove_from_workspace(
@@ -334,10 +370,12 @@ __all__ = [
     "SAFE_HARBOR_NOTICE",
     "SCALAR_TYPES",
     "applied_presets",
+    "apply_preset",
     "apply_to_workspace",
     "get_preset",
     "remove_from_workspace",
     "set_enabled",
+    "switch",
     "validate_assertions",
     "validate_preset",
     "validate_preset_schema",

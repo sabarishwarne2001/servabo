@@ -556,7 +556,7 @@ def apply_preset(
     context: deps.TenantContext = Depends(deps.RequireWorkspaceAdmin),
 ) -> PresetResponse:
     try:
-        applied = preset_service.apply_to_workspace(
+        applied, created = preset_service.apply_preset(
             db,
             organization_id=context.organization_id,
             workspace_id=context.workspace_id,
@@ -570,17 +570,18 @@ def apply_preset(
         db.rollback()
         raise _fail(exc)
 
-    audit_service.record(
-        db,
-        organization_id=context.organization_id,
-        workspace_id=context.workspace_id,
-        principal=get_current_principal(),
-        resource_type=AuditResourceType.DOCUMENT_SCHEMA_PRESET,
-        resource_id=preset.id,
-        action=AuditAction.CREATED,
-        outcome=AuditOutcome.ALLOWED,
-        details={"document_type": preset.document_type, "enabled": False},
-    )
+    if created:  # applying again changes nothing, so it writes nothing
+        audit_service.record(
+            db,
+            organization_id=context.organization_id,
+            workspace_id=context.workspace_id,
+            principal=get_current_principal(),
+            resource_type=AuditResourceType.DOCUMENT_SCHEMA_PRESET,
+            resource_id=preset.id,
+            action=AuditAction.CREATED,
+            outcome=AuditOutcome.ALLOWED,
+            details={"document_type": preset.document_type, "enabled": False},
+        )
     db.commit()
     return _preset_response(preset, applied)
 
@@ -599,7 +600,7 @@ def set_preset_enabled(
         preset = preset_service.get_preset(
             db, organization_id=context.organization_id, preset_id=preset_id
         )
-        applied = preset_service.set_enabled(
+        applied, changed = preset_service.switch(
             db,
             workspace_id=context.workspace_id,
             preset_id=preset_id,
@@ -609,17 +610,18 @@ def set_preset_enabled(
         db.rollback()
         raise _fail(exc)
 
-    audit_service.record(
-        db,
-        organization_id=context.organization_id,
-        workspace_id=context.workspace_id,
-        principal=get_current_principal(),
-        resource_type=AuditResourceType.DOCUMENT_SCHEMA_PRESET,
-        resource_id=preset.id,
-        action=AuditAction.ENABLED if payload.enabled else AuditAction.DISABLED,
-        outcome=AuditOutcome.ALLOWED,
-        details={"document_type": preset.document_type},
-    )
+    if changed:
+        audit_service.record(
+            db,
+            organization_id=context.organization_id,
+            workspace_id=context.workspace_id,
+            principal=get_current_principal(),
+            resource_type=AuditResourceType.DOCUMENT_SCHEMA_PRESET,
+            resource_id=preset.id,
+            action=AuditAction.ENABLED if payload.enabled else AuditAction.DISABLED,
+            outcome=AuditOutcome.ALLOWED,
+            details={"document_type": preset.document_type},
+        )
     db.commit()
     return _preset_response(preset, applied)
 

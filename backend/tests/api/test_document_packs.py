@@ -281,6 +281,66 @@ def test_apply_enable_and_disable_are_audited(client, db_session, tenant, packs)
         assert row.details["document_type"] == "intake_form"
 
 
+def test_only_a_real_change_is_audited_and_enabling_twice_keeps_the_first_time(client, db_session, tenant, packs) -> None:
+    """Applying a pack again wrote another 'created' row saying enabled: false (even for a pack that is
+    enabled); switching it on again restarted its enabled-since time, and switching a pack that was
+    already off wrote 'disabled'. Nothing changed, so nothing is written."""
+    preset_id = packs["lease"]
+    base = _url(tenant.workspace.id)
+    post = lambda path, body: client.post(f"{base}{path}", json=body, headers=tenant.owner.headers)  # noqa: E731
+
+    def audit() -> list[AuditAction]:
+        db_session.expire_all()
+        return [r.action for r in db_session.execute(select(AuditLog).where(
+            AuditLog.resource_type == AuditResourceType.DOCUMENT_SCHEMA_PRESET,
+            AuditLog.resource_id == preset_id).order_by(AuditLog.created_at)).scalars()]
+
+    assert post("/apply", {"preset_id": str(preset_id)}).status_code == 200
+    assert post("/apply", {"preset_id": str(preset_id)}).status_code == 200
+    assert audit() == [AuditAction.CREATED], audit()
+
+    assert post(f"/{preset_id}/enabled", {"enabled": False}).status_code == 200  # already off
+    assert audit() == [AuditAction.CREATED], audit()
+
+    assert post(f"/{preset_id}/enabled", {"enabled": True}).status_code == 200
+    first = _rows(db_session, tenant.workspace.id)[0].enabled_at
+    assert first is not None
+    assert post(f"/{preset_id}/enabled", {"enabled": True}).status_code == 200
+    assert post("/apply", {"preset_id": str(preset_id)}).json()["enabled"] is True
+    assert _rows(db_session, tenant.workspace.id)[0].enabled_at == first, "enabling again restarted the clock"
+    assert audit() == [AuditAction.CREATED, AuditAction.ENABLED], audit()
+
+    assert post(f"/{preset_id}/enabled", {"enabled": False}).status_code == 200
+    assert post(f"/{preset_id}/enabled", {"enabled": False}).status_code == 200
+    assert audit() == [AuditAction.CREATED, AuditAction.ENABLED, AuditAction.DISABLED], audit()
+    assert _rows(db_session, tenant.workspace.id)[0].enabled_at is None
+
+
+def test_the_safe_harbor_notice_names_what_the_profile_removes_and_what_it_leaves(
+    client, db_session, tenant, packs
+) -> None:
+    """The profile runs six detectors, not the eighteen Safe Harbor identifiers: the notice says which
+    it removes, says the rest (medical record numbers, admission dates ...) need a manual pass, and
+    never says 'HIPAA compliant' (N-077)."""
+    from app.services.redaction import vocabulary as rv
+
+    shown = next(p for p in client.get(_url(tenant.workspace.id), headers=tenant.owner.headers).json()
+                 if p["redaction_profile"] == PROFILE_HIPAA_SAFE_HARBOR)
+    notice = shown["safe_harbor_notice"].lower()
+    words = {
+        rv.DETECTOR_KNOWN_PARTY: "names", rv.DETECTOR_DATE_OF_BIRTH: "dates of birth",
+        rv.DETECTOR_US_SSN: "social security numbers", rv.DETECTOR_EMAIL: "email addresses",
+        rv.DETECTOR_PHONE: "phone numbers", rv.DETECTOR_CARD_NUMBER: "card numbers",
+    }
+    assert set(rv.profile_detectors(PROFILE_HIPAA_SAFE_HARBOR)) == set(words), (
+        "the profile's detectors changed: update the Safe Harbor notice and this list together")
+    for detector, phrase in words.items():
+        assert phrase in notice, f"the notice does not say it removes {phrase}"
+    assert "manual" in notice and "medical record numbers" in notice and "admission dates" in notice
+    assert "hipaa compliant" not in notice and "not a compliance certification" in notice
+    assert "removes the hipaa safe harbor identifiers" not in notice, "it removes six kinds, not the eighteen"
+
+
 # ---------------------------------------------------------------------------
 # Bad input
 # ---------------------------------------------------------------------------
