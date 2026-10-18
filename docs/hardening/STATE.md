@@ -4,6 +4,19 @@ _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep th
 
 _Last updated: 2026-10-18 (Session C)_
 
+## UI polish pass (2026-10-18): Branding page and Dispatch policy card
+Branch `claude/zealous-davinci-9q2hv9`. Frontend only; no API, schema or migration change.
+- Branding & custom domains: colour picker + hex field + quick swatches + six presets (`components/branding/`),
+  a two-surface live preview (sign-in page, inside the app) with contrast read-outs, logo/favicon tiles,
+  "Discard changes", dark-mode-safe banners and pills. Test IDs and ids (`#brand-name`, `#color-<key>`,
+  "Save brand", "Enable/Disable custom branding", `brand-colour-reach`) are unchanged.
+- Dispatch policy: each threshold on its own full-width row (the overlap came from a viewport-breakpoint
+  two-column grid inside a narrow card); lane scale bar added. `dispatch-policy`, `tag-documents-note` and the
+  slider labels are unchanged.
+- Verified: `tsc`, `npm run lint`, `npm run build`, `npm run check:self` clean; screenshots at 320/380/560 px and
+  390/1440 px, light and dark, from a throwaway harness with mocked API; e2e interactions replayed against it.
+  Unverified: the Playwright browser specs 20, 23, 26, 43 were not run (no backend stack in this session).
+
 ## Current phase — Session C: close the browser-test gaps (C1) and build the Dodo check kit (C2)
 Branch `claude/new-session-janwly` (the session's assigned branch), based on `main` at `9d0fa4e` (PR #27 merged).
 Draft PR opened at the start. Founder authority: decisions in NEEDS-OWNER.md as `DECIDED (Session C)`

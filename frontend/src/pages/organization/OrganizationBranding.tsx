@@ -5,13 +5,19 @@ import {
   CheckCircle2,
   Copy,
   Globe,
+  Image as ImageIcon,
   Loader2,
+  Monitor,
+  Moon,
   Palette,
   RefreshCw,
   ShieldCheck,
   Star,
+  Sun,
   Trash2,
+  Undo2,
   Upload,
+  type LucideIcon,
 } from "lucide-react";
 
 import {
@@ -57,27 +63,38 @@ import {
   type TenantBrandingUpdate,
 } from "@/types/branding";
 import { PageHeader } from "@/components/ui/PageHeader";
+import {
+  BUTTON_DESTRUCTIVE,
+  BUTTON_GHOST,
+  BUTTON_PRIMARY,
+  BUTTON_SECONDARY,
+  FIELD_LABEL,
+  HINT,
+  INPUT as INPUT_BASE,
+  SECTION_TITLE,
+} from "@/components/ui/primitives";
+import { BrandPreview } from "@/components/branding/BrandPreview";
+import { BRAND_PRESETS, type BrandPreset } from "@/components/branding/brandPresets";
+import { ColorField } from "@/components/branding/ColorField";
 
-const CARD =
-  "rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm";
-const LABEL = "text-sm font-medium text-foreground";
-const HINT = "text-xs text-muted-foreground";
-const INPUT =
-  "mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm";
-const BUTTON =
-  "inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed";
-const PRIMARY = `${BUTTON} bg-primary text-primary-foreground hover:opacity-90`;
-const SECONDARY = `${BUTTON} border border-border bg-background hover:bg-muted`;
-const DANGER = `${BUTTON} border border-red-200 text-red-700 hover:bg-red-50`;
+const CARD = "fp-card p-5 sm:p-6";
+const LABEL = FIELD_LABEL;
+const INPUT = `${INPUT_BASE} mt-1`;
+const PRIMARY = BUTTON_PRIMARY;
+const SECONDARY = BUTTON_SECONDARY;
+const GHOST = BUTTON_GHOST;
+const DANGER = BUTTON_DESTRUCTIVE;
 
 const COLOR_FIELDS = [
-  { key: "primary_color", label: "Primary" },
-  { key: "accent_color", label: "Accent" },
-  { key: "background_color", label: "Background" },
-  { key: "foreground_color", label: "Text" },
+  { key: "primary_color", label: "Primary", help: "Buttons, links and focus rings" },
+  { key: "accent_color", label: "Accent", help: "The glow behind sign-in pages" },
+  { key: "background_color", label: "Background", help: "Sign-in page backdrop" },
+  { key: "foreground_color", label: "Text", help: "Sign-in page text" },
 ] as const;
 
 type ColorKey = (typeof COLOR_FIELDS)[number]["key"];
+
+const SCHEME_ICONS: Readonly<Record<ColorScheme, LucideIcon>> = { SYSTEM: Monitor, LIGHT: Sun, DARK: Moon };
 
 const SCHEMES: readonly ColorScheme[] = ["SYSTEM", "LIGHT", "DARK"];
 
@@ -113,7 +130,7 @@ const CopyButton: React.FC<{ value: string; label: string }> = ({
 const ChallengeInstructions: React.FC<{ domain: CustomDomainDetail }> = ({
   domain,
 }) => (
-  <div className="mt-3 rounded-md border border-border bg-muted/40 p-3">
+  <div className="mt-3 rounded-lg border border-border/70 bg-muted/40 p-3">
     <p className={LABEL}>Publish this TXT record, then verify</p>
     <p className={`${HINT} mt-1`}>
       DNS changes can take up to 48 hours to propagate. Verification is also
@@ -196,7 +213,7 @@ const DomainRow: React.FC<DomainRowProps> = ({
   onRevoke,
   onRelease,
 }) => (
-  <li className="rounded-md border border-border p-4">
+  <li className="rounded-xl border border-border/70 bg-muted/20 p-4">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="flex items-center gap-2">
         <Globe className="h-4 w-4 text-muted-foreground" aria-hidden />
@@ -226,14 +243,14 @@ const DomainRow: React.FC<DomainRowProps> = ({
     </p>
 
     {domain.last_failure_reason ? (
-      <p className="mt-2 flex items-start gap-2 text-xs text-amber-700">
+      <p className="mt-2 flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300">
         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
         {domain.last_failure_reason}
       </p>
     ) : null}
 
     {domain.certificate_last_error ? (
-      <p className="mt-2 flex items-start gap-2 text-xs text-red-700">
+      <p className="mt-2 flex items-start gap-2 text-xs text-destructive">
         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
         {domain.certificate_last_error}
       </p>
@@ -331,70 +348,66 @@ const DomainRow: React.FC<DomainRowProps> = ({
 );
 
 // ---------------------------------------------------------------------------
-// Theme preview
+// Logo and favicon
 // ---------------------------------------------------------------------------
 
-const ThemePreview: React.FC<{
-  readonly draft: Record<ColorKey, string>;
-  readonly brandName: string;
-  readonly logoUrl: string | null;
-}> = ({ draft, brandName, logoUrl }) => {
-  const logoImage = useImageFallback(logoUrl);
-  const background = isValidHexColor(draft.background_color)
-    ? draft.background_color
-    : "#ffffff";
-  const foreground = isValidHexColor(draft.foreground_color)
-    ? draft.foreground_color
-    : "#111827";
-  const primary = isValidHexColor(draft.primary_color)
-    ? draft.primary_color
-    : "#2563eb";
-  const accent = isValidHexColor(draft.accent_color)
-    ? draft.accent_color
-    : "#7c3aed";
-
+const AssetTile: React.FC<{
+  readonly label: string;
+  readonly hint: string;
+  readonly hasFile: boolean;
+  readonly previewUrl: string | null;
+  readonly accept: string;
+  readonly canEdit: boolean;
+  readonly busy: boolean;
+  readonly onUpload: (file: File) => void;
+  readonly onClear: () => void;
+}> = ({ label, hint, hasFile, previewUrl, accept, canEdit, busy, onUpload, onClear }) => {
+  const image = useImageFallback(previewUrl);
   return (
-    <div
-      className="rounded-md border border-border p-6"
-      /*
-       * Inline style with four values that have already passed the hex test.
-       * Not dangerouslySetInnerHTML, not an injected <style> block, and no
-       * string concatenation into CSS: the only thing crossing this boundary
-       * is a validated six-digit token, so there is nothing here a tenant
-       * could turn into script. verify_arch25.py G17 fails if that changes.
-       */
-      style={{ backgroundColor: background, color: foreground }}
-    >
-      <div className="flex items-center gap-3">
-        {logoUrl && !logoImage.failed ? (
-          <img
-            src={logoUrl}
-            alt=""
-            className="h-8 w-auto"
-            style={{ maxWidth: 160 }}
-            onError={logoImage.onError}
-          />
-        ) : null}
-        <span className="text-lg font-semibold">
-          {brandName.trim() || "Your brand"}
-        </span>
-      </div>
-      <p className="mt-3 text-sm opacity-80">
-        Sign in to continue to your workspace.
-      </p>
-      <div className="mt-4 flex gap-2">
-        <span
-          className="rounded-md px-3 py-2 text-sm font-medium"
-          style={{ backgroundColor: primary, color: background }}
-        >
-          Sign in
-        </span>
-        <span
-          className="rounded-md px-3 py-2 text-sm font-medium"
-          style={{ backgroundColor: accent, color: background }}
-        >
-          Single sign-on
-        </span>
+    <div className="flex items-center gap-3 rounded-xl border border-border/70 bg-muted/30 p-3">
+      <span
+        aria-hidden
+        className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background text-muted-foreground"
+      >
+        {previewUrl && !image.failed ? (
+          <img src={previewUrl} alt="" className="max-h-full max-w-full object-contain" onError={image.onError} />
+        ) : hasFile ? (
+          <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+        ) : (
+          <ImageIcon className="h-5 w-5" />
+        )}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className={LABEL}>{label}</p>
+        <p className={HINT}>{hasFile ? "Uploaded" : hint}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <label
+            className={`${SECONDARY} h-8 px-2.5 text-xs ${canEdit ? "cursor-pointer" : "pointer-events-none opacity-50"}`}
+            aria-disabled={!canEdit}
+          >
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Upload className="h-3.5 w-3.5" aria-hidden />}
+            Upload
+            <input
+              disabled={!canEdit}
+              type="file"
+              accept={accept}
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                  onUpload(file);
+                }
+                event.target.value = "";
+              }}
+            />
+          </label>
+          {hasFile ? (
+            <button type="button" className={`${DANGER} h-8 px-2.5 text-xs`} disabled={busy} onClick={onClear}>
+              <Trash2 className="h-3.5 w-3.5" aria-hidden />
+              Remove
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -667,6 +680,24 @@ const OrganizationBranding: React.FC = () => {
       (colors[field.key] ?? "") !== "" && !isValidHexColor(colors[field.key]),
   );
 
+  const applyPreset = (preset: BrandPreset) => {
+    setColorDraft(
+      Object.fromEntries(COLOR_FIELDS.map((field) => [field.key, preset.colours[field.key]])) as Partial<
+        Record<ColorKey, string>
+      >,
+    );
+  };
+
+  const discardDrafts = () => {
+    setBrandDraft(null);
+    setColorDraft({});
+  };
+
+  // The address bar in the preview: the hostname a visitor would actually use, if there is one.
+  const verifiedDomains = (domainsQuery.data ?? []).filter((domain) => domain.status === "VERIFIED");
+  const previewHostname =
+    (verifiedDomains.find((domain) => domain.is_primary) ?? verifiedDomains[0])?.hostname ?? "app.yourcompany.com";
+
   const submitTokens = () => {
     const payload: TenantBrandingUpdate = {};
     if (brandDraft !== null) {
@@ -680,7 +711,7 @@ const OrganizationBranding: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <PlanLockBanner capability={CAPABILITY.customBranding} feature="Custom branding" />
       <PageHeader
         icon={Palette}
@@ -690,13 +721,15 @@ const OrganizationBranding: React.FC = () => {
       />
 
       {notice ? (
-        <div className="flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+        <div role="status"
+          className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-800 dark:text-emerald-200">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           {notice}
         </div>
       ) : null}
       {problem ? (
-        <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        <div role="alert"
+          className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           {problem}
         </div>
@@ -711,7 +744,7 @@ const OrganizationBranding: React.FC = () => {
         />
       ) : (
       <section className={CARD}>
-        <h2 className="text-base font-semibold">Custom domains</h2>
+        <h2 className={SECTION_TITLE}>Custom domains</h2>
         {domainAddon.access && domainAddon.access.state !== "ACTIVE" ? (
           <AddOnGraceNotice
             organizationId={organizationId}
@@ -728,7 +761,7 @@ const OrganizationBranding: React.FC = () => {
         {/* F-060: the deployment's switch, from the branding read. Unknown
             (older server) behaves as before. */}
         {branding?.custom_domains_enabled === false ? (
-          <p className="mt-4 rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground" role="status">
+          <p className="mt-4 rounded-lg border border-border/70 bg-muted/40 p-3 text-sm text-muted-foreground" role="status">
             Custom domains are not switched on for this Servabo deployment, so a hostname
             cannot be claimed here yet. Ask your platform administrator to enable custom
             domains.
@@ -796,217 +829,221 @@ const OrganizationBranding: React.FC = () => {
       )}
 
       {/* ---- Brand tokens ---- */}
-      <section className={CARD}>
-        <h2 className="text-base font-semibold">Brand</h2>
-        <p className={`${HINT} mt-1`}>
-          Colours are six-digit hex values. Named colours, rgb(), CSS variables
-          and stylesheet fragments are not accepted — branding is a fixed set of
-          tokens rather than stylesheet input, because these pages are served
-          from an origin shared with other tenants.
-        </p>
-        <p className={`${HINT} mt-1`} data-testid="brand-colour-reach">
-          On your verified domains, the primary colour is used for buttons,
-          links and focus rings on the sign-in pages and in the app; the accent
-          colour for the glow behind the sign-in pages; the background and text
-          colours and the colour scheme for the sign-in pages. Inside the app,
-          light or dark stays each person&apos;s own choice.
-        </p>
-
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div>
-            <label className={LABEL} htmlFor="brand-name">
-              Brand name
-            </label>
-            <input
-              id="brand-name"
-              className={INPUT}
-              value={brandName}
-              maxLength={120}
-              onChange={(event) => setBrandDraft(event.target.value)}
-              placeholder="Acme Inc."
-              disabled={!canBrand}
-            />
-            <p className={`${HINT} mt-1`}>
-              Ampersands and apostrophes are fine. Angle brackets, double
-              quotes and backslashes are not.
+      <section className={CARD} aria-labelledby="brand-title">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 id="brand-title" className={SECTION_TITLE}>Brand</h2>
+            <p className={`${HINT} mt-1 max-w-2xl`}>
+              Colours are six-digit hex values, chosen here with the picker or a preset. Named colours, rgb(),
+              CSS variables and stylesheet fragments are not accepted — branding is a fixed set of tokens rather
+              than stylesheet input, because these pages are served from an origin shared with other tenants.
             </p>
+          </div>
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${
+              branding?.is_enabled
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                : "border-border bg-muted/50 text-muted-foreground"
+            }`}
+          >
+            <span
+              aria-hidden
+              className={`h-1.5 w-1.5 rounded-full ${branding?.is_enabled ? "bg-emerald-500" : "bg-muted-foreground/60"}`}
+            />
+            {branding?.is_enabled ? "Live" : "Not applied"}
+          </span>
+        </div>
+        <p className={`${HINT} mt-2 max-w-2xl`} data-testid="brand-colour-reach">
+          On your verified domains, the primary colour is used for buttons, links and focus rings on the sign-in
+          pages and in the app; the accent colour for the glow behind the sign-in pages; the background and text
+          colours and the colour scheme for the sign-in pages. Inside the app, light or dark stays each
+          person&apos;s own choice.
+        </p>
 
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              {COLOR_FIELDS.map((field) => {
-                const value = colors[field.key] ?? "";
-                const valid = value === "" || isValidHexColor(value);
-                return (
-                  <div key={field.key}>
-                    <label className={LABEL} htmlFor={`color-${field.key}`}>
-                      {field.label}
-                    </label>
-                    <div className="mt-1 flex items-center gap-2">
-                      <input
-                        id={`color-${field.key}`}
-                        className={`${INPUT} mt-0 font-mono`}
-                        value={value}
-                        placeholder="#1a73e8"
-                        disabled={!canBrand}
-                        onChange={(event) =>
-                          setColorDraft((current) => ({
-                            ...current,
-                            [field.key]: event.target.value,
-                          }))
-                        }
-                      />
-                      <span
-                        aria-hidden
-                        className="h-8 w-8 shrink-0 rounded border border-border"
-                        style={{
-                          backgroundColor: valid && value ? value : undefined,
-                        }}
-                      />
-                    </div>
-                    {!valid ? (
-                      <p className="mt-1 text-xs text-red-700">
-                        Use six-digit hex, e.g. #1a73e8.
-                      </p>
-                    ) : null}
-                  </div>
-                );
-              })}
+        <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
+          <div className="min-w-0 space-y-7">
+            {/* Identity */}
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className={LABEL} htmlFor="brand-name">
+                  Brand name
+                </label>
+                <input
+                  id="brand-name"
+                  className={INPUT}
+                  value={brandName}
+                  maxLength={120}
+                  onChange={(event) => setBrandDraft(event.target.value)}
+                  placeholder="Acme Inc."
+                  disabled={!canBrand}
+                />
+                <p className={`${HINT} mt-1`}>
+                  Ampersands and apostrophes are fine. Angle brackets, double quotes and backslashes are not.
+                </p>
+              </div>
+
+              <AssetTile
+                label="Logo"
+                hint="PNG, JPEG or WebP"
+                hasFile={Boolean(branding?.logo_file_id)}
+                previewUrl={logoPreviewSrc}
+                accept="image/png,image/jpeg,image/webp"
+                canEdit={canBrand}
+                busy={logoUpload.isPending || logoClear.isPending}
+                onUpload={(file) => logoUpload.mutate(file)}
+                onClear={() => logoClear.mutate()}
+              />
+              <AssetTile
+                label="Favicon"
+                hint="PNG, ICO or WebP"
+                hasFile={Boolean(branding?.favicon_file_id)}
+                previewUrl={null}
+                accept="image/png,image/x-icon,image/webp"
+                canEdit={canBrand}
+                busy={faviconUpload.isPending || faviconClear.isPending}
+                onUpload={(file) => faviconUpload.mutate(file)}
+                onClear={() => faviconClear.mutate()}
+              />
             </div>
 
-            <div className="mt-4">
-              <span className={LABEL}>Colour scheme</span>
-              <div className="mt-1 flex gap-2">
-                {SCHEMES.map((scheme) => (
-                  <button
-                    key={scheme}
-                    type="button"
-                    className={
-                      branding?.color_scheme === scheme ? PRIMARY : SECONDARY
-                    }
-                    disabled={!canBrand || saveTokens.isPending}
-                    onClick={() => saveTokens.mutate({ color_scheme: scheme })}
-                  >
-                    {scheme.charAt(0) + scheme.slice(1).toLowerCase()}
-                  </button>
+            {/* Colours */}
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <h3 className="text-sm font-semibold text-foreground">Colours</h3>
+                <p className={HINT}>Start from a preset, then adjust any colour.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="group" aria-label="Colour presets">
+                {BRAND_PRESETS.map((preset) => {
+                  const active = COLOR_FIELDS.every(
+                    (field) => colors[field.key].trim().toLowerCase() === preset.colours[field.key],
+                  );
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      disabled={!canBrand}
+                      aria-pressed={active}
+                      aria-label={`Apply ${preset.name} preset`}
+                      onClick={() => applyPreset(preset)}
+                      className={`flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 ${
+                        active ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-muted/60"
+                      }`}
+                    >
+                      <span aria-hidden className="flex -space-x-1">
+                        {COLOR_FIELDS.map((field) => (
+                          <span
+                            key={field.key}
+                            className="h-4 w-4 rounded-full border border-card"
+                            style={{ backgroundColor: preset.colours[field.key] }}
+                          />
+                        ))}
+                      </span>
+                      {preset.name}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="grid gap-6 sm:grid-cols-2">
+                {COLOR_FIELDS.map((field) => (
+                  <ColorField
+                    key={field.key}
+                    id={`color-${field.key}`}
+                    label={field.label}
+                    help={field.help}
+                    value={colors[field.key] ?? ""}
+                    disabled={!canBrand}
+                    onChange={(next) => setColorDraft((current) => ({ ...current, [field.key]: next }))}
+                  />
                 ))}
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={PRIMARY}
-                disabled={
-                  !canBrand ||
-                  saveTokens.isPending ||
-                  invalidColors.length > 0 ||
-                  (brandDraft === null && dirtyColors.length === 0)
-                }
-                onClick={submitTokens}
+            {/* Colour scheme: applies as soon as it is pressed, as before. */}
+            <div>
+              <span className={LABEL} id="scheme-label">Colour scheme</span>
+              <p className={HINT}>How the sign-in pages look. Applies as soon as you choose.</p>
+              <div
+                role="group"
+                aria-labelledby="scheme-label"
+                className="mt-2 inline-flex rounded-lg bg-muted/70 p-0.5"
               >
-                {saveTokens.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                ) : null}
-                Save brand
-              </button>
-              <button
-                type="button"
-                className={SECONDARY}
-                disabled={!canBrand || saveTokens.isPending}
-                onClick={() =>
-                  saveTokens.mutate({ is_enabled: !branding?.is_enabled })
-                }
-              >
-                {branding?.is_enabled
-                  ? "Disable custom branding"
-                  : "Enable custom branding"}
-              </button>
+                {SCHEMES.map((scheme) => {
+                  const Icon = SCHEME_ICONS[scheme];
+                  const selected = branding?.color_scheme === scheme;
+                  return (
+                    <button
+                      key={scheme}
+                      type="button"
+                      aria-pressed={selected}
+                      className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 ${
+                        selected ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      disabled={!canBrand || saveTokens.isPending}
+                      onClick={() => saveTokens.mutate({ color_scheme: scheme })}
+                    >
+                      <Icon className="h-3.5 w-3.5" aria-hidden />
+                      {scheme.charAt(0) + scheme.slice(1).toLowerCase()}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <p className={`${HINT} mt-2`}>
-              {!canBrand
-                ? "Custom branding is included on higher plans. What is on file stays; you can still remove a logo or favicon."
-                : branding?.is_enabled
-                  ? "Custom branding is live on your verified domains."
-                  : "Saved but not applied. Nothing a visitor sees changes until you enable it."}
-            </p>
+
+            <div className="border-t border-border/60 pt-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className={PRIMARY}
+                  disabled={
+                    !canBrand ||
+                    saveTokens.isPending ||
+                    invalidColors.length > 0 ||
+                    (brandDraft === null && dirtyColors.length === 0)
+                  }
+                  onClick={submitTokens}
+                >
+                  {saveTokens.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                  Save brand
+                </button>
+                {brandDraft !== null || dirtyColors.length > 0 ? (
+                  <button type="button" className={GHOST} disabled={saveTokens.isPending} onClick={discardDrafts}>
+                    <Undo2 className="h-3.5 w-3.5" aria-hidden />
+                    Discard changes
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className={`${SECONDARY} sm:ml-auto`}
+                  disabled={!canBrand || saveTokens.isPending}
+                  onClick={() => saveTokens.mutate({ is_enabled: !branding?.is_enabled })}
+                >
+                  {branding?.is_enabled ? "Disable custom branding" : "Enable custom branding"}
+                </button>
+              </div>
+              <p className={`${HINT} mt-2`}>
+                {!canBrand
+                  ? "Custom branding is included on higher plans. What is on file stays; you can still remove a logo or favicon."
+                  : branding?.is_enabled
+                    ? "Custom branding is live on your verified domains."
+                    : "Saved but not applied. Nothing a visitor sees changes until you enable it."}
+              </p>
+            </div>
           </div>
 
-          <div>
-            <span className={LABEL}>Preview</span>
-            <div className="mt-1">
-              <ThemePreview
-                draft={colors}
+          <div className="min-w-0">
+            <div className="lg:sticky lg:top-20">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className={LABEL}>Live preview</span>
+                <span className={HINT}>Updates as you edit</span>
+              </div>
+              <BrandPreview
+                colours={colors}
+                scheme={branding?.color_scheme ?? "SYSTEM"}
                 brandName={brandName}
                 logoUrl={logoPreviewSrc}
+                hostname={previewHostname}
               />
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <div>
-                <span className={LABEL}>Logo</span>
-                <label
-                  className={`${SECONDARY} mt-1 ${canBrand ? "cursor-pointer" : "pointer-events-none opacity-50"}`}
-                  aria-disabled={!canBrand}
-                >
-                  <Upload className="h-3.5 w-3.5" aria-hidden />
-                  Upload
-                  <input
-                    disabled={!canBrand}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    className="hidden"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) {
-                        logoUpload.mutate(file);
-                      }
-                      event.target.value = "";
-                    }}
-                  />
-                </label>
-                {branding?.logo_file_id ? (
-                  <button
-                    type="button"
-                    className={`${DANGER} mt-2`}
-                    onClick={() => logoClear.mutate()}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                    Remove
-                  </button>
-                ) : null}
-              </div>
-              <div>
-                <span className={LABEL}>Favicon</span>
-                <label
-                  className={`${SECONDARY} mt-1 ${canBrand ? "cursor-pointer" : "pointer-events-none opacity-50"}`}
-                  aria-disabled={!canBrand}
-                >
-                  <Upload className="h-3.5 w-3.5" aria-hidden />
-                  Upload
-                  <input
-                    disabled={!canBrand}
-                    type="file"
-                    accept="image/png,image/x-icon,image/webp"
-                    className="hidden"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) {
-                        faviconUpload.mutate(file);
-                      }
-                      event.target.value = "";
-                    }}
-                  />
-                </label>
-                {branding?.favicon_file_id ? (
-                  <button
-                    type="button"
-                    className={`${DANGER} mt-2`}
-                    onClick={() => faviconClear.mutate()}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                    Remove
-                  </button>
-                ) : null}
-              </div>
             </div>
           </div>
         </div>
@@ -1014,7 +1051,7 @@ const OrganizationBranding: React.FC = () => {
 
       {/* ---- Sender domain ---- */}
       <section className={CARD}>
-        <h2 className="text-base font-semibold">Notification sender domain</h2>
+        <h2 className={SECTION_TITLE}>Notification sender domain</h2>
         <p className={`${HINT} mt-1`}>
           Send notifications from your own domain. Until SPF and DKIM verify,
           mail goes out from the Servabo platform address.
@@ -1027,7 +1064,7 @@ const OrganizationBranding: React.FC = () => {
            * this copy in a local switch over sender_domain_status is how it
            * eventually goes quiet again.
            */
-          <p className="mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             {branding.sender.degradation_reason}
           </p>
@@ -1087,7 +1124,7 @@ const OrganizationBranding: React.FC = () => {
             {branding.sender.required_records.map((record) => (
               <li
                 key={record.purpose}
-                className="rounded-md border border-border p-3 text-sm"
+                className="rounded-lg border border-border/70 bg-muted/20 p-3 text-sm"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium">{record.purpose}</span>

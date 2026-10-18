@@ -190,9 +190,9 @@ export const DOMAIN_STATUS_LABELS: Record<CustomDomainStatus, string> = {
 };
 
 export const DOMAIN_STATUS_CLASSES: Record<CustomDomainStatus, string> = {
-  PENDING: "bg-amber-100 text-amber-800",
-  VERIFIED: "bg-emerald-100 text-emerald-800",
-  FAILED: "bg-red-100 text-red-800",
+  PENDING: "bg-amber-500/10 text-amber-800 dark:text-amber-300",
+  VERIFIED: "bg-emerald-500/10 text-emerald-800 dark:text-emerald-300",
+  FAILED: "bg-destructive/10 text-destructive",
   REVOKED: "bg-muted text-muted-foreground",
 };
 
