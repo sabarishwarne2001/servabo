@@ -514,6 +514,10 @@ def simulate(db: Session, *, workspace_id: uuid.UUID, organization_id: uuid.UUID
     origin = db.execute(select(MeshNode).where(MeshNode.workspace_id == workspace_id,
                                                MeshNode.work_item_id == work_item_id)).scalar_one_or_none()
     if origin is None:
+        exists = db.execute(select(WorkItem.id).where(WorkItem.id == work_item_id,
+                                                      WorkItem.workspace_id == workspace_id)).first()
+        if exists is None:
+            raise MeshError("DOCUMENT_NOT_FOUND", "That document is not in this workspace.", 404)
         raise MeshError("NOT_IN_MESH", "This document is not in the mesh yet. Build the mesh first.", 409)
     scope = loader.neighbourhood(db, workspace_id, {work_item_id}, hops=v.RIPPLE_MAX_DEPTH, cap=v.RIPPLE_MAX_NODES)
     twins = {n.work_item_id: loader.twin_from_node(n) for n in loader.nodes(db, workspace_id, scope)}
