@@ -569,11 +569,15 @@ def state(db: Session, workspace_id: uuid.UUID) -> Optional[MeshState]:
     return db.get(MeshState, workspace_id)
 
 
-def _node_out(node: MeshNode) -> dict[str, Any]:
-    meta = next((f for f in (node.facts or []) if f.get("concept") == "_twin"), {})
+def _node_out(node: Any) -> dict[str, Any]:
+    """A node, or a light card from `loader.node_cards` (which carries `filename` itself)."""
+    if hasattr(node, "filename"):
+        filename = node.filename
+    else:
+        filename = next((f for f in (node.facts or []) if f.get("concept") == "_twin"), {}).get("filename")
     return {
         "work_item_id": str(node.work_item_id), "kind": node.kind, "kind_label": node.kind_label, "rank": node.rank,
-        "title": node.title, "filename": meta.get("filename") or node.title, "document_number": node.document_number,
+        "title": node.title, "filename": filename or node.title, "document_number": node.document_number,
         "counterparty": node.counterparty, "currency": node.currency, "amount_micros": node.amount_micros,
         "net_amount_micros": node.net_amount_micros,
         "document_date": node.document_date.isoformat() if node.document_date else None,
@@ -605,14 +609,14 @@ def conflict_out(conflict: MeshConflict) -> dict[str, Any]:
 
 def overview(db: Session, workspace_id: uuid.UUID) -> dict[str, Any]:
     current = state(db, workspace_id)
-    nodes = loader.nodes(db, workspace_id)
+    nodes = loader.node_cards(db, workspace_id)
     open_rows = list(db.execute(select(MeshConflict).where(
         MeshConflict.workspace_id == workspace_id, MeshConflict.status.in_(OPEN))).scalars())
     severities = Counter(c.severity for c in open_rows)
     kinds = Counter(c.kind for c in open_rows)
     currencies = {c.currency for c in open_rows if c.currency and c.kind in v.EXPOSURE_KINDS}
     here = {n.work_item_id for n in nodes}
-    links = [l for l in loader.links(db, workspace_id) if l.status != "REJECTED"
+    links = [l for l in loader.link_pairs(db, workspace_id) if l.status != "REJECTED"
              and l.source_work_item_id in here and l.target_work_item_id in here]
     relations = Counter(l.relation for l in links)
     # Clusters: connected components over usable links.
@@ -668,10 +672,10 @@ def graph(db: Session, workspace_id: uuid.UUID, *, focus: Optional[uuid.UUID] = 
                                                              cap=limit)
     else:
         ids = None
-    nodes = loader.nodes(db, workspace_id, ids)
+    nodes = loader.node_cards(db, workspace_id, ids)
     nodes = sorted(nodes, key=lambda n: (-float(n.risk_score), -n.degree, n.title))[:limit]
     kept = {n.work_item_id for n in nodes}
-    links = [l for l in loader.links(db, workspace_id, kept if ids is not None else None)
+    links = [l for l in loader.links(db, workspace_id, kept)
              if l.source_work_item_id in kept and l.target_work_item_id in kept and float(l.strength) >= min_strength]
     open_by_doc: Counter[uuid.UUID] = Counter()
     for c in db.execute(select(MeshConflict).where(MeshConflict.workspace_id == workspace_id,
@@ -728,7 +732,7 @@ def matrix(db: Session, workspace_id: uuid.UUID, *, limit_documents: int = 12) -
     rows.sort(key=lambda c: (v.SEVERITY_ORDER[c.severity], -(c.exposure_micros or 0), c.title))
     counts: Counter[uuid.UUID] = Counter(i for c in rows for i in c.work_item_ids)
     columns_ids = [i for i, _ in counts.most_common(limit_documents)]
-    nodes = {n.work_item_id: n for n in loader.nodes(db, workspace_id, columns_ids)}
+    nodes = {n.work_item_id: n for n in loader.node_cards(db, workspace_id, columns_ids)}
     columns = [_node_out(nodes[i]) for i in columns_ids if i in nodes]
     out_rows = []
     for c in rows[:60]:
@@ -746,7 +750,8 @@ def export_csv(db: Session, workspace_id: uuid.UUID) -> str:
     """Audit-ready: every conflict with its documents, values, exposure and decision. Formula-safe."""
     from app.services.tables.export import safe_text
 
-    titles = {n.work_item_id: n.title for n in loader.nodes(db, workspace_id)}
+    titles = dict(db.execute(select(MeshNode.work_item_id, MeshNode.title).where(
+        MeshNode.workspace_id == workspace_id)).all())
     rows = list(db.execute(select(MeshConflict).where(MeshConflict.workspace_id == workspace_id)
                            .order_by(MeshConflict.status, MeshConflict.severity, MeshConflict.first_seen_at)).scalars())
     buffer = io.StringIO()

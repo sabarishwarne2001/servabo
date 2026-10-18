@@ -14,7 +14,7 @@ from typing import Any, Iterable, Optional, Sequence
 
 import numpy as np
 from sqlalchemy import func, select, text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from app.models.document_role import DocumentRole
 from app.models.truthmesh import MeshLink, MeshNode
@@ -104,8 +104,39 @@ def twin_from_node(node: MeshNode) -> Twin:
     )
 
 
+#: The columns a node's card needs (lists, graph, matrix, overview). Not the 384-number centroid, the
+#: facts or the terms: at 5,000 documents loading those whole made the overview take 1.5 s. The file
+#: name sits in the first fact (`_twin`), read in SQL.
+_CARD_COLUMNS = (
+    MeshNode.work_item_id, MeshNode.kind, MeshNode.kind_label, MeshNode.rank, MeshNode.title,
+    MeshNode.document_number, MeshNode.counterparty, MeshNode.currency, MeshNode.amount_micros,
+    MeshNode.net_amount_micros, MeshNode.document_date, MeshNode.effective_date, MeshNode.end_date,
+    MeshNode.risk_score, MeshNode.degree,
+)
+
+
+def node_cards(db: Session, workspace_id: uuid.UUID, work_item_ids: Optional[Iterable[uuid.UUID]] = None) -> list[Any]:
+    """Light rows (the `_CARD_COLUMNS` and `filename`) for the read models."""
+    query = select(*_CARD_COLUMNS, MeshNode.facts[0]["filename"].astext.label("filename")).where(
+        MeshNode.workspace_id == workspace_id)
+    if work_item_ids is not None:
+        wanted = list(work_item_ids)
+        if not wanted:
+            return []
+        query = query.where(MeshNode.work_item_id.in_(wanted))
+    return list(db.execute(query).all())
+
+
+def link_pairs(db: Session, workspace_id: uuid.UUID) -> list[Any]:
+    """(source, target, relation, status) of every link, without their signals."""
+    return list(db.execute(select(MeshLink.source_work_item_id, MeshLink.target_work_item_id, MeshLink.relation,
+                                  MeshLink.status).where(MeshLink.workspace_id == workspace_id)).all())
+
+
 def nodes(db: Session, workspace_id: uuid.UUID, work_item_ids: Optional[Iterable[uuid.UUID]] = None) -> list[MeshNode]:
-    query = select(MeshNode).where(MeshNode.workspace_id == workspace_id)
+    # The centroid (384 numbers) is never read from a loaded node: neighbours are found in SQL and
+    # `twin_from_node` leaves it out.
+    query = select(MeshNode).options(defer(MeshNode.centroid)).where(MeshNode.workspace_id == workspace_id)
     if work_item_ids is not None:
         wanted = list(work_item_ids)
         if not wanted:
