@@ -453,3 +453,42 @@ def test_the_read_models_do_not_load_every_nodes_embedding(client, db_session, t
     assert selecting
     heavy = [s[:160] for s in selecting if "mesh_nodes.centroid" in s]
     assert not heavy, heavy
+
+
+def test_erasing_a_person_takes_their_documents_out_of_the_mesh(db_session, tenant: Fixture, test_sessions) -> None:
+    """GDPR erasure emptied the person's documents but left their mesh nodes (title, facts, parties,
+    counterparty), the conflicts quoting their values and the simulations that reached them."""
+    from app.services.compliance import erasure_service
+
+    put_on_plan(db_session, tenant.organization, "enterprise")
+    ids = seed_documents(db_session, tenant.workspace.id, tenant.contributor.user.id)
+    build(tenant.workspace.id, tenant.organization.id)
+    db_session.expire_all()
+    assert db_session.execute(select(MeshNode).where(MeshNode.workspace_id == tenant.workspace.id)).scalars().all()
+    assert db_session.execute(select(MeshConflict).where(MeshConflict.workspace_id == tenant.workspace.id)
+                              ).scalars().all()
+
+    from app.models.truthmesh import MeshSimulation
+    from app.services.truthmesh import service
+
+    with TestSessionLocal() as session:
+        service.simulate(session, workspace_id=tenant.workspace.id, organization_id=tenant.organization.id,
+                         actor_id=tenant.owner.user.id, work_item_id=ids["PO-TM-5001"], scenario="DELAY",
+                         parameters={"days": 5})
+        session.commit()
+    assert db_session.execute(select(MeshSimulation)).scalars().all()
+
+    erasure_service.erase_subject(db_session, organization=tenant.organization,
+                                  subject_user_id=tenant.contributor.user.id, erasure_ticket="DSR-TM-1",
+                                  actor_user_id=tenant.owner.user.id)
+    db_session.commit()
+    db_session.expire_all()
+
+    assert not db_session.execute(select(MeshNode).where(MeshNode.workspace_id == tenant.workspace.id)
+                                  ).scalars().all(), "the erased person's documents are still in the mesh"
+    assert not db_session.execute(select(MeshLink).where(MeshLink.workspace_id == tenant.workspace.id)
+                                  ).scalars().all()
+    left = db_session.execute(select(MeshConflict).where(MeshConflict.workspace_id == tenant.workspace.id)
+                              ).scalars().all()
+    assert not left, [c.title for c in left]
+    assert not db_session.execute(select(MeshSimulation)).scalars().all(), "a simulation that reached them stays"

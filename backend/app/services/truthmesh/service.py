@@ -29,10 +29,10 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Iterable, Optional, Sequence
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import String, delete, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.truthmesh import MeshConflict, MeshLink, MeshNode, MeshSimulation, MeshState
+from app.models.truthmesh import CONFLICT_STATUSES, MeshConflict, MeshLink, MeshNode, MeshSimulation, MeshState
 from app.models.work_item import WorkItem
 from app.services.truthmesh import conflicts as C
 from app.services.truthmesh import facts as F
@@ -149,13 +149,18 @@ def _remove_missing(db: Session, workspace_id: uuid.UUID, keep: set[uuid.UUID]) 
     db.flush()
 
 
-def forget_documents(db: Session, *, workspace_id: uuid.UUID, work_item_ids: Iterable[uuid.UUID]) -> int:
+def forget_documents(db: Session, *, workspace_id: uuid.UUID, work_item_ids: Iterable[uuid.UUID],
+                     erase: bool = False) -> int:
     """Take deleted documents out of the mesh now: their nodes and links go, the conflicts that name
     them are resolved ("a document in it was deleted"), and their neighbours' risk is recomputed.
 
     Conflicts name their documents by id (no foreign key), so before this a deleted document's
     conflicts stayed OPEN, and in "money at risk", until somebody pressed Rebuild. Call it in the
     transaction that deletes (or erases) the documents. Returns the conflicts it resolved.
+
+    `erase=True` is for a person's erasure (GDPR): a conflict quotes its documents' values and a
+    simulation quotes the documents it reached, so every conflict and simulation that names an erased
+    document is deleted, not kept as history.
     """
     ids = list(dict.fromkeys(work_item_ids))
     if not ids:
@@ -164,7 +169,7 @@ def forget_documents(db: Session, *, workspace_id: uuid.UUID, work_item_ids: Ite
         MeshNode.workspace_id == workspace_id, MeshNode.work_item_id.in_(ids))).scalar_one()
     named = db.execute(select(func.count()).select_from(MeshConflict).where(
         MeshConflict.workspace_id == workspace_id, MeshConflict.work_item_ids.overlap(ids),
-        MeshConflict.status.in_(OPEN))).scalar_one()
+        MeshConflict.status.in_(OPEN) if not erase else MeshConflict.status.in_(CONFLICT_STATUSES))).scalar_one()
     if not in_mesh and not named:
         return 0  # not in the mesh (the plan does not carry it, or it was never indexed)
     lock_workspace(db, workspace_id)
@@ -172,13 +177,24 @@ def forget_documents(db: Session, *, workspace_id: uuid.UUID, work_item_ids: Ite
     neighbours = loader.neighbourhood(db, workspace_id, gone, hops=1) - gone
     now = _now()
     resolved = 0
-    for conflict in db.execute(select(MeshConflict).where(
+    if erase:
+        resolved = db.execute(delete(MeshConflict).where(
             MeshConflict.workspace_id == workspace_id, MeshConflict.work_item_ids.overlap(ids),
-            MeshConflict.status.in_(OPEN))).scalars():
-        conflict.status, conflict.auto_resolved, conflict.resolved_at = "RESOLVED", True, now
-        conflict.resolution_note = "A document in this conflict was deleted."
-        conflict.updated_at = now
-        resolved += 1
+            MeshConflict.status.in_(OPEN))).rowcount or 0
+        db.execute(delete(MeshConflict).where(
+            MeshConflict.workspace_id == workspace_id, MeshConflict.work_item_ids.overlap(ids)))
+        mentions = [MeshSimulation.result.cast(String).like(f"%{i}%") for i in ids]
+        db.execute(delete(MeshSimulation).where(
+            MeshSimulation.workspace_id == workspace_id,
+            (MeshSimulation.origin_work_item_id.in_(ids)) | or_(*mentions)))
+    else:
+        for conflict in db.execute(select(MeshConflict).where(
+                MeshConflict.workspace_id == workspace_id, MeshConflict.work_item_ids.overlap(ids),
+                MeshConflict.status.in_(OPEN))).scalars():
+            conflict.status, conflict.auto_resolved, conflict.resolved_at = "RESOLVED", True, now
+            conflict.resolution_note = "A document in this conflict was deleted."
+            conflict.updated_at = now
+            resolved += 1
     db.execute(delete(MeshLink).where(
         MeshLink.workspace_id == workspace_id,
         MeshLink.source_work_item_id.in_(ids) | MeshLink.target_work_item_id.in_(ids)))
