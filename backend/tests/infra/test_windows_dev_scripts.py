@@ -12,6 +12,7 @@ Both scripts parse with PowerShell 7.4's own parser (checked in session 4; run
 
 from __future__ import annotations
 
+import os
 import pathlib
 import re
 import subprocess
@@ -27,6 +28,7 @@ pytestmark = pytest.mark.no_db
 BACKEND = pathlib.Path(__file__).resolve().parents[2]
 REPO = BACKEND.parent
 START = (REPO / "start_dev.ps1").read_text(encoding="utf-8")
+START_SH = (REPO / "start_dev.sh").read_text(encoding="utf-8")
 RESET = (REPO / "reset_dev.ps1").read_text(encoding="utf-8")
 DEV_COMPOSE = yaml.safe_load((BACKEND / "docker-compose.yml").read_text())
 
@@ -102,3 +104,36 @@ def test_the_website_switch_is_not_inside_the_api_failure_branch() -> None:
     website = START.index("if ($Website) {", failed)
     assert leaves < website, "-Website is started only on the path that exits"
     assert START.index("if (-not $NoFrontend) {", failed) > website
+
+
+def test_dodo_webhooks_switch_refuses_live_mode_before_anything_starts_in_both_scripts() -> None:
+    assert "[switch]$DodoWebhooks" in START
+    assert "--dodo-webhooks)" in START_SH
+    for script, first_step in ((START, "Write-Step '1/8"), (START_SH, "step '1/8")):
+        refusal = script.index("TEST mode only")
+        assert refusal < script.index(first_step), "the refusal comes after the script began to start the stack"
+        assert "DODO_LIVEMODE" in script[:refusal]
+
+
+def test_the_relay_is_started_and_stopped_by_the_scripts_with_flags_the_helper_has() -> None:
+    start_help, stop_help = _help("scripts/dodo_relay.py", "start"), _help("scripts/dodo_relay.py", "stop")
+    for script in (START, START_SH):
+        assert "scripts/dodo_relay.py start" in script and "scripts/dodo_relay.py stop" in script
+        for flag in ("--api-port", "--run-dir", "--env-file"):
+            assert flag in script and flag in start_help, flag
+    assert "--run-dir" in stop_help
+
+
+def test_the_shell_script_parses_and_refuses_live_mode_without_touching_docker() -> None:
+    assert subprocess.run(["bash", "-n", str(REPO / "start_dev.sh")], capture_output=True).returncode == 0
+    done = subprocess.run(["bash", str(REPO / "start_dev.sh"), "--dodo-webhooks"], capture_output=True, text=True,
+                          timeout=60, env={**os.environ, "DODO_LIVEMODE": "true"})
+    assert done.returncode == 1
+    assert "TEST mode only" in done.stdout + done.stderr
+    assert "Verifying prerequisites" not in done.stdout
+    assert not (REPO / ".dev").exists() or not (REPO / ".dev" / "dodo-relay.json").exists()
+
+
+def test_the_shell_script_names_the_new_switch_in_its_help() -> None:
+    help_text = subprocess.run(["bash", str(REPO / "start_dev.sh"), "--help"], capture_output=True, text=True, timeout=60).stdout
+    assert "--dodo-webhooks" in help_text
