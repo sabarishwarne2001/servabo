@@ -35,12 +35,12 @@ restart.**
 - [x] B4. Decisions recorded: N-118 (Dodo hard limits), N-119 (Tailwind 4), N-120 (N-074), N-121 (aliases),
   N-122 (incremental ledger), N-123 (127.0.0.1), N-124 (Task 5)
 - [x] B5. Task 5 deferred (N-124) and Task 4 handed to Session C (HANDOFF "Session B → next sessions")
-- [ ] Finish: full backend suite (local: 4,986 passed in two halves, then 297 re-run after a clash between the halves, before the last records commits; CI is the
+- [x] Finish: CI green on c1e1b94 (all 11 checks, browser suite included); full backend suite (local: 4,986 passed in two halves, then 297 re-run after a clash between the halves, before the last records commits; CI is the
   judge), full browser suite (817 passed, 2 skipped, 1 timing test failed under load and passed alone),
   `campaign_slices.py --check all` 0, one Alembic head (up/down/up, no drift), frontend lint / typecheck /
   check:self / e2e typecheck clean, records, CI green, PR description for a non-engineer, mark ready.
 
-**Next action:** wait for CI on the last push, fix anything red, mark PR #27 ready, stop.
+**Next action:** none for Session B. PR #27 is marked ready for review. Session C: Task 4 of NEXT-SESSION-PROMPT.md.
 
 ## Previous phase — Helm visual session: Night Bridge, the switch, Lumen and the website's Helm page
 Branch `claude/beautiful-dijkstra-yvlspo` (the session's assigned branch), based on `main` at `5e4366d`
