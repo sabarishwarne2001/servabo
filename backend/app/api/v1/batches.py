@@ -642,9 +642,16 @@ def download_package(
     package = _package_or_404(db, workspace_id, package_id)
     now = datetime.now(timezone.utc)
     if package.status == "READY" and package.expires_at is not None and package.expires_at <= now:
-        packages.expire(db, now=now)
+        # Only this package; the hourly sweep does the rest. If its archive could not be deleted now,
+        # it is still expired: the sweep tries again, and it is not served meanwhile.
+        packages.expire_one(db, package=package)
         db.commit()
         db.refresh(package)
+        if package.status == "READY":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"code": "PACKAGE_EXPIRED", "message": "This package has expired; request a new one."},
+            )
     if package.status != "READY" or not package.storage_key:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

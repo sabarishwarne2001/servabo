@@ -437,25 +437,31 @@ def fail(package: ExportPackage, code: str, detail: str) -> ExportPackage:
     return package
 
 
-def expire(db: Session, *, now: Optional[datetime] = None) -> int:
-    """Delete the archives of packages past their expiry and mark them EXPIRED."""
+def expire_one(db: Session, *, package: ExportPackage) -> bool:
+    """Delete one package's archive and mark it EXPIRED; False when its storage could not be deleted
+    (the hourly sweep tries again). The digests stay: they still prove what was issued."""
     from app.core.storage import StorageError, get_storage_driver
 
+    try:
+        if package.storage_key:
+            get_storage_driver().delete(package.storage_key)
+    except StorageError:
+        return False
+    package.status = PACKAGE_EXPIRED
+    package.storage_key = None
+    db.flush()
+    return True
+
+
+def expire(db: Session, *, now: Optional[datetime] = None) -> int:
+    """Delete the archives of packages past their expiry and mark them EXPIRED (the hourly sweep)."""
     moment = now or datetime.now(timezone.utc)
-    driver = get_storage_driver()
     count = 0
     for package in db.execute(
         select(ExportPackage).where(ExportPackage.status == PACKAGE_READY, ExportPackage.expires_at <= moment)
     ).scalars():
-        try:
-            if package.storage_key:
-                driver.delete(package.storage_key)
-        except StorageError:
-            continue
-        package.status = PACKAGE_EXPIRED
-        package.storage_key = None  # the digests stay: they still prove what was issued
-        count += 1
-    db.flush()
+        if expire_one(db, package=package):
+            count += 1
     return count
 
 
@@ -649,6 +655,7 @@ __all__ = [
     "PackageError",
     "build",
     "expire",
+    "expire_one",
     "fail",
     "folder_name",
     "request_package",
