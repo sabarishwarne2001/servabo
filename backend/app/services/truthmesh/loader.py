@@ -114,6 +114,15 @@ def nodes(db: Session, workspace_id: uuid.UUID, work_item_ids: Optional[Iterable
     return list(db.execute(query).scalars())
 
 
+def present(db: Session, workspace_id: uuid.UUID, work_item_ids: Iterable[uuid.UUID]) -> set[uuid.UUID]:
+    """Which of these documents have a node in the mesh."""
+    wanted = list(work_item_ids)
+    if not wanted:
+        return set()
+    return set(db.execute(select(MeshNode.work_item_id).where(
+        MeshNode.workspace_id == workspace_id, MeshNode.work_item_id.in_(wanted))).scalars())
+
+
 def links(db: Session, workspace_id: uuid.UUID, touching: Optional[Iterable[uuid.UUID]] = None) -> list[MeshLink]:
     query = select(MeshLink).where(MeshLink.workspace_id == workspace_id)
     if touching is not None:

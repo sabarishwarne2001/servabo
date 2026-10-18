@@ -136,11 +136,14 @@ def _store_twins(db: Session, *, organization_id: uuid.UUID, workspace_id: uuid.
 
 
 def _remove_missing(db: Session, workspace_id: uuid.UUID, keep: set[uuid.UUID]) -> None:
-    """Nodes whose documents left the mesh (failed reprocessing, deleted) go; their links go with them."""
+    """Nodes whose documents left the mesh (failed or being reprocessed, deleted) go, with their automatic
+    links. A link a person CONFIRMED or REJECTED stays: it is their decision about two documents, and a
+    document that is only being reprocessed comes back (a deleted one takes its links with it by foreign
+    key). Deleting a rejected link let the engine propose the pair again as automatic."""
     stale = [n for n in loader.nodes(db, workspace_id) if n.work_item_id not in keep]
     for node in stale:
         db.execute(delete(MeshLink).where(
-            MeshLink.workspace_id == workspace_id,
+            MeshLink.workspace_id == workspace_id, MeshLink.status == "AUTO",
             (MeshLink.source_work_item_id == node.work_item_id) | (MeshLink.target_work_item_id == node.work_item_id)))
         db.delete(node)
     db.flush()
@@ -276,8 +279,10 @@ def _refresh_risk(db: Session, workspace_id: uuid.UUID, ids: Optional[set[uuid.U
         query = query.where(MeshConflict.work_item_ids.overlap(list(ids)))
     risks = RK.node_risks(db.execute(query).scalars())
     degree: Counter[uuid.UUID] = Counter()
-    for link in loader.links(db, workspace_id, ids):
-        if link.status != "REJECTED":
+    rows = loader.links(db, workspace_id, ids)
+    here = loader.present(db, workspace_id, {x for l in rows for x in (l.source_work_item_id, l.target_work_item_id)})
+    for link in rows:
+        if link.status != "REJECTED" and link.source_work_item_id in here and link.target_work_item_id in here:
             degree[link.source_work_item_id] += 1
             degree[link.target_work_item_id] += 1
     for node in loader.nodes(db, workspace_id, ids):
@@ -290,8 +295,10 @@ def _refresh_state(db: Session, *, workspace_id: uuid.UUID, organization_id: uui
                    status: str = "READY", error: Optional[str] = None) -> MeshState:
     nodes = db.execute(select(MeshNode.work_item_id, MeshNode.risk_score, MeshNode.amount_micros)
                        .where(MeshNode.workspace_id == workspace_id)).all()
+    present = select(MeshNode.work_item_id).where(MeshNode.workspace_id == workspace_id).scalar_subquery()
     links = db.execute(select(func.count()).select_from(MeshLink).where(
-        MeshLink.workspace_id == workspace_id, MeshLink.status != "REJECTED")).scalar_one()
+        MeshLink.workspace_id == workspace_id, MeshLink.status != "REJECTED",
+        MeshLink.source_work_item_id.in_(present), MeshLink.target_work_item_id.in_(present))).scalar_one()
     open_conflicts = db.execute(select(func.count()).select_from(MeshConflict).where(
         MeshConflict.workspace_id == workspace_id, MeshConflict.status.in_(OPEN))).scalar_one()
     index = RK.risk_index({n.work_item_id: float(n.risk_score) for n in nodes},
@@ -600,7 +607,9 @@ def overview(db: Session, workspace_id: uuid.UUID) -> dict[str, Any]:
     severities = Counter(c.severity for c in open_rows)
     kinds = Counter(c.kind for c in open_rows)
     currencies = {c.currency for c in open_rows if c.currency and c.kind in v.EXPOSURE_KINDS}
-    links = [l for l in loader.links(db, workspace_id) if l.status != "REJECTED"]
+    here = {n.work_item_id for n in nodes}
+    links = [l for l in loader.links(db, workspace_id) if l.status != "REJECTED"
+             and l.source_work_item_id in here and l.target_work_item_id in here]
     relations = Counter(l.relation for l in links)
     # Clusters: connected components over usable links.
     parent: dict[uuid.UUID, uuid.UUID] = {n.work_item_id: n.work_item_id for n in nodes}
