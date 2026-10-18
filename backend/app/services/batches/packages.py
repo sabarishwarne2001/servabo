@@ -34,6 +34,7 @@ import tempfile
 import uuid
 import zipfile
 import zlib
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, BinaryIO, Iterable, Optional, Sequence
@@ -486,6 +487,13 @@ _UNREADABLE_ENTRY: tuple[type[BaseException], ...] = (
 )
 
 
+def _added_by_macos(path: str) -> bool:
+    """`__MACOSX/…` (resource forks) and `.DS_Store` (Finder view settings) appear when a folder is
+    re-zipped on a Mac; they carry no package content (N-076)."""
+    parts = path.split("/")
+    return parts[0] == "__MACOSX" or parts[-1] == ".DS_Store"
+
+
 def _manifest_shape_ok(manifest: Any) -> bool:
     """The fields verify reads have the types Servabo writes (F-407): valid JSON of another
     shape is not a package, not a server error."""
@@ -528,6 +536,7 @@ def verify(db: Session, *, workspace_id: uuid.UUID, handle: BinaryIO) -> dict[st
         if len(infos) > v.VERIFY_MAX_ENTRIES or sum(i.file_size for i in infos) > v.VERIFY_MAX_UNCOMPRESSED_BYTES:
             return {**invalid, "message": "This archive is too large to verify here."}
         names = {i.filename for i in infos}
+        repeated = sorted(n for n, count in Counter(i.filename for i in infos).items() if count > 1)
         manifest_names = sorted(n for n in names if n == "manifest.json" or n.endswith("/manifest.json"))
         if not manifest_names:
             return {**invalid, "message": "This is not a Servabo export package: it has no manifest.json."}
@@ -581,7 +590,15 @@ def verify(db: Session, *, workspace_id: uuid.UUID, handle: BinaryIO) -> dict[st
             actual = digest.hexdigest()
             checks.append(FileCheck(path, expected, actual, "OK" if actual == expected else "MODIFIED"))
         for path in sorted(set(relative) - set(sums)):
-            checks.append(FileCheck(path, None, None, "UNEXPECTED"))
+            if not _added_by_macos(path):
+                checks.append(FileCheck(path, None, None, "UNEXPECTED"))
+        # N-076: nothing else may ride along. A file outside the package folder, and a name that
+        # appears twice (zipfile reads the last one; another tool may extract the first), are
+        # changes, except the two things macOS adds when someone re-zips the folder.
+        for name in sorted(n for n in names if not n.startswith(root) and not _added_by_macos(n)):
+            checks.append(FileCheck(name, None, None, "UNEXPECTED"))
+        for name in repeated:
+            checks.append(FileCheck(name[len(root):] if name.startswith(root) else name, None, None, "UNEXPECTED"))
         listed = {f.get("path"): f.get("sha256") for f in manifest.get("files") or [] if isinstance(f, dict)}
         for path, expected in listed.items():
             if sums.get(path) != expected:
