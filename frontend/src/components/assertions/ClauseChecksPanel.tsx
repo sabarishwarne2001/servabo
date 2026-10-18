@@ -16,6 +16,8 @@ import { Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { ClauseAssertionBlock } from "@/components/assertions/ClauseAssertionBlock";
 import { ErrorState } from "@/components/common/ErrorState";
 import { errorMessage } from "@/services/api/errors";
+import { getWorkItems } from "@/services/api/workItem";
+import { workItemKeys } from "@/services/api/queryKeys";
 import {
   createClauseCheck,
   deleteClauseCheck,
@@ -36,6 +38,16 @@ export const ClauseChecksPanel: React.FC<ClauseChecksPanelProps> = ({ workspaceI
 
   const checks = useQuery({ queryKey: key, queryFn: () => listClauseChecks(workspaceId), enabled: Boolean(workspaceId) });
   const refresh = () => void queryClient.invalidateQueries({ queryKey: key });
+
+  // The documents a clause can be tried against before it is saved ("Test on a document"): the most
+  // recent ones the workspace has finished reading.
+  const recent = useQuery({
+    queryKey: workItemKeys.list(workspaceId, { page: 1, pageSize: 25, sortBy: "created_at", sortOrder: "desc" }),
+    queryFn: () => getWorkItems(workspaceId, { page: 1, pageSize: 25, sortBy: "created_at", sortOrder: "desc" }),
+    enabled: Boolean(workspaceId),
+    staleTime: 60_000,
+  });
+  const testableWorkItems = (recent.data?.items ?? []).map((item) => ({ id: item.id, name: item.original_filename }));
 
   const create = useMutation({
     mutationFn: () => createClauseCheck(workspaceId, name.trim()),
@@ -160,6 +172,7 @@ export const ClauseChecksPanel: React.FC<ClauseChecksPanelProps> = ({ workspaceI
                     workspaceId={workspaceId}
                     ruleId={check.rule_id}
                     nodeKey={check.node_key}
+                    testableWorkItems={testableWorkItems}
                     existing={check.definition}
                     onSaved={() => {
                       toast.success(

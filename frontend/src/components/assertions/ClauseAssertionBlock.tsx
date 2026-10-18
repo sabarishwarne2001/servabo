@@ -102,9 +102,9 @@ export const ClauseAssertionBlock: React.FC<ClauseAssertionBlockProps> = ({
   const [acknowledged, setAcknowledged] = React.useState(
     Boolean(existing?.llm_acknowledged_by),
   );
-  const [testWorkItemId, setTestWorkItemId] = React.useState(
-    testableWorkItems[0]?.id ?? "",
-  );
+  const [chosenWorkItemId, setTestWorkItemId] = React.useState("");
+  // The first document is the choice until the author picks another (the list may arrive after the panel opens).
+  const testWorkItemId = chosenWorkItemId || (testableWorkItems[0]?.id ?? "");
   const [simulation, setSimulation] = React.useState<AssertionSimulation | null>(
     null,
   );
