@@ -82,6 +82,9 @@ test.describe("Batch operations — Enterprise owner", () => {
     await page.goto(ws("C", "batches"));
     const policy = page.getByTestId("dispatch-policy");
     await expect(policy).toContainText("Dispatch policy");
+    // N-077: tags are history. The switch says so next to itself.
+    await expect(policy.getByTestId("tag-documents-note")).toContainText(
+      "Switching this off stops new tags; the tags already written stay on their documents.");
     const threshold = policy.getByLabel("Straight-through threshold (percent)");
     await threshold.fill("95");
     await policy.getByRole("button", { name: "Save policy" }).click();

@@ -114,6 +114,9 @@ export const DispatchPolicyCard: React.FC<{ readonly workspaceId: string; readon
                      onChange={(e) => setTag(e.target.checked)} />
               Tag dispatched documents (dispatch-straight-through, dispatch-review, dispatch-exception)
             </label>
+            <p className="pl-6 text-xs text-muted-foreground" data-testid="tag-documents-note">
+              Switching this off stops new tags; the tags already written stay on their documents.
+            </p>
           </div>
           {canEdit ? (
             <div className="flex items-center justify-end gap-2">
