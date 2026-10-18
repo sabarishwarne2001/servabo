@@ -585,18 +585,6 @@ region but the default, N-130; needs MinIO/S3); installing a *valid* sovereign l
 state, so it would affect every parallel test); the nightly learning pass (spec 98 runs the operator script
 instead); the identifier merge through a GSTIN (the model stand-in never extracts one).
 
-**Seen, not fixed (You have Full Owner Authority. Plan and Build all):**
-- The identity console never lists saved role mappings (no read route), so an owner cannot see or remove one.
-- The three-way match page never shows the stored `resolution_reason` and has no re-score, notes or separate
-  Reject button (the API has them); supplier-cost "Reconcile" cannot force an open period though the API can.
-- A password sign-in of a member of an SSO-required organization answers 200 and each later request 403
-  `ORGANIZATION_SSO_REQUIRED`; the sign-in itself should refuse.
-- Refusing to archive an organization's last workspace is a 403 `PERMISSION_DENIED`; it is a conflict (409).
-- The process agent's "Undo" needs a fitted calibration model (spec 100 adds historical labels by SQL).
-- The residency card offers a region the storage backend cannot hold (Save is then refused).
-- Spec 94 leaves an INR price book in force on the shared platform; a spec that reads the billing page's
-  Currency dropdown for other currencies must run on its own tenant (N-127).
-
 ## Owner launch checklist
 
 Only you can do these. Do them in this order; each step says what you need, where to click and how
