@@ -20,7 +20,7 @@ restart.**
     "Servabo … renamed … Servabo" comment damage, `.env.production.template` section 2.
   - [x] B1c. Compose binds Postgres, Redis, MinIO and its console to `127.0.0.1` (test reads the file).
   - [x] B1d. Guard test tightened; CHANGELOG line (operators must use `SERVABO_*`).
-- [ ] B2. The carried-over defects (each with its failing test first)
+- [x] B2. The carried-over defects (each with its failing test first)
   - [x] Task 1 batch operations (6 items)
   - [x] Task 1 TruthMesh (6 items)
   - [x] Task 1 document packs (4 items, F-400 migration)
@@ -28,13 +28,19 @@ restart.**
   - [x] Task 3 the session-3 leftovers
   - [x] Task 4b the first-run tier-ordering oddity
   - [x] NEXT-SESSION-PROMPT.md top line
-- [ ] B3. Helm's ledger truly incremental (failing budget test, incremental path, equivalence property
-  test, nightly check that repairs and alerts, PERFORMANCE.md and ARCHITECTURE §13)
-- [ ] B4. Decisions recorded (Dodo hard limits, Tailwind 4 deferred, N-074 deferred, aliases removed)
-- [ ] B5. Task 5 deferred (recorded in NEEDS-OWNER) and Task 4 handed to Session C
-- [ ] Finish: full backend suite, full browser suite, `campaign_slices.py --check all`, one Alembic head
-  (up/down/up), records (FINDINGS, COVERAGE, STATE, HANDOFF "Session B → next sessions", NEEDS-OWNER,
-  CHANGELOG, README), CI green, PR description for a non-engineer, mark ready.
+- [x] B3. Helm's ledger truly incremental: failing budget test (4.07 s), incremental path
+  (`ledger_incremental.py`, marks in `models/helm_dirty.py`), equivalence property test (300 seeds of 40
+  changes), concurrency test, nightly check that repairs and alerts (`HELM_LEDGER_DRIFT`), 0.70 s at
+  10,000 documents (PERFORMANCE.md, ARCHITECTURE §4.5 and §13)
+- [x] B4. Decisions recorded: N-118 (Dodo hard limits), N-119 (Tailwind 4), N-120 (N-074), N-121 (aliases),
+  N-122 (incremental ledger), N-123 (127.0.0.1), N-124 (Task 5)
+- [x] B5. Task 5 deferred (N-124) and Task 4 handed to Session C (HANDOFF "Session B → next sessions")
+- [ ] Finish: full backend suite (local: 4,986 passed in two halves, then 297 re-run after a clash between the halves, before the last records commits; CI is the
+  judge), full browser suite (817 passed, 2 skipped, 1 timing test failed under load and passed alone),
+  `campaign_slices.py --check all` 0, one Alembic head (up/down/up, no drift), frontend lint / typecheck /
+  check:self / e2e typecheck clean, records, CI green, PR description for a non-engineer, mark ready.
+
+**Next action:** wait for CI on the last push, fix anything red, mark PR #27 ready, stop.
 
 ## Previous phase — Helm visual session: Night Bridge, the switch, Lumen and the website's Helm page
 Branch `claude/beautiful-dijkstra-yvlspo` (the session's assigned branch), based on `main` at `5e4366d`
