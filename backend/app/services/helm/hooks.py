@@ -17,7 +17,7 @@ logger = logging.getLogger("app.services.helm.hooks")
 
 
 def document_changed(db: Any, *, workspace_id: Optional[uuid.UUID], organization_id: Optional[uuid.UUID] = None,
-                     reason: str) -> None:
+                     reason: str, work_item_ids=None) -> None:  # (named so the caller can; used from the next commit)
     if workspace_id is None:
         return
     try:

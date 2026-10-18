@@ -34,6 +34,7 @@ from app.models.helm import HelmBook, HelmPromise, HelmSettings
 from app.models.work_item import WorkItem
 from app.services.helm import ledger_store, money, plan_store, reconcile, simulation, snapshot_store
 from app.services.helm import vocabulary as v
+from tests.engines.conftest import test_sessions  # noqa: F401  (fixture: the job opens its own sessions)
 from tests.security.plans import put_on_plan
 
 DOCUMENTS = int(os.getenv("HELM_PERF_DOCUMENTS", "1000"))
@@ -139,7 +140,7 @@ def _timed(name: str, fn):
     return result
 
 
-def test_helm_meets_its_budget_at_scale(db_session, tenant, capsys):
+def test_helm_meets_its_budget_at_scale(db_session, tenant, test_sessions, capsys):
     from app.workers.handlers import register_all
 
     register_all(replace=True)  # a bank import queues a re-plan, as in production
@@ -166,16 +167,21 @@ def test_helm_meets_its_budget_at_scale(db_session, tenant, capsys):
     # its line no longer equals what is owed and is left for a person).
     assert len(paid) >= len(seeded["payments"]) - SUPPLIERS
 
-    # One document changes: the job a change runs recomputes the workspace and writes the difference.
+    # One document changes: the job a change runs (what the worker runs after the hook asks for it)
+    # brings the ledger up to date. Session B: it re-projects that document and what depends on it,
+    # not the workspace, and is held to the raw one-second budget at 10,000 documents.
+    from app.services.helm import hooks as helm_hooks
+    from app.workers.handlers.helm import handle_ledger_build
     from tests.services.helm import factories
 
-    factories.invoice(db_session, workspace=ws, organization_id=org, number="LATE-1", supplier=_supplier(1),
-                      amount=12_000, on=today - timedelta(days=2))
+    late = factories.invoice(db_session, workspace=ws, organization_id=org, number="LATE-1", supplier=_supplier(1),
+                             amount=12_000, on=today - timedelta(days=2))
+    helm_hooks.document_changed(db_session, workspace_id=ws.id, organization_id=org, reason="document processed",
+                                work_item_ids=[late.id])
     db_session.commit()
-    result = _timed("ledger_incremental", lambda: ledger_store.rebuild_workspace(db_session, workspace_id=ws.id,
-                                                                                 as_of=today))
-    db_session.commit()
-    assert result.inserted == 1
+    result = _timed("ledger_incremental", lambda: handle_ledger_build({"workspace_id": str(ws.id)}))
+    assert result["inserted"] == 1 and result["deleted"] == 0, result
+    db_session.expire_all()
 
     from app.services.helm.mandates import registry
     from app.services.helm.mandates.spec import MandateSpec
@@ -237,10 +243,9 @@ def test_helm_meets_its_budget_at_scale(db_session, tenant, capsys):
             print(f"  {name:28s} {seconds:8.2f} s")
 
     scale = max(1.0, len(open_payables) / 1000)
-    # The ledger update recomputes the whole workspace: within budget to about 2,000 documents (ARCHITECTURE
-    # §13 records the 10,000-document figure, over budget, and the next step). Asserted where it holds.
-    if DOCUMENTS <= 2000:
-        assert MEASURED["ledger_incremental"] <= 1.0 * MULTIPLIER, MEASURED
+    # The ledger update after one document changes: one second, raw at 10,000 documents (the brief's
+    # budget; the multiplier is for the shared CI machine's smaller run).
+    assert MEASURED["ledger_incremental"] <= (1.0 if DOCUMENTS >= 10_000 else 1.0 * MULTIPLIER), MEASURED
     assert MEASURED["plan"] <= 10.0 * MULTIPLIER * scale, MEASURED
     assert MEASURED["what_if"] <= 10.0 * MULTIPLIER * scale, MEASURED
     assert MEASURED["simulation_1000_futures"] <= 3.0 * MULTIPLIER, MEASURED
