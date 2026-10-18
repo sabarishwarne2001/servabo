@@ -28,6 +28,7 @@ from app.api import capability_gate
 from app.api.deps import RequireWorkspaceRole, TenantContext, get_db
 from app.core import entitlements
 from app.models.audit_log import AuditAction, AuditOutcome, AuditResourceType
+from app.models.job import Job, JobStatus
 from app.models.truthmesh import MeshConflict, MeshLink, MeshSimulation
 from app.models.workspace import WorkspaceRole
 from app.schemas.truthmesh import (
@@ -83,6 +84,17 @@ def _audit(db: Session, context: TenantContext, *, resource_id: Optional[uuid.UU
 
 def _enqueue_rebuild(db: Session, context: TenantContext, *, reason: str) -> uuid.UUID:
     service.mark_building(db, workspace_id=context.workspace_id, organization_id=context.organization_id)
+    # A rebuild already waiting for a worker will read everything this one would: reuse it. (One that
+    # has started may have read the documents before this change, so a new request still queues.)
+    waiting = db.execute(
+        select(Job.id).where(
+            Job.job_type == v.JOB_REBUILD_WORKSPACE, Job.status == JobStatus.PENDING,
+            Job.organization_id == context.organization_id,
+            Job.payload["workspace_id"].astext == str(context.workspace_id),
+        ).order_by(Job.created_at).limit(1)
+    ).scalar_one_or_none()
+    if waiting is not None:
+        return waiting
     job = job_service.enqueue(
         db, job_type=v.JOB_REBUILD_WORKSPACE, organization_id=context.organization_id,
         payload={"workspace_id": str(context.workspace_id), "reason": reason},
