@@ -1,13 +1,16 @@
 import { formatTimestampDate } from "@/utils/displayTime";
 import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { Loader2, Monitor, ShieldAlert, Smartphone } from "lucide-react";
 
 import {
   listSessionsRequest,
   logoutAllRequest,
+  logoutRequest,
   revokeSessionRequest,
 } from "@/services/api/auth";
+import { ROUTES } from "@/constants/routes";
 import { sessionKeys } from "@/services/api/queryKeys";
 import { useAuthStore } from "@/store/useAuthStore";
 import type { SessionResponse } from "@/types/auth";
@@ -78,6 +81,9 @@ export const SessionManagement: React.FC = () => {
   const queryClient = useQueryClient();
   const token = useAuthStore((state) => state.token);
   const clearAuth = useAuthStore((state) => state.clearAuth);
+  const beginSignOut = useAuthStore((state) => state.beginSignOut);
+  const endSignOut = useAuthStore((state) => state.endSignOut);
+  const navigate = useNavigate();
 
   const [confirmingAll, setConfirmingAll] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -90,28 +96,44 @@ export const SessionManagement: React.FC = () => {
     staleTime: 15_000,
   });
 
+  // Signing out of this device (or everywhere) leaves the way the sidebar's Sign out does: the
+  // guard is told first, so it does not add "/login?redirect=<this page>" when the session ends under
+  // requests still in flight, and the move to the sign-in screen happens once (F-506).
+  const leave = (): void => {
+    // Navigate first: clearing the session unmounts this page, and a navigation requested by an
+    // unmounted component is dropped.
+    navigate(ROUTES.LOGIN, { replace: true });
+    clearAuth({ leaving: true });
+  };
+
   const revoke = useMutation({
-    mutationFn: (sessionId: string) => revokeSessionRequest(sessionId),
+    // This device leaves through the sign-out request itself (the only one the client lets through
+    // once a sign-out has begun); another device is ended by its id.
+    mutationFn: (sessionId: string) =>
+      sessionId === activeSessionId ? logoutRequest() : revokeSessionRequest(sessionId),
+    onMutate: (sessionId) => {
+      if (sessionId === activeSessionId) {beginSignOut();}
+    },
     onSuccess: (_result, sessionId) => {
       setActionError(null);
       if (sessionId === activeSessionId) {
-        clearAuth();
-        window.location.assign("/login");
+        leave();
         return;
       }
       void queryClient.invalidateQueries({ queryKey: sessionKeys.all });
     },
-    onError: () =>
-      setActionError("That session couldn't be ended. Please try again."),
+    onError: (_error, sessionId) => {
+      if (sessionId === activeSessionId) {endSignOut();}
+      setActionError("That session couldn't be ended. Please try again.");
+    },
   });
 
   const revokeAll = useMutation({
     mutationFn: logoutAllRequest,
-    onSuccess: () => {
-      clearAuth();
-      window.location.assign("/login");
-    },
+    onMutate: () => beginSignOut(),
+    onSuccess: leave,
     onError: () => {
+      endSignOut();
       setConfirmingAll(false);
       setActionError("Sessions couldn't be ended. Please try again.");
     },

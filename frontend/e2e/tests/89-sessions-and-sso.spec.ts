@@ -87,6 +87,13 @@ const sessionIdOf = async (session: ApiSession, userAgent: string): Promise<stri
 
 const sessionsPath = (customer: Customer): string => customer.ws("settings?section=sessions");
 
+/** Every address the page's main frame moves to from now on. */
+function recordNavigations(page: import("@playwright/test").Page): string[] {
+  const urls: string[] = [];
+  page.on("framenavigated", (frame) => { if (frame === page.mainFrame()) urls.push(frame.url()); });
+  return urls;
+}
+
 test.describe("Sessions", () => {
   test.setTimeout(180_000);
 
@@ -149,8 +156,11 @@ test.describe("Sessions", () => {
     await expect(page.getByRole("heading", { name: "Active sessions" })).toBeVisible();
     const here = page.getByRole("listitem").filter({ hasText: "This device" });
     await expect(here).toHaveCount(1);
+    const visited = recordNavigations(page);
     await here.getByRole("button", { name: "Sign out of this device" }).click();
-    await expect(page).toHaveURL(/\/login/);
+    await expect(page).toHaveURL(/\/login$/);
+    // A deliberate sign-out carries no "come back to this page" address (F-506).
+    expect(visited.filter((url) => url.includes("redirect="))).toEqual([]);
 
     // Signed out in the browser: the protected page sends it back to the sign-in page.
     await page.goto(sessionsPath(customer));
@@ -182,8 +192,10 @@ test.describe("Sessions", () => {
     const phoneAgain = await signInFrom(customer.email, UA_PHONE);
 
     await page.getByRole("button", { name: "Sign out everywhere" }).click();
+    const visited = recordNavigations(page);
     await page.getByRole("button", { name: "Yes, sign out everywhere" }).click();
-    await expect(page).toHaveURL(/\/login/);
+    await expect(page).toHaveURL(/\/login$/);
+    expect(visited.filter((url) => url.includes("redirect="))).toEqual([]);
 
     // The browser holds no session any more...
     await expect
@@ -544,7 +556,8 @@ test.describe("Single sign-on enforcement", () => {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await expect(page).toHaveURL(/\/workspaces/, { timeout: 30_000 });
+    // Signed in: the app leaves /login for the workspace picker or, with one workspace, straight into it.
+    await expect(page).not.toHaveURL(/\/login/, { timeout: 30_000 });
     await page.goto(owner.ws());
     await expect(page.getByRole("dialog", { name: "Single sign-on required" })).toHaveCount(0);
     await expect(page.locator("main")).toBeVisible();
