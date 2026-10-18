@@ -60,7 +60,7 @@ import {
   type SupplierInvoice,
   type TenantEconomicsEntry,
 } from "@/types/cogs";
-import { errorMessage } from "@/services/api/errors";
+import { ApiError, errorMessage } from "@/services/api/errors";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { formatMoney, formatNumber } from "@/utils/displayTime";
 
@@ -415,6 +415,8 @@ export const AdminMarginsHub: React.FC = () => {
   const [days, setDays] = useState(30);
   const [order, setOrder] = useState<MarginOrder>("MARGIN_ASC");
   const [error, setError] = useState<string | null>(null);
+  // The invoice whose period has not closed: the refusal (409) names it, and the operator may reconcile anyway.
+  const [openPeriodInvoiceId, setOpenPeriodInvoiceId] = useState<string | null>(null);
 
   // F-316. Refresh moves the window to end now; it used to re-ask for the window computed when
   // the page opened (or the window was last changed).
@@ -461,14 +463,21 @@ export const AdminMarginsHub: React.FC = () => {
   const reconcile = useMutation({
     mutationFn: ({ id, force }: { id: string; force: boolean }) =>
       reconcileSupplierInvoice(id, { force }),
-    onSuccess: invalidate,
-    onError: (err: unknown) => {
+    onSuccess: async () => {
+      setOpenPeriodInvoiceId(null);
+      await invalidate();
+    },
+    onError: (err: unknown, variables) => {
       // A 409 here is the period-not-closed refusal, and it is worth
       // surfacing verbatim rather than as "something went wrong": the
       // operator's next action depends on whether they should wait or force.
       const message =
         errorMessage(err, "Reconciliation failed.");
       setError(message);
+      // Only a refusal of an unforced run can be forced; the button below sends force: true.
+      setOpenPeriodInvoiceId(
+        err instanceof ApiError && err.status === 409 && !variables.force ? variables.id : null,
+      );
     },
   });
 
@@ -482,6 +491,7 @@ export const AdminMarginsHub: React.FC = () => {
   const handleReconcile = useCallback(
     (id: string, force: boolean) => {
       setError(null);
+      setOpenPeriodInvoiceId(null);
       reconcile.mutate({ id, force });
     },
     [reconcile],
@@ -549,7 +559,23 @@ export const AdminMarginsHub: React.FC = () => {
           role="alert"
           className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm"
         >
-          {error}
+          <p>{error}</p>
+          {openPeriodInvoiceId ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <p className="text-xs text-muted-foreground">
+                Supplier figures for an open period can still change, so the variance may move. Reconciling now is
+                recorded as forced.
+              </p>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => handleReconcile(openPeriodInvoiceId, true)}
+                className="rounded border border-border px-2 py-1 text-xs hover:bg-muted disabled:opacity-50"
+              >
+                Reconcile anyway
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
