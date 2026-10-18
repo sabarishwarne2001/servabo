@@ -501,6 +501,49 @@ passes; a fresh database also passes. Spec 34 should delete its copy at the end.
 own); the template gallery's sheen is the shared panel hover. Findings F-465 to F-468 are fixed but proven
 by screenshots only.
 
+## Session B → next sessions
+
+_2026-10-18. Branch `claude/new-session-zo5d98`, PR sabarishwarne2001/servabo#27. Decisions N-118 to N-124;
+findings F-469 to F-499._
+
+**What changed.**
+- *The old name is gone for good (N-121).* No `FLOWPILOT_*` setting, `fp_` key, old backup name, `--loop
+  stripe`/`worker-stripe`, Docker-volume shim or `legacy_names.py` is left; the guard test allows the old
+  name only in history files and in the secret values the production guard refuses. Operators use the
+  `SERVABO_*` names (CHANGELOG). The README's data section is two lines; the dev compose file listens on
+  127.0.0.1 only (N-123).
+- *The carried-over defects (NEXT-SESSION-PROMPT Tasks 1–3 and 4b)*: batch operations, TruthMesh (including
+  a GDPR gap: erased people's documents stayed in the mesh, F-485), document packs (the F-400 PAN card
+  phrase, migration `b1a1`), the N-077 rules, the session-3 leftovers, and the deterministic first-run
+  catalog. Every API list endpoint now bounds its `offset` (a test over the API's own schema keeps it so).
+- *Helm's ledger is incremental (N-122, F-498).* A document change re-projects that document and what depends
+  on it: 4.07 s → 0.70 s at 10,000 documents. The nightly rebuild checks the incremental updates and raises
+  an operator alert (`HELM_LEDGER_DRIFT`) when they differ. Design in `docs/helm/ARCHITECTURE.md` §4.5.
+
+**Session C: Task 4 of NEXT-SESSION-PROMPT (browser-test gaps) is yours.** Tasks 1–3 and 4b are done.
+Task 5 is deferred (N-124: Tailwind 4 is N-119, least-privilege database roles N-120).
+
+**Keep in mind (Helm's ledger).**
+- *Anything that changes what the ledger reads must be marked.* ORM writes to documents, roles,
+  verifications, field corrections, payments (settlements), obligations and procurement cases are marked
+  automatically (`app/models/helm_dirty.py`). A write that bypasses the ORM (a Core `update()`/`delete()`,
+  an `INSERT … ON CONFLICT`) is not seen: call `helm_dirty.mark(db.connection(), workspace_id, [ids], reason)`
+  (or `mark_obligations_of`) next to it, as `role_service` and the obligation deletes do. If you forget, the
+  nightly check finds it, repairs it and tells the operator (the alert lists example promises).
+- A change that every promise depends on (who we are, date format, currency, price tolerance, which books
+  read the workspace) is `request_full`; the next update is a full rebuild.
+- `tests/services/helm/test_ledger_incremental_equivalence.py` is the safety net: change what the ledger
+  reads, then run it wide, `HELM_EQUIVALENCE_SEEDS=200 HELM_EQUIVALENCE_STEPS=40 pytest …` (about 3 s a
+  seed). 300 seeds of 40 changes passed when this was written.
+- The first update of each day is a full rebuild (statuses depend on today); the first update after a
+  worker restart reads the long bank statements again (they are kept in memory afterwards).
+- The job after an update also runs `value.sweep`, which reads every payable promise of the book: about
+  0.5 s of the 0.7 s at 10,000 documents. It is the next thing to make incremental if the budget is tightened.
+
+**Seen, not fixed.** When two live procurement cases disagree about a purchase order line's price (the order
+was edited between them), the ledger now uses the latest scoring (F-499), but nothing tells a person that
+the cases disagree; re-scoring the older case would settle it.
+
 ## Owner launch checklist
 
 Only you can do these. Do them in this order; each step says what you need, where to click and how

@@ -1734,3 +1734,65 @@ being read, read, failed), the KPI cards, Helm's card, Recent Activity and the d
 donut with matching bars. Two read-only fields were added to the overview API for it (documents read,
 and a count for each of the last 14 days), so nothing on the page is invented. "Today" keeps the
 existing UTC day boundary (the workspace time zone is not used yet; noted in the code as before).
+
+## N-118 — Usage on Dodo stays hard limits at launch (DECIDED (Session B))
+
+A customer who pays through Dodo Payments never pays for use beyond their plan: a limit that would bill
+extra on Stripe is a hard ceiling on Dodo, and the product says so where the limit is shown. Reasons:
+Dodo cannot bill usage lines (N-026, N-071), and an Indian small-business buyer prefers a bill that never
+surprises. More seats raise the allowances, so the way to more room is a larger plan, not a larger bill.
+**Revisit** at 20 paying customers, or the first customer who asks for pay-as-you-go. Nothing to build;
+this is the rule already in force (N-103 and the plan tables), now recorded as final for launch.
+
+## N-119 — Tailwind 4 is deferred until after launch (DECIDED (Session B))
+
+Tailwind 4 rewrites the CSS configuration and has to be checked page by page against today's look.
+Session A has just restyled Helm (Night Bridge) and Documents (Lumen), so a comparison now would be
+against a moving target. The seven development-only advisories stay accepted (nothing from Tailwind ships
+to a browser; `npm audit --omit=dev` is 0). **Do it after launch**, with screenshots of every page in
+light and dark taken before and after.
+
+## N-120 — Least-privilege database roles (N-074) are deferred until the production server exists (DECIDED (Session B))
+
+An app role that cannot change tables, and a separate role for the nightly sweeps, need a server to
+create them on and a deploy that runs migrations as the owner role. Doing it on paper before that risks a
+plan that does not fit the server. The RUNBOOK keeps the plan (section on database roles); until then
+the app connects as the database owner and the audit trigger guards against mistakes, not against
+someone holding the database password (N-074, F-355). **Do it with the first production deploy.**
+
+## N-121 — The old-name aliases are removed (DECIDED (Session B))
+
+No installation from before the rename on 2026-10-16 remains, so the one-release compatibility is gone:
+the `FLOWPILOT_*` settings, `fp_live_`/`fp_test_` API keys, the old backup file names, `--loop stripe` /
+`worker-stripe`, and the Docker volume and project-name shims are no longer read or accepted. Operators
+use the `SERVABO_*` names (CHANGELOG says so). The old name survives only in history files and in the
+secret values the production guard refuses. Each alias had a test proving it worked; each such test now
+proves it is gone, and failed against the old code first.
+
+## N-122 — Helm's ledger updates incrementally; the nightly rebuild checks it (DECIDED (Session B))
+
+A document change now re-projects that document and what depends on it (a credit note's invoice, a
+receipt's purchase order, the invoices that can take the same bank line), not the workspace: 4.1 s to 0.7 s
+at 10,000 documents (budget 1 s). Rules settled: (1) the first update on a new day, a change of "who we
+are" or of the workspace's date format or currency, and a change of more than 200 documents are full
+rebuilds, because they can change every row; (2) the nightly full rebuild first compares the stored
+ledger with a recomputation of the day it was written for, and **a difference is an operator alert**
+(kind `HELM_LEDGER_DRIFT`, one per workspace) as well as a repair, because it means a change reached the
+ledger by a path nobody marked; (3) nothing is shown to customers about it: the repair happens before
+they could notice. What the alert needs from the operator is to find the path (the alert lists example
+promises) and add its mark.
+
+## N-123 — Local data services listen on this computer only (DECIDED (Session B))
+
+The development compose file published Postgres, Redis (no password), MinIO and its console on every
+network interface, so on a café's Wi-Fi anyone could reach them. They are bound to `127.0.0.1` now. The
+start scripts, the browser-test stack, CI and the RUNBOOK use `localhost`, so nothing else changes. A
+test reads the compose file and refuses a port published on all interfaces. A second computer on your
+network that needs the database must reach it through an SSH tunnel, not an open port.
+
+## N-124 — Task 5 of NEXT-SESSION-PROMPT is deferred (DECIDED (Session B))
+
+"Later (not launch blockers)": Tailwind 4 (N-119), least-privilege database roles (N-120) and the
+`docs/PRODUCT-NEXT.md` items. The first two have their own decisions above. The product items wait for
+you to choose them: they are product decisions, not defects, and nothing in the launch checklist depends
+on them. Task 4 (browser-test gaps) moves to Session C.

@@ -48,6 +48,24 @@ production guard for good.
 `backend/docker-compose.yml` publishes Postgres (5432), Redis (6379) and MinIO (9000, console 9001)
 on `127.0.0.1` instead of every network interface.
 
+### Changed — Helm's Promise ledger updates incrementally (Session B, 2026-10-18)
+
+A document change used to recompute the whole workspace's ledger (4.07 s at 10,000 documents, budget 1 s).
+It now re-projects that document and what depends on it (0.70 s), and gives exactly what a full rebuild
+gives. The nightly rebuild checks that, repairs a difference and raises an operator alert of the new kind
+`HELM_LEDGER_DRIFT`. Migration `h1a5_helm_ledger_incremental` adds two bookkeeping tables
+(`helm_ledger_state`, `helm_ledger_dirty`) and an index on `helm_promises.fulfilments`; a migration
+`b1a1_pan_card_phrase` lets the Aadhaar / PAN card document pack recognise a real PAN card.
+
+### Fixed — carried-over defects (Session B, 2026-10-18)
+
+Batch operations (two dispatches or adds at once, archived batches, totals over every batch, packages of
+erased documents, extra files in a package), TruthMesh (a deleted or erased document leaves the mesh and
+its conflicts at once, a rebuild keeps people's decisions on links, the reason is audited, lighter read
+models), document packs (whole-word phrases, one answer on a tie, a real audit trail), conversation
+retention counted from the last message, a refused tenant refreshes the app, and every list endpoint
+refuses an `offset` above 2,147,483,647 (422) instead of failing with a 500. FINDINGS.md F-469 to F-499.
+
 ### Planned
 
 - Backend foundation
