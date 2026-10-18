@@ -326,8 +326,13 @@ def build(db: Session, *, package: ExportPackage) -> ExportPackage:
             select(UploadedFile).where(UploadedFile.id.in_([i.uploaded_file_id for i in items if i.uploaded_file_id]))
         ).scalars()
     }
+    # An erased document keeps its row but its upload is marked deleted (GDPR erasure). Its original
+    # is not put in a package: the stored object may already be gone (reading it would fail the whole
+    # build) or, if its deletion failed, still be there although erasure promised it was not.
+    erased = {i.id for i in items if i.uploaded_file_id in files and files[i.uploaded_file_id].deleted_at is not None}
     if package.include_originals:
-        total = sum(int(files[i.uploaded_file_id].file_size or 0) for i in items if i.uploaded_file_id in files)
+        total = sum(int(files[i.uploaded_file_id].file_size or 0) for i in items
+                    if i.uploaded_file_id in files and i.id not in erased)
         if total > v.MAX_PACKAGE_BYTES:
             return fail(
                 package, "TOO_LARGE",
@@ -349,7 +354,7 @@ def build(db: Session, *, package: ExportPackage) -> ExportPackage:
                 prefix = f"{index:04d}-{safe_name(item.original_filename)}"
                 stem = prefix.rsplit(".", 1)[0]
                 file_path = None
-                if package.include_originals and item.stored_filename:
+                if package.include_originals and item.stored_filename and item.id not in erased:
                     uploaded = files.get(item.uploaded_file_id) if item.uploaded_file_id else None
                     entry = writer.add_stream(f"files/{prefix}", driver.iter_chunks(item.stored_filename, chunk_size=_CHUNK))
                     file_path = entry.path
