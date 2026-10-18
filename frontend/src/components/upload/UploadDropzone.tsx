@@ -13,6 +13,31 @@ const DEFAULT_ACCEPT = [
   "image/webp",
 ] as const;
 
+/** Extensions that name the same kind of file (the workspace setting may write either). */
+const EXTENSION_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  jpg: ["jpg", "jpeg"],
+  jpeg: ["jpg", "jpeg"],
+  tif: ["tif", "tiff"],
+  tiff: ["tif", "tiff"],
+};
+
+const extensionOf = (fileName: string): string => {
+  const dot = fileName.lastIndexOf(".");
+  return dot < 0 ? "" : fileName.slice(dot + 1).toLowerCase();
+};
+
+/**
+ * Whether one allowed entry admits a file. The entry is a MIME type ("application/pdf") or, as the
+ * workspace's "Allowed file types" setting writes it, an extension ("pdf", ".jpg").
+ */
+const admits = (entry: string, file: { readonly name: string; readonly type: string }): boolean => {
+  if (entry.includes("/")) {
+    return entry === file.type;
+  }
+  const wanted = entry.replace(/^\./, "").toLowerCase();
+  return (EXTENSION_ALIASES[wanted] ?? [wanted]).includes(extensionOf(file.name));
+};
+
 export interface UploadDropzoneProps {
   readonly workspaceId: string;
   readonly maxSizeMb?: number;
@@ -69,7 +94,10 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
 
   const dragDepth = useRef(0);
   const maxBytes = useMemo(() => maxSizeMb * 1024 * 1024, [maxSizeMb]);
-  const acceptAttr = useMemo(() => allowedTypes.join(","), [allowedTypes]);
+  const acceptAttr = useMemo(
+    () => allowedTypes.map((entry) => (entry.includes("/") || entry.startsWith(".") ? entry : `.${entry}`)).join(","),
+    [allowedTypes],
+  );
 
   const validate = useCallback(
     (file: File): string | null => {
@@ -80,8 +108,8 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
         const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
         return `${sizeMb}MB exceeds the ${maxSizeMb}MB limit for this workspace.`;
       }
-      if (file.type && !allowedTypes.includes(file.type)) {
-        return `${file.type} isn't accepted here.`;
+      if (!allowedTypes.some((entry) => admits(entry, file))) {
+        return `${file.type || `.${extensionOf(file.name)}`} isn't accepted here.`;
       }
       return null;
     },
