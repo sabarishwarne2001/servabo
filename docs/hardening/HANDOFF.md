@@ -606,7 +606,8 @@ RUNBOOK §9.2 step 9: add the webhook endpoint in Dodo (Test Mode), put its secr
 invoice "issued by Dodo Payments", and its "Download invoice" opens Dodo's PDF. Also try: upgrade to
 Business (the amount shown is what is charged), a refund from Dodo's dashboard (the invoice says
 "Refunded"), and cancelling in "Manage payment method" (Billing says the plan ends at the period's
-end). Compare what you see with `docs/billing/DODO.md` §6 and note anything different.
+end). Compare what you see with `docs/billing/DODO.md` §6 and note anything different. On your own PC,
+`docs/billing/DODO-LOCAL-TEST.md` walks through all of this with a read-only probe and a results table.
 
 **Step 10 — Backups, scheduled jobs and monitoring (same day as step 7).**
 RUNBOOK §9.4 and §9.6: create `/etc/servabo/backup.key` and copy it into your password manager
