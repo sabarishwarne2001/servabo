@@ -222,6 +222,53 @@ def progress_for(db: Session, batch_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID,
     return out
 
 
+def totals_for(db: Session, *, workspace_id: uuid.UUID, status: Optional[str] = None) -> dict[str, Any]:
+    """Counts over every batch of the workspace (of `status`, if given), not just one page of them:
+    what the batch page's tiles show. `mean_confidence` is the mean over the documents that have a
+    verification score."""
+    from app.models.verification import DocumentVerification
+
+    batches = select(ProcessingBatch.id).where(ProcessingBatch.workspace_id == workspace_id)
+    if status:
+        batches = batches.where(ProcessingBatch.status == status)
+    batch_ids = batches.scalar_subquery()
+    row = db.execute(
+        select(
+            func.count(func.distinct(ProcessingBatchItem.batch_id)),
+            func.count(),
+            func.count().filter(WorkItem.status.in_(("QUEUED", "PROCESSING"))),
+            func.count().filter(WorkItem.status == "FAILED"),
+            func.count().filter(ProcessingBatchItem.lane == v.LANE_STRAIGHT_THROUGH),
+            func.count().filter(ProcessingBatchItem.lane == v.LANE_REVIEW),
+            func.count().filter(ProcessingBatchItem.lane == v.LANE_EXCEPTION),
+        )
+        .join(WorkItem, WorkItem.id == ProcessingBatchItem.work_item_id)
+        .where(ProcessingBatchItem.batch_id.in_(batch_ids))
+    ).one()
+    members = select(ProcessingBatchItem.work_item_id).where(ProcessingBatchItem.batch_id.in_(batch_ids))
+    latest = (
+        select(DocumentVerification.work_item_id, DocumentVerification.confidence)
+        .where(DocumentVerification.workspace_id == workspace_id, DocumentVerification.work_item_id.in_(members))
+        .order_by(DocumentVerification.work_item_id, DocumentVerification.created_at.desc())
+        .distinct(DocumentVerification.work_item_id)
+        .subquery()
+    )
+    mean = db.execute(select(func.avg(latest.c.confidence))).scalar_one()
+    batch_count = int(db.execute(select(func.count()).select_from(batches.subquery())).scalar_one())
+    straight, review, exception = int(row[4]), int(row[5]), int(row[6])
+    return {
+        "batches": batch_count,
+        "documents": int(row[1]),
+        "in_flight": int(row[2]),
+        "failed": int(row[3]),
+        "straight_through": straight,
+        "review": review,
+        "exception": exception,
+        "dispatched": straight + review + exception,
+        "mean_confidence": round(float(mean), 4) if mean is not None else None,
+    }
+
+
 # ------------------------------------------------------------------ assessment (detail view)
 
 @dataclass
@@ -516,4 +563,5 @@ __all__ = [
     "progress_for",
     "remove_document",
     "retry_failed",
+    "totals_for",
 ]

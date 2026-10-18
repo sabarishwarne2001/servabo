@@ -484,3 +484,21 @@ def test_downloading_an_expired_package_expires_that_package_only(engines: Engin
     states = dict(engines.db.execute(select(ExportPackage.id, ExportPackage.status)).all())
     assert states[uuid.UUID(first["id"])] == "EXPIRED"
     assert states[uuid.UUID(second["id"])] == "READY", "the other package is left to the hourly sweep"
+
+
+def test_the_list_totals_cover_every_batch_not_just_the_page(engines: Engines) -> None:
+    """The page's tiles summed the batches on the page (50 at most). The list now carries totals over
+    every batch of the tab, so a workspace with 60 batches does not show 50 documents' worth."""
+    first = _batch(engines, [_completed(engines, "T-1.pdf"), _completed(engines, "T-2.pdf")], "one")
+    _batch(engines, [_completed(engines, "T-3.pdf")], "two")
+    archived = _batch(engines, [_completed(engines, "T-4.pdf")], "three")
+    assert engines.post(f"/processing-batches/{first}/dispatch").status_code == 200
+    assert engines.patch(f"/processing-batches/{archived}", {"status": "ARCHIVED"}).status_code == 200
+
+    page = engines.get("/processing-batches", params={"status": "ACTIVE", "limit": 1}).json()
+    assert len(page["items"]) == 1 and page["total"] == 2
+    assert page["totals"] == {"batches": 2, "documents": 3, "in_flight": 0, "failed": 0, "straight_through": 0,
+                              "review": 2, "exception": 0, "dispatched": 2, "mean_confidence": None}, page["totals"]
+
+    gone = engines.get("/processing-batches", params={"status": "ARCHIVED"}).json()
+    assert gone["total"] == 1 and gone["totals"]["batches"] == 1 and gone["totals"]["documents"] == 1

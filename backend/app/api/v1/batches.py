@@ -48,6 +48,7 @@ from app.schemas.batches import (
     BatchList,
     BatchProgress,
     BatchSummary,
+    BatchTotals,
     BatchUpdate,
     DispatchPolicyIn,
     DispatchPolicyOut,
@@ -194,7 +195,8 @@ def list_batches(
         ).scalars()
     )
     progress = service.progress_for(db, [b.id for b in batches])
-    return BatchList(items=[_summary(b, progress.get(b.id)) for b in batches], total=int(total))
+    totals = BatchTotals.model_validate(service.totals_for(db, workspace_id=workspace_id, status=batch_status))
+    return BatchList(items=[_summary(b, progress.get(b.id)) for b in batches], total=int(total), totals=totals)
 
 
 @router.post(
