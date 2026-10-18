@@ -24,6 +24,8 @@ export const meshKeys = {
   document: (workspaceId: string, workItemId: string) => ["truthmesh", workspaceId, "document", workItemId] as const,
   conflicts: (workspaceId: string, filters: Record<string, string | undefined>) =>
     ["truthmesh", workspaceId, "conflicts", filters] as const,
+  conflictPages: (workspaceId: string, filters: Record<string, string | undefined>) =>
+    ["truthmesh", workspaceId, "conflict-pages", filters] as const,
   matrix: (workspaceId: string) => ["truthmesh", workspaceId, "matrix"] as const,
   simulations: (workspaceId: string) => ["truthmesh", workspaceId, "simulations"] as const,
   simulation: (workspaceId: string, id: string) => ["truthmesh", workspaceId, "simulation", id] as const,
@@ -56,6 +58,7 @@ export const listMeshConflicts = async (
     kind?: string | undefined;
     workItemId?: string | undefined;
     limit?: number | undefined;
+    offset?: number | undefined;
   },
 ): Promise<{ items: MeshConflict[]; total: number }> =>
   (
@@ -66,6 +69,7 @@ export const listMeshConflicts = async (
         ...(filters.kind ? { kind: filters.kind } : {}),
         ...(filters.workItemId ? { work_item_id: filters.workItemId } : {}),
         limit: filters.limit ?? 100,
+        ...(filters.offset ? { offset: filters.offset } : {}),
       },
     })
   ).data;

@@ -98,6 +98,8 @@ export interface MeshOverview {
     readonly build_ms: number | null;
     readonly engine_version: string | null;
     readonly error: string | null;
+    /** When the state last changed: how long a BUILDING mesh has been building. */
+    readonly since: string | null;
   };
   readonly documents: number;
   readonly links: number;

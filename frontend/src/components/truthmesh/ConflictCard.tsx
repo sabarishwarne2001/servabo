@@ -31,6 +31,9 @@ const STATUS_LABEL: Readonly<Record<ConflictStatus, string>> = {
   DISMISSED: "Dismissed",
 };
 
+/** The longest reason the server keeps. */
+const NOTE_LIMIT = 2_000;
+
 export const ConflictCard: React.FC<ConflictCardProps> = ({ workspaceId, conflict, canDecide, onOpenDocument, defaultOpen = false }) => {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(defaultOpen);
@@ -209,9 +212,11 @@ export const ConflictCard: React.FC<ConflictCardProps> = ({ workspaceId, conflic
             className="fp-input mt-1.5 min-h-[5rem] w-full resize-y"
             value={note}
             autoFocus
+            maxLength={NOTE_LIMIT}
             onChange={(event) => setNote(event.target.value)}
             placeholder={asking === "RESOLVED" ? "e.g. INV-1002 cancelled with the supplier; credit note requested" : "e.g. the scan is the paper copy of the same invoice"}
           />
+          <p className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground">{note.length} / {NOTE_LIMIT}</p>
         </Modal>
       ) : null}
     </article>
