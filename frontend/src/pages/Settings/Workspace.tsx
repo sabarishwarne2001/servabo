@@ -282,13 +282,20 @@ export const Workspace: React.FC = () => {
     },
   });
 
-  const { mutateAsync: archiveMutation, isPending: isArchiving } = useMutation({
+  const { mutate: archiveMutation, isPending: isArchiving } = useMutation({
     mutationFn: () =>
       workspaceDetail?.status === "ACTIVE"
         ? archiveWorkspace(workspaceId)
         : restoreWorkspace(workspaceId),
     onSuccess: async (updated) => {
-      await invalidateTenant();
+      if (updated.status !== "ACTIVE") {
+        // An archived workspace is no longer served: keep what the archive call returned instead of
+        // asking for it again (that read answers 403 and put an error in the console).
+        queryClient.setQueryData(["workspaces", "detail", workspaceId], updated);
+        await queryClient.invalidateQueries({ queryKey: ["me"] });
+      } else {
+        await invalidateTenant();
+      }
       setConfirmArchive(false);
       toast.success(
         updated.status === "ACTIVE" ? "Workspace restored." : "Workspace archived.",
@@ -1057,7 +1064,7 @@ export const Workspace: React.FC = () => {
         loading={isArchiving}
         onCancel={() => setConfirmArchive(false)}
         onConfirm={() => {
-          void archiveMutation();
+          archiveMutation();
         }}
       />
       {grantOpen && (

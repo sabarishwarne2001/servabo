@@ -195,6 +195,36 @@ test.describe("Invitations the invitee does not take", () => {
   });
 });
 
+test.describe("An invitation that stops being valid under the invitee", () => {
+  test.setTimeout(180_000);
+
+  test("Accept and join / Decline invitation on a revoked invitation say so, with no error behind the page (F-508)", async ({ page, problems }) => {
+    problems.allowHttp(/\/invitations\//, [400, 404, 409, 410], "a revoked invitation cannot be taken");
+    const owner = await newCustomer("revoked-inv", "Revoked Invitation Ltd");
+    const email = `late-${runId()}@e2e.example.com`;
+    await signUpVerified(email);
+    const since = Date.now() - 1_000;
+    const invited = await api<{ id: string }>(owner.session, "POST", `/organizations/${owner.orgId}/invitations`, {
+      email, organization_role: "MEMBER", grants: [{ workspace_id: owner.wsId, role: "VIEWER" }],
+    });
+    expect(invited.status, invited.text).toBe(201);
+    const link = linkFrom(await waitForMail(email, /invitations\/accept/, since), /invitations\/accept/);
+
+    await signInAs(page, email);
+    await page.goto(link);
+    await expect(page.getByRole("button", { name: "Accept and join" })).toBeVisible({ timeout: 20_000 });
+    // The owner withdraws it while the invitee is reading.
+    const revoked = await api(owner.session, "POST", `/organizations/${owner.orgId}/invitations/${invited.body.id}/revoke`);
+    expect(revoked.status, revoked.text).toBeLessThan(300);
+
+    await page.getByRole("button", { name: "Accept and join" }).click();
+    await expect(page.getByRole("alert").or(page.getByText(/no longer|revoked|expired|not valid|cannot be/i)).first()).toBeVisible({ timeout: 20_000 });
+    const members = await api<{ items: Array<{ user?: { email?: string } }> }>(owner.session, "GET", `/organizations/${owner.orgId}/members`);
+    expect(members.body.items.map((m) => m.user?.email)).not.toContain(email);
+    await expectHealthyPage(page);
+  });
+});
+
 test.describe("Leaving an organization", () => {
   test.setTimeout(180_000);
 
