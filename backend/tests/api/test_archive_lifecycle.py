@@ -86,6 +86,15 @@ def test_an_archived_workspace_refuses_reads_and_writes(client, tenant, second_w
     assert write.status_code == 403
 
 
+def test_the_last_active_workspace_cannot_be_archived_and_that_is_a_conflict(client, tenant, db_session):
+    """The actor may archive; the organization's state does not allow it. 409, not 403 (a permission)."""
+    response = client.post(f"{API}/workspaces/{tenant.workspace.id}/archive", headers=tenant.owner.headers)
+    assert response.status_code == 409, response.text
+    assert response.json()["code"] == "LAST_WORKSPACE", response.text
+    db_session.refresh(tenant.workspace)
+    assert tenant.workspace.status == WorkspaceStatus.ACTIVE
+
+
 def test_an_archived_workspace_can_be_restored(client, tenant, second_workspace):
     _archive_workspace(client, tenant)
 

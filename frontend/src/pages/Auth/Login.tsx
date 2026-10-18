@@ -139,6 +139,8 @@ export const Login: React.FC = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // The password was right but the organization takes single sign-on only: the server says so in words.
+  const [ssoRequired, setSsoRequired] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [mfaToken, setMfaToken] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -158,6 +160,7 @@ export const Login: React.FC = () => {
     setMode(next);
     setError(null);
     setNotice(null);
+    setSsoRequired(false);
     setPassword("");
     setMfaToken(null);
     setCode("");
@@ -188,6 +191,7 @@ export const Login: React.FC = () => {
     setIsLoading(true);
     setError(null);
     setNotice(null);
+    setSsoRequired(false);
 
     try {
       const loginResponse = await authApi.loginRequest({ email, password });
@@ -203,6 +207,10 @@ export const Login: React.FC = () => {
       if (err instanceof ApiError) {
         if (err.code === API_ERROR_CODES.UNAUTHORIZED) {
           setError("Incorrect email or password.");
+        } else if (err.code === API_ERROR_CODES.SSO_SIGN_IN_REQUIRED) {
+          setPassword("");
+          setSsoRequired(true);
+          setError(err.message);
         } else {
           setError(err.message);
         }
@@ -324,6 +332,11 @@ export const Login: React.FC = () => {
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <span>{error}</span>
         </div>
+      )}
+      {ssoRequired && (
+        <button type="button" onClick={() => switchMode("sso")} className={`text-[13px] ${AUTH_LINK}`}>
+          Sign in with single sign-on
+        </button>
       )}
       {notice && (
         <div

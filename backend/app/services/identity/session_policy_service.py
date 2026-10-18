@@ -139,6 +139,44 @@ def sso_required_for(policy: TenantSecurityPolicy, *, org_role: str | None) -> b
     return True
 
 
+def password_sign_in_refused_by(db, *, user_id) -> str | None:
+    """The name of an organization that makes a password sign-in pointless for this person, or None.
+
+    A password session is refused on every request into an organization that requires single
+    sign-on for the member's role (`api.deps._assert_sso_compliance`). When that is true of EVERY
+    active organization the person belongs to, signing in with a password only opens a session in
+    which nothing works, so the sign-in itself should refuse. When any organization would still
+    accept it (no requirement there, or an owner with break-glass on), or the person belongs to
+    none yet, the sign-in goes ahead; the per-request check keeps guarding the strict one.
+    """
+    from app.models.organization import MembershipStatus, Organization, OrganizationMember, OrganizationStatus
+
+    rows = (
+        db.query(OrganizationMember, Organization)
+        .join(Organization, Organization.id == OrganizationMember.organization_id)
+        .filter(
+            OrganizationMember.user_id == user_id,
+            OrganizationMember.status == MembershipStatus.ACTIVE,
+            Organization.status == OrganizationStatus.ACTIVE,
+        )
+        .all()
+    )
+    if not rows:
+        return None
+    policies = {
+        policy.organization_id: policy
+        for policy in db.query(TenantSecurityPolicy)
+        .filter(TenantSecurityPolicy.organization_id.in_([org.id for _, org in rows]))
+        .all()
+    }
+    for membership, organization in rows:
+        policy = policies.get(organization.id)
+        role = getattr(membership.role, "value", membership.role)
+        if policy is None or not sso_required_for(policy, org_role=role):
+            return None
+    return rows[0][1].name
+
+
 def ip_allowlist_trustworthy(settings=None) -> bool:
     """Whether the client address an allowlist would be checked against can be trusted.
 

@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import (
+    LastWorkspaceError,
     OrganizationPermissionDeniedError,
     TenantSuspendedError,
     WorkspaceAlreadyExistsError,
@@ -414,7 +415,7 @@ def archive_workspace(
         statuses=(WorkspaceStatus.ACTIVE,),
     )
     if active_count <= 1:
-        raise WorkspacePermissionDeniedError(
+        raise LastWorkspaceError(
             "An organization must retain at least one active workspace. Create another workspace before archiving this one."
         )
 

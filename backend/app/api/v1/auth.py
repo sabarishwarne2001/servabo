@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.core.client_ip import client_ip, trusted_client_ip
+from app.core.exceptions import SsoSignInRequiredError
 from app.core.config import settings
 from app.core.cookies import (
     REFRESH_COOKIE_NAME,
@@ -65,6 +66,7 @@ from app.services import (
     verification_service,
 )
 from app.services.auth_service import authenticate_user, register_new_user
+from app.services.identity import session_policy_service
 from app.services.login_backoff_service import (
     apply_delay,
     check_login_backoff,
@@ -289,6 +291,17 @@ def login(
             ip,
         )
         raise _login_refused()
+
+    # The password is proved, so saying why it cannot be used reveals nothing to a guesser. A
+    # member whose every organization requires single sign-on would get a session in which every
+    # request is refused; refuse here instead, before any second step or session exists.
+    strict_organization = session_policy_service.password_sign_in_refused_by(db, user_id=user.id)
+    if strict_organization is not None:
+        logger.info("AUTH_LOGIN_REFUSED | reason=sso_required | user=%s | ip=%s", user.id, ip)
+        raise SsoSignInRequiredError(
+            f"{strict_organization} requires single sign-on. Sign in through your organization's "
+            "identity provider instead of a password."
+        )
 
     if mfa_service.is_enabled(db, user.id):
         # N-017: the password was right, but it is only half. No session yet;
