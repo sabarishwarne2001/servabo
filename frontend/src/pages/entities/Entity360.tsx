@@ -113,8 +113,12 @@ const Entity360: React.FC = () => {
   const erase = useMutation({
     mutationFn: () => eraseEntity(workspaceId, entityId),
     onSuccess: () => {
-      refresh();
+      // Refresh what lists records, but not this record's own detail and graph: they are about to be
+      // asked for again by this still-mounted page and would answer 404. Drop them after leaving.
+      const ownQueries = (query: { readonly queryKey: readonly unknown[] }): boolean => query.queryKey.includes(entityId);
+      void queryClient.invalidateQueries({ queryKey: entityKeys.all(workspaceId), predicate: (query) => !ownQueries(query) });
       navigate(entitiesPath(orgSlug, workspaceSlug));
+      queryClient.removeQueries({ queryKey: entityKeys.all(workspaceId), predicate: ownQueries });
     },
   });
 
