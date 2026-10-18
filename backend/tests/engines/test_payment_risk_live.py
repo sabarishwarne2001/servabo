@@ -53,6 +53,10 @@ def test_a_changed_bank_account_and_a_round_total_are_flagged(engines: Engines) 
     assert engines.post(f"/payment-risk/{flag_id}/confirm", as_user=engines.tenant.viewer).status_code == 403
     short = engines.post(f"/payment-risk/{flag_id}/dismiss", {"reason": "fine"}, as_user=engines.tenant.contributor)
     assert short.status_code == 422, short.text
+    # F-503: the length is counted after trimming, so blanks and padding cannot stand in for a reason.
+    for padded in (" " * 12, "  fine      "):
+        blank = engines.post(f"/payment-risk/{flag_id}/dismiss", {"reason": padded}, as_user=engines.tenant.contributor)
+        assert blank.status_code == 422, (padded, blank.text)
     confirmed = engines.post(f"/payment-risk/{flag_id}/confirm", as_user=engines.tenant.contributor)
     assert confirmed.status_code == 200 and confirmed.json()["status"] == "CONFIRMED", confirmed.text
     again = engines.post(f"/payment-risk/{flag_id}/dismiss", {"reason": "the vendor confirmed by phone"},

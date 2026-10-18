@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -58,6 +58,15 @@ class PaymentRiskList(BaseModel):
 
 class DismissRequest(BaseModel):
     reason: str = Field(min_length=MIN_DISMISS_REASON, max_length=2000)
+
+    @field_validator("reason")
+    @classmethod
+    def _enough_after_trimming(cls, value: str) -> str:
+        # Length is counted on what the reviewer actually wrote: blanks or padding are not a reason.
+        trimmed = value.strip()
+        if len(trimmed) < MIN_DISMISS_REASON:
+            raise ValueError(f"Give a reason of at least {MIN_DISMISS_REASON} characters.")
+        return trimmed
 
 
 def _scope(db: Session, context: TenantContext, workspace_id: uuid.UUID, operation: str) -> None:
