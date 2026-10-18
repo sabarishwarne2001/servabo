@@ -448,7 +448,11 @@ class FakeDodo:
             return 200, "application/pdf", _pdf(f"Dodo Payments tax invoice for payment {payment['payment_id']}")
         if seg[0] == "products":
             if len(seg) == 1 and method == "GET":
-                return _json(200, {"items": list(self.products.values())})
+                # Dodo's list takes page_size / page_number (zero-based) and answers {items: [...]}.
+                size = int((query.get("page_size") or [100])[0])
+                number = int((query.get("page_number") or [0])[0])
+                everything = list(self.products.values())
+                return _json(200, {"items": everything[number * size:(number + 1) * size]})
             if len(seg) == 1 and method == "POST":
                 price = body.get("price") or {}
                 pid = self.add_product(name=str(body.get("name") or "Product"), price=int(price.get("price") or 0),
