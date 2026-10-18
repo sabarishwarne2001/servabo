@@ -57,6 +57,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.pagination import MAX_OFFSET
 from app.api import capability_gate
 from app.api.deps import RequireWorkspaceRole, TenantContext, get_db
 from app.core import entitlements
@@ -209,7 +210,7 @@ def list_cases(
     created_after: Optional[datetime] = Query(default=None),
     created_before: Optional[datetime] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
+    offset: int = Query(default=0, ge=0, le=MAX_OFFSET),
 ) -> list[Any]:
     _assert_workspace(context, workspace_id)
     _gate(db, context, "procurement.cases.list")

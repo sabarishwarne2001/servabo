@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.core.pagination import MAX_OFFSET
 from app.api import capability_gate
 from app.api.deps import RequireWorkspaceRole, TenantContext, get_db
 from app.core import entitlements
@@ -195,7 +196,7 @@ def list_obligations(workspace_id: uuid.UUID, state: Optional[str] = Query(defau
                      due_from: Optional[date] = Query(default=None), due_to: Optional[date] = Query(default=None),
                      q: Optional[str] = Query(default=None, max_length=200),
                      include_superseded: bool = Query(default=False), include_rejected: bool = Query(default=False),
-                     limit: int = Query(default=100, ge=1, le=v.MAX_LIST), offset: int = Query(default=0, ge=0),
+                     limit: int = Query(default=100, ge=1, le=v.MAX_LIST), offset: int = Query(default=0, ge=0, le=MAX_OFFSET),
                      db: Session = Depends(get_db), context: TenantContext = Depends(RequireViewer)) -> ObligationList:
     _ws(context, workspace_id)
     _gate(db, context, "obligations.list")

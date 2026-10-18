@@ -7,6 +7,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
+from app.core.pagination import MAX_OFFSET
 from app.core.client_ip import client_ip as _resolve_client_ip
 from app.core.config import settings
 
@@ -420,7 +421,7 @@ def get_billing_access_summary(
 def list_invoices(
     organization_id: uuid.UUID,
     limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
+    offset: int = Query(default=0, ge=0, le=MAX_OFFSET),
     context: OrganizationContext = Depends(RequireOrgBillingReader),
     db: Session = Depends(get_db),
 ) -> InvoiceListResponse:

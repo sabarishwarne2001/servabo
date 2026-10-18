@@ -59,6 +59,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.pagination import MAX_OFFSET
 from app.api import capability_gate
 from app.api.deps import RequireWorkspaceRole, TenantContext, get_db
 from app.core import entitlements
@@ -348,7 +349,7 @@ def list_review_queue(
     db: Session = Depends(get_db),
     context: TenantContext = Depends(RequireViewer),
     limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
+    offset: int = Query(default=0, ge=0, le=MAX_OFFSET),
     work_item_id: Optional[uuid.UUID] = Query(default=None),
 ) -> list[AssertionReviewItemResponse]:
     """Triaged assertions still waiting for a human."""

@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import crud
+from app.core.pagination import MAX_OFFSET
 from app.api import deps
 # L-1. The /logs query joins these two. Neither was imported —
 # the module only ever needed AutomationExecution before.
@@ -322,7 +323,7 @@ def list_executions(
             "'what is silently not running' view."
         ),
     ),
-    offset: int = Query(0, ge=0),
+    offset: int = Query(0, ge=0, le=MAX_OFFSET),
     limit: int = Query(100, ge=1, le=200),
 ) -> AutomationExecutionPage:
     stmt = select(AutomationExecution).where(

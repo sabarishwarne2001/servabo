@@ -17,13 +17,23 @@ pytestmark = pytest.mark.no_db
 LARGEST_OFFSET = 2**31 - 1
 
 
+def _maximum(schema: dict) -> int | None:
+    """The `maximum` of a parameter's schema, or of its integer alternative when it may also be null."""
+    if "maximum" in schema:
+        return schema["maximum"]
+    for option in schema.get("anyOf", []):
+        if "maximum" in option:
+            return option["maximum"]
+    return None
+
+
 def test_every_offset_parameter_has_a_maximum() -> None:
     unbounded = []
     for path, operations in app.openapi()["paths"].items():
         for method, operation in operations.items():
             for parameter in operation.get("parameters", []):
                 if parameter.get("name") == "offset" and parameter.get("in") == "query":
-                    maximum = (parameter.get("schema") or {}).get("maximum")
+                    maximum = _maximum(parameter.get("schema") or {})
                     if maximum is None or maximum > LARGEST_OFFSET:
                         unbounded.append(f"{method.upper()} {path}")
     assert not unbounded, "offset has no maximum on: " + ", ".join(sorted(unbounded))
