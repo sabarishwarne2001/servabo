@@ -192,8 +192,13 @@ def progress_for(db: Session, batch_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID,
     ).all()
     from app.models.verification import DocumentVerification
 
+    # Only these batches' documents, in their own workspaces: the ranking below used to run over every
+    # organization's verifications before joining back to this page of batches.
+    members = select(ProcessingBatchItem.work_item_id).where(ProcessingBatchItem.batch_id.in_(list(batch_ids)))
+    workspaces = select(ProcessingBatch.workspace_id).where(ProcessingBatch.id.in_(list(batch_ids)))
     latest = (
         select(DocumentVerification.work_item_id, DocumentVerification.confidence)
+        .where(DocumentVerification.workspace_id.in_(workspaces), DocumentVerification.work_item_id.in_(members))
         .order_by(DocumentVerification.work_item_id, DocumentVerification.created_at.desc())
         .distinct(DocumentVerification.work_item_id)
         .subquery()
