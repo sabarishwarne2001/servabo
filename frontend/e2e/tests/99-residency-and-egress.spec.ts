@@ -57,6 +57,32 @@ test.describe("Data residency", () => {
     expect([400, 409, 422], direct.text.slice(0, 200)).toContain(direct.status);
     expect((await residency()).region).toBe(state.region);
   });
+
+  test("the card offers exactly the regions the server accepts: no region is listed as available and then refused on Save", async ({ page }) => {
+    const state = await residency();
+    expect(state.available_regions.find((option) => option.region === "GLOBAL")?.configured, "the default is always available").toBe(true);
+    await signInAs(page, customer.email);
+    await page.goto(customer.org("compliance"));
+    await settle(page);
+    const region = page.getByLabel("Region", { exact: true });
+    for (const option of state.available_regions) {
+      // The page marks a region the deployment cannot hold, and disables Save for it ...
+      await region.selectOption(option.region);
+      if (option.configured) await expect(page.getByText(/No bucket is provisioned for/)).toHaveCount(0);
+      else await expect(page.getByText(/No bucket is provisioned for/)).toBeVisible();
+    }
+    // ... and the server agrees with the page about every one of them. (On local file storage that is every
+    // region but the default; with MinIO or S3 it is the regions that have a bucket.)
+    for (const option of state.available_regions) {
+      const saved = await api(customer.session, "PUT", `/organizations/${customer.orgId}/compliance/residency`,
+        { region: option.region, acknowledge_no_migration: true });
+      if (option.configured) expect(saved.status, `${option.region}: ${saved.text.slice(0, 200)}`).toBe(200);
+      else expect([400, 409, 422], `${option.region}: ${saved.text.slice(0, 200)}`).toContain(saved.status);
+    }
+    const back = await api(customer.session, "PUT", `/organizations/${customer.orgId}/compliance/residency`,
+      { region: state.region, acknowledge_no_migration: true });
+    expect(back.status, back.text.slice(0, 200)).toBe(200);
+  });
 });
 
 test.describe("Egress lockdown", () => {

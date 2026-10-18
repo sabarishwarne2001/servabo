@@ -158,7 +158,8 @@ const ResidencyCard: React.FC<{
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <span>
               No bucket is provisioned for {REGION_LABELS[selected]} on this
-              deployment. Selecting it would pin your data to storage that does
+              deployment (or it keeps files on local disk, which has no
+              regions). Selecting it would pin your data to storage that does
               not exist, so the change is refused rather than accepted quietly.
             </span>
           </p>
