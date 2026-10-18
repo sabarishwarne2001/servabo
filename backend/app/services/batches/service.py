@@ -117,6 +117,10 @@ def create_batch(
 
 
 def add_documents(db: Session, *, batch: ProcessingBatch, work_item_ids: Sequence[uuid.UUID]) -> int:
+    # Adds to one batch take turns. Two at once each read the documents already there, so the same
+    # document was inserted twice (a key violation) and two single adds to a batch one short of the
+    # limit both passed the count. The second now reads what the first added.
+    db.execute(select(ProcessingBatch.id).where(ProcessingBatch.id == batch.id).with_for_update())
     ids = _workspace_ids(db, batch.workspace_id, work_item_ids)
     present = set(
         db.execute(
