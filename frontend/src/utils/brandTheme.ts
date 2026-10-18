@@ -76,6 +76,13 @@ export const readableTextOn = (hex: string): string => {
   return contrast(surface, 1) >= contrast(surface, INK_LUMINANCE) ? WHITE : INK;
 };
 
+/** WCAG contrast ratio between two six-digit hex colours, 1 to 21. */
+export const contrastRatio = (a: string, b: string): number => contrast(luminance(a), luminance(b));
+
+/** `readableTextOn` as a hex colour, for the settings preview (which paints with hex, not HSL). */
+export const readableHexOn = (hex: string): string =>
+  contrast(luminance(hex), 1) >= contrast(luminance(hex), INK_LUMINANCE) ? "#ffffff" : "#121826";
+
 /** The same hue and saturation at another lightness: a primary that reads on a dark surface. */
 const lightened = (triplet: string, lightness: number): string => {
   const [hue, saturation] = triplet.split(" ");
@@ -133,6 +140,8 @@ export const runBrandColourSelfCheck = (): string[] => {
   expect("a hue past 300 degrees", hexToHslTriplet("#ff00aa"), "320 100% 50%");
   expect("white text on a dark primary", readableTextOn("#0f766e"), WHITE);
   expect("dark text on a pale primary", readableTextOn("#fde68a"), INK);
+  expect("the preview picks the same text colour", [readableHexOn("#0f766e"), readableHexOn("#fde68a")], ["#ffffff", "#121826"]);
+  expect("black on white is 21:1", Math.round(contrastRatio("#000000", "#ffffff")), 21);
   expect("the primary sets buttons, links and focus rings",
     Object.keys(brandProperties(brand({ primary_color: "#0f766e" }))), ["--primary", "--ring", "--primary-foreground", "--primary-on-dark"]);
   expect("primary text on a dark surface keeps the hue, lightened",
