@@ -544,6 +544,59 @@ Task 5 is deferred (N-124: Tailwind 4 is N-119, least-privilege database roles N
 was edited between them), the ledger now uses the latest scoring (F-499), but nothing tells a person that
 the cases disagree; re-scoring the older case would settle it.
 
+## Session C → next sessions
+
+_2026-10-18. Branch `claude/new-session-janwly`, draft PR sabarishwarne2001/servabo#28. Decisions N-125 to
+N-130; findings F-500 to F-517._
+
+**What changed.**
+- *Browser specs 86 to 104* press the buttons no browser test had pressed (ERP posting, payment risk and
+  anomalies, legal holds, sessions and single sign-on, Entity 360, seats, review hub decisions, tables,
+  RevOps money actions, account security, procurement, credential rotation, automation / clause checks /
+  obligations, residency and egress, exception agent / partner marketplace / identity credentials,
+  documents bulk and workspace, connection tests, upload tray, Sync now and licence). Each runs on a tenant
+  of its own, checks the page and the API (or a reload), and was run three times in a row without retries.
+- *Eighteen defects found by those specs were fixed test-first* (F-500 to F-517; F-507 is unverified: seen
+  once, a timing race). The serious ones: a second workspace could see and release another workspace's
+  legal holds (F-501); the assistant page's upload box refused every file (F-514); an owner could save only
+  one role mapping per identity connection (F-504); a partner's sample workflow could not be installed by
+  anyone (F-517); sign-out added a stale `?redirect=` (F-506).
+- *The Dodo check kit (C2)* is built and proven against `fake_dodo.py`: `backend/scripts/dodo_probe.py`
+  (read-only), `backend/scripts/dodo_relay.py`, `start_dev.ps1 -DodoWebhooks` / `start_dev.sh --dodo-webhooks`,
+  and `docs/billing/DODO-LOCAL-TEST.md`. **It has never talked to Dodo.** Every Dodo point in DODO.md §6 stays
+  "not confirmed" until Session D (below).
+
+**Session D: what to run, exactly** (needs the owner's PC, a Dodo *test-mode* account and its keys; never a
+live key). Follow `docs/billing/DODO-LOCAL-TEST.md` from the top:
+1. Test mode on; put the test API key and webhook key in `backend/.env` (§1–2).
+2. `cd backend; .\.venv\Scripts\python.exe scripts\dodo_setup.py --create-test-products`, paste the seven
+   `GATEWAY_PRICE_ID_…` lines into `.env`, then `scripts\dodo_setup.py` until every line says `OK` (§3).
+3. `.\start_dev.ps1 -Stop; .\start_dev.ps1` (§4), then `.\start_dev.ps1 -Stop; .\start_dev.ps1 -DodoWebhooks` (§5).
+4. Walk journeys A to E in the browser (§6).
+5. `scripts\dodo_probe.py`, then with `--subscription-id sub_… --after-plan-change --payment-id pay_…`, once
+   more with the refunded payment, and with `--webhook-file` for one saved webhook body (§7).
+6. Fill the results table (§8). Move each confirmed point out of "not yet confirmed" in DODO.md §6, describe
+   each difference, fix what differs (test-first), and tick step 9 of the owner launch checklist below.
+
+**Not driven in a browser (and why).** OIDC client-secret rotation (the feature does not exist); the
+organization-email "Send test" and the document-settings "Test" (need a mail server / a configured model
+provider; the stand-ins do not cover them); a *successful* residency repin (local file storage refuses any
+region but the default, N-130; needs MinIO/S3); installing a *valid* sovereign licence (it is global
+state, so it would affect every parallel test); the nightly learning pass (spec 98 runs the operator script
+instead); the identifier merge through a GSTIN (the model stand-in never extracts one).
+
+**Seen, not fixed** (none blocks anything; each is a small decision or build):
+- The identity console never lists saved role mappings (no read route), so an owner cannot see or remove one.
+- The three-way match page never shows the stored `resolution_reason` and has no re-score, notes or separate
+  Reject button (the API has them); supplier-cost "Reconcile" cannot force an open period though the API can.
+- A password sign-in of a member of an SSO-required organization answers 200 and each later request 403
+  `ORGANIZATION_SSO_REQUIRED`; the sign-in itself should refuse.
+- Refusing to archive an organization's last workspace is a 403 `PERMISSION_DENIED`; it is a conflict (409).
+- The process agent's "Undo" needs a fitted calibration model (spec 100 adds historical labels by SQL).
+- The residency card offers a region the storage backend cannot hold (Save is then refused).
+- Spec 94 leaves an INR price book in force on the shared platform; a spec that reads the billing page's
+  Currency dropdown for other currencies must run on its own tenant (N-127).
+
 ## Owner launch checklist
 
 Only you can do these. Do them in this order; each step says what you need, where to click and how
