@@ -11,23 +11,23 @@ NEEDS-OWNER.md as `DECIDED (Session B)` (next free number N-118); new findings s
 **If cut off, paste the prompt again: continue on this branch and PR from the first unticked box. Never
 restart.**
 
-- [ ] 0. Start-up: docs read; Postgres 16 + pgvector on :5433 (e2e) and :5434 (backend tests), Redis,
+- [x] 0. Start-up: docs read; Postgres 16 + pgvector on :5433 (e2e) and :5434 (backend tests), Redis,
   API, worker, model stand-in (`E2E_LLM=1`); this plan; draft PR.
-- [ ] B1. The old name, gone for good
-  - [ ] B1a. Remove the aliases: `legacy_names.py`, `fp_` key prefixes, `LOOP_ALIASES`, `ROLE_ALIASES`,
+- [x] B1. The old name, gone for good
+  - [x] B1a. Remove the aliases: `legacy_names.py`, `fp_` key prefixes, `LOOP_ALIASES`, `ROLE_ALIASES`,
     the `Use-PreRenameDockerData` shims, the `deploy/bin` fallbacks, `.gitignore` lines.
-  - [ ] B1b. README "Local data from before the rename" (two lines), clone URL, repository URL elsewhere,
+  - [x] B1b. README "Local data from before the rename" (two lines), clone URL, repository URL elsewhere,
     "Servabo … renamed … Servabo" comment damage, `.env.production.template` section 2.
-  - [ ] B1c. Compose binds Postgres, Redis, MinIO and its console to `127.0.0.1` (test reads the file).
-  - [ ] B1d. Guard test tightened; CHANGELOG line (operators must use `SERVABO_*`).
+  - [x] B1c. Compose binds Postgres, Redis, MinIO and its console to `127.0.0.1` (test reads the file).
+  - [x] B1d. Guard test tightened; CHANGELOG line (operators must use `SERVABO_*`).
 - [ ] B2. The carried-over defects (each with its failing test first)
-  - [ ] Task 1 batch operations (6 items)
-  - [ ] Task 1 TruthMesh (6 items)
-  - [ ] Task 1 document packs (4 items, F-400 migration)
-  - [ ] Task 2 the N-077 rules
-  - [ ] Task 3 the session-3 leftovers
-  - [ ] Task 4b the first-run tier-ordering oddity
-  - [ ] NEXT-SESSION-PROMPT.md top line
+  - [x] Task 1 batch operations (6 items)
+  - [x] Task 1 TruthMesh (6 items)
+  - [x] Task 1 document packs (4 items, F-400 migration)
+  - [x] Task 2 the N-077 rules
+  - [x] Task 3 the session-3 leftovers
+  - [x] Task 4b the first-run tier-ordering oddity
+  - [x] NEXT-SESSION-PROMPT.md top line
 - [ ] B3. Helm's ledger truly incremental (failing budget test, incremental path, equivalence property
   test, nightly check that repairs and alerts, PERFORMANCE.md and ARCHITECTURE §13)
 - [ ] B4. Decisions recorded (Dodo hard limits, Tailwind 4 deferred, N-074 deferred, aliases removed)
