@@ -104,10 +104,23 @@ _MARK_CASES_OF = text(
     FROM procurement_cases c
     JOIN workspaces w ON w.id = c.workspace_id,
          unnest(ARRAY[c.po_work_item_id, c.invoice_work_item_id, c.receipt_work_item_id]) AS subject
-    WHERE c.workspace_id = :workspace_id AND c.status <> 'SUPERSEDED' AND subject IS NOT NULL
-      AND :work_item_id IN (c.po_work_item_id, c.invoice_work_item_id, c.receipt_work_item_id) AND {_READ_BY_A_BOOK}
+    WHERE c.status <> 'SUPERSEDED' AND subject IS NOT NULL AND {_READ_BY_A_BOOK}
+      AND (c.po_work_item_id = ANY(CAST(:ids AS uuid[])) OR c.invoice_work_item_id = ANY(CAST(:ids AS uuid[]))
+           OR c.receipt_work_item_id = ANY(CAST(:ids AS uuid[])))
     {_MERGE.replace('helm_ledger_dirty.claims || EXCLUDED.claims', "helm_ledger_dirty.claims || '{}'::bigint[]")
            .replace('helm_ledger_dirty.numbers || EXCLUDED.numbers', "helm_ledger_dirty.numbers || '{}'::text[]")}
+    """
+)
+
+#: The documents themselves, by id (the workspace is read from the document), with what their promises said.
+_MARK_DOCUMENTS = text(
+    f"""
+    INSERT INTO helm_ledger_dirty (workspace_id, organization_id, work_item_id, reason, claims, numbers)
+    SELECT DISTINCT w.id, w.organization_id, subject, :reason, {_OLD_STATE}
+    FROM work_items wi JOIN workspaces w ON w.id = wi.workspace_id,
+         unnest(ARRAY[wi.id]) AS subject
+    WHERE wi.id = ANY(CAST(:ids AS uuid[])) AND {_READ_BY_A_BOOK}
+    {_MERGE}
     """
 )
 
@@ -151,6 +164,19 @@ def mark_obligations_of(connection: Connection, work_item_ids: Iterable[uuid.UUI
         connection.execute(_MARK_OBLIGATIONS_OF, {"ids": ids, "reason": reason[:60]})
 
 
+def mark_deleted(connection: Connection, work_item_ids: Iterable[uuid.UUID], reason: str = "document deleted") -> None:
+    """Mark documents about to be deleted, and what goes or changes with them: their promises (what they
+    said is kept on the mark), their obligations (which outlive them) and the other documents of their
+    procurement cases (which go with them). Call it before the delete, in the same transaction."""
+    ids = sorted({str(i) for i in work_item_ids})
+    if not ids or not _ready(connection):
+        return
+    params = {"ids": ids, "reason": reason[:60]}
+    connection.execute(_MARK_DOCUMENTS, params)
+    connection.execute(_MARK_OBLIGATIONS_OF, params)
+    connection.execute(_MARK_CASES_OF, params)
+
+
 def request_full(connection: Connection, *, workspace_id: Optional[uuid.UUID] = None,
                  organization_id: Optional[uuid.UUID] = None) -> None:
     if not _ready(connection):
@@ -184,12 +210,7 @@ def _work_item_changed(_mapper: object, connection: Connection, target: WorkItem
 
 
 def _work_item_deleting(_mapper: object, connection: Connection, target: WorkItem) -> None:
-    # Before the delete: the document's promises (and what they said) go with it, and are read now.
-    mark(connection, target.workspace_id, [target.id], "document deleted")
-    if _ready(connection):
-        mark_obligations_of(connection, [target.id], "document deleted")
-        connection.execute(_MARK_CASES_OF, {"workspace_id": target.workspace_id, "work_item_id": target.id,
-                                            "reason": "document deleted"})
+    mark_deleted(connection, [target.id])
 
 
 def _case(_mapper: object, connection: Connection, target: ProcurementCase) -> None:
@@ -233,4 +254,4 @@ def _register() -> None:
 
 _register()
 
-__all__: Sequence[str] = ("mark", "mark_obligations_of", "request_full")
+__all__: Sequence[str] = ("mark", "mark_deleted", "mark_obligations_of", "request_full")

@@ -540,3 +540,45 @@ def test_changes_and_updates_running_at_once_converge(db_session, tenant, test_s
     db.commit()
     assert_equivalent(db, wid, TODAY, seed_world, 0)
     assert "incremental" in modes, modes
+
+
+def test_the_retention_purge_is_followed_by_the_ledger(db_session, tenant) -> None:
+    """The nightly retention purge deletes documents with raw SQL, which the ORM's events never see: it
+    marks them itself, with their obligations and procurement cases, so the next update re-projects what
+    pointed at them (the invoice a deleted credit note reduced, the order whose receipt went)."""
+    from datetime import timezone
+    from sqlalchemy import text
+    from sqlalchemy.orm import sessionmaker
+
+    from app.models.compliance import RetentionPolicy
+    from scripts import sweep_compliance
+
+    db = db_session
+    _book(db, tenant)
+    world = World(db, tenant, 11)
+    for _ in range(4):
+        world.create_invoice()
+    world.create_credit_note()
+    world.create_purchase_order()
+    world.create_goods_receipt()
+    world.create_case()
+    world.create_obligation()
+    wid = tenant.workspace.id
+    ledger_store.rebuild_workspace(db, workspace_id=wid, as_of=TODAY)
+    old = datetime.now(timezone.utc) - timedelta(days=400)
+    victims = [world.docs["CREDIT_NOTE"][0].id, world.docs["GOODS_RECEIPT"][0].id, world.docs["INVOICE"][1].id]
+    db.add(RetentionPolicy(organization_id=tenant.organization.id, work_item_retention_days=90,
+                           auto_purge_enabled=True))
+    db.execute(text("UPDATE work_items SET created_at = :old WHERE id = ANY(:ids)"), {"old": old, "ids": victims})
+    db.commit()
+    assert not ledger_store._claim_dirty(db, wid)
+
+    deleted = sweep_compliance._purge_work_items(
+        sessionmaker(bind=db.get_bind()), organization_id=tenant.organization.id, days=90, apply=True, batch_size=50)
+
+    assert deleted == len(victims)
+    db.expire_all()
+    assert set(victims) <= set(ledger_store._claim_dirty(db, wid)), "the purge did not mark what it deleted"
+    result = ledger_store.refresh_workspace(db, workspace_id=wid, as_of=TODAY)
+    assert result.mode == "incremental"
+    assert_equivalent(db, wid, TODAY, world, 0)

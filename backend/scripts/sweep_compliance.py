@@ -189,6 +189,11 @@ def _purge_work_items(
                 by_workspace.setdefault(workspace_id, []).append(item_id)
             for workspace_id, workspace_ids in by_workspace.items():
                 truthmesh_service.forget_documents(db, workspace_id=workspace_id, work_item_ids=workspace_ids)
+            # Helm's Promise ledger: these documents, their obligations and the documents of their
+            # procurement cases are re-projected at the next update (a raw delete is not seen by the ORM).
+            from app.models import helm_dirty
+
+            helm_dirty.mark_deleted(db.connection(), ids, "retention purge")
             db.execute(
                 text("DELETE FROM document_chunks WHERE work_item_id = ANY(:ids)"),
                 {"ids": ids},
