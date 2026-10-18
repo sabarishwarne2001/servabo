@@ -84,7 +84,9 @@ subscription's webhook to be reconciled before saying "Payment confirmed".
 ## 6. Not yet confirmed against a real Dodo test account
 
 Built from the documentation and proven only against the stand-in. Run these once in Dodo's test
-mode before going live (RUNBOOK §9 has the steps):
+mode before going live. The step-by-step, the read-only probe (`scripts/dodo_probe.py`), the webhook
+relay (`start_dev.ps1 -DodoWebhooks`) and a results table for these ten points are in
+[`DODO-LOCAL-TEST.md`](DODO-LOCAL-TEST.md); RUNBOOK §9 has the server steps:
 
 1. `GET /payments/{id}` includes `subscription_id`, `refunds[]` and `disputes[]` in the shapes above.
 2. `change-plan` answers with an empty body or the subscription (both are accepted);

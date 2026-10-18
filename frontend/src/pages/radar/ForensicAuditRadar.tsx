@@ -17,6 +17,7 @@ import CapabilityLockCard from "@/components/radar/CapabilityLockCard";
 import PaymentRiskPanel from "@/components/radar/PaymentRiskPanel";
 import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 import { useCapabilityAccess } from "@/hooks/useCapabilityAccess";
+import { isAtLeast } from "@/permissions/workspacePermissions";
 import { ApiError } from "@/services/api/errors";
 import {
   confirmAnomaly,
@@ -38,6 +39,7 @@ import type {
   PriceSeries,
 } from "@/types/radar";
 import { KIND_LABELS, LAYER_LABELS } from "@/types/radar";
+import type { WorkspaceRole } from "@/types/tenancy";
 
 /**
  * ARCH-34 §5.6 — the Forensic Audit Radar.
@@ -324,6 +326,7 @@ const EvidenceBlock: React.FC<{ readonly item: AnomalyEvidence }> = ({ item }) =
  */
 export const ForensicAuditRadar: React.FC = () => {
   const workspace = useActiveWorkspace();
+  const canDecide = isAtLeast((workspace?.role ?? "VIEWER") as WorkspaceRole, "CONTRIBUTOR");
   const workspaceId = workspace?.workspaceId ?? "";
   const organizationId = workspace?.organizationId ?? "";
   const capability = useCapabilityAccess(organizationId, ANOMALY_RADAR_CAPABILITY);
@@ -617,7 +620,9 @@ export const ForensicAuditRadar: React.FC = () => {
                         <EvidenceBlock key={`${item.kind}-${index}`} item={item} />
                       ))}
 
-                      {detail.data.status === "OPEN" ? (
+                      {detail.data.status === "OPEN" && !canDecide ? (
+                        <p className={HINT}>Only contributors and administrators can decide a finding.</p>
+                      ) : detail.data.status === "OPEN" ? (
                         <div className="space-y-2">
                           <label className={HINT} htmlFor={`reason-${finding.id}`}>
                             If this is not an anomaly, say why. The reason is kept

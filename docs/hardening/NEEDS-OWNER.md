@@ -1796,3 +1796,54 @@ network that needs the database must reach it through an SSH tunnel, not an open
 `docs/PRODUCT-NEXT.md` items. The first two have their own decisions above. The product items wait for
 you to choose them: they are product decisions, not defects, and nothing in the launch checklist depends
 on them. Task 4 (browser-test gaps) moves to Session C.
+
+## N-125 — A button the server will refuse is not offered to that person (DECIDED (Session C))
+
+Four screens showed controls to people the server then turned away: the Audit radar's decision buttons
+(viewers), the three-way match's Approve match / Flag dispute and their `a` / `d` keys (viewers), the
+Automation page's switch, Test, Duplicate, Edit, Delete and Create New Rule (contributors; only a workspace
+administrator may use them), and the upload and delete controls elsewhere that already followed the rule.
+The rule is now the same everywhere: a person sees what they can read, a control they cannot use is
+disabled (the Automation switch, which shows the rule's state) or not shown, and the server still refuses
+whatever is sent. A short line says who can decide where that helps (the radar). Nothing about who may do
+what changed; only what the page offers.
+
+## N-126 — Role mappings take the next free place; a taken place is refused in words (DECIDED (Session C))
+
+An identity connection's role mappings are tried lowest number first, one per number. The console never sent
+a number, so only one mapping could ever be saved. A mapping saved without a number now goes after the
+ones already saved (the highest number plus 10, starting at 100); asking for a number that is taken is
+refused with a sentence that says so. Order is therefore the order they were saved in; changing the order
+needs the API until a list screen exists (see "seen, not fixed" in HANDOFF).
+
+## N-127 — The browser suite's RevOps spec uses INR only (DECIDED (Session C))
+
+Publishing a price book retires the one in force for its currency, and price books are global to the whole
+test database. Spec 94 therefore creates and publishes its own INR book and proves that the USD prices
+(which other specs read) are identical before and after. The INR book stays in force after a run; the next
+run retires it. The billing screen then shows a Currency dropdown with USD first. The suite passes with it;
+a fresh CI database starts with no INR book.
+
+## N-128 — "Test on a document" tries the 25 most recent documents (DECIDED (Session C))
+
+The clause checks panel now offers the workspace's 25 most recent documents for "Test on a document", the
+first one chosen. A search box and older documents can be added when someone asks for them; the test writes
+nothing, so which document is tried matters little.
+
+## N-129 — The webhook relay and probe for the real Dodo check (DECIDED (Session C))
+
+`scripts/dodo_probe.py` sends only GET requests and prints field names and types, never ids, addresses,
+amounts or metadata values (so its output can be pasted into a chat). `start_dev.ps1 -DodoWebhooks` (and
+`start_dev.sh --dodo-webhooks`) prefers Dodo's own CLI (`dodo wh listen`, test mode only, original signature
+headers) and falls back to a Cloudflare quick tunnel; both refuse `DODO_LIVEMODE=true`, and the signing
+secret is only ever typed by hand into `backend/.env`. The walk-through and a results table for the ten
+unconfirmed points are in `docs/billing/DODO-LOCAL-TEST.md`. Unverified until Session D runs it: the exact
+labels in Dodo's dashboard and whether `dodo wh listen` takes the address as an argument or `--forward-to`
+(the relay asks the CLI's own `--help`).
+
+## N-130 — A region change cannot be proven in the browser suite (DECIDED (Session C))
+
+The data-residency card's "Save region" refuses, correctly, any region but the default while the
+deployment stores files locally ("requires an object-storage backend"). The browser suite runs on local
+storage, so it proves the refusal path (no bucket, disabled button, server 409) and not a successful
+repin. A successful repin is a test for a deployment with MinIO or S3.

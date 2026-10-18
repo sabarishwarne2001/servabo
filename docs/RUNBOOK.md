@@ -460,6 +460,10 @@ In Dodo's dashboard (Test Mode on): **Developer → Webhooks → Add endpoint**,
 `$COMPOSE up -d`. The app refuses unsigned events and refuses to start when the key has no secret.
 `docs/billing/DODO.md` lists every event and what Servabo does with it.
 
+To check Dodo's real answers against what Servabo expects from your own PC before (or besides) this
+server step, follow `docs/billing/DODO-LOCAL-TEST.md`: a read-only probe, a webhook relay for your
+laptop (`start_dev.ps1 -DodoWebhooks`) and a results table for the ten unconfirmed points.
+
 Then buy a plan yourself with Dodo's test card (Dodo's dashboard shows the test card numbers): the
 checkout page is Dodo's; back in Servabo the page says "Confirming your payment…" and then "Payment
 confirmed" with the plan. If it says the confirmation is late, the webhook is not arriving: check the

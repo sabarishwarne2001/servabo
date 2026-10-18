@@ -33,6 +33,8 @@ import type { AutomationRule, AutomationLog, AutomationErrorPolicy } from "@/typ
 import { formatCostMicros, formatDurationMs } from "@/types/automation";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useActiveWorkspace, useActiveWorkspaceId } from "@/hooks/useActiveWorkspace";
+import { canManageAutomation } from "@/permissions/workspacePermissions";
+import type { WorkspaceRole } from "@/types/tenancy";
 import { useCapabilityAccess } from "@/hooks/useCapabilityAccess";
 import { CAPABILITY } from "@/constants/capabilities";
 import { PlanLockBanner } from "@/components/billing/PlanLockBanner";
@@ -103,6 +105,9 @@ export const Automation: React.FC = () => {
   // N-049 (campaign session 1): automations are Developer and up. Without them the
   // rules stay visible and can be switched off or deleted (N-003); nothing else.
   const organizationId = useActiveWorkspace()?.organizationId ?? "";
+  // Creating, changing, testing and deleting a rule are for workspace administrators (the server enforces it);
+  // a contributor reads the rules and their state.
+  const canManage = canManageAutomation((useActiveWorkspace()?.role ?? "VIEWER") as WorkspaceRole);
   const automations = useCapabilityAccess(organizationId, CAPABILITY.automations);
   const planLocked = !automations.isLoading && !automations.isError && !automations.granted;
 
@@ -534,6 +539,7 @@ export const Automation: React.FC = () => {
               }`}
             />
           </button>
+          {canManage && (
           <button
             type="button"
             onClick={handleOpenCreateForm}
@@ -543,6 +549,7 @@ export const Automation: React.FC = () => {
             <Plus className="h-4 w-4 mr-1.5 flex-shrink-0" />
             Create New Rule
           </button>
+          )}
         </div>
       </header>
 
@@ -762,6 +769,7 @@ export const Automation: React.FC = () => {
                   team, send to review, update a field.
                 </p>
               </div>
+              {canManage && (
               <button
                 type="button"
                 onClick={handleOpenCreateForm}
@@ -771,6 +779,7 @@ export const Automation: React.FC = () => {
                 <Plus className="h-3.5 w-3.5" aria-hidden />
                 Create your first rule
               </button>
+              )}
             </div>
           ) : sortedRules.length === 0 ? (
             <div className="text-center py-14 px-6 bg-card border border-dashed border-border/60 rounded-2xl select-none flex flex-col items-center justify-center space-y-3">
@@ -866,6 +875,7 @@ export const Automation: React.FC = () => {
                             : "bg-muted-foreground/30"
                         }`}
                       disabled={
+                        !canManage ||
                         togglingRuleId === rule.id ||
                         isDeletingRule ||
                         isUpdatingRule ||
@@ -978,6 +988,7 @@ export const Automation: React.FC = () => {
                       )}
                     </div>
 
+                    {canManage && (
                     <div className="flex items-center space-x-1 self-end sm:self-auto">
                       <button
                         type="button"
@@ -1022,6 +1033,7 @@ export const Automation: React.FC = () => {
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
+                    )}
                   </div>
                 </article>
               ))}

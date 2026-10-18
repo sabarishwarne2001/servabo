@@ -7,6 +7,7 @@ import CapabilityLockCard from "@/components/procurement/CapabilityLockCard";
 import PdfViewer from "@/components/pdf/PdfViewer";
 import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 import { useCapabilityAccess } from "@/hooks/useCapabilityAccess";
+import { isAtLeast } from "@/permissions/workspacePermissions";
 import { ApiError } from "@/services/api/errors";
 import { approveCase, disputeCase, getCase } from "@/services/api/procurement";
 import { procurementKeys } from "@/services/api/queryKeys";
@@ -24,6 +25,7 @@ import { NOTHING_COMPARED, RED_OUTCOMES, outcomeLabel, outcomeTone, statusTone }
 import { formatMoneyMicros, vendorLabel } from "@/utils/formatters";
 import { formatTimestamp } from "@/utils/displayTime";
 import { ErrorState } from "@/components/common/ErrorState";
+import type { WorkspaceRole } from "@/types/tenancy";
 import { errorMessage } from "@/services/api/errors";
 
 const RECONCILIATION_CAPABILITY = "capability.reconciliation";
@@ -65,6 +67,8 @@ export const ThreeWayComparison: React.FC = () => {
   const workspace = useActiveWorkspace();
   const workspaceId = workspace?.workspaceId ?? "";
   const organizationId = workspace?.organizationId ?? "";
+  // Approving and disputing are for contributors and above; the server refuses a viewer either way.
+  const canDecide = isAtLeast((workspace?.role ?? "VIEWER") as WorkspaceRole, "CONTRIBUTOR");
   const { caseId = "" } = useParams<{ caseId: string }>();
   const queryClient = useQueryClient();
 
@@ -204,12 +208,14 @@ export const ThreeWayComparison: React.FC = () => {
           break;
         case "a":
           event.preventDefault();
-          startApprove();
+          if (canDecide) {startApprove();}
           break;
         case "d":
           event.preventDefault();
-          setActionError(null);
-          setDialog("dispute");
+          if (canDecide) {
+            setActionError(null);
+            setDialog("dispute");
+          }
           break;
         default:
           break;
@@ -217,7 +223,7 @@ export const ThreeWayComparison: React.FC = () => {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [activeLine, dialog, lines.length, openEvidence, startApprove]);
+  }, [activeLine, canDecide, dialog, lines.length, openEvidence, startApprove]);
 
   useEffect(() => {
     rowRefs.current[cursor]?.scrollIntoView({ block: "nearest" });
@@ -279,7 +285,7 @@ export const ThreeWayComparison: React.FC = () => {
           <button
             type="button"
             className={BUTTON_PRIMARY}
-            disabled={resolved || approve.isPending}
+            disabled={resolved || !canDecide || approve.isPending}
             onClick={startApprove}
           >
             Approve match
@@ -287,7 +293,7 @@ export const ThreeWayComparison: React.FC = () => {
           <button
             type="button"
             className={BUTTON_SECONDARY}
-            disabled={resolved || dispute.isPending}
+            disabled={resolved || !canDecide || dispute.isPending}
             onClick={() => {
               setActionError(null);
               setDialog("dispute");
@@ -484,7 +490,7 @@ export const ThreeWayComparison: React.FC = () => {
             aria-label="Override reason"
           />
           <div className="flex justify-end gap-2">
-            <button type="button" className={BUTTON_SECONDARY} onClick={() => setDialog(null)}>
+            <button type="button" className={BUTTON_SECONDARY} onClick={() => { setDialog(null); setReason(""); }}>
               Cancel
             </button>
             <button
@@ -515,7 +521,7 @@ export const ThreeWayComparison: React.FC = () => {
             aria-label="Dispute reason"
           />
           <div className="flex justify-end gap-2">
-            <button type="button" className={BUTTON_SECONDARY} onClick={() => setDialog(null)}>
+            <button type="button" className={BUTTON_SECONDARY} onClick={() => { setDialog(null); setReason(""); }}>
               Cancel
             </button>
             <button

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import axios from "axios";
 
 import {
   abortUploadSession,
@@ -141,10 +142,13 @@ export const useUploadTrayStore = create<UploadTrayState>((set, get) => {
         }),
       });
     } catch (error) {
+      // A part in flight is stopped by axios, which throws its own CanceledError rather than the
+      // browser's AbortError; between parts the loop throws the AbortError itself. Both mean "stopped".
       const aborted =
-        error instanceof DOMException && error.name === "AbortError";
+        (error instanceof DOMException && error.name === "AbortError") || axios.isCancel(error);
       const current = get().files.find((file) => file.id === entry.id);
-      if (aborted && current?.status === "paused") {
+      // Pause and Cancel have already set their own status; the stop that follows must not undo it.
+      if (aborted && (current?.status === "paused" || current?.status === "cancelled")) {
         return;
       }
       set({

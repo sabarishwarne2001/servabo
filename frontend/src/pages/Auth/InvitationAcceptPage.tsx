@@ -224,7 +224,7 @@ export const InvitationAcceptPage: React.FC = () => {
     return "This invitation is invalid or has expired.";
   }, [previewError, token]);
 
-  const { mutateAsync: acceptMutation, isPending: isAccepting } = useMutation({
+  const { mutate: acceptMutation, isPending: isAccepting } = useMutation({
     mutationFn: () => acceptInvitation(token as string),
     onSuccess: async (result) => {
       setPhase("accepted");
@@ -265,7 +265,7 @@ export const InvitationAcceptPage: React.FC = () => {
     },
   });
 
-  const { mutateAsync: rejectMutation, isPending: isRejecting } = useMutation({
+  const { mutate: rejectMutation, isPending: isRejecting } = useMutation({
     mutationFn: () => rejectInvitation(token as string),
     onSuccess: () => {
       setPhase("rejected");
@@ -426,7 +426,7 @@ export const InvitationAcceptPage: React.FC = () => {
             <div className="flex flex-col gap-2">
               <button
                 type="button"
-                onClick={() => void acceptMutation()}
+                onClick={() => acceptMutation()}
                 disabled={isAccepting}
                 className={AUTH_PRIMARY}
               >
@@ -434,7 +434,7 @@ export const InvitationAcceptPage: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => void rejectMutation()}
+                onClick={() => rejectMutation()}
                 disabled={isRejecting}
                 className={AUTH_SECONDARY}
               >

@@ -416,6 +416,19 @@ def lint_manifest(
             f"Manifest is not a valid automation graph: {exc}"
         ) from exc
 
+    # The automation tables refuse an action node without a type (ck_automation_nodes_action_has_type), so
+    # a manifest that has one would publish and then fail for every organization that installs it.
+    untyped = sorted(
+        spec.node_key
+        for spec in node_specs
+        if spec.node_type == "action" and not str(spec.config.get("action_type") or "").strip()
+    )
+    if untyped:
+        raise ManifestValidationError(
+            "Every action node needs an action_type in its config (for example \"notify\"); "
+            f"missing on: {', '.join(untyped)}."
+        )
+
     _refuse_r33_violations(node_specs)
     return compiled
 

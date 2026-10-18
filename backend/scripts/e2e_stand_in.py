@@ -489,7 +489,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("command", choices=[
         "subscribe", "seats", "change-plan", "cancel", "cancel-at-period-end", "renewal-fails", "payment-fails-again", "mark-unpaid",
         "card-fixed", "refund", "dodo-catalogue", "trial-ending", "trial-ends", "run-job", "dns-publish", "saml-idp",
-        "saml-response", "truthmesh-fill", "truthmesh-stick"])
+        "saml-response", "truthmesh-fill", "truthmesh-stick", "fail-document"])
     parser.add_argument("--gateway", choices=["dodo", "stripe"], type=str.lower,
                         default=_gateway_from_argv([]), help="whose side to play (default: E2E_GATEWAY, else dodo)")
     parser.add_argument("--amount", type=int, help="refund: in cents (default: the whole payment)")
@@ -502,6 +502,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--domain", help="saml-idp, saml-response: the customer's email domain")
     parser.add_argument("--email", help="saml-response: who signs in")
     parser.add_argument("--saml-request", help="saml-response: the SAMLRequest Servabo sent (redirect binding)")
+    parser.add_argument("--document", help="fail-document: the document (work item) id")
     parser.add_argument("--conflicts", type=int, default=0, help="truthmesh-fill: how many open conflicts to add")
     parser.add_argument("--documents", type=int, default=0, help="truthmesh-fill: how many documents to add to the mesh")
     args = parser.parse_args(argv)
@@ -527,6 +528,18 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if args.command in ("truthmesh-fill", "truthmesh-stick"):
         return _truthmesh(args)
+
+    if args.command == "fail-document":
+        # A worker that died on a document: the document reads FAILED, as the "Retry processing" button expects.
+        from app.models.work_item import WorkItem
+
+        with SessionLocal() as db, db.begin():
+            item = db.get(WorkItem, uuid.UUID(args.document))
+            item.status = "FAILED"
+            item.failure_stage = "EXTRACTION"
+            item.failure_reason = "The worker stopped while reading this document (stand-in)."
+        print(json.dumps({"failed": args.document}))
+        return 0
 
     if args.command == "run-job":
         # Queue a job for the running worker, as its schedule would. With --org, the job is about

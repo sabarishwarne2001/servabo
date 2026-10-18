@@ -3448,3 +3448,46 @@ hash chain on the rewritten journeys (spec 76); the TruthMesh decision lock duri
 dismissal made during a rebuild waits; pinned by a test that passes); the Helm ledger's concurrency
 (an update is serialised per workspace by the same lock as the full rebuild; a change that commits while
 an update runs keeps its mark; a request for a full rebuild raised while one runs stays pending).
+
+## Session C: the browser-test gaps and the Dodo check kit (2026-10-18)
+
+New findings start at F-500. Every browser spec below (86 to 104) presses the real buttons against the
+real API on a tenant of its own and was run three times in a row; each defect marked "failed first" was
+found by a spec or test that failed before the fix and passed after it.
+
+| ID | Severity | Area | Finding | Evidence | Status |
+| --- | --- | --- | --- | --- | --- |
+| F-500 | Medium | Legal holds | **The list of holds returned only the active ones, so the "Released holds" section of the Legal holds panel could never fill**: a released hold vanished from the screen and the record of what had been preserved was lost. | `test_a_released_hold_is_still_listed_with_its_release_time` failed first; 61e22bd | Fixed |
+| F-501 | High | Legal holds / tenant isolation | **The list and release routes looked at the whole organization, not the workspace.** A second workspace saw the first one's hold reasons, and its administrator could release a hold placed in the first workspace, which would let a document under legal hold be deleted. | `test_holds_are_listed_and_released_only_in_their_own_workspace` failed first; f765d71 | Fixed |
+| F-502 | Low | Dev launcher | **`start_dev.ps1 -Website` started the website only when the API had failed to start** (its block sat inside the "API did not bind" branch). | `test_the_website_switch_is_not_inside_the_api_failure_branch` failed first; 1c3bb1c | Fixed |
+| F-503 | Low | Payment risk | **A dismissal's reason was counted before trimming**: twelve spaces were accepted and the flag was recorded as dismissed with an empty note (the anomaly route already refused this). | spec 87 and `test_a_changed_bank_account_and_a_round_total_are_flagged` failed first; da369f5 | Fixed |
+| F-504 | Medium | Single sign-on | **An owner could save only one role mapping per identity connection.** The console always sent priority 100, the database allows one mapping per priority, and the second "Save mapping" failed with the misleading "changed by another request". A mapping with no priority now goes after the others; a taken priority is refused in plain words. | spec 89 and `test_several_role_mappings_can_be_saved_on_one_connection` failed first; 29dac61 | Fixed |
+| F-505 | Low | Audit radar | **Viewers were offered "This is a real finding" / "Not an anomaly"**; pressing them ended in a 403. They now see the evidence and who can decide. | spec 87 (rewritten to the intended behaviour) failed first; 0590a1a | Fixed |
+| F-506 | Medium | Sessions | **"Sign out of this device" and "Sign out everywhere" moved the browser to the sign-in screen three times and added `?redirect=<settings page>`**, so the next person to sign in was sent back to the previous person's settings page; the double navigation also made a spec fail one run in three. They now leave once, like the sidebar's Sign out. | spec 89 failed first (and 5 clean runs after); 376593e | Fixed |
+| F-507 | Low | Entity 360 | **Erasing a record made the still-open page ask for the erased record once more (a 404 in the console).** Seen once, a timing race, so no failing test could be made; the page no longer re-fetches that record's own queries. | spec 90 (one earlier run); e62f92e | Unverified |
+| F-508 | Low | Archive / invitations | **"Archive workspace" (refused for an organization's last workspace), "Accept and join" and "Decline invitation" threw an unhandled error in the browser on every refusal** (the notice was shown, the promise was dropped). | specs 101 and 95 failed first; ae0d795 | Fixed |
+| F-509 | Low | Archive | **After a successful archive the page re-read the archived workspace, which the server refuses (403 in the console).** | spec 101 failed first; ae0d795 | Fixed |
+| F-510 | Low | Three-way match | **Viewers saw enabled "Approve match" and "Flag dispute" buttons and the a / d shortcuts**; the server refused after a reason was typed. | spec 96 failed first; f6fa5e1 | Fixed |
+| F-511 | Low | Three-way match | **One reason box was shared by the dispute and approval dialogs**, so a cancelled dispute reason (written for the supplier) appeared in the approval box. | spec 96 test failed first, re-confirmed by undoing the fix; f6fa5e1 | Fixed |
+| F-512 | Low | Accessibility | **The workspace "Send Test Email" window was a plain overlay**: no dialog role or name, the address field had no label, Escape did nothing. | spec 102 failed first; 3307fc9 | Fixed |
+| F-513 | Medium | Upload tray | **Pause (and Cancel) while a part was on the wire showed "1 failed"**: axios throws its own cancel error, which the tray did not recognise as a stop. | spec 103 failed first; f796b45 | Fixed |
+| F-514 | High | Assistant uploads | **The assistant page's dropzone refused every file** ("application/pdf isn't accepted here"): it compared the file's type with the workspace setting "Allowed file types", which is written as extensions (pdf, png, jpg). | spec 103 failed first; f796b45 | Fixed |
+| F-515 | Medium | Clause checks | **"Test on a document" could not be reached**: the button renders only when given documents to try and its only caller never gave any. | spec 98 failed first; e5535bc | Fixed |
+| F-516 | Low | Automation | **Contributors were shown the rule switch, Test, Duplicate, Edit, Delete and Create New Rule**, but the server lets only a workspace administrator use them. | spec 98 (rewritten to the intended behaviour) failed first; 70967a4 | Fixed |
+| F-517 | Medium | Marketplace | **The partner console's sample workflow published ("signature verified") but every organization that installed it got a 422**: the automation tables require an `action_type` on an action node, and neither the sample nor the publish lint had one. | spec 100 and `test_an_action_without_an_action_type_is_refused_when_published` failed first; efd82b8 | Fixed |
+
+**Session C — seen, not fixed (listed in HANDOFF "Session C → next sessions"):** the identity console never
+lists the role mappings it saved (no read route), so an owner cannot see or remove one; the three-way match
+page never shows the stored `resolution_reason`, has no re-score, notes or separate Reject button (the API
+calls exist and nothing uses them), and supplier-cost "Reconcile" cannot force an open period although the
+API can; a password sign-in of a member of an SSO-required organization returns 200 and each request then
+answers 403 `ORGANIZATION_SSO_REQUIRED`; the "last active workspace" refusal is a 403 `PERMISSION_DENIED`
+though it is a conflict; the process agent's "Undo" needs a fitted calibration model (the spec adds
+historical labels by SQL as the backend tests do); there is no OIDC secret rotation (the secret is
+accepted only at creation); an organization's data-residency card offers a region the storage backend
+cannot hold (local file storage refuses it on Save).
+
+**Session C — checked and sound (no defect):** ERP posting (spec 86: Post N, a real failed post and Retry,
+Do not post, targets, mapping versions), tables (93), seats (91), review hub decisions per kind and the
+bulk actions (92), RevOps price books / promo codes / contracts / invoices / disputes (94), credential
+rotation for API keys, webhooks and provider keys (97), the egress lockdown (99), entity 360 (90).

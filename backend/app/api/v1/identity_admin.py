@@ -7,6 +7,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+from sqlalchemy import select
 
 from app.api import deps
 from app.models.identity import (
@@ -416,17 +417,28 @@ def add_role_mapping(organization_id: str, config_id: str, payload: dict = Body(
     match_kind = str(payload.get("match_kind") or "EQUALS").upper()
     if match_kind not in _MATCH_KINDS:
         raise HTTPException(422, "match_kind must be EQUALS, CONTAINS or PREFIX.")
-    priority = payload.get("priority", 100)
-    if (isinstance(priority, bool) or not isinstance(priority, int)
+    attribute_name = _required_text(payload, "attribute_name")
+    match_value = _required_text(payload, "match_value")
+    priority = payload.get("priority")
+    taken = set(db.execute(select(IdpRoleMapping.priority).where(IdpRoleMapping.idp_config_id == config.id)).scalars())
+    if priority is None:
+        # No place asked for: after the mappings already saved (lower numbers are tried first).
+        priority = max(taken, default=90) + 10
+        if priority >= 2**31:
+            raise HTTPException(409, "No priority is left for another mapping.")
+    elif (isinstance(priority, bool) or not isinstance(priority, int)
             or not -(2**31) < priority < 2**31):
         raise HTTPException(422, "priority must be a whole number.")
+    elif priority in taken:
+        raise HTTPException(409, f"Another mapping on this connection already has priority {priority}; "
+                                 "leave the priority empty to add this one after the others.")
 
     mapping = IdpRoleMapping(
         idp_config_id=config.id,
         priority=priority,
-        attribute_name=_required_text(payload, "attribute_name"),
+        attribute_name=attribute_name,
         match_kind=match_kind,
-        match_value=_required_text(payload, "match_value"),
+        match_value=match_value,
         organization_role=role)
     db.add(mapping)
     db.flush()

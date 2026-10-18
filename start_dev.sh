@@ -16,6 +16,7 @@ DO_RESET=0
 DO_STOP=0
 NO_FRONTEND=0
 WITH_WEBSITE=0
+WITH_DODO_WEBHOOKS=0
 WEBSITE_DIR="${REPO_ROOT}/website"
 WEBSITE_PORT=4321
 SKIP_MIGRATIONS=0
@@ -34,16 +35,34 @@ die()  {
 
 trap 'die "start_dev.sh failed at line ${LINENO}"' ERR
 
+usage() {
+    cat <<'USAGE'
+Servabo local development launcher.
+  ./start_dev.sh [options]
+    --reset             destroy the Docker volumes first
+    --stop              stop everything this script started (including the Dodo relay)
+    --no-frontend       do not start the Vite dev server
+    --website           also start the public website on port 4321
+    --dodo-webhooks     also carry Dodo Payments' TEST-mode webhooks to this machine (Dodo's CLI, else a
+                        Cloudflare quick tunnel) and print what to click in Dodo's dashboard;
+                        see docs/billing/DODO-LOCAL-TEST.md
+    --skip-migrations   do not run alembic
+    --api-port N        API port (default 8000)
+    --frontend-port N   frontend port (default 5173)
+USAGE
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --reset)           DO_RESET=1 ;;
         --stop)            DO_STOP=1 ;;
         --no-frontend)     NO_FRONTEND=1 ;;
         --website)         WITH_WEBSITE=1 ;;
+        --dodo-webhooks)   WITH_DODO_WEBHOOKS=1 ;;
         --skip-migrations) SKIP_MIGRATIONS=1 ;;
         --api-port)        API_PORT="$2"; shift ;;
         --frontend-port)   FRONTEND_PORT="$2"; shift ;;
-        -h|--help)         sed -n '2,12p' "$0"; exit 0 ;;
+        -h|--help)         usage; exit 0 ;;
         *)                 die "unknown option: $1" ;;
     esac
     shift
@@ -119,10 +138,22 @@ printf '  %s----------------------------------------%s\n' "${C_DIM}" "${C_RESET}
 
 if (( DO_STOP )); then
     step 'Stopping tracked processes'; stop_tracked
+    if [[ -x "${VENV_DIR}/bin/python" ]]; then
+        (cd "${BACKEND_DIR}" && "${VENV_DIR}/bin/python" scripts/dodo_relay.py stop --run-dir "${RUN_DIR}") || true
+    fi
     step 'Stopping Docker backing services'
     (cd "${BACKEND_DIR}" && docker compose stop db redis minio >/dev/null 2>&1) || true
     ok 'Containers stopped.'
     exit 0
+fi
+
+# The Dodo webhook relay works in test mode only; refuse live mode before anything starts.
+if (( WITH_DODO_WEBHOOKS )); then
+    LIVE_MODE="${DODO_LIVEMODE:-$(env_get "${BACKEND_DIR}/.env" DODO_LIVEMODE)}"
+    case "$(printf '%s' "${LIVE_MODE}" | tr '[:upper:]' '[:lower:]')" in
+        1|true|yes|on) die 'DODO_LIVEMODE is true: the Dodo webhook relay is for TEST mode only.' \
+            "Set DODO_LIVEMODE=false in backend/.env (and turn on Test Mode in Dodo's dashboard), then run this again." ;;
+    esac
 fi
 
 mkdir -p "${RUN_DIR}" "${LOG_DIR}"
@@ -316,6 +347,15 @@ if (( WITH_WEBSITE )); then
     wait_for_port 'Website' "${WEBSITE_PORT}" 120 || warn 'The website has not bound yet; check .dev/logs/website.log'
 fi
 
+RELAY_TEXT=''
+if (( WITH_DODO_WEBHOOKS )); then
+    step 'Dodo webhook relay'
+    RELAY_TEXT="$(cd "${BACKEND_DIR}" && "${VENV_PY}" scripts/dodo_relay.py start --api-port "${API_PORT}" \
+        --run-dir "${RUN_DIR}" --env-file "${BACKEND_ENV}" \
+        --restart-hint './start_dev.sh --stop  then  ./start_dev.sh --dodo-webhooks' 2>&1)" \
+        || warn 'The Dodo webhook relay did not start (see below).'
+fi
+
 step '8/8  Ready'
 cat <<BANNER
 
@@ -336,3 +376,8 @@ $( (( WITH_WEBSITE )) && echo "   Website      http://localhost:${WEBSITE_PORT}"
      ./start_dev.sh --stop
   ${C_DIM}---------------------------------------------------------------${C_RESET}
 BANNER
+if [[ -n "${RELAY_TEXT}" ]]; then
+    printf '  Dodo webhooks\n'
+    printf '%s\n' "${RELAY_TEXT}" | sed 's/^/   /'
+    printf '\n'
+fi

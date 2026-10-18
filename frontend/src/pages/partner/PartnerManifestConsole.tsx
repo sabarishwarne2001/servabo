@@ -47,7 +47,7 @@ import { formatTimestampDate } from "@/utils/displayTime";
 const SAMPLE_GRAPH = `{
   "nodes": [
     { "node_key": "start", "node_type": "trigger", "config": { "event": "document.processed" } },
-    { "node_key": "notify", "node_type": "action", "config": { "action": "notification.send" } }
+    { "node_key": "notify", "node_type": "action", "config": { "action_type": "notify", "recipient": "ap-team@example.com" } }
   ],
   "edges": [{ "from_node_key": "start", "to_node_key": "notify", "branch": "default" }]
 }`;

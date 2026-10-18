@@ -3,6 +3,10 @@
     Servabo â€” single-command local development launcher (Windows).
 
 .DESCRIPTION
+    -DodoWebhooks also starts a relay that carries Dodo Payments' TEST-mode webhooks to this PC
+    (Dodo's own CLI, else a Cloudflare quick tunnel) and prints what to click in Dodo's dashboard.
+    -Stop ends the relay with everything else. docs/billing/DODO-LOCAL-TEST.md has the full walk-through.
+
     Brings up the complete stack from a clean checkout:
       1. Verifies Docker, Python 3.12 and Node.js.
       2. Generates backend/.env and frontend/.env with validated defaults.
@@ -21,6 +25,7 @@ param(
     [switch]$Stop,
     [switch]$SkipMigrations,
     [switch]$Website,
+    [switch]$DodoWebhooks,
     [int]$ApiPort = 8000,
     [int]$FrontendPort = 5173
 )
@@ -130,11 +135,24 @@ Write-Host '  ----------------------------------------' -ForegroundColor DarkGra
 if ($Stop) {
     Write-Step 'Stopping tracked processes'
     Stop-Tracked
+    $relayPython = Join-Path $VenvDir 'Scripts\python.exe'
+    if (Test-Path $relayPython) {
+        Push-Location $BackendDir
+        try { & $relayPython scripts/dodo_relay.py stop --run-dir $RunDir } finally { Pop-Location }
+    }
     Write-Step 'Stopping Docker backing services'
     Push-Location $BackendDir
     try { docker compose stop db redis minio 2>&1 | Out-Null; Write-Ok 'Containers stopped.' }
     finally { Pop-Location }
     exit 0
+}
+
+# The Dodo webhook relay works in test mode only; refuse live mode before anything starts.
+if ($DodoWebhooks) {
+    $liveMode = if ($env:DODO_LIVEMODE) { $env:DODO_LIVEMODE } else { Get-EnvValue (Join-Path $BackendDir '.env') 'DODO_LIVEMODE' }
+    if ("$liveMode".Trim().ToLower() -in @('1', 'true', 'yes', 'on')) {
+        Fail-Hard 'DODO_LIVEMODE is true: the Dodo webhook relay is for TEST mode only.' 'Set DODO_LIVEMODE=false in backend/.env (and turn on Test Mode in Dodo''s dashboard), then run this again.'
+    }
 }
 
 New-Item -ItemType Directory -Force -Path $RunDir, $LogDir | Out-Null
@@ -376,7 +394,11 @@ if (-not (Wait-ForPort 'API' $ApiPort 90)) {
     if (Test-Path $apiLog) {
         Get-Content -LiteralPath $apiLog -Tail 40 | ForEach-Object { Write-Host "      $_" -ForegroundColor DarkGray }
     }
-    # Website session: the public website (website/) on port 4321; the app's /pricing, /terms and
+    $tracked | ConvertTo-Json | Set-Content -LiteralPath $PidFile
+    exit 1
+}
+
+# Website session: the public website (website/) on port 4321; the app's /pricing, /terms and
 # /privacy and its sign-in footer link here in development.
 if ($Website) {
     $websiteDir = Join-Path $RepoRoot 'website'
@@ -393,10 +415,6 @@ if ($Website) {
     $tracked['website'] = $websiteProc.Id
     Write-Ok "Website starting -> $websiteLog"
     Wait-ForPort 'Website' 4321 120 | Out-Null
-}
-
-$tracked | ConvertTo-Json | Set-Content -LiteralPath $PidFile
-    exit 1
 }
 
 if (-not $NoFrontend) {
@@ -417,6 +435,18 @@ if (-not $NoFrontend) {
 }
 
 $tracked | ConvertTo-Json | Set-Content -LiteralPath $PidFile
+
+# Dodo's TEST-mode webhooks to this PC (docs/billing/DODO-LOCAL-TEST.md). The relay's own steps are
+# printed after the "Ready" box so they are the last thing on screen; the secret goes in backend/.env by hand.
+$relayText = $null
+if ($DodoWebhooks) {
+    Write-Step 'Dodo webhook relay'
+    Push-Location $BackendDir
+    try {
+        $relayText = (& $venvPython scripts/dodo_relay.py start --api-port $ApiPort --run-dir $RunDir --env-file (Join-Path $BackendDir '.env') 2>&1 | Out-String)
+        if ($LASTEXITCODE -ne 0) { Write-Warn2 'The Dodo webhook relay did not start (see below).' }
+    } finally { Pop-Location }
+}
 
 # --- 8. Ready --------------------------------------------------------------
 Write-Step '8/8  Ready'
@@ -447,6 +477,12 @@ Write-Host '   Stop everything' -ForegroundColor White
 Write-Host '     .\start_dev.ps1 -Stop' -ForegroundColor DarkGray
 Write-Host '  ---------------------------------------------------------------' -ForegroundColor DarkGray
 Write-Host ''
+
+if ($relayText) {
+    Write-Host '  Dodo webhooks' -ForegroundColor White
+    $relayText.TrimEnd().Split("`n") | ForEach-Object { Write-Host "   $($_.TrimEnd())" }
+    Write-Host ''
+}
 
 if (-not $NoFrontend) {
     Start-Process "http://localhost:$FrontendPort"

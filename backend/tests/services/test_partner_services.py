@@ -578,6 +578,16 @@ class TestManifestLinting:
         with pytest.raises(ManifestValidationError, match="R33"):
             marketplace_service.lint_manifest(nodes, edges)
 
+    def test_an_action_without_an_action_type_is_refused_when_published(self) -> None:
+        """F-517: the database refuses such a node at install; the lint says so at publish."""
+        nodes, edges = simple_manifest()
+        del nodes[1]["config"]["action_type"]
+        with pytest.raises(ManifestValidationError, match="action_type"):
+            marketplace_service.lint_manifest(nodes, edges)
+        nodes[1]["config"]["action_type"] = "  "
+        with pytest.raises(ManifestValidationError, match="action_type"):
+            marketplace_service.lint_manifest(nodes, edges)
+
     def test_authored_literal_recipient_is_allowed(self) -> None:
         nodes, edges = simple_manifest()
         nodes[1]["config"]["recipient"] = "billing@acme.example"
