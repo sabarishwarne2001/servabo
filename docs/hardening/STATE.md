@@ -15,13 +15,13 @@ Local stack: Postgres 16 + pgvector 0.8.0 (built from source) on :5433, Redis, A
 - [x] 0. Start-up: docs read; stack up; specs 76 + 77 re-run green (10 passed); this checklist; draft PR.
 - [ ] C1. Browser specs, one file per feature (numbered after 85), each run `--repeat-each=3` before commit
   - [x] 1. ERP posting (spec 86, 7 tests, 3x green; no app bug found): "Post N", Retry, "Do not post"; target "Test connection", "Set credential"; mapping "Save as new version" / "Restore default"
-  - [ ] 2. Payment risk and anomalies: "Confirm risk"; "Not a risk…" + reason, "Dismiss"; "This is a real finding"; "Not an anomaly"
+  - [x] 2. Payment risk and anomalies (spec 87; F-503, F-505): "Confirm risk"; "Not a risk…" + reason, "Dismiss"; "This is a real finding"; "Not an anomaly"
   - [x] 3. Legal holds (spec 88; F-500, F-501 fixed test-first): "Place hold" + reason; deleting a held document refused; "Release"
-  - [ ] 4. Sessions and SSO: "End session"; "Sign out everywhere" (fresh user); "Require single sign-on" + bypass; role mapping "Save mapping"
-  - [ ] 5. Entity 360: "Rename", "Erase record", "Split into a new record", "Undo merge"
-  - [ ] 6. Seats and RevOps money: "One seat fewer" → "Confirm"; "Remove N unused seats"; RevOps "Publish", "Create code", "Void", "Issue due invoices"
-  - [ ] 7. Review hub decisions per kind (ERP, table, obligation, merge, corroboration); bulk "All pass" / "Dismiss all"
-  - [ ] 8. Tables: "Accept figures", "Reject table", correct a cell
+  - [x] 4. Sessions and SSO (spec 89; F-504, F-506): "End session"; "Sign out everywhere" (fresh user); "Require single sign-on" + bypass; role mapping "Save mapping"
+  - [x] 5. Entity 360 (spec 90; F-507 unverified): "Rename", "Erase record", "Split into a new record", "Undo merge"
+  - [ ] 6. Seats (spec 91 done, no bug) and RevOps money (spec 94 with a helper): "One seat fewer" → "Confirm"; "Remove N unused seats"; RevOps "Publish", "Create code", "Void", "Issue due invoices"
+  - [ ] 7. (spec 92 with a helper) Review hub decisions per kind (ERP, table, obligation, merge, corroboration); bulk "All pass" / "Dismiss all"
+  - [x] 8. Tables (spec 93, no bug): "Accept figures", "Reject table", correct a cell
   - [ ] Long tail (Task 4's order, grouped by area): three-way-match "Flag dispute"; supplier-cost "Record invoice" / "Reconcile"; partner manifest → marketplace install; document bulk "Reprocess" / "Retry processing"; workspace archive and logo; corroboration decisions; packet "Approve split"; case detail actions; obligation "Waive" / feeds "Revoke"; identity OIDC and SCIM rotate/revoke; credential rotation (API keys, webhooks, BYOK); data residency "Save region"; egress rule removal; process agent "Save policy" and proposal "Reject" / "Undo"; leave organization / decline invitation; recovery codes and "Stop requiring two-factor"; automation rule toggle/test/edit/duplicate/delete; clause assertion "It passes" / "Wrong paragraph" / "Test on a document"; extraction memory "Reset" / "Retire"; AI / email / document settings "Test connection" / "Send test"; analytics "Sync now"; sovereign licence "Verify and install"; resumable upload tray
 - [ ] C2. The Dodo check kit
   - [x] 1. `backend/scripts/dodo_probe.py` (GET only, shapes not values, refuses live mode) + tests against `fake_dodo.py`
