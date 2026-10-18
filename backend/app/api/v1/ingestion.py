@@ -636,12 +636,14 @@ def list_holds(
     db: Session = Depends(deps.get_db),
     context: deps.TenantContext = Depends(deps.RequireWorkspaceViewer),
 ) -> list[RetentionHoldResponse]:
+    # Released holds stay on the list (with `released_at`): the Legal holds panel shows them under
+    # "Released holds", the record of what was once preserved. Newest first, bounded.
     rows = list(
         db.execute(
-            select(RetentionHold).where(
-                RetentionHold.organization_id == context.organization_id,
-                RetentionHold.released_at.is_(None),
-            )
+            select(RetentionHold)
+            .where(RetentionHold.organization_id == context.organization_id)
+            .order_by(RetentionHold.placed_at.desc())
+            .limit(500)
         ).scalars()
     )
     return [RetentionHoldResponse.model_validate(row) for row in rows]
