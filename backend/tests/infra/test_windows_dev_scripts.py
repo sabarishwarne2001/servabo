@@ -78,3 +78,27 @@ def test_they_ask_for_the_python_the_images_use() -> None:
     dockerfile = (BACKEND / "Dockerfile").read_text()
     assert "python:3.12" in dockerfile
     assert "'py -3.12', 'python3.12'" in START
+
+
+def _without_strings_and_comments(script: str) -> str:
+    """PowerShell with its quoted strings and comments removed, so only the code's own braces remain."""
+    script = re.sub(r"(?s)<#.*?#>", "", script)
+    script = re.sub(r"'(?:''|[^'\n])*'", "''", script)
+    script = re.sub(r'"(?:`.|[^"`\n])*"', '""', script)
+    return re.sub(r"(?m)#.*$", "", script)
+
+
+def test_the_powershell_script_is_balanced() -> None:
+    """A cheap parse check where PowerShell itself is not installed: every bracket closes."""
+    code = _without_strings_and_comments(START)
+    for opening, closing in ("{}", "()", "[]"):
+        assert code.count(opening) == code.count(closing), (opening, code.count(opening), code.count(closing))
+
+
+def test_the_website_switch_is_not_inside_the_api_failure_branch() -> None:
+    """The -Website block once sat inside `if the API did not bind`, so -Website ran only when the API failed."""
+    failed = START.index("The API did not bind")
+    leaves = START.index("exit 1", failed)
+    website = START.index("if ($Website) {", failed)
+    assert leaves < website, "-Website is started only on the path that exits"
+    assert START.index("if (-not $NoFrontend) {", failed) > website

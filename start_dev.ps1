@@ -376,7 +376,11 @@ if (-not (Wait-ForPort 'API' $ApiPort 90)) {
     if (Test-Path $apiLog) {
         Get-Content -LiteralPath $apiLog -Tail 40 | ForEach-Object { Write-Host "      $_" -ForegroundColor DarkGray }
     }
-    # Website session: the public website (website/) on port 4321; the app's /pricing, /terms and
+    $tracked | ConvertTo-Json | Set-Content -LiteralPath $PidFile
+    exit 1
+}
+
+# Website session: the public website (website/) on port 4321; the app's /pricing, /terms and
 # /privacy and its sign-in footer link here in development.
 if ($Website) {
     $websiteDir = Join-Path $RepoRoot 'website'
@@ -395,9 +399,6 @@ if ($Website) {
     Wait-ForPort 'Website' 4321 120 | Out-Null
 }
 
-$tracked | ConvertTo-Json | Set-Content -LiteralPath $PidFile
-    exit 1
-}
 
 if (-not $NoFrontend) {
     $nodeModules = Join-Path $FrontendDir 'node_modules'
