@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.pagination import MAX_OFFSET
 from app.api import capability_gate
 from app.api.deps import RequireWorkspaceRole, TenantContext, get_db
 from app.core import entitlements
@@ -174,7 +175,7 @@ def _options(body: CorroborationRequest) -> dict:
 
 @router.get("/workspaces/{workspace_id}/corroboration/runs", response_model=RunList)
 def list_runs(workspace_id: uuid.UUID, status_filter: Optional[str] = Query(default=None, alias="status"),
-              limit: int = Query(default=50, ge=1, le=200), offset: int = Query(default=0, ge=0),
+              limit: int = Query(default=50, ge=1, le=200), offset: int = Query(default=0, ge=0, le=MAX_OFFSET),
               db: Session = Depends(get_db), context: TenantContext = Depends(RequireViewer)) -> RunList:
     _ws(context, workspace_id)
     _gate(db, context, "corroboration.list")

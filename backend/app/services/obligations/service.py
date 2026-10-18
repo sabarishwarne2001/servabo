@@ -790,6 +790,11 @@ def delete_obligation(db: Session, *, ob: Obligation, actor_user_id: uuid.UUID) 
                                            "(so re-reading the document does not bring it back).")
     ob_id, org, ws = ob.id, ob.organization_id, ob.workspace_id
     dependents = _dependents(db, ob)
+    # These writes bypass the ORM's events: tell Helm's Promise ledger this obligation and the ones that
+    # counted from it changed.
+    from app.models import helm_dirty
+
+    helm_dirty.mark(db.connection(), ws, [ob_id, *(d.id for d in dependents)], "obligation deleted")
     # Dependents lose their anchor and their date (a person sets a new one); an open one goes back
     # to OPEN (an alert state needs a date), a done or waived one stays closed.
     db.execute(sa_update(Obligation).where(Obligation.anchor_obligation_id == ob_id).values(
@@ -811,6 +816,9 @@ def erase_for_work_items(db: Session, work_item_ids: Sequence[uuid.UUID]) -> int
     if not work_item_ids:
         return 0
     ids = list(work_item_ids)
+    from app.models import helm_dirty
+
+    helm_dirty.mark_obligations_of(db.connection(), ids, "document erased")  # these writes bypass the ORM's events
     db.execute(sa_update(Obligation).where(Obligation.work_item_id.in_(ids), Obligation.origin == v.ORIGIN_MANUAL)
                .values(work_item_id=None).execution_options(synchronize_session=False))
     result = db.execute(delete(Obligation).where(Obligation.work_item_id.in_(ids),

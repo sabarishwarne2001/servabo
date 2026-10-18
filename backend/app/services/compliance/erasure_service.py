@@ -371,6 +371,18 @@ def _destroy_documents(
     from app.services.collab import threads as _collab_threads
 
     counts["review_threads"] = _collab_threads.erase_for_work_items(db, work_item_ids)
+    # TruthMesh: the documents' nodes (title, facts, parties, counterparty), the links between them,
+    # the conflicts that quote their values and the simulations that reached them are the documents'
+    # content too; they go with it.
+    from app.services.truthmesh import service as _truthmesh
+
+    by_workspace: dict[uuid.UUID, list[uuid.UUID]] = {}
+    for item in work_items:
+        by_workspace.setdefault(item.workspace_id, []).append(item.id)
+    counts["truthmesh_conflicts"] = sum(
+        _truthmesh.forget_documents(db, workspace_id=workspace_id, work_item_ids=ids_in_workspace, erase=True)
+        for workspace_id, ids_in_workspace in by_workspace.items()
+    )
 
 
 def _destroy_conversations(

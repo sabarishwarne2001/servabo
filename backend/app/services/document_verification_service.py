@@ -397,7 +397,8 @@ def emit_outcome(
     from app.services.helm import hooks as helm_hooks
 
     helm_hooks.document_changed(db, workspace_id=verification.workspace_id,
-                                organization_id=verification.organization_id, reason="document verified")
+                                organization_id=verification.organization_id, reason="document verified",
+                                work_item_ids=[verification.work_item_id])
     releasing = verification.status in (
         VerificationStatus.AGREED,
         VerificationStatus.AUTO_APPROVED,
@@ -555,7 +556,8 @@ def resolve(
     from app.services.helm import hooks as helm_hooks
 
     helm_hooks.document_changed(db, workspace_id=verification.workspace_id,
-                                organization_id=verification.organization_id, reason="review resolved")
+                                organization_id=verification.organization_id, reason="review resolved",
+                                work_item_ids=[verification.work_item_id])
 
     logger.info(
         "verification.resolved",

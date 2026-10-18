@@ -48,7 +48,7 @@ def test_every_declared_role_has_a_profile() -> None:
     """Nothing in the roadmap's role list resolves to the web default."""
     for role in (
         "web", "worker-light", "worker-ocr", "worker-enrich",
-        "worker-relay", "worker-delivery", "worker-billing", "worker-stripe", "sweeper", "cron",
+        "worker-relay", "worker-delivery", "worker-billing", "sweeper", "cron",
         "migrate",
     ):
         assert db_session.resolve_role(role) in db_session.POOL_PROFILES

@@ -2,6 +2,8 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. This file is history and keeps the old name._
 
+**Tasks 1–3 and 4b done in Session B, Task 4 in Session C, Task 5 deferred (NEEDS-OWNER N-124).**
+
 Paste everything below the line into a new Claude Code session on this repository.
 
 ---

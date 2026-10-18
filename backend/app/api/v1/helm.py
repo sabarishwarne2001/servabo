@@ -65,6 +65,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.pagination import MAX_OFFSET
 from app.api.deps import OrganizationContext, RequireAnyOrgRole, get_db
 from app.services.helm import gate, money, service
 from app.services.helm import vocabulary as v
@@ -492,7 +493,7 @@ def helm_ledger(organization_id: uuid.UUID, book_id: uuid.UUID, kind: Optional[s
                 direction: Optional[str] = Query(None), status: Optional[str] = Query(None),
                 counterparty: Optional[str] = Query(None, max_length=255), at_risk: bool = Query(False),
                 due_on: Optional[date] = Query(None), limit: int = Query(200, ge=1, le=500),
-                offset: int = Query(0, ge=0),
+                offset: int = Query(0, ge=0, le=MAX_OFFSET),
                 db: Session = Depends(get_db),
                 context: OrganizationContext = Depends(RequireAnyOrgRole)) -> dict[str, Any]:
     who = _viewer(db, context)

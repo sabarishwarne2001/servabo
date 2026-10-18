@@ -13,7 +13,7 @@
  * viewers read.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import {
   Activity,
@@ -59,6 +59,7 @@ import {
   exportConflictsCsv,
   getGraph,
   getMatrix,
+  getMeshDocument,
   getOverview,
   getSimulation,
   listMeshConflicts,
@@ -80,6 +81,12 @@ import {
 import { formatTimestamp } from "@/utils/displayTime";
 
 type View = "cockpit" | "conflicts" | "whatif";
+/** Conflicts listed per request. */
+const CONFLICT_PAGE = 100;
+
+/** How long a build may run before the page offers Rebuild again. */
+const LOST_BUILD_MS = 10 * 60_000;
+
 const VIEWS: readonly { id: View; label: string; Icon: React.ElementType }[] = [
   { id: "cockpit", label: "Cockpit", Icon: Activity },
   { id: "conflicts", label: "Conflicts", Icon: AlertOctagon },
@@ -178,7 +185,12 @@ export const TruthMesh: React.FC = () => {
   }
 
   const data = overview.data;
-  const building = status === "BUILDING" || rebuild.isPending;
+  // A build that has run for ten minutes has most likely been lost (a worker restarted under it): the
+  // page says so and offers Rebuild again instead of waiting for a state that will not change.
+  const buildingSince = data?.state.since ? new Date(data.state.since).getTime() : null;
+  const lost = status === "BUILDING" && buildingSince !== null && Date.now() - buildingSince > LOST_BUILD_MS;
+  const building = (status === "BUILDING" && !lost) || rebuild.isPending;
+  const showsBuilding = status === "BUILDING" || rebuild.isPending;
 
   return (
     <div className="space-y-5 p-4 sm:p-6">
@@ -196,8 +208,8 @@ export const TruthMesh: React.FC = () => {
                 }`}
                 data-testid="mesh-state"
               >
-                {building ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> : <span className={`h-1.5 w-1.5 rounded-full ${status === "READY" ? "bg-emerald-500" : "bg-muted-foreground"}`} aria-hidden />}
-                {building ? "Building…" : status === "FAILED" ? "Last build failed" : status === "READY" ? `Built ${relativeTime(data.state.last_built_at)}${data.state.build_ms !== null ? ` in ${data.state.build_ms} ms` : ""}` : "Not built yet"}
+                {showsBuilding ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> : <span className={`h-1.5 w-1.5 rounded-full ${status === "READY" ? "bg-emerald-500" : "bg-muted-foreground"}`} aria-hidden />}
+                {showsBuilding ? "Building…" : status === "FAILED" ? "Last build failed" : status === "READY" ? `Built ${relativeTime(data.state.last_built_at)}${data.state.build_ms !== null ? ` in ${data.state.build_ms} ms` : ""}` : "Not built yet"}
               </span>
             ) : null}
           </div>
@@ -223,6 +235,13 @@ export const TruthMesh: React.FC = () => {
           ) : null}
         </div>
       </header>
+
+      {lost ? (
+        <p role="status" className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm">
+          The last build started {relativeTime(data?.state.since)} and has not finished; it may have stopped. Rebuild
+          starts a new one.
+        </p>
+      ) : null}
 
       {status === "FAILED" && data?.state.error ? (
         <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
@@ -514,10 +533,17 @@ const ConflictsView: React.FC<{
   const [severity, setSeverity] = useState<Severity | "">("");
   const [layout, setLayout] = useState<"list" | "matrix">("list");
   const filters = { status, severity: severity || undefined };
-  const list = useQuery({
-    queryKey: meshKeys.conflicts(workspaceId, filters),
-    queryFn: () => listMeshConflicts(workspaceId, filters),
+  const list = useInfiniteQuery({
+    queryKey: meshKeys.conflictPages(workspaceId, filters),
+    queryFn: ({ pageParam }) => listMeshConflicts(workspaceId, { ...filters, limit: CONFLICT_PAGE, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (last, pages) => {
+      const loaded = pages.reduce((acc, page) => acc + page.items.length, 0);
+      return loaded < last.total ? loaded : undefined;
+    },
   });
+  const conflicts = useMemo(() => list.data?.pages.flatMap((page) => page.items) ?? [], [list.data]);
+  const conflictTotal = list.data?.pages[0]?.total ?? 0;
   const matrix = useQuery({
     queryKey: meshKeys.matrix(workspaceId),
     queryFn: () => getMatrix(workspaceId),
@@ -570,7 +596,7 @@ const ConflictsView: React.FC<{
                 </option>
               ))}
             </select>
-            {list.data ? <span className="text-xs text-muted-foreground">{list.data.total} conflict{list.data.total === 1 ? "" : "s"}</span> : null}
+            {list.data ? <span className="text-xs text-muted-foreground">{conflictTotal} conflict{conflictTotal === 1 ? "" : "s"}</span> : null}
           </>
         ) : null}
       </div>
@@ -580,13 +606,25 @@ const ConflictsView: React.FC<{
           <p className="text-sm text-muted-foreground">Loading conflicts…</p>
         ) : list.isError ? (
           <p className="text-sm text-destructive">{errorMessage(list.error, "Conflicts could not be loaded.")}</p>
-        ) : (list.data?.items.length ?? 0) === 0 ? (
+        ) : conflicts.length === 0 ? (
           <p className="fp-card px-4 py-6 text-sm text-muted-foreground">Nothing here.</p>
         ) : (
           <div className="space-y-2">
-            {list.data!.items.map((c) => (
+            {conflicts.map((c) => (
               <ConflictCard key={c.id} workspaceId={workspaceId} conflict={c} canDecide={canDecide} onOpenDocument={onOpen} />
             ))}
+            {list.hasNextPage ? (
+              <div className="pt-1 text-center">
+                <button
+                  type="button"
+                  className="fp-btn fp-btn-secondary h-8 text-xs"
+                  disabled={list.isFetchingNextPage}
+                  onClick={() => void list.fetchNextPage()}
+                >
+                  {list.isFetchingNextPage ? "Loading…" : `Show more conflicts (${conflicts.length} of ${conflictTotal})`}
+                </button>
+              </div>
+            ) : null}
           </div>
         )
       ) : matrix.isLoading ? (
@@ -664,8 +702,9 @@ const WhatIf: React.FC<{
 }> = ({ workspaceId, canRun, origin, onOrigin, onOpen }) => {
   const queryClient = useQueryClient();
   const [scenario, setScenario] = useState<Scenario>("DELAY");
-  const [days, setDays] = useState(14);
-  const [percent, setPercent] = useState(8);
+  // Text, not numbers: a cleared box is empty, not 0, and is not sent.
+  const [days, setDays] = useState("14");
+  const [percent, setPercent] = useState("8");
   const [clause, setClause] = useState("");
   const [result, setResult] = useState<Simulation | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
@@ -677,14 +716,27 @@ const WhatIf: React.FC<{
     [graph.data],
   );
   const selectedOrigin = origin ?? documents.find((d) => d.kind === "PURCHASE_ORDER")?.work_item_id ?? documents[0]?.work_item_id ?? "";
+  const mesh = useQuery({ queryKey: meshKeys.overview(workspaceId), queryFn: () => getOverview(workspaceId) });
+  // The graph lists the documents with the most risk and links, up to a cap. A document the page was
+  // opened for (the twin's "What if") may be beyond it: it is added to the list.
+  const beyond = useQuery({
+    queryKey: meshKeys.document(workspaceId, selectedOrigin),
+    queryFn: () => getMeshDocument(workspaceId, selectedOrigin),
+    enabled: Boolean(selectedOrigin) && Boolean(graph.data) && !documents.some((d) => d.work_item_id === selectedOrigin),
+  });
+  const daysNumber = /^\d+$/.test(days.trim()) ? Number(days.trim()) : NaN;
+  const daysValid = daysNumber >= 1 && daysNumber <= 730;
+  const percentNumber = percent.trim() === "" ? NaN : Number(percent);
+  const percentValid = percentNumber >= -95 && percentNumber <= 500;
+  const inputsValid = scenario === "DELAY" ? daysValid : scenario === "AMOUNT_CHANGE" ? percentValid : true;
 
   const run = useMutation({
     mutationFn: () =>
       runSimulation(workspaceId, {
         work_item_id: selectedOrigin,
         scenario,
-        ...(scenario === "DELAY" ? { days } : {}),
-        ...(scenario === "AMOUNT_CHANGE" ? { percent } : {}),
+        ...(scenario === "DELAY" ? { days: daysNumber } : {}),
+        ...(scenario === "AMOUNT_CHANGE" ? { percent: percentNumber } : {}),
         ...(scenario === "CLAUSE_INVOKED" ? { clause } : {}),
       }),
     onSuccess: async (sim) => {
@@ -714,12 +766,23 @@ const WhatIf: React.FC<{
           <h2 id="whatif-form" className="text-[15px] font-semibold tracking-tight">Simulate a change</h2>
           <label className="block text-xs font-medium" htmlFor="whatif-origin">Starting document</label>
           <select id="whatif-origin" className="fp-input w-full" value={selectedOrigin} onChange={(event) => onOrigin(event.target.value)}>
+            {beyond.data ? (
+              <option value={beyond.data.node.work_item_id}>
+                {beyond.data.node.kind_label}: {beyond.data.node.title}
+              </option>
+            ) : null}
             {documents.map((d) => (
               <option key={d.work_item_id} value={d.work_item_id}>
                 {d.kind_label}: {d.title}
               </option>
             ))}
           </select>
+          {graph.data?.truncated ? (
+            <p className="text-xs text-muted-foreground" data-testid="whatif-truncated">
+              Listing {documents.length} of {mesh.data?.documents ?? "your"} documents: the ones with the most risk and
+              links. To start from another, open it in the Conflicts view or the graph and choose What if.
+            </p>
+          ) : null}
           <fieldset>
             <legend className="mb-1.5 text-xs font-medium">What happens</legend>
             <div className="grid gap-1.5">
@@ -740,12 +803,16 @@ const WhatIf: React.FC<{
           {scenario === "DELAY" ? (
             <label className="block text-xs font-medium">
               Days late
-              <input type="number" min={1} max={730} className="fp-input mt-1 w-full" value={days} onChange={(event) => setDays(Number(event.target.value))} />
+              <input type="number" min={1} max={730} step={1} className="fp-input mt-1 w-full" value={days}
+                aria-invalid={!daysValid} onChange={(event) => setDays(event.target.value)} />
+              {!daysValid ? <span className="mt-1 block text-xs text-destructive">Enter a whole number of days from 1 to 730.</span> : null}
             </label>
           ) : scenario === "AMOUNT_CHANGE" ? (
             <label className="block text-xs font-medium">
               Change (%)
-              <input type="number" min={-95} max={500} step={0.5} className="fp-input mt-1 w-full" value={percent} onChange={(event) => setPercent(Number(event.target.value))} />
+              <input type="number" min={-95} max={500} step={0.5} className="fp-input mt-1 w-full" value={percent}
+                aria-invalid={!percentValid} onChange={(event) => setPercent(event.target.value)} />
+              {!percentValid ? <span className="mt-1 block text-xs text-destructive">Enter a percentage from -95 to 500.</span> : null}
             </label>
           ) : scenario === "CLAUSE_INVOKED" ? (
             <label className="block text-xs font-medium">
@@ -756,7 +823,7 @@ const WhatIf: React.FC<{
           <button
             type="button"
             className="fp-btn fp-btn-primary inline-flex w-full items-center justify-center gap-1.5"
-            disabled={!canRun || !selectedOrigin || run.isPending || (scenario === "CLAUSE_INVOKED" && !clause.trim())}
+            disabled={!canRun || !selectedOrigin || run.isPending || !inputsValid || (scenario === "CLAUSE_INVOKED" && !clause.trim())}
             onClick={() => run.mutate()}
           >
             {run.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Play className="h-4 w-4" aria-hidden />}

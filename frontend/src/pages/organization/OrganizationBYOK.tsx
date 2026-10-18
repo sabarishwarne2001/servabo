@@ -45,6 +45,7 @@ import {
 } from "@/types/byok";
 import { errorMessage as apiErrorMessage } from "@/services/api/errors";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 const CARD =
   "rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm";
@@ -264,9 +265,11 @@ const ProviderCard: React.FC<{
     onError: (error) => setFailure(errorMessage(error)),
   });
 
+  const [confirmRetire, setConfirmRetire] = useState(false);
   const remove = useMutation({
     mutationFn: () => deleteCredential(organizationId, entry.provider),
     onSuccess: () => {
+      setConfirmRetire(false);
       setNotice("Key retired.");
       setFailure(null);
       invalidate();
@@ -412,7 +415,7 @@ const ProviderCard: React.FC<{
                 type="button"
                 className={DANGER}
                 disabled={!canRemove || busy}
-                onClick={() => remove.mutate()}
+                onClick={() => setConfirmRetire(true)}
               >
                 <Trash2 className="h-3.5 w-3.5" aria-hidden />
                 Retire
@@ -421,6 +424,16 @@ const ProviderCard: React.FC<{
           )}
         </div>
       )}
+      <ConfirmDialog
+        open={confirmRetire}
+        title={`Retire the ${entry.label} key?`}
+        message="Requests that used this key fall back to the platform's provider (where your plan allows it) or stop. The stored key is deleted and cannot be recovered; you can add another later."
+        confirmText="Retire key"
+        loading={remove.isPending}
+        loadingText="Retiring…"
+        onConfirm={() => remove.mutate()}
+        onCancel={() => { if (!remove.isPending) { setConfirmRetire(false); } }}
+      />
     </article>
   );
 };

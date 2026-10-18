@@ -30,6 +30,7 @@ an annotation is mapping metadata, and a résumé the generic prompt extracted
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from typing import Any, Mapping, Optional
 
@@ -50,7 +51,8 @@ def _visible(db: Session, organization_id: uuid.UUID) -> list[Any]:
     return list(db.execute(select(DocumentSchemaPreset).where(or_(
         DocumentSchemaPreset.organization_id.is_(None),
         DocumentSchemaPreset.organization_id == organization_id,
-    )).order_by(DocumentSchemaPreset.document_type, DocumentSchemaPreset.version.desc())).scalars())
+    )).order_by(DocumentSchemaPreset.document_type, DocumentSchemaPreset.version.desc(),
+                     DocumentSchemaPreset.id)).scalars())
 
 
 def _enabled_ids(db: Session, workspace_id: uuid.UUID) -> set[uuid.UUID]:
@@ -79,14 +81,30 @@ def select_for_document(
         if not fields:
             continue
         score = (preset.id in enabled, len(properties & keys), -len(properties))
-        if best is None or score > best[0]:
+        if best is None or score > best[0]:  # `_visible` is ordered, so an equal score keeps the first
             best = (score, (preset.document_type, fields, detect))
     return best[1] if best else None
 
 
+def _compact(text: str) -> str:
+    return " ".join((text or "").casefold().split())
+
+
 def _hint_count(hints: list[Any], text: str) -> int:
-    lowered = (text or "").casefold()
-    return sum(1 for h in hints if isinstance(h, str) and h.strip() and h.casefold() in lowered)
+    """How many of the phrases the text mentions, as whole words ("lease" is not in "pleased"),
+    whatever the spacing or line breaks between the phrase's words."""
+    lowered = _compact(text)
+    found = 0
+    for hint in hints:
+        if not isinstance(hint, str) or not hint.strip():
+            continue
+        phrase = _compact(hint)
+        # A boundary only where the phrase itself starts or ends with a letter or digit.
+        before = r"(?<!\w)" if re.match(r"\w", phrase[0]) else ""
+        after = r"(?!\w)" if re.match(r"\w", phrase[-1]) else ""
+        if re.search(before + re.escape(phrase) + after, lowered):
+            found += 1
+    return found
 
 
 def prompt_context(db: Session, *, workspace_id: uuid.UUID, text: str) -> Optional[str]:
@@ -106,13 +124,19 @@ def _prompt_context(db: Session, *, workspace_id: uuid.UUID, text: str) -> Optio
         enabled = _enabled_ids(db, workspace_id)
         if not enabled:
             return None
-        best: Optional[tuple[int, Any]] = None
+        # Most phrases matched wins; then the pack whose phrases the text matches most completely (a
+        # specific pack over a broad one); a true tie goes to the first document type alphabetically.
+        # The database's own order never decides.
+        best: Optional[tuple[tuple, Any]] = None
         for preset in db.execute(select(DocumentSchemaPreset).where(DocumentSchemaPreset.id.in_(enabled))).scalars():
             hints = list(preset.classifier_hints or [])
             needed = min(MIN_HINTS, len(hints)) or 1
             count = _hint_count(hints, text)
-            if hints and count >= needed and (best is None or count > best[0]):
-                best = (count, preset)
+            if not hints or count < needed:
+                continue
+            rank = (-count, -count / len(hints), preset.document_type, -(preset.version or 0), str(preset.id))
+            if best is None or rank < best[0]:
+                best = (rank, preset)
         if best is None:
             return None
         preset = best[1]

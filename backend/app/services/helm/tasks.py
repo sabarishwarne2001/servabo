@@ -73,7 +73,8 @@ def resolve(db: Session, *, task_id: uuid.UUID, workspace_id: uuid.UUID, verdict
     from app.services.helm import hooks
 
     hooks.document_changed(db, workspace_id=task.workspace_id, organization_id=task.organization_id,
-                           reason="helm task resolved")
+                           reason="helm task resolved",
+                           work_item_ids=[task.work_item_id] if task.work_item_id else None)
     return task
 
 

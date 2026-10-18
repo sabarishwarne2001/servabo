@@ -18,9 +18,11 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import threading
 import uuid
+from collections import OrderedDict
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Iterable, Mapping, Optional, Sequence
 
@@ -100,6 +102,9 @@ class MatchLineFacts:
     invoice_quantity: Optional[Decimal]
     outcome: str
     tolerance_bps: int = 0
+    #: When the case was scored. Two live cases can carry different prices for one line of an order (it
+    #: was edited between them); the latest scoring is the price agreed.
+    case_created_at: Optional[datetime] = None
 
 
 @dataclass(frozen=True)
@@ -148,6 +153,12 @@ class LedgerInputs:
     identities: ident.Identities = field(default_factory=lambda: ident.Identities(frozenset(), frozenset()))
     date_format: Optional[str] = None
     workspace_currency: Optional[str] = None
+    #: The workspace's organization, for an obligation whose workspace has no document in these inputs.
+    organization_id: Optional[uuid.UUID] = None
+    #: Every invoice number the workspace knows (`_joined` forms), when `documents` is only the part being
+    #: projected: a bank line that names another invoice pays that one, and which invoices exist is a fact
+    #: about the whole workspace. None: the documents are all of them, and the numbers are read from them.
+    known_invoice_numbers: Optional[frozenset[str]] = None
 
 
 # ---------------------------------------------------------------------------
@@ -371,10 +382,37 @@ class StatementLine:
     currency: Optional[str]
 
 
+#: Reading a year of bank statements (thousands of lines, each an amount and a date to normalise) costs more
+#: than the rest of an incremental update, and the statements rarely change. The lines of the long ones
+#: are kept (by what they say, not by when they were read) for the next update in this process.
+_LINES_KEPT = 24
+_LINES_WORTH_KEEPING = 60
+_lines_cache: "OrderedDict[tuple[Any, ...], tuple[StatementLine, ...]]" = OrderedDict()
+_lines_lock = threading.Lock()
+
+
 def statement_lines(doc: DocumentFacts, date_format: Optional[str]) -> list[StatementLine]:
     raw = doc.entities.get("transactions") or doc.entities.get("line_items") or doc.entities.get("lines") or []
     if not isinstance(raw, list):
         return []
+    if len(raw) < _LINES_WORTH_KEEPING:
+        return _read_statement_lines(doc, raw, date_format)
+    digest = hashlib.blake2b(json.dumps(raw, sort_keys=True, default=str).encode(), digest_size=16).digest()
+    key = (doc.work_item_id, doc.filename, doc.currency, _text(doc.entities.get("currency")), date_format, digest)
+    with _lines_lock:
+        kept = _lines_cache.get(key)
+        if kept is not None:
+            _lines_cache.move_to_end(key)
+            return list(kept)
+    lines = _read_statement_lines(doc, raw, date_format)
+    with _lines_lock:
+        _lines_cache[key] = tuple(lines)
+        while len(_lines_cache) > _LINES_KEPT:
+            _lines_cache.popitem(last=False)
+    return lines
+
+
+def _read_statement_lines(doc: DocumentFacts, raw: list[Any], date_format: Optional[str]) -> list[StatementLine]:
     out: list[StatementLine] = []
     currency = doc.currency or _text(doc.entities.get("currency"))
     for entry in raw:
@@ -459,6 +497,7 @@ def _line_matches(line: StatementLine, *, amount: int, not_before: Optional[date
 
 
 _CENT = money.MICROS // 100
+_NEVER = datetime(1, 1, 1, tzinfo=timezone.utc)
 
 
 def nz_number(number: Optional[str]) -> str:
@@ -476,6 +515,41 @@ def _credits(doc: DocumentFacts, credits_by_invoice: Mapping[tuple[uuid.UUID, st
         out.append({"kind": "CREDIT", "work_item_id": str(credit.work_item_id), "document": credit.filename,
                     "on": (credit.document_date or credit.received_on), "amount_micros": abs(credit_amount)})
     return out
+
+
+def credit_reference(doc: DocumentFacts) -> Optional[str]:
+    """The invoice number (normalised) a credit note points at, or None."""
+    ref = _first(doc.entities, CREDIT_REFERENCE_KEYS) if doc.role == ROLE_CREDIT_NOTE else None
+    return nz_number(ref) if ref else None
+
+
+def credit_index(docs: Iterable[DocumentFacts]) -> dict[tuple[uuid.UUID, str], list[DocumentFacts]]:
+    """The credit notes of these documents, by the invoice (workspace, normalised number) each points at."""
+    out: dict[tuple[uuid.UUID, str], list[DocumentFacts]] = {}
+    for doc in docs:
+        ref = credit_reference(doc)
+        if ref:
+            out.setdefault((doc.workspace_id, ref), []).append(doc)
+    return out
+
+
+joined_number = _joined
+
+
+def claim_micros(doc: DocumentFacts, settlement: Optional[SettlementFacts],
+                 credits_by_invoice: Mapping[tuple[uuid.UUID, str], list[DocumentFacts]]) -> set[int]:
+    """The amounts this invoice may take a bank statement line for: what is still owed, and what was
+    recorded as paid. Two invoices can compete for a line only when their claims are within a few
+    cents of each other; the incremental update uses this to find the invoices a change can affect."""
+    currency = doc.currency or nz.currency_code(_text(doc.entities.get("currency")) or "")
+    amount = doc.total_micros if doc.total_micros is not None else read_money(_first(doc.entities, TOTAL_KEYS),
+                                                                              currency)
+    out: set[int] = set()
+    if amount is not None:
+        out.add(max(0, amount - sum(c["amount_micros"] for c in _credits(doc, credits_by_invoice, currency))))
+    if settlement is not None and settlement.paid_amount_micros:
+        out.add(settlement.paid_amount_micros)
+    return {amount for amount in out if amount}
 
 
 def _use_lines_of_recorded_payments(inputs: LedgerInputs, docs: Sequence[DocumentFacts],
@@ -546,15 +620,11 @@ def build(inputs: LedgerInputs) -> list[PromiseRow]:
 
     # Receipts and credit notes, indexed for the invoices and POs that point at them.
     receipts_by_po: dict[tuple[uuid.UUID, str], list[DocumentFacts]] = {}
-    credits_by_invoice: dict[tuple[uuid.UUID, str], list[DocumentFacts]] = {}
+    credits_by_invoice = credit_index(docs)
     statements: list[DocumentFacts] = []
     for doc in docs:
         if doc.role == ROLE_GOODS_RECEIPT and doc.po_reference:
             receipts_by_po.setdefault((doc.workspace_id, nz_number(doc.po_reference)), []).append(doc)
-        elif doc.role == ROLE_CREDIT_NOTE:
-            ref = _first(doc.entities, CREDIT_REFERENCE_KEYS)
-            if ref:
-                credits_by_invoice.setdefault((doc.workspace_id, nz_number(ref)), []).append(doc)
         elif doc.role == ROLE_STATEMENT and statement_kind(doc, inputs.identities) == STATEMENT_BANK:
             statements.append(doc)
     lines_by_workspace: dict[uuid.UUID, list[StatementLine]] = {}
@@ -570,8 +640,8 @@ def build(inputs: LedgerInputs) -> list[PromiseRow]:
                     lines_by_amount.setdefault((workspace_id, outgoing, round(value / _CENT)), []).append(index)
     used_lines: set[tuple[uuid.UUID, int]] = set()
     # Every invoice number the workspaces know: a line that names one pays that invoice, not another.
-    known_numbers = frozenset(_joined(d.document_number) for d in docs
-                              if d.role == ROLE_INVOICE and d.document_number) - {""}
+    known_numbers = inputs.known_invoice_numbers if inputs.known_invoice_numbers is not None else frozenset(
+        _joined(d.document_number) for d in docs if d.role == ROLE_INVOICE and d.document_number) - {""}
     named_in_line: dict[tuple[uuid.UUID, int], frozenset[str]] = {}
     _use_lines_of_recorded_payments(inputs, docs, lines_by_workspace, lines_by_amount, credits_by_invoice,
                                     known_numbers, used_lines, named_in_line)
@@ -727,7 +797,8 @@ def build(inputs: LedgerInputs) -> list[PromiseRow]:
         po = by_id.get(po_id)
         if po is None:
             continue
-        agreed = group[0].po_unit_price_micros or 0
+        latest = max(group, key=lambda ln: (ln.case_created_at or _NEVER, str(ln.case_id), ln.line_number))
+        agreed = latest.po_unit_price_micros or 0
         fulfil: list[dict[str, Any]] = []
         broken = False
         for line in sorted(group, key=lambda ln: (str(ln.invoice_work_item_id), ln.line_number)):
@@ -747,7 +818,7 @@ def build(inputs: LedgerInputs) -> list[PromiseRow]:
                            "outcome": "BROKEN" if over else "KEPT"})
         cp_key, cp_name = _counterparty(po, receivable=False)
         status = v.STATUS_BROKEN if broken else (v.STATUS_KEPT if fulfil else v.STATUS_OPEN)
-        description = group[0].description or f"line {index + 1}"
+        description = latest.description or f"line {index + 1}"
         rows.append(PromiseRow(
             organization_id=po.organization_id, workspace_id=po.workspace_id, work_item_id=po.work_item_id,
             source_key=source_key(v.KIND_PRICE_AGREED, po.work_item_id, index), kind=v.KIND_PRICE_AGREED,
@@ -756,7 +827,7 @@ def build(inputs: LedgerInputs) -> list[PromiseRow]:
             counterparty_key=cp_key, counterparty_name=cp_name, currency=po.currency, amount_micros=agreed,
             evidence=[_evidence(po, ("po_number", "document_number"))], fulfilments=fulfil,
             details={"po_number": po.document_number, "line_index": index, "description": description,
-                     "tolerance_bps": group[0].tolerance_bps},
+                     "tolerance_bps": latest.tolerance_bps},
         ))
 
     # ---- deliveries a purchase order is owed ---------------------------------------------------
@@ -861,6 +932,8 @@ def build(inputs: LedgerInputs) -> list[PromiseRow]:
 
 
 def _org_of(inputs: LedgerInputs, workspace_id: uuid.UUID) -> uuid.UUID:
+    if inputs.organization_id is not None:
+        return inputs.organization_id
     for doc in inputs.documents:
         if doc.workspace_id == workspace_id:
             return doc.organization_id

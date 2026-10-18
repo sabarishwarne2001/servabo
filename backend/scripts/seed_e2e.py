@@ -178,6 +178,10 @@ E2E_PRICE_IDS = {
 }
 
 
+#: When the browser suite's first catalog starts to be in force.
+CATALOG_EPOCH = "2020-01-01T00:00:00Z"
+
+
 def _ensure_catalog(db) -> None:
     """The price book and the four tiers, published by the production seed scripts.
 
@@ -189,9 +193,23 @@ def _ensure_catalog(db) -> None:
 
     from app.services import pricing_service, quota_service
 
+    from sqlalchemy import func, select
+
+    from app.models.price_book import PriceBook
+    from app.models.quota_tier import QuotaTier
+
+    # The first catalog of a database is in force from a fixed early instant, not from the moment the
+    # seed ran. A subscription is pinned to the plan in force at its period start, which a gateway states
+    # in whole seconds or a little earlier: seeded "now", the plans did not exist yet for the first
+    # seconds, and the first browser run's `subscribe` failed with UnmappableTierError while the next run
+    # (a few seconds later) passed. Later versions (a changed seed) still take effect when published.
+    from_the_start = ["--effective-from", CATALOG_EPOCH]
+    first_prices = [] if db.execute(select(func.count()).select_from(PriceBook)).scalar_one() else from_the_start
+    first_tiers = [] if db.execute(select(func.count()).select_from(QuotaTier)).scalar_one() else from_the_start
+
     # `auto`: version 1 on a new database; on one seeded by an earlier release, the next version
     # when the seed's entries changed (N-030 seat prices, N-031 local model), else nothing.
-    if _load_seed_module("seed_price_book").main(["--version", "auto"]) != 0:
+    if _load_seed_module("seed_price_book").main(["--version", "auto", *first_prices]) != 0:
         raise RuntimeError("seed_price_book.py failed")
     pricing_service.clear_cache()
 
@@ -199,7 +217,7 @@ def _ensure_catalog(db) -> None:
         # Empty counts as unset: backend/.env lists these keys with no value.
         if not os.environ.get(name, "").strip():
             os.environ[name] = value
-    if _load_seed_module("seed_quota_tiers").main([]) != 0:
+    if _load_seed_module("seed_quota_tiers").main(first_tiers) != 0:
         raise RuntimeError("seed_quota_tiers.py failed")
     quota_service.clear_cache()
     db.expire_all()

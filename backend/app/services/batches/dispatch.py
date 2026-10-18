@@ -124,12 +124,22 @@ def tag_documents(
     lanes: dict[uuid.UUID, Optional[str]],
     user_id: Optional[uuid.UUID],
 ) -> None:
-    """One `dispatch-*` tag per dispatched document; an undispatched one loses its old tag."""
+    """One `dispatch-*` tag per dispatched document; an undispatched one loses its old tag.
+
+    Two dispatches at once (a double click, or two batches that share a document) both delete the
+    old tags, find nothing, and insert the same tag: the slower one used to hit the (document, tag)
+    key. The workspace's tag writes take turns (a short transaction-scoped lock), and an insert that
+    meets a tag already there leaves it, so neither dispatch fails and each document keeps one lane tag.
+    """
+    from sqlalchemy import func
+    from sqlalchemy.dialects.postgresql import insert
+
     from app.models.ingestion import WorkItemTag
 
     ids = list(lanes)
     if not ids:
         return
+    db.execute(select(func.pg_advisory_xact_lock(func.hashtextextended(f"dispatch-tags:{workspace_id}", 0))))
     db.execute(
         delete(WorkItemTag).where(
             WorkItemTag.workspace_id == workspace_id,
@@ -137,17 +147,14 @@ def tag_documents(
             WorkItemTag.tag.in_(list(v.LANE_TAGS.values())),
         )
     )
-    for work_item_id, lane in lanes.items():
-        if lane is None:
-            continue
-        db.add(
-            WorkItemTag(
-                work_item_id=work_item_id,
-                workspace_id=workspace_id,
-                tag=v.LANE_TAGS[lane],
-                created_by_user_id=user_id,
-            )
-        )
+    rows = [
+        {"work_item_id": work_item_id, "workspace_id": workspace_id, "tag": v.LANE_TAGS[lane],
+         "created_by_user_id": user_id}
+        for work_item_id, lane in lanes.items()
+        if lane is not None
+    ]
+    if rows:
+        db.execute(insert(WorkItemTag).values(rows).on_conflict_do_nothing(index_elements=["work_item_id", "tag"]))
     db.flush()
 
 

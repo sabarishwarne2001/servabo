@@ -10,6 +10,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.pagination import MAX_OFFSET
 from app.api.deps import RequireAnyOrgRole, get_db, get_read_db
 from app.crud import notification as notification_crud
 from app.models.notification import NotificationType
@@ -43,7 +44,7 @@ def list_organization_notifications(
         ORG_NOTIFICATIONS_DEFAULT_PAGE_SIZE, ge=1,
         le=ORG_NOTIFICATIONS_MAX_PAGE_SIZE,
     ),
-    offset: int = Query(0, ge=0),
+    offset: int = Query(0, ge=0, le=MAX_OFFSET),
 ) -> NotificationPage:
     rows, total, unread = notification_crud.list_organization_scoped_for_user(
         db,

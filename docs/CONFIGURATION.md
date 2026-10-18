@@ -205,8 +205,8 @@ guard), and the comment written above it in the code.
 | `RERANKER_CONNECT_TIMEOUT` | `float` | `0.5` | — |  |
 | `RERANKER_BREAKER_THRESHOLD` | `int` | `5` | — |  |
 | `RERANKER_BREAKER_RESET_SECONDS` | `float` | `30.0` | — |  |
-| `SERVABO_EDITION` | `str` | `Field(default='saas', validation_alias=AliasChoices('SERVAB…` | — | ARCH50-S1:settings. The sovereign edition. Every value here is the OPERATOR's: environment only, never a database column and never an API field, so no tenant can widen egress or point the local model elsewhere. SERVABO_… |
-| `SERVABO_DEPLOYMENT_ID` | `str` | `Field(default='', validation_alias=AliasChoices('SERVABO_DE…` | — | A sovereign licence may be bound to one deployment: this deployment's id (any string the operator chooses, written into the licence when it is issued). Renamed with the product. |
+| `SERVABO_EDITION` | `str` | `'saas'` | — | ARCH50-S1:settings. The sovereign edition. Every value here is the OPERATOR's: environment only, never a database column and never an API field, so no tenant can widen egress or point the local model elsewhere. SERVABO_… |
+| `SERVABO_DEPLOYMENT_ID` | `str` | `''` | — | A sovereign licence may be bound to one deployment: this deployment's id (any string the operator chooses, written into the licence when it is issued). |
 | `EGRESS_MODE` | `str` | `'open'` | — |  |
 | `EGRESS_OPERATOR_HOSTS` | `str` | `''` | — |  |
 | `LOCAL_LLM_MODE` | `str` | `'off'` | production, guard |  |

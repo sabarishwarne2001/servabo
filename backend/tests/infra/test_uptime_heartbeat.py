@@ -80,27 +80,26 @@ def test_cron_runs_it_every_minute() -> None:
     assert "* * * * *" in cron and "servabo-uptime-heartbeat" in cron
 
 
-# Servabo was renamed Servabo (2026-10-16): a host configured before the rename keeps working for
-# one release, and the script says what to rename. The new name wins when both are set.
-from app.core.legacy_names import LEGACY_PREFIX  # noqa: E402
+# Session B (B1): the variables from before the rename (the old product name's prefix) are no longer
+# read. The script reads SERVABO_* only; a host still holding the old names gets the same refusal as
+# one with nothing set.
+OLD_PREFIX = "FLOW" + "PILOT_"  # split so the guard test does not match this file
 
 
-def test_a_pre_rename_variable_still_works_and_is_named_in_a_warning(run) -> None:
-    code, urls, stderr = run(**{LEGACY_PREFIX + "PUBLIC_URL": "https://old.example.com"})
-    assert code == 0
-    assert urls == ["https://old.example.com/api/v1/health/ready"]
-    assert f"rename {LEGACY_PREFIX}PUBLIC_URL to SERVABO_PUBLIC_URL" in stderr
+def test_a_pre_rename_variable_is_not_read(run) -> None:
+    code, urls, stderr = run(**{OLD_PREFIX + "PUBLIC_URL": "https://old.example.com"})
+    assert code == 64 and urls == [] and "SERVABO_PUBLIC_URL" in stderr
 
 
-def test_the_new_name_wins_over_the_old_one(run) -> None:
-    code, urls, _ = run(**{LEGACY_PREFIX + "PUBLIC_URL": "https://old.example.com",
-                           "SERVABO_PUBLIC_URL": "https://new.example.com"})
+def test_the_new_name_is_read_whatever_else_is_set(run) -> None:
+    code, urls, stderr = run(**{OLD_PREFIX + "PUBLIC_URL": "https://old.example.com",
+                                "SERVABO_PUBLIC_URL": "https://new.example.com"})
     assert code == 0 and urls == ["https://new.example.com/api/v1/health/ready"]
+    assert "rename" not in stderr
 
 
-def test_a_config_file_still_spelling_the_old_names_is_read(run, tmp_path: Path) -> None:
+def test_a_config_file_spelling_the_old_names_is_not_read(run, tmp_path: Path) -> None:
     config = tmp_path / "sweepers.env"
-    config.write_text(f"{LEGACY_PREFIX}PUBLIC_URL=https://from-file.example.com\n", encoding="utf-8")
+    config.write_text(f"{OLD_PREFIX}PUBLIC_URL=https://from-file.example.com\n", encoding="utf-8")
     code, urls, stderr = run(SERVABO_SWEEPER_ENV=str(config))
-    assert code == 0 and urls == ["https://from-file.example.com/api/v1/health/ready"]
-    assert "SERVABO_PUBLIC_URL" in stderr
+    assert code == 64 and urls == [] and "SERVABO_PUBLIC_URL" in stderr

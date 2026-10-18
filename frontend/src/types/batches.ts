@@ -32,9 +32,23 @@ export interface BatchSummary {
   readonly progress: BatchProgress;
 }
 
+/** Over every batch of the tab, not only the page that was asked for. */
+export interface BatchTotals {
+  readonly batches: number;
+  readonly documents: number;
+  readonly in_flight: number;
+  readonly failed: number;
+  readonly straight_through: number;
+  readonly review: number;
+  readonly exception: number;
+  readonly dispatched: number;
+  readonly mean_confidence: number | null;
+}
+
 export interface BatchList {
   readonly items: readonly BatchSummary[];
   readonly total: number;
+  readonly totals: BatchTotals;
 }
 
 export interface HealingChange {

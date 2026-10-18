@@ -785,3 +785,6 @@ from app.models.helm import (  # noqa: E402,F401
     HelmTask,
     HelmValueEvent,
 )
+
+# Session B: the Promise ledger is told what changed where the data is written (mapper events).
+from app.models import helm_dirty  # noqa: E402,F401

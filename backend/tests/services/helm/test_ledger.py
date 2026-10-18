@@ -166,6 +166,37 @@ def test_agreed_prices_come_from_matching_and_break_on_an_overcharge():
     assert price.fulfilments[0]["overcharge_micros"] == 100 * M
 
 
+def test_the_agreed_price_is_the_latest_cases_whatever_order_the_lines_are_read_in():
+    """Two live cases can carry different prices for one line of an order (it was edited between them).
+    Which line the database returned first used to decide the promise; the latest scoring decides now, so
+    the same facts in any order give the same rows (an incremental update reads a different subset and
+    must agree with a full rebuild)."""
+    from datetime import datetime, timezone
+    from decimal import Decimal
+
+    po = doc(1, "PURCHASE_ORDER", {"vendor_name": "A", "po_number": "PO-1"}, number="PO-1", on=date(2026, 9, 1),
+             total=1000, vendor="A")
+    invoices = [doc(n, "INVOICE", {"vendor_name": "A", "po_number": "PO-1"}, number=f"A-{n}", on=date(2026, 9, 10),
+                    total=1100, vendor="A", po="PO-1") for n in (2, 3)]
+
+    def line(case: int, invoice, price: int, scored: datetime) -> ledger.MatchLineFacts:
+        return ledger.MatchLineFacts(
+            case_id=uuid.UUID(int=case), workspace_id=WS, po_work_item_id=po.work_item_id,
+            invoice_work_item_id=invoice.work_item_id, receipt_work_item_id=None, line_number=0,
+            description="Corrugated cartons", po_line_index=0, po_unit_price_micros=price * M,
+            invoice_unit_price_micros=11 * M, po_quantity=None, receipt_quantity=None,
+            invoice_quantity=Decimal(100), outcome="PRICE_VARIANCE", case_created_at=scored)
+
+    older = line(9, invoices[0], 10, datetime(2026, 9, 2, tzinfo=timezone.utc))
+    newer = line(5, invoices[1], 12, datetime(2026, 9, 9, tzinfo=timezone.utc))  # the order was edited since
+    prices = []
+    for lines in ([older, newer], [newer, older]):
+        (price,) = of_kind(build(po, *invoices, match_lines=lines), v.KIND_PRICE_AGREED)
+        prices.append((price.amount_micros, price.content_hash))
+    assert prices[0] == prices[1]
+    assert prices[0][0] == 12 * M
+
+
 def test_deliveries_are_kept_by_goods_receipts_on_time():
     po = doc(1, "PURCHASE_ORDER", {"vendor_name": "A", "po_number": "PO-7", "delivery_date": "2026-09-20"},
              number="PO-7", on=date(2026, 9, 1), total=1000, vendor="A")

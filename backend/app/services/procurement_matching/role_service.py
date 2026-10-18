@@ -150,6 +150,10 @@ def classify_and_store(
     )
     db.execute(statement)
     db.flush()
+    # An upsert is not seen by the ORM's events: tell Helm's Promise ledger the role changed.
+    from app.models import helm_dirty
+
+    helm_dirty.mark(db.connection(), work_item.workspace_id, [work_item.id], "role stored")
 
     outcome = RoleOutcome(
         work_item_id=work_item.id,

@@ -117,6 +117,10 @@ def create_batch(
 
 
 def add_documents(db: Session, *, batch: ProcessingBatch, work_item_ids: Sequence[uuid.UUID]) -> int:
+    # Adds to one batch take turns. Two at once each read the documents already there, so the same
+    # document was inserted twice (a key violation) and two single adds to a batch one short of the
+    # limit both passed the count. The second now reads what the first added.
+    db.execute(select(ProcessingBatch.id).where(ProcessingBatch.id == batch.id).with_for_update())
     ids = _workspace_ids(db, batch.workspace_id, work_item_ids)
     present = set(
         db.execute(
@@ -188,8 +192,13 @@ def progress_for(db: Session, batch_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID,
     ).all()
     from app.models.verification import DocumentVerification
 
+    # Only these batches' documents, in their own workspaces: the ranking below used to run over every
+    # organization's verifications before joining back to this page of batches.
+    members = select(ProcessingBatchItem.work_item_id).where(ProcessingBatchItem.batch_id.in_(list(batch_ids)))
+    workspaces = select(ProcessingBatch.workspace_id).where(ProcessingBatch.id.in_(list(batch_ids)))
     latest = (
         select(DocumentVerification.work_item_id, DocumentVerification.confidence)
+        .where(DocumentVerification.workspace_id.in_(workspaces), DocumentVerification.work_item_id.in_(members))
         .order_by(DocumentVerification.work_item_id, DocumentVerification.created_at.desc())
         .distinct(DocumentVerification.work_item_id)
         .subquery()
@@ -211,6 +220,53 @@ def progress_for(db: Session, batch_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID,
             round(float(mean), 4) if mean is not None else None,
         )
     return out
+
+
+def totals_for(db: Session, *, workspace_id: uuid.UUID, status: Optional[str] = None) -> dict[str, Any]:
+    """Counts over every batch of the workspace (of `status`, if given), not just one page of them:
+    what the batch page's tiles show. `mean_confidence` is the mean over the documents that have a
+    verification score."""
+    from app.models.verification import DocumentVerification
+
+    batches = select(ProcessingBatch.id).where(ProcessingBatch.workspace_id == workspace_id)
+    if status:
+        batches = batches.where(ProcessingBatch.status == status)
+    batch_ids = batches.scalar_subquery()
+    row = db.execute(
+        select(
+            func.count(func.distinct(ProcessingBatchItem.batch_id)),
+            func.count(),
+            func.count().filter(WorkItem.status.in_(("QUEUED", "PROCESSING"))),
+            func.count().filter(WorkItem.status == "FAILED"),
+            func.count().filter(ProcessingBatchItem.lane == v.LANE_STRAIGHT_THROUGH),
+            func.count().filter(ProcessingBatchItem.lane == v.LANE_REVIEW),
+            func.count().filter(ProcessingBatchItem.lane == v.LANE_EXCEPTION),
+        )
+        .join(WorkItem, WorkItem.id == ProcessingBatchItem.work_item_id)
+        .where(ProcessingBatchItem.batch_id.in_(batch_ids))
+    ).one()
+    members = select(ProcessingBatchItem.work_item_id).where(ProcessingBatchItem.batch_id.in_(batch_ids))
+    latest = (
+        select(DocumentVerification.work_item_id, DocumentVerification.confidence)
+        .where(DocumentVerification.workspace_id == workspace_id, DocumentVerification.work_item_id.in_(members))
+        .order_by(DocumentVerification.work_item_id, DocumentVerification.created_at.desc())
+        .distinct(DocumentVerification.work_item_id)
+        .subquery()
+    )
+    mean = db.execute(select(func.avg(latest.c.confidence))).scalar_one()
+    batch_count = int(db.execute(select(func.count()).select_from(batches.subquery())).scalar_one())
+    straight, review, exception = int(row[4]), int(row[5]), int(row[6])
+    return {
+        "batches": batch_count,
+        "documents": int(row[1]),
+        "in_flight": int(row[2]),
+        "failed": int(row[3]),
+        "straight_through": straight,
+        "review": review,
+        "exception": exception,
+        "dispatched": straight + review + exception,
+        "mean_confidence": round(float(mean), 4) if mean is not None else None,
+    }
 
 
 # ------------------------------------------------------------------ assessment (detail view)
@@ -507,4 +563,5 @@ __all__ = [
     "progress_for",
     "remove_document",
     "retry_failed",
+    "totals_for",
 ]

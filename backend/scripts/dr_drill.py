@@ -134,7 +134,6 @@ def drill_1_pool_budgets() -> None:
     for alias, target in (
         ("worker-delivery", "worker-relay"),
         ("worker-billing", "worker-relay"),
-        ("worker-stripe", "worker-relay"),
         ("migrate", "sweeper"),
         ("cron", "sweeper"),
     ):

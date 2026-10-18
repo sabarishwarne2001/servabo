@@ -19,8 +19,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # rather than at the first encrypted assertion.
 from typing import Literal  # noqa: E402
 from app.core.constants import APP_VERSION
-from app.core.legacy_names import LEGACY_PREFIX
-from app.core.legacy_names import rebrand as legacy_rebrand
 from app.core.production_guard import (
     HARDENED_ENVIRONMENTS,
     UnsafeConfigurationError,
@@ -44,12 +42,6 @@ class Settings(BaseSettings):
     APP_VERSION: str = APP_VERSION
     API_TITLE: str = "Servabo Core API"
 
-    @field_validator("PROJECT_NAME", "API_TITLE", "PLATFORM_SMTP_FROM_NAME", mode="after")
-    @classmethod
-    def _show_the_new_product_name(cls, value: str, info) -> str:
-        # A .env copied from the template before the rename names the old product; people see
-        # Servabo, and start-up warns once so the file gets updated (app/core/legacy_names.py).
-        return legacy_rebrand(info.field_name, value)
     ENVIRONMENT: str = "development"
     API_V1_STR: str = "/api/v1"
     
@@ -616,18 +608,10 @@ class Settings(BaseSettings):
     #                          fallback (used when the configured provider fails
     #                          or is refused) | exclusive (every completion and
     #                          stream, whatever a tenant selected)
-    # Renamed with the product on 2026-10-16; the pre-rename name is read for one
-    # release (app/core/legacy_names.py) and start-up warns when it is still set.
-    SERVABO_EDITION: str = Field(
-        default="saas",
-        validation_alias=AliasChoices("SERVABO_EDITION", LEGACY_PREFIX + "EDITION"),
-    )
+    SERVABO_EDITION: str = "saas"
     # A sovereign licence may be bound to one deployment: this deployment's id (any string the
-    # operator chooses, written into the licence when it is issued). Renamed with the product.
-    SERVABO_DEPLOYMENT_ID: str = Field(
-        default="",
-        validation_alias=AliasChoices("SERVABO_DEPLOYMENT_ID", LEGACY_PREFIX + "DEPLOYMENT_ID"),
-    )
+    # operator chooses, written into the licence when it is issued).
+    SERVABO_DEPLOYMENT_ID: str = ""
     EGRESS_MODE: str = "open"
     EGRESS_OPERATOR_HOSTS: str = ""
     LOCAL_LLM_MODE: str = "off"

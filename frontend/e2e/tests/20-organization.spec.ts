@@ -229,6 +229,25 @@ test.describe("Developer platform", () => {
       await page.getByRole("button", { name: lang, exact: true }).click();
     }
   });
+
+  // Session B: the Issue key window was a plain overlay: no dialog role or name for a screen reader,
+  // Escape did nothing and Tab walked into the page behind it.
+  test("the Issue key window is a named dialog: focus moves in, Tab stays in, Escape closes it", async ({ page }) => {
+    await page.goto(org("C", "developer"));
+    const opener = page.getByRole("button", { name: "Issue key" }).first();
+    await opener.click();
+    const dialog = page.getByRole("dialog", { name: "Issue a gateway API key" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveAttribute("aria-modal", "true");
+    await expect(dialog.locator(":focus")).toHaveCount(1);
+    for (let i = 0; i < 12; i += 1) {
+      await page.keyboard.press("Tab");
+      expect(await dialog.locator(":focus").count(), "Tab left the dialog").toBe(1);
+    }
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(opener).toBeFocused();
+  });
 });
 
 test.describe("Enterprise BYOK and models", () => {

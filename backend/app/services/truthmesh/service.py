@@ -29,10 +29,10 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Iterable, Optional, Sequence
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import String, delete, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.truthmesh import MeshConflict, MeshLink, MeshNode, MeshSimulation, MeshState
+from app.models.truthmesh import CONFLICT_STATUSES, MeshConflict, MeshLink, MeshNode, MeshSimulation, MeshState
 from app.models.work_item import WorkItem
 from app.services.truthmesh import conflicts as C
 from app.services.truthmesh import facts as F
@@ -136,14 +136,77 @@ def _store_twins(db: Session, *, organization_id: uuid.UUID, workspace_id: uuid.
 
 
 def _remove_missing(db: Session, workspace_id: uuid.UUID, keep: set[uuid.UUID]) -> None:
-    """Nodes whose documents left the mesh (failed reprocessing, deleted) go; their links go with them."""
+    """Nodes whose documents left the mesh (failed or being reprocessed, deleted) go, with their automatic
+    links. A link a person CONFIRMED or REJECTED stays: it is their decision about two documents, and a
+    document that is only being reprocessed comes back (a deleted one takes its links with it by foreign
+    key). Deleting a rejected link let the engine propose the pair again as automatic."""
     stale = [n for n in loader.nodes(db, workspace_id) if n.work_item_id not in keep]
     for node in stale:
         db.execute(delete(MeshLink).where(
-            MeshLink.workspace_id == workspace_id,
+            MeshLink.workspace_id == workspace_id, MeshLink.status == "AUTO",
             (MeshLink.source_work_item_id == node.work_item_id) | (MeshLink.target_work_item_id == node.work_item_id)))
         db.delete(node)
     db.flush()
+
+
+def forget_documents(db: Session, *, workspace_id: uuid.UUID, work_item_ids: Iterable[uuid.UUID],
+                     erase: bool = False) -> int:
+    """Take deleted documents out of the mesh now: their nodes and links go, the conflicts that name
+    them are resolved ("a document in it was deleted"), and their neighbours' risk is recomputed.
+
+    Conflicts name their documents by id (no foreign key), so before this a deleted document's
+    conflicts stayed OPEN, and in "money at risk", until somebody pressed Rebuild. Call it in the
+    transaction that deletes (or erases) the documents. Returns the conflicts it resolved.
+
+    `erase=True` is for a person's erasure (GDPR): a conflict quotes its documents' values and a
+    simulation quotes the documents it reached, so every conflict and simulation that names an erased
+    document is deleted, not kept as history.
+    """
+    ids = list(dict.fromkeys(work_item_ids))
+    if not ids:
+        return 0
+    in_mesh = db.execute(select(func.count()).select_from(MeshNode).where(
+        MeshNode.workspace_id == workspace_id, MeshNode.work_item_id.in_(ids))).scalar_one()
+    named = db.execute(select(func.count()).select_from(MeshConflict).where(
+        MeshConflict.workspace_id == workspace_id, MeshConflict.work_item_ids.overlap(ids),
+        MeshConflict.status.in_(OPEN) if not erase else MeshConflict.status.in_(CONFLICT_STATUSES))).scalar_one()
+    if not in_mesh and not named:
+        return 0  # not in the mesh (the plan does not carry it, or it was never indexed)
+    lock_workspace(db, workspace_id)
+    gone = set(ids)
+    neighbours = loader.neighbourhood(db, workspace_id, gone, hops=1) - gone
+    now = _now()
+    resolved = 0
+    if erase:
+        resolved = db.execute(delete(MeshConflict).where(
+            MeshConflict.workspace_id == workspace_id, MeshConflict.work_item_ids.overlap(ids),
+            MeshConflict.status.in_(OPEN))).rowcount or 0
+        db.execute(delete(MeshConflict).where(
+            MeshConflict.workspace_id == workspace_id, MeshConflict.work_item_ids.overlap(ids)))
+        mentions = [MeshSimulation.result.cast(String).like(f"%{i}%") for i in ids]
+        db.execute(delete(MeshSimulation).where(
+            MeshSimulation.workspace_id == workspace_id,
+            (MeshSimulation.origin_work_item_id.in_(ids)) | or_(*mentions)))
+    else:
+        for conflict in db.execute(select(MeshConflict).where(
+                MeshConflict.workspace_id == workspace_id, MeshConflict.work_item_ids.overlap(ids),
+                MeshConflict.status.in_(OPEN))).scalars():
+            conflict.status, conflict.auto_resolved, conflict.resolved_at = "RESOLVED", True, now
+            conflict.resolution_note = "A document in this conflict was deleted."
+            conflict.updated_at = now
+            resolved += 1
+    db.execute(delete(MeshLink).where(
+        MeshLink.workspace_id == workspace_id,
+        MeshLink.source_work_item_id.in_(ids) | MeshLink.target_work_item_id.in_(ids)))
+    db.execute(delete(MeshNode).where(MeshNode.workspace_id == workspace_id, MeshNode.work_item_id.in_(ids)))
+    db.flush()
+    _refresh_risk(db, workspace_id, neighbours)
+    current = db.get(MeshState, workspace_id)
+    if current is not None:
+        _refresh_state(db, workspace_id=workspace_id, organization_id=current.organization_id, ms=None,
+                       status=current.status if current.status in ("BUILDING", "FAILED") else "READY",
+                       error=current.error)
+    return resolved
 
 
 # --------------------------------------------------------------------------- links
@@ -232,8 +295,10 @@ def _refresh_risk(db: Session, workspace_id: uuid.UUID, ids: Optional[set[uuid.U
         query = query.where(MeshConflict.work_item_ids.overlap(list(ids)))
     risks = RK.node_risks(db.execute(query).scalars())
     degree: Counter[uuid.UUID] = Counter()
-    for link in loader.links(db, workspace_id, ids):
-        if link.status != "REJECTED":
+    rows = loader.links(db, workspace_id, ids)
+    here = loader.present(db, workspace_id, {x for l in rows for x in (l.source_work_item_id, l.target_work_item_id)})
+    for link in rows:
+        if link.status != "REJECTED" and link.source_work_item_id in here and link.target_work_item_id in here:
             degree[link.source_work_item_id] += 1
             degree[link.target_work_item_id] += 1
     for node in loader.nodes(db, workspace_id, ids):
@@ -246,8 +311,10 @@ def _refresh_state(db: Session, *, workspace_id: uuid.UUID, organization_id: uui
                    status: str = "READY", error: Optional[str] = None) -> MeshState:
     nodes = db.execute(select(MeshNode.work_item_id, MeshNode.risk_score, MeshNode.amount_micros)
                        .where(MeshNode.workspace_id == workspace_id)).all()
+    present = select(MeshNode.work_item_id).where(MeshNode.workspace_id == workspace_id).scalar_subquery()
     links = db.execute(select(func.count()).select_from(MeshLink).where(
-        MeshLink.workspace_id == workspace_id, MeshLink.status != "REJECTED")).scalar_one()
+        MeshLink.workspace_id == workspace_id, MeshLink.status != "REJECTED",
+        MeshLink.source_work_item_id.in_(present), MeshLink.target_work_item_id.in_(present))).scalar_one()
     open_conflicts = db.execute(select(func.count()).select_from(MeshConflict).where(
         MeshConflict.workspace_id == workspace_id, MeshConflict.status.in_(OPEN))).scalar_one()
     index = RK.risk_index({n.work_item_id: float(n.risk_score) for n in nodes},
@@ -372,8 +439,10 @@ def decide_conflict(db: Session, *, conflict: MeshConflict, status: str, note: O
     if status in ("RESOLVED", "DISMISSED"):
         conflict.resolved_at, conflict.resolved_by_user_id, conflict.resolution_note = now, actor_id, text[:2000]
     else:
+        # Reopening keeps the reason the conflict was resolved or dismissed with (a new note replaces it):
+        # the person who reopens it, and anyone after, can still read what was decided before.
         conflict.resolved_at, conflict.resolved_by_user_id = None, None
-        conflict.resolution_note = text[:2000] or None
+        conflict.resolution_note = text[:2000] or conflict.resolution_note
     conflict.updated_at = now
     db.flush()
     _refresh_risk(db, conflict.workspace_id, set(conflict.work_item_ids))
@@ -461,6 +530,10 @@ def simulate(db: Session, *, workspace_id: uuid.UUID, organization_id: uuid.UUID
     origin = db.execute(select(MeshNode).where(MeshNode.workspace_id == workspace_id,
                                                MeshNode.work_item_id == work_item_id)).scalar_one_or_none()
     if origin is None:
+        exists = db.execute(select(WorkItem.id).where(WorkItem.id == work_item_id,
+                                                      WorkItem.workspace_id == workspace_id)).first()
+        if exists is None:
+            raise MeshError("DOCUMENT_NOT_FOUND", "That document is not in this workspace.", 404)
         raise MeshError("NOT_IN_MESH", "This document is not in the mesh yet. Build the mesh first.", 409)
     scope = loader.neighbourhood(db, workspace_id, {work_item_id}, hops=v.RIPPLE_MAX_DEPTH, cap=v.RIPPLE_MAX_NODES)
     twins = {n.work_item_id: loader.twin_from_node(n) for n in loader.nodes(db, workspace_id, scope)}
@@ -512,11 +585,15 @@ def state(db: Session, workspace_id: uuid.UUID) -> Optional[MeshState]:
     return db.get(MeshState, workspace_id)
 
 
-def _node_out(node: MeshNode) -> dict[str, Any]:
-    meta = next((f for f in (node.facts or []) if f.get("concept") == "_twin"), {})
+def _node_out(node: Any) -> dict[str, Any]:
+    """A node, or a light card from `loader.node_cards` (which carries `filename` itself)."""
+    if hasattr(node, "filename"):
+        filename = node.filename
+    else:
+        filename = next((f for f in (node.facts or []) if f.get("concept") == "_twin"), {}).get("filename")
     return {
         "work_item_id": str(node.work_item_id), "kind": node.kind, "kind_label": node.kind_label, "rank": node.rank,
-        "title": node.title, "filename": meta.get("filename") or node.title, "document_number": node.document_number,
+        "title": node.title, "filename": filename or node.title, "document_number": node.document_number,
         "counterparty": node.counterparty, "currency": node.currency, "amount_micros": node.amount_micros,
         "net_amount_micros": node.net_amount_micros,
         "document_date": node.document_date.isoformat() if node.document_date else None,
@@ -548,13 +625,15 @@ def conflict_out(conflict: MeshConflict) -> dict[str, Any]:
 
 def overview(db: Session, workspace_id: uuid.UUID) -> dict[str, Any]:
     current = state(db, workspace_id)
-    nodes = loader.nodes(db, workspace_id)
+    nodes = loader.node_cards(db, workspace_id)
     open_rows = list(db.execute(select(MeshConflict).where(
         MeshConflict.workspace_id == workspace_id, MeshConflict.status.in_(OPEN))).scalars())
     severities = Counter(c.severity for c in open_rows)
     kinds = Counter(c.kind for c in open_rows)
     currencies = {c.currency for c in open_rows if c.currency and c.kind in v.EXPOSURE_KINDS}
-    links = [l for l in loader.links(db, workspace_id) if l.status != "REJECTED"]
+    here = {n.work_item_id for n in nodes}
+    links = [l for l in loader.link_pairs(db, workspace_id) if l.status != "REJECTED"
+             and l.source_work_item_id in here and l.target_work_item_id in here]
     relations = Counter(l.relation for l in links)
     # Clusters: connected components over usable links.
     parent: dict[uuid.UUID, uuid.UUID] = {n.work_item_id: n.work_item_id for n in nodes}
@@ -580,6 +659,7 @@ def overview(db: Session, workspace_id: uuid.UUID) -> dict[str, Any]:
             "build_ms": current.build_ms if current else None,
             "engine_version": current.engine_version if current else None,
             "error": current.error if current else None,
+            "since": current.updated_at if current else None,
         },
         "documents": len(nodes),
         "links": len(links),
@@ -609,10 +689,10 @@ def graph(db: Session, workspace_id: uuid.UUID, *, focus: Optional[uuid.UUID] = 
                                                              cap=limit)
     else:
         ids = None
-    nodes = loader.nodes(db, workspace_id, ids)
+    nodes = loader.node_cards(db, workspace_id, ids)
     nodes = sorted(nodes, key=lambda n: (-float(n.risk_score), -n.degree, n.title))[:limit]
     kept = {n.work_item_id for n in nodes}
-    links = [l for l in loader.links(db, workspace_id, kept if ids is not None else None)
+    links = [l for l in loader.links(db, workspace_id, kept)
              if l.source_work_item_id in kept and l.target_work_item_id in kept and float(l.strength) >= min_strength]
     open_by_doc: Counter[uuid.UUID] = Counter()
     for c in db.execute(select(MeshConflict).where(MeshConflict.workspace_id == workspace_id,
@@ -669,7 +749,7 @@ def matrix(db: Session, workspace_id: uuid.UUID, *, limit_documents: int = 12) -
     rows.sort(key=lambda c: (v.SEVERITY_ORDER[c.severity], -(c.exposure_micros or 0), c.title))
     counts: Counter[uuid.UUID] = Counter(i for c in rows for i in c.work_item_ids)
     columns_ids = [i for i, _ in counts.most_common(limit_documents)]
-    nodes = {n.work_item_id: n for n in loader.nodes(db, workspace_id, columns_ids)}
+    nodes = {n.work_item_id: n for n in loader.node_cards(db, workspace_id, columns_ids)}
     columns = [_node_out(nodes[i]) for i in columns_ids if i in nodes]
     out_rows = []
     for c in rows[:60]:
@@ -687,7 +767,8 @@ def export_csv(db: Session, workspace_id: uuid.UUID) -> str:
     """Audit-ready: every conflict with its documents, values, exposure and decision. Formula-safe."""
     from app.services.tables.export import safe_text
 
-    titles = {n.work_item_id: n.title for n in loader.nodes(db, workspace_id)}
+    titles = dict(db.execute(select(MeshNode.work_item_id, MeshNode.title).where(
+        MeshNode.workspace_id == workspace_id)).all())
     rows = list(db.execute(select(MeshConflict).where(MeshConflict.workspace_id == workspace_id)
                            .order_by(MeshConflict.status, MeshConflict.severity, MeshConflict.first_seen_at)).scalars())
     buffer = io.StringIO()
@@ -707,5 +788,5 @@ def export_csv(db: Session, workspace_id: uuid.UUID) -> str:
 
 
 __all__ = ["BuildResult", "MeshError", "build_workspace", "conflict_out", "decide_conflict", "decide_link",
-           "document", "export_csv", "graph", "index_document", "lock_workspace", "mark_building", "matrix",
-           "overview", "simulate", "state"]
+           "document", "export_csv", "forget_documents", "graph", "index_document", "lock_workspace",
+           "mark_building", "matrix", "overview", "simulate", "state"]

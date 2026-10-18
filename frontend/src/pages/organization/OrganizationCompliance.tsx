@@ -295,7 +295,7 @@ const RetentionCard: React.FC<{
             disabled={!canWrite}
             onChange={(event) => setConversations(event.target.value)}
           />
-          <p className={`${HINT} mt-1`}>Minimum 30.</p>
+          <p className={`${HINT} mt-1`}>Counted from the last message, not from when the conversation began. Minimum 30.</p>
         </div>
         <div>
           <label className={LABEL} htmlFor="retention-audit">

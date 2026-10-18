@@ -113,7 +113,7 @@ risky migration for no customer benefit. They hold Dodo data too:
 | `billing_accounts.stripe_customer_id` | Stripe only; Dodo's customer id is in `gateway_customer_id` |
 | `subscriptions.stripe_subscription_id`, `stripe_state_version` | Stripe only / the re-fetch ordering stamp for both gateways; Dodo's id is in `gateway_subscription_id` |
 | `invoices.stripe_invoice_id` | Stripe only; a Dodo invoice's payment id is in `gateway_invoice_id` |
-| worker loop `--loop stripe`, service `worker-stripe` | old names of `--loop billing` / `worker-billing`, accepted for one release |
+| worker loop `--loop billing`, service `worker-billing` | the old names `--loop stripe` / `worker-stripe` were removed in Session B |
 
 ## 8. Checking a test account: `scripts/dodo_setup.py`
 

@@ -3,7 +3,7 @@
  * confidence; the dispatch policy; export packages; and package verification.
  */
 import React, { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { Activity, Gauge, Layers, Lock, Plus, ShieldCheck, Sparkles, Target } from "lucide-react";
 
@@ -18,10 +18,10 @@ import { VerifyPackageDialog } from "@/components/batches/VerifyPackageDialog";
 import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 import { useCapabilityAccess } from "@/hooks/useCapabilityAccess";
 import { batchPath } from "@/routes/tenantPaths";
-import { batchKeys, listBatches } from "@/services/api/batches";
+import { BATCH_PAGE_SIZE, batchKeys, listBatches } from "@/services/api/batches";
 import { errorMessage } from "@/services/api/errors";
 import { formatTimestampDate } from "@/utils/displayTime";
-import type { BatchSummary } from "@/types/batches";
+import type { BatchList, BatchSummary } from "@/types/batches";
 
 type Tab = "ACTIVE" | "ARCHIVED" | "PACKAGES";
 
@@ -97,29 +97,32 @@ const Batches: React.FC = () => {
   const [verifying, setVerifying] = useState(false);
 
   const status = tab === "ARCHIVED" ? "ARCHIVED" : "ACTIVE";
-  const query = useQuery({
-    queryKey: batchKeys.list(workspaceId, status),
-    queryFn: () => listBatches(workspaceId, status),
+  const query = useInfiniteQuery({
+    queryKey: batchKeys.pages(workspaceId, status),
+    queryFn: ({ pageParam }) => listBatches(workspaceId, status, { limit: BATCH_PAGE_SIZE, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (last: BatchList, pages) => {
+      const loaded = pages.reduce((acc, page) => acc + page.items.length, 0);
+      return loaded < last.total ? loaded : undefined;
+    },
     enabled: Boolean(workspaceId && capability.granted) && tab !== "PACKAGES",
     refetchInterval: (q) =>
-      q.state.data?.items.some((b) => b.progress.queued + b.progress.processing > 0) ? 3_000 : false,
+      q.state.data?.pages.some((page) => page.items.some((b) => b.progress.queued + b.progress.processing > 0))
+        ? 3_000
+        : false,
   });
 
+  const batches = useMemo(() => query.data?.pages.flatMap((page) => page.items) ?? [], [query.data]);
+  // The tiles come from the server's totals over every batch of the tab, not from the page on screen.
   const totals = useMemo(() => {
-    const items = query.data?.items ?? [];
-    const sum = (pick: (b: BatchSummary) => number) => items.reduce((acc, b) => acc + pick(b), 0);
-    const dispatched = sum((b) => b.progress.straight_through + b.progress.review + b.progress.exception);
-    const scored = items.filter((b) => b.progress.mean_confidence !== null);
+    const t = query.data?.pages[0]?.totals;
     return {
-      batches: items.length,
-      documents: sum((b) => b.progress.documents),
-      inFlight: sum((b) => b.progress.queued + b.progress.processing),
-      failed: sum((b) => b.progress.failed),
-      straightThrough: dispatched ? sum((b) => b.progress.straight_through) / dispatched : null,
-      confidence: scored.length
-        ? scored.reduce((acc, b) => acc + (b.progress.mean_confidence ?? 0) * b.progress.documents, 0) /
-          Math.max(scored.reduce((acc, b) => acc + b.progress.documents, 0), 1)
-        : null,
+      batches: t?.batches ?? 0,
+      documents: t?.documents ?? 0,
+      inFlight: t?.in_flight ?? 0,
+      failed: t?.failed ?? 0,
+      straightThrough: t && t.dispatched ? t.straight_through / t.dispatched : null,
+      confidence: t?.mean_confidence ?? null,
     };
   }, [query.data]);
 
@@ -158,7 +161,13 @@ const Batches: React.FC = () => {
       </header>
 
       <section aria-label="Batch totals" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <StatTile label="Active batches" value={totals.batches} hint={`${totals.documents} documents`} icon={Layers} testId="kpi-batches" />
+        <StatTile
+          label={tab === "ARCHIVED" ? "Archived batches" : "Active batches"}
+          value={totals.batches}
+          hint={`${totals.documents} documents`}
+          icon={Layers}
+          testId="kpi-batches"
+        />
         <StatTile
           label="In flight"
           value={totals.inFlight}
@@ -166,7 +175,7 @@ const Batches: React.FC = () => {
           icon={Activity}
         />
         <StatTile label="Straight-through rate" value={pct(totals.straightThrough)} hint="Of dispatched documents" icon={Target} />
-        <StatTile label="Mean confidence" value={pct(totals.confidence)} hint="Verified documents, weighted by batch size" icon={Gauge} />
+        <StatTile label="Mean confidence" value={pct(totals.confidence)} hint="Of the documents that have a verification score" icon={Gauge} />
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -194,7 +203,7 @@ const Batches: React.FC = () => {
             <div className="fp-card h-48 animate-pulse" />
           ) : query.isError ? (
             <p className="text-sm text-destructive">{errorMessage(query.error, "Batches could not be loaded.")}</p>
-          ) : (query.data?.items.length ?? 0) === 0 ? (
+          ) : batches.length === 0 ? (
             <div className="fp-card flex flex-col items-center gap-3 px-6 py-12 text-center">
               <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-muted/60 text-muted-foreground">
                 <Sparkles className="h-5 w-5" aria-hidden />
@@ -226,11 +235,23 @@ const Batches: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {query.data?.items.map((batch) => (
+                  {batches.map((batch) => (
                     <BatchRow key={batch.id} batch={batch} to={batchPath(orgSlug, workspaceSlug, batch.id)} />
                   ))}
                 </tbody>
               </table>
+              {query.hasNextPage ? (
+                <div className="border-t border-border/60 p-3 text-center">
+                  <button
+                    type="button"
+                    className="fp-btn fp-btn-secondary h-8 text-xs"
+                    disabled={query.isFetchingNextPage}
+                    onClick={() => void query.fetchNextPage()}
+                  >
+                    {query.isFetchingNextPage ? "Loading…" : `Show more batches (${batches.length} of ${totals.batches})`}
+                  </button>
+                </div>
+              ) : null}
             </div>
           )}
         </div>

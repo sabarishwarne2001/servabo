@@ -10,7 +10,7 @@ import "@fontsource-variable/inter";
 import "@fontsource-variable/jetbrains-mono";
 import "@/styles/index.css";
 
-import { ApiError } from "@/services/api/client";
+import { ApiError, TENANT_UNAVAILABLE_EVENT } from "@/services/api/client";
 
 import { assertPermissionParity } from "@/permissions";
 
@@ -78,6 +78,19 @@ export const queryClient = new QueryClient({
       retry: false,
     },
   },
+});
+
+// A request was refused because its organization or workspace is archived or suspended (from another
+// tab, or by a platform operator): the signed-in context still says it is active, so it is read again.
+// The guards then take the person to the workspace picker, which says what happened. Several refusals
+// arrive together; one read is enough.
+let contextRefreshedAt = 0;
+window.addEventListener(TENANT_UNAVAILABLE_EVENT, () => {
+  if (Date.now() - contextRefreshedAt < 3_000) {
+    return;
+  }
+  contextRefreshedAt = Date.now();
+  void queryClient.invalidateQueries({ queryKey: ["me", "context"] });
 });
 
 // Verifies the client mirrors of backend logic still agree with their

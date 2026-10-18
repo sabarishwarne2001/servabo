@@ -61,9 +61,24 @@ class BatchSummary(BaseModel):
     progress: BatchProgress
 
 
+class BatchTotals(BaseModel):
+    """Over every batch of the tab, not only the page that was asked for."""
+
+    batches: int
+    documents: int
+    in_flight: int
+    failed: int
+    straight_through: int
+    review: int
+    exception: int
+    dispatched: int
+    mean_confidence: Optional[float] = None
+
+
 class BatchList(BaseModel):
     items: list[BatchSummary]
     total: int
+    totals: BatchTotals
 
 
 class HealingChangeOut(BaseModel):

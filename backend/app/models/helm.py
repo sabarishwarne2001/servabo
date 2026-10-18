@@ -383,6 +383,8 @@ class HelmPromise(Base):
         Index("ix_helm_promises_workspace_kind_status", "workspace_id", "kind", "status"),
         Index("ix_helm_promises_work_item", "work_item_id"),
         Index("ix_helm_promises_counterparty", "workspace_id", "counterparty_key"),
+        Index("ix_helm_promises_fulfilments", "fulfilments", postgresql_using="gin",
+              postgresql_ops={"fulfilments": "jsonb_path_ops"}),
     )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
@@ -410,6 +412,58 @@ class HelmPromise(Base):
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = _ts()
     updated_at: Mapped[datetime] = _ts()
+
+
+class HelmLedgerState(Base):
+    """What the Promise ledger of one workspace is up to date with (migration h1a5)."""
+
+    __tablename__ = "helm_ledger_state"
+    __table_args__ = (
+        _workspace_fk("helm_ledger_state"),
+        CheckConstraint("incremental_runs >= 0 AND check_mismatches >= 0 AND full_requests >= 0 AND full_served >= 0",
+                        name="ck_helm_ledger_state_runs"),
+        Index("ix_helm_ledger_state_organization", "organization_id"),
+    )
+
+    workspace_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), nullable=False)
+    #: The day the stored promises were computed for (statuses such as "broken" depend on today); empty
+    #: until the first build.
+    as_of: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    built_at: Mapped[Optional[datetime]] = _ts(nullable=True)
+    #: Raised by a change that cannot be attributed to documents; `full_served` is what the last full
+    #: build had seen when it began. Requests above served mean the next update is a full one.
+    full_requests: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default=text("0"))
+    full_served: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default=text("0"))
+    incremental_runs: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    checked_at: Mapped[Optional[datetime]] = _ts(nullable=True)
+    check_mismatches: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    created_at: Mapped[datetime] = _ts()
+    updated_at: Mapped[datetime] = _ts()
+
+
+class HelmLedgerDirty(Base):
+    """A document (or the payment settled on it) changed since the ledger was last updated."""
+
+    __tablename__ = "helm_ledger_dirty"
+    __table_args__ = (
+        _workspace_fk("helm_ledger_dirty"),
+        Index("ix_helm_ledger_dirty_organization", "organization_id"),
+    )
+
+    workspace_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), nullable=False)
+    #: No foreign key: a deleted document's id must outlive the document.
+    work_item_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True)
+    reason: Mapped[str] = mapped_column(String(60), nullable=False)
+    #: How many changes were marked; an update clears only the count it saw.
+    marks: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    #: What the document's stored promises said when it was first marked: the amounts (in micros) it could
+    #: have taken a bank line for, and its invoice number. Kept because a deleted document takes its
+    #: promises with it.
+    claims: Mapped[list[int]] = mapped_column(ARRAY(BigInteger), nullable=False, server_default=text("'{}'"))
+    numbers: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, server_default=text("'{}'"))
+    marked_at: Mapped[datetime] = _ts()
 
 
 class HelmMandate(Base):

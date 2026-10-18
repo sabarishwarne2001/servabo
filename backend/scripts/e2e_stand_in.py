@@ -28,7 +28,10 @@ and worker. Two things a browser cannot do in a sandbox are played here instead:
 * **the customer's DNS provider and identity provider** — `dns-publish` puts a TXT record where
   the journeys' DNS server (`scripts/e2e_dns.py`) answers Servabo's real lookup, and `saml-idp`
   / `saml-response` play the SAML provider (a signing certificate, then a signed assertion that
-  answers Servabo's own AuthnRequest), with the backend's test IdP (`tests/engines/saml_idp.py`).
+  answers Servabo's own AuthnRequest), with the backend's test IdP (`tests/engines/saml_idp.py`);
+* **a TruthMesh no click can reach** — `truthmesh-fill` adds filler conflicts or documents (the page
+  lists 100 conflicts and 400 documents at a time) and `truthmesh-stick` leaves the build in
+  BUILDING since an hour ago, as after a worker lost it.
 
 Development and test databases only: it refuses to run when ENVIRONMENT is production.
 """
@@ -430,12 +433,63 @@ def _identity_provider(args: argparse.Namespace) -> int:
     return 0
 
 
+def _truthmesh(args: argparse.Namespace) -> int:
+    """Put the workspace's TruthMesh in a state a browser journey cannot reach by clicking.
+
+    truthmesh-fill   --conflicts N adds N open synthetic conflicts (the page lists 100 at a time);
+                     --documents N adds N documents, each a node of the mesh (the what-if picker lists 400).
+    truthmesh-stick  the state reads BUILDING since an hour ago, as after a worker lost the build.
+    """
+    from app.models.truthmesh import MeshConflict, MeshNode, MeshState
+    from app.models.work_item import WorkItem
+    from app.models.workspace import Workspace
+
+    with SessionLocal() as db, db.begin():
+        organization = _organization(db, args.org)
+        workspace = db.execute(select(Workspace).where(Workspace.organization_id == organization.id)
+                               .order_by(Workspace.created_at).limit(1)).scalar_one()
+        if args.command == "truthmesh-stick":
+            state = db.get(MeshState, workspace.id)
+            if state is None:
+                state = MeshState(workspace_id=workspace.id, organization_id=organization.id)
+                db.add(state)
+            state.status = "BUILDING"
+            state.updated_at = datetime.now(timezone.utc) - timedelta(hours=1)
+            print(json.dumps({"stuck": str(workspace.id)}))
+            return 0
+        author = db.execute(select(OrganizationMember).where(OrganizationMember.organization_id == organization.id)
+                            .limit(1)).scalar_one().user_id
+        known = list(db.execute(select(MeshNode.work_item_id).where(MeshNode.workspace_id == workspace.id)
+                                .limit(2)).scalars())
+        added_documents = 0
+        for n in range(args.documents):
+            item = WorkItem(workspace_id=workspace.id, created_by_user_id=author, original_filename=f"filler-{n}.pdf",
+                            stored_filename=f"filler_{uuid.uuid4().hex}.pdf", file_type="application/pdf",
+                            file_size=1024, status="COMPLETED", extracted_entities={})
+            db.add(item)
+            db.flush()
+            db.add(MeshNode(organization_id=organization.id, workspace_id=workspace.id, work_item_id=item.id,
+                            kind="INVOICE", kind_label="Invoice", rank=4, title=f"Filler invoice {n:04d}",
+                            facts=[{"concept": "_twin", "filename": f"filler-{n}.pdf"}], terms={}, identifiers=[],
+                            referenced_identifiers=[], parties=[], fingerprint=uuid.uuid4().hex * 2))
+            known = known or [item.id]
+            added_documents += 1
+        for n in range(args.conflicts):
+            db.add(MeshConflict(organization_id=organization.id, workspace_id=workspace.id,
+                                fingerprint=f"filler-{uuid.uuid4().hex}", kind="DUPLICATE_BILLING", concept="amount",
+                                severity="LOW", status="OPEN", title=f"Filler conflict {n:04d}",
+                                summary="Two filler documents state different amounts.", relation="RELATES_TO",
+                                work_item_ids=known[:2], document_values=[], details={}))
+        print(json.dumps({"documents": added_documents, "conflicts": args.conflicts}))
+        return 0
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="The browser journeys' clock and gateway stand-ins.")
     parser.add_argument("command", choices=[
         "subscribe", "seats", "change-plan", "cancel", "cancel-at-period-end", "renewal-fails", "payment-fails-again", "mark-unpaid",
         "card-fixed", "refund", "dodo-catalogue", "trial-ending", "trial-ends", "run-job", "dns-publish", "saml-idp",
-        "saml-response"])
+        "saml-response", "truthmesh-fill", "truthmesh-stick"])
     parser.add_argument("--gateway", choices=["dodo", "stripe"], type=str.lower,
                         default=_gateway_from_argv([]), help="whose side to play (default: E2E_GATEWAY, else dodo)")
     parser.add_argument("--amount", type=int, help="refund: in cents (default: the whole payment)")
@@ -448,6 +502,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--domain", help="saml-idp, saml-response: the customer's email domain")
     parser.add_argument("--email", help="saml-response: who signs in")
     parser.add_argument("--saml-request", help="saml-response: the SAMLRequest Servabo sent (redirect binding)")
+    parser.add_argument("--conflicts", type=int, default=0, help="truthmesh-fill: how many open conflicts to add")
+    parser.add_argument("--documents", type=int, default=0, help="truthmesh-fill: how many documents to add to the mesh")
     args = parser.parse_args(argv)
 
     # run-job waits on the worker and touches no shared state; neither do the Dodo steps (the
@@ -468,6 +524,9 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if args.command in ("saml-idp", "saml-response"):
         return _identity_provider(args)
+
+    if args.command in ("truthmesh-fill", "truthmesh-stick"):
+        return _truthmesh(args)
 
     if args.command == "run-job":
         # Queue a job for the running worker, as its schedule would. With --org, the job is about

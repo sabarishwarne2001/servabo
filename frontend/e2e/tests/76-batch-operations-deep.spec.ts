@@ -256,4 +256,57 @@ test.describe("Batch operations in depth — a tenant of its own", () => {
     }
     await expectHealthyPage(page);
   });
+
+  // Session B: the batch page's tiles and list cover every batch, not the 50 on the first page.
+  test("the tiles count every batch, the list pages on, and the Archived tab says Archived", async ({ page }) => {
+    const items = await listWorkItems(customer.session, customer.wsId);
+    const one = String(items[0].id);
+    for (let i = 1; i <= 51; i += 1) {
+      const made = await api(customer.session, "POST", `/workspaces/${customer.wsId}/processing-batches`, {
+        name: `Paged batch ${String(i).padStart(2, "0")}`,
+        work_item_ids: [one],
+      });
+      expect(made.status, made.text.slice(0, 200)).toBe(201);
+    }
+    // The oldest batch ("Depth batch", 3 documents, dispatched above) is on the second page.
+    await signInAs(page, customer.email);
+    await page.goto(customer.ws("batches"));
+    await settle(page);
+    const tile = page.getByTestId("kpi-batches");
+    await expect(tile).toContainText("Active batches");
+    await expect(tile).toContainText("52");
+    await expect(tile).toContainText("54 documents");
+    // Only the newest 50 are listed, and the straight-through rate is still the workspace's (0% of the
+    // 3 dispatched documents), not "—" for a page where nothing has been dispatched.
+    await expect(page.getByTestId("batch-row")).toHaveCount(50);
+    await expect(page.getByText("0%", { exact: true }).first()).toBeVisible();
+    await page.getByRole("button", { name: /Show more batches \(50 of 52\)/ }).click();
+    await expect(page.getByTestId("batch-row")).toHaveCount(52);
+    await expect(page.getByRole("button", { name: /Show more batches/ })).toHaveCount(0);
+
+    const archived = await api<{ items: Array<{ id: string }> }>(customer.session, "GET", `/workspaces/${customer.wsId}/processing-batches?limit=1`);
+    expect((await api(customer.session, "PATCH", `/workspaces/${customer.wsId}/processing-batches/${archived.body.items[0].id}`, { status: "ARCHIVED" })).status).toBe(200);
+    await page.getByRole("tab", { name: "Archived" }).click();
+    await expect(page.getByTestId("kpi-batches")).toContainText("Archived batches");
+    await expect(page.getByTestId("kpi-batches")).not.toContainText("Active batches");
+    await expect(page.getByTestId("kpi-batches")).toContainText("1 documents");
+    await expectHealthyPage(page);
+  });
+
+  test("Delete waits while Dispatch is running", async ({ page }) => {
+    await signInAs(page, customer.email);
+    await page.route(`**/processing-batches/${batchId}/dispatch`, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+      await route.continue();
+    });
+    await page.goto(customer.ws(`batches/${batchId}`));
+    await settle(page);
+    const del = page.getByRole("button", { name: "Delete", exact: true });
+    await expect(del).toBeEnabled();
+    await page.getByRole("button", { name: "Dispatch", exact: true }).click();
+    await expect(del).toBeDisabled();
+    await expect(page.getByText(/^Dispatched:/)).toBeVisible({ timeout: 15_000 });
+    await expect(del).toBeEnabled();
+    await expectHealthyPage(page);
+  });
 });

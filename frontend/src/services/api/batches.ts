@@ -25,14 +25,25 @@ const pkg = (workspaceId: string, packageId: string): string =>
 export const batchKeys = {
   all: (workspaceId: string) => ["batches", workspaceId] as const,
   list: (workspaceId: string, status: string) => ["batches", workspaceId, "list", status] as const,
+  pages: (workspaceId: string, status: string) => ["batches", workspaceId, "pages", status] as const,
   detail: (workspaceId: string, batchId: string) => ["batches", workspaceId, "batch", batchId] as const,
   analytics: (workspaceId: string, batchId: string) => ["batches", workspaceId, "analytics", batchId] as const,
   packages: (workspaceId: string, batchId?: string) => ["batches", workspaceId, "packages", batchId ?? "all"] as const,
   policy: (workspaceId: string) => ["batches", workspaceId, "policy"] as const,
 };
 
-export const listBatches = async (workspaceId: string, status?: "ACTIVE" | "ARCHIVED"): Promise<BatchList> =>
-  (await apiClient.get<BatchList>(`${ws(workspaceId)}/processing-batches`, { params: status ? { status } : {} })).data;
+export const BATCH_PAGE_SIZE = 50;
+
+export const listBatches = async (
+  workspaceId: string,
+  status?: "ACTIVE" | "ARCHIVED",
+  page: { readonly limit?: number; readonly offset?: number } = {},
+): Promise<BatchList> =>
+  (
+    await apiClient.get<BatchList>(`${ws(workspaceId)}/processing-batches`, {
+      params: { ...(status ? { status } : {}), ...(page.limit ? { limit: page.limit } : {}), ...(page.offset ? { offset: page.offset } : {}) },
+    })
+  ).data;
 
 export const createBatch = async (
   workspaceId: string,

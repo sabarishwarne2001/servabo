@@ -1,5 +1,5 @@
 import { formatTimestamp, formatTimestampDate } from "@/utils/displayTime";
-import React, { useMemo, useState } from "react";
+import React, { useId, useMemo, useRef, useState } from "react";
 import {
   useInfiniteQuery,
   useMutation,
@@ -30,6 +30,7 @@ import {
   updateKeyTier,
 } from "@/services/api/developer";
 import { developerKeys } from "@/services/api/queryKeys";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { useResolvedOrganization } from "@/routes/OrganizationGuard";
 import {
   API_RATE_TIERS,
@@ -542,11 +543,23 @@ const IssueKeyModal: React.FC<{
   const canSubmit =
     name.trim().length > 0 && scopes.length > 0 && !issue.isPending;
 
+  // A dialog: named for a screen reader, focus moves in and stays in, Escape closes it (not while the
+  // key is being issued), and focus returns to the button that opened it.
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const titleId = useId();
+  useDialogFocus(dialogRef, onClose, { busy: issue.isPending });
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4">
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4"
+    >
       <div className="w-full max-w-lg rounded-lg border border-border bg-card p-5 shadow-lg">
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 id={titleId} className="text-lg font-semibold text-foreground">
             {token ? "Key issued" : "Issue a gateway API key"}
           </h2>
           <button

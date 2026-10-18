@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.pagination import MAX_OFFSET
 from app.api import capability_gate
 from app.api.deps import RequireWorkspaceRole, TenantContext, get_db
 from app.core import entitlements
@@ -142,7 +143,7 @@ def _audit_export(db: Session, context: TenantContext, **details: object) -> Non
 
 @router.get("/workspaces/{workspace_id}/tables", response_model=TableList)
 def list_tables(workspace_id: uuid.UUID, status_filter: Optional[str] = Query(default=None, alias="status"),
-                limit: int = Query(default=100, ge=1, le=500), offset: int = Query(default=0, ge=0),
+                limit: int = Query(default=100, ge=1, le=500), offset: int = Query(default=0, ge=0, le=MAX_OFFSET),
                 db: Session = Depends(get_db), context: TenantContext = Depends(RequireViewer)) -> TableList:
     _ws(context, workspace_id)
     _gate(db, context, "tables.list")

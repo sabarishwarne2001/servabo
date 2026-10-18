@@ -58,6 +58,8 @@ could forget.
 | `helm_backtests` | a Time-machine run: period, mandates, findings, value by honesty class, summary | source |
 | `helm_value_events` | evidence-backed value held, one row per outcome (unique `dedupe_key`, never counted twice) | source |
 | `helm_tasks` | the decision and verification tasks Helm opens; they appear in the review hub as kind `HELM` | source |
+| `helm_ledger_state` | per workspace (migration `h1a5_helm_ledger_incremental`): the day the stored promises are for, when they were built, a counter of "next update must be full" requests and the counter the last full build had seen, incremental updates since, the nightly check's time and mismatches (§4.5) | bookkeeping, rebuildable |
+| `helm_ledger_dirty` | the documents changed since the ledger was last updated, with a change count and what their promises said before (no foreign key: a deleted document's id must outlive it) (§4.5) | bookkeeping, rebuildable |
 
 `workspaces.is_sample` marks the sample workspace: it is labelled in the workspace picker, it does
 not count towards `limit.workspaces`, and deleting it archives the workspace and its sample book.
@@ -113,17 +115,63 @@ check (§7) lets an action run without approval only on VERIFIED or CALIBRATED f
 ### 4.5 Rebuildable projection
 
 `helm/ledger.py` is a pure function from (documents, roles, matching lines, obligations,
-settlements, identities) to promise rows, each with a deterministic `source_key`. It runs:
-- **incrementally**: post-enrichment dispatch (`app/services/post_enrichment.dispatch_in_session`),
-  a field correction, a review resolution and a document delete enqueue `helm.ledger_build` for that
-  document (idempotency key per document and change marker); the handler rebuilds that document's
-  promises and its counterparties' settlement links;
-- **fully**: nightly (`helm.ledger_build` with `{"full": true}` in `DEFAULT_SCHEDULE`).
-A test proves the nightly full rebuild produces exactly the rows the incremental updates did.
-Reads take a shared hold on each workspace's ledger lock, so a plan never sees half a rebuild. An
-invoice's payment state is the one exception to "read the projection": the snapshot takes the
-`helm_settlements` row whenever its version is newer than the promise's copy, so a payment approved
-seconds ago is already scheduled for the next plan and the next bank import (F-427).
+settlements, identities) to promise rows, each with a deterministic `source_key` and a content hash.
+Writing is always a diff: insert new keys, update changed hashes, delete keys no longer produced. Two
+things produce what is diffed, and both call `ledger.build`, so they cannot disagree about what a
+promise is:
+
+- **Full** (`ledger_store.rebuild_workspace`): the whole workspace. The first build, the nightly one,
+  and whenever the shortcut below is not safe.
+- **Incremental** (`ledger_store.refresh_workspace`, what a document change runs; Session B): only the
+  documents that changed, and the documents whose promises read them.
+
+**How the incremental update knows what changed.** The ORM writes the ledger reads are marked where
+they happen (`app/models/helm_dirty.py`: mapper events on documents, roles, verifications, field
+corrections, payments, obligations and procurement cases) into `helm_ledger_dirty`, in the same
+transaction as the write, so a rolled-back change leaves no mark and a committed one always has one.
+The few writes that bypass the ORM (the role upsert, the obligation deletes) mark explicitly. A change
+that every promise depends on (who we are, the workspace's date format or currency, the price
+tolerance, which books read the workspace) raises a counter instead (`helm_ledger_state.full_requests`);
+the next update is a full rebuild. An update clears only the marks it saw (a mark has a count), and a
+request raised while a full build ran stays pending (the build records the counter it read before it
+began), so a change that arrives mid-update is never lost.
+
+**What the update re-projects.** The marked documents, plus:
+1. *By reference*: what their stored promises were fulfilled by or fulfilled (a credit note's invoice, a
+   receipt's purchase order, a price line's invoice, a procurement case's three documents, an
+   obligation's document). What pointed at a changed or deleted document is found from the stored
+   promises (`fulfilments`, GIN-indexed); what it points at, from the document.
+2. *By bank line*: a statement line pays the first invoice (in the ledger's order) that fits and that no
+   earlier invoice used, so an invoice's payment depends on every invoice that could take the same
+   line. Invoices are grouped by the lines they can reach (amount within two cents); the group is
+   closed transitively, from the amounts alone, so it can be larger than needed (time) but never
+   smaller (correctness). A deleted document's old claims are remembered on its mark, because its
+   promises go with it.
+3. *By number*: a line that names another invoice pays that one, so a new, changed or deleted invoice
+   number re-projects the invoices around the lines naming it.
+4. *A certificate kept by a newer one*: the supplier's group of expiry obligations.
+
+These are projected by `ledger.build` itself on a smaller set of facts (the projected documents, what
+they reference, every bank statement, credit note and receipt, and the set of invoice numbers), and only
+the rows the projected documents own are compared and written. Statuses depend on today, so an update
+for a different day than the stored one is full. More than 200 marked documents, or more than 600 to
+re-project, is also full (simpler and about as fast).
+
+**The nightly check** (`ledger_store.verify_workspace`, in the `{"full": true}` job): brings pending
+changes in as of the day the ledger was written for, recomputes the whole workspace as of that day and
+compares with what is stored. Any difference means an update missed a change; it is counted
+(`helm_ledger_state.check_mismatches`), logged, reported to the operator (`HELM_LEDGER_DRIFT` alert, one
+per workspace) and repaired by the rebuild for today that follows. A ledger that is merely a day old, or
+already waiting for a full rebuild, is not drift.
+
+`tests/services/helm/test_ledger_incremental_equivalence.py` holds the incremental update to a full
+rebuild, row for row, across random creates, edits, deletes, payments, credit notes, receipts, bank
+statements, obligations and procurement cases (`HELM_EQUIVALENCE_SEEDS=200` for a wider search);
+`test_ledger_nightly_check.py` holds the check. Reads take a shared hold on each workspace's ledger
+lock, so a plan never sees half a rebuild. An invoice's payment state is the one exception to "read the
+projection": the snapshot takes the `helm_settlements` row whenever its version is newer than the
+promise's copy, so a payment approved seconds ago is already scheduled for the next plan and the next
+bank import (F-427).
 
 ## 5. Mandates
 
@@ -333,20 +381,24 @@ statement of account per supplier) and times each step on real Postgres. It runs
 | Plan for the open payables over 30 days | ≤ 10 s for 1,000 open payables | 2.9 s (88 open) | **5.8 s (1,080 open)** |
 | 1,000 seeded futures of cash | ≤ 3 s | 0.01 s | 0.01 s |
 | What if… (today's plan and the scenario's; §21, measured 2026-10-16) | ≤ 10 s (a person waits) | 0.3 s | 2.4 s |
-| Ledger update after one document changes | ≤ 1 s | 0.7 s | **2.9 s: over budget** |
+| Ledger update after one document changes (the job; §4.5, measured 2026-10-18) | ≤ 1 s | 0.3 s | **0.7 s** (was 2.9 s; 4.1 s through the job before §4.5 was built) |
+| The first such update after a worker starts (it reads the bank statements) | ≤ 2 s | 0.3 s | 1.4 to 1.6 s |
 | Snapshot (every input the plan reads) | — | 0.2 s | 1.7 s |
 | Every supplier statement reconciled (40) | — | 0.9 s | 1.3 s |
 | Bank import with matching | — | 0.4 s (500 lines) | 4.0 s (5,000 lines) |
-| First full ledger build | — | 2.8 s | 25.4 s |
+| First full ledger build (and the nightly rebuild) | — | 2.2 s | 23.5 s |
 | Event loop | no database work on the loop | every Helm route is a plain `def` (threadpool) | — |
 
 Fixed on the way (F-423, F-425): the ledger compared every invoice with every statement line (now an
 index by amount) and named-invoice checks scanned every known number (now one pass per line); the
 reconciliation re-read every supplier's name per statement and ran twice per plan (now cached).
-**Not yet within budget:** the ledger update recomputes the whole workspace on each change, which
-holds the 1-second budget up to about 2,000 documents a workspace; each further 1,000 documents add
-about 0.25 s. The update runs in the worker, never in a request, so nobody waits on it; making
-it truly incremental (recompute only the documents a change touches) is the next step (HANDOFF).
+**Within budget since §4.5 (Session B):** the ledger update used to recompute the whole workspace on each
+change, which held the 1-second budget up to about 2,000 documents and cost 2.9 s at 10,000. It now
+re-projects the changed documents and what depends on them: 0.7 s at 10,000 documents (about half of that
+is the value sweep and the job's own sessions, not the ledger). The update runs in the worker, never in a
+request, so nobody waits on it. What stays full: the first build and the nightly rebuild (23.5 s at 10,000
+documents, in the worker), and the first update of a new day. The other rows of the table are from the
+earlier runs (plan, snapshot and bank import move by a second between runs of this shared machine).
 
 ## 14. The Time machine (`helm/backtest.py`, `helm/history.py`)
 

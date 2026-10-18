@@ -275,29 +275,10 @@ if (Test-Path $frontendDevEnv) {
 }
 
 # --- 4. Backing services ---------------------------------------------------
-# >>> one-release names: Docker data made before the rename (FlowPilot became Servabo on
-# 2026-10-16) lives in volumes named flowpilot_*. Keep using them, so nothing looks lost; README
-# "Local data from before the rename" says how to move to the new names. Remove next release.
-function Use-PreRenameDockerData {
-    if ($env:COMPOSE_PROJECT_NAME) { return }
-    docker volume inspect flowpilot_postgres_data 2>&1 | Out-Null
-    $hasOld = ($LASTEXITCODE -eq 0)
-    docker volume inspect servabo_postgres_data 2>&1 | Out-Null
-    $hasNew = ($LASTEXITCODE -eq 0)
-    if ($hasOld -and -not $hasNew) {
-        $env:COMPOSE_PROJECT_NAME = 'flowpilot'
-        foreach ($c in @('flowpilot-db', 'flowpilot-redis', 'flowpilot-minio', 'flowpilot-minio-init')) {
-            docker rm -f $c 2>&1 | Out-Null
-        }
-        Write-Warn2 'Using your Docker data from before the rename (volumes flowpilot_*); see README.'
-    }
-}
-# <<< one-release names
 Write-Step '4/8  Docker backing services'
 
 Push-Location $BackendDir
 try {
-    Use-PreRenameDockerData
     if ($Reset) {
         Write-Warn2 'Reset requested: destroying volumes.'
         docker compose down -v 2>&1 | Out-Null

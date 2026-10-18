@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.core.pagination import MAX_OFFSET
 from app.api import capability_gate
 from app.api.deps import RequireWorkspaceRole, TenantContext, get_db
 from app.core import entitlements
@@ -459,7 +460,7 @@ def list_postings(workspace_id: uuid.UUID, state: Optional[str] = Query(default=
                   source_kind: Optional[str] = Query(default=None), source_id: Optional[uuid.UUID] = Query(default=None),
                   work_item_id: Optional[uuid.UUID] = Query(default=None),
                   q: Optional[str] = Query(default=None, max_length=100),
-                  limit: int = Query(default=100, ge=1, le=500), offset: int = Query(default=0, ge=0),
+                  limit: int = Query(default=100, ge=1, le=500), offset: int = Query(default=0, ge=0, le=MAX_OFFSET),
                   db: Session = Depends(get_db), context: TenantContext = Depends(RequireViewer)) -> PostingList:
     _ws(context, workspace_id)
     _gate(db, context, "erp.postings.list")

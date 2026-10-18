@@ -5,7 +5,7 @@
 import { apiClient } from "@/services/api/client";
 import type {
   Contract, ContractEndReason, ContractInput, ContractSummary, PriceBook, PriceBookSummary, PriceEntryInput,
-  BillingDispute, PromoCode, PromoCodeInput, PromoQuote, RevenueMetrics, RevOpsOrganization, SweepResult,
+  BillingDispute, PromoCode, PromoCodeInput, PromoQuote, PromoRedemption, RevenueMetrics, RevOpsOrganization, SweepResult,
   TenantContract,
 } from "@/types/revops";
 
@@ -18,6 +18,7 @@ export const revopsKeys = {
   books: () => ["revops", "books"] as const,
   book: (id: string) => ["revops", "books", id] as const,
   promos: () => ["revops", "promos"] as const,
+  redemptions: (id: string) => ["revops", "promos", id, "redemptions"] as const,
   organizations: () => ["revops", "organizations"] as const,
   contracts: () => ["revops", "contracts"] as const,
   contract: (id: string) => ["revops", "contracts", id] as const,
@@ -51,6 +52,8 @@ export const publishPriceBook = async (id: string): Promise<PriceBook> =>
 
 export const listPromoCodes = async (): Promise<readonly PromoCode[]> =>
   (await apiClient.get<PromoCode[]>(`${ADMIN}/promo-codes`)).data;
+export const listPromoRedemptions = async (id: string): Promise<readonly PromoRedemption[]> =>
+  (await apiClient.get<PromoRedemption[]>(`${ADMIN}/promo-codes/${seg(id)}/redemptions`)).data;
 export const createPromoCode = async (input: PromoCodeInput): Promise<PromoCode> =>
   (await apiClient.post<PromoCode>(`${ADMIN}/promo-codes`, input)).data;
 export const setPromoActive = async (id: string, isActive: boolean): Promise<PromoCode> =>

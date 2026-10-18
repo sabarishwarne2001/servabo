@@ -74,6 +74,10 @@ import { ApiError, parseErrorEnvelope } from "@/services/api/errors";
 import { buildLoginRedirect } from "@/utils/security";
 
 export { ApiError } from "@/services/api/errors";
+
+/** Fired on `window` when a request is refused because its organization or workspace is archived or
+ * suspended: main.tsx reads the signed-in context again. */
+export const TENANT_UNAVAILABLE_EVENT = "servabo:tenant-unavailable";
 export type { ParsedApiError } from "@/services/api/errors";
 
 /**
@@ -621,6 +625,13 @@ apiClient.interceptors.response.use(
           message: parsed.message,
         });
         return reject();
+      }
+
+      // The organization or workspace stopped serving requests under an open page (archived or suspended
+      // from elsewhere). The signed-in context still says it is active; tell the app to read it again so
+      // the guards take the person to the picker, which says what happened (N-077).
+      if (parsed.code === API_ERROR_CODES.TENANT_SUSPENDED && typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent(TENANT_UNAVAILABLE_EVENT));
       }
 
       // An ordinary permission refusal — `PERMISSION_DENIED`,

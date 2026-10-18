@@ -25,6 +25,11 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 
 CURSOR_VERSION = 1
+
+#: The largest `offset` a list endpoint accepts. Postgres takes a bigint, but nobody pages two
+#: billion rows in: a larger value is refused as a bad request instead of reaching the database,
+#: where 10**30 was a "bigint out of range" server error.
+MAX_OFFSET = 2_147_483_647
 _DIGEST_BYTES = 8
 
 

@@ -19,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import crud
+from app.core.pagination import MAX_OFFSET
 from app.api import deps
 from app.models.assistant import Conversation
 from app.models.assistant_suite import SCOPE_WORKSPACE
@@ -105,7 +106,7 @@ def list_sessions(
     archived: bool = Query(default=False),
     q: Optional[str] = Query(default=None, max_length=100),
     limit: int = Query(default=50, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
+    offset: int = Query(default=0, ge=0, le=MAX_OFFSET),
     db: Session = Depends(deps.get_db),
     context: deps.TenantContext = Depends(deps.RequireWorkspaceViewer),
 ) -> list[ConversationSessionSummary]:

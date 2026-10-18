@@ -323,3 +323,83 @@ test.describe("TruthMesh — an empty workspace", () => {
     await expectHealthyPage(page);
   });
 });
+
+// Session B: a mesh bigger than the page shows, and a build that was lost.
+test.describe("TruthMesh — a big mesh and a lost build", () => {
+  test.describe.configure({ mode: "serial" });
+  test.setTimeout(120_000);
+  let big: Customer;
+
+  test.beforeAll(async () => {
+    test.setTimeout(120_000);
+    big = await newCustomer("mesh-big", "Big Mesh Ltd");
+    standIn("subscribe", big.orgSlug, "--plan", "enterprise", "--seats", "2");
+    // 450 documents are in the mesh and 130 conflicts are open: more than the page lists at a time.
+    standIn("truthmesh-fill", big.orgSlug, "--documents", "450", "--conflicts", "130");
+  });
+
+  test("the conflict list shows 100 at a time and can show the rest", async ({ page }) => {
+    await signInAs(page, big.email);
+    await page.goto(big.ws("truthmesh?view=conflicts"));
+    await settle(page);
+    const cards = page.getByTestId("mesh-conflict");
+    await expect(cards).toHaveCount(100);
+    await expect(page.getByText("130 conflicts")).toBeVisible();
+    await page.getByRole("button", { name: "Show more conflicts (100 of 130)" }).click();
+    await expect(cards).toHaveCount(130);
+    await expect(page.getByRole("button", { name: /Show more conflicts/ })).toHaveCount(0);
+    await expectHealthyPage(page);
+  });
+
+  test("the reason for a decision stops at 2,000 characters and says so", async ({ page }) => {
+    await signInAs(page, big.email);
+    await page.goto(big.ws("truthmesh?view=conflicts"));
+    await settle(page);
+    await page.getByTestId("mesh-conflict").first().getByRole("button", { expanded: false }).first().click();
+    await page.getByRole("button", { name: "Not a conflict" }).first().click();
+    const reason = page.getByLabel("Reason");
+    await reason.fill("x".repeat(2_100));
+    expect((await reason.inputValue()).length).toBe(2_000);
+    await expect(page.getByText("2000 / 2000")).toBeVisible();
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await expectHealthyPage(page);
+  });
+
+  test("the what-if picker says when it lists only part of the mesh, and a cleared box is not sent as 0", async ({ page }) => {
+    await signInAs(page, big.email);
+    await page.goto(big.ws("truthmesh?view=whatif"));
+    await settle(page);
+    await expect(page.getByTestId("whatif-truncated")).toContainText("400 of 450 documents");
+    const days = page.getByLabel("Days late");
+    const run = page.getByRole("button", { name: "Run simulation" });
+    await expect(run).toBeEnabled();
+    let sent = 0;
+    page.on("request", (request) => {
+      if (request.method() === "POST" && /\/truthmesh\/simulations$/.test(request.url())) sent += 1;
+    });
+    await days.fill("");
+    await expect(run).toBeDisabled();
+    await expect(page.getByText("Enter a whole number of days from 1 to 730.")).toBeVisible();
+    await days.fill("0");
+    await expect(run).toBeDisabled();
+    await days.fill("21");
+    await expect(run).toBeEnabled();
+    expect(sent, "a simulation was sent with an empty or zero box").toBe(0);
+    await expectHealthyPage(page);
+  });
+
+  test("a build that was lost can be started again", async ({ page }) => {
+    standIn("truthmesh-stick", big.orgSlug);
+    await signInAs(page, big.email);
+    await page.goto(big.ws("truthmesh"));
+    await settle(page);
+    await expect(page.getByTestId("mesh-state")).toContainText("Building");
+    await expect(page.getByText(/may have stopped/)).toBeVisible();
+    const rebuild = page.getByRole("button", { name: "Rebuild" });
+    await expect(rebuild).toBeEnabled();
+    const accepted = page.waitForResponse((r) => /\/truthmesh\/rebuild$/.test(r.url()) && r.request().method() === "POST");
+    await rebuild.click();
+    expect((await accepted).status()).toBe(202);
+    await expectHealthyPage(page);
+  });
+});

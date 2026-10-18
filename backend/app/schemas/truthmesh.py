@@ -15,6 +15,8 @@ class MeshStateOut(BaseModel):
     build_ms: Optional[int] = None
     engine_version: Optional[str] = None
     error: Optional[str] = None
+    #: When the state last changed: how long a BUILDING mesh has been building.
+    since: Optional[datetime] = None
 
 
 class MeshNodeOut(BaseModel):

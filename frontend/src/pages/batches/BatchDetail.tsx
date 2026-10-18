@@ -343,7 +343,12 @@ const BatchDetail: React.FC = () => {
               {archived ? <ArchiveRestore className="h-4 w-4" aria-hidden /> : <Archive className="h-4 w-4" aria-hidden />}
               {archived ? "Restore" : "Archive"}
             </button>
-            <button type="button" className="fp-btn fp-btn-ghost h-9 text-[13px] text-destructive" onClick={() => setConfirmDelete(true)}>
+            <button
+              type="button"
+              className="fp-btn fp-btn-ghost h-9 text-[13px] text-destructive"
+              disabled={busy}
+              onClick={() => setConfirmDelete(true)}
+            >
               <Trash2 className="h-4 w-4" aria-hidden /> Delete
             </button>
           </div>

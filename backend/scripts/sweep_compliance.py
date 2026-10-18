@@ -178,6 +178,22 @@ def _purge_work_items(
                     text("UPDATE uploaded_files SET deleted_at = now() WHERE id = ANY(:ids)"),
                     {"ids": [row.id for row in files]},
                 )
+            # TruthMesh: the purged documents leave the mesh and their conflicts are resolved in the
+            # same transaction (conflicts name documents by id; no foreign key does it).
+            from app.services.truthmesh import service as truthmesh_service
+
+            by_workspace: dict = {}
+            for item_id, workspace_id in db.execute(
+                text("SELECT id, workspace_id FROM work_items WHERE id = ANY(:ids)"), {"ids": ids}
+            ).fetchall():
+                by_workspace.setdefault(workspace_id, []).append(item_id)
+            for workspace_id, workspace_ids in by_workspace.items():
+                truthmesh_service.forget_documents(db, workspace_id=workspace_id, work_item_ids=workspace_ids)
+            # Helm's Promise ledger: these documents, their obligations and the documents of their
+            # procurement cases are re-projected at the next update (a raw delete is not seen by the ORM).
+            from app.models import helm_dirty
+
+            helm_dirty.mark_deleted(db.connection(), ids, "retention purge")
             db.execute(
                 text("DELETE FROM document_chunks WHERE work_item_id = ANY(:ids)"),
                 {"ids": ids},
@@ -214,7 +230,8 @@ def _purge_conversations(
                 SELECT count(*)
                 FROM conversations c
                 JOIN workspaces w ON w.id = c.workspace_id
-                WHERE w.organization_id = :org AND c.created_at < :cutoff
+                WHERE w.organization_id = :org
+                  AND COALESCE(c.last_message_at, c.created_at) < :cutoff
                 """
             ),
             {"org": organization_id, "cutoff": cutoff},
@@ -235,7 +252,8 @@ def _purge_conversations(
                         SELECT c.id
                         FROM conversations c
                         JOIN workspaces w ON w.id = c.workspace_id
-                        WHERE w.organization_id = :org AND c.created_at < :cutoff
+                        WHERE w.organization_id = :org
+                  AND COALESCE(c.last_message_at, c.created_at) < :cutoff
                         LIMIT :batch
                         """
                     ),

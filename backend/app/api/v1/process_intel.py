@@ -41,6 +41,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app.core.pagination import MAX_OFFSET
 from app.api import deps
 from app.core.exceptions import ServaboError
 from app.schemas.process_intel import (AgentPolicyIn, AgentPolicyOut, ApproveOut, ConformanceOut, CostOut, DiscoveryOut,
@@ -330,7 +331,7 @@ def set_policy(body: AgentPolicyIn, db: Session = Depends(deps.get_db),
 @router.get("/agent/proposals", response_model=ProposalList, summary="The agent's proposals")
 def list_proposals(status_filter: Optional[str] = Query(None, alias="status"),
                    subject_id: Optional[uuid.UUID] = Query(None), subject_kind: Optional[str] = Query(None),
-                   limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0),
+                   limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0, le=MAX_OFFSET),
                    db: Session = Depends(deps.get_db),
                    context: Any = Depends(deps.RequireWorkspaceContributor)) -> ProposalList:
     _gate(db, context, "process.agent.proposals.list")

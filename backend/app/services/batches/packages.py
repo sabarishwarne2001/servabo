@@ -34,6 +34,7 @@ import tempfile
 import uuid
 import zipfile
 import zlib
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, BinaryIO, Iterable, Optional, Sequence
@@ -326,8 +327,13 @@ def build(db: Session, *, package: ExportPackage) -> ExportPackage:
             select(UploadedFile).where(UploadedFile.id.in_([i.uploaded_file_id for i in items if i.uploaded_file_id]))
         ).scalars()
     }
+    # An erased document keeps its row but its upload is marked deleted (GDPR erasure). Its original
+    # is not put in a package: the stored object may already be gone (reading it would fail the whole
+    # build) or, if its deletion failed, still be there although erasure promised it was not.
+    erased = {i.id for i in items if i.uploaded_file_id in files and files[i.uploaded_file_id].deleted_at is not None}
     if package.include_originals:
-        total = sum(int(files[i.uploaded_file_id].file_size or 0) for i in items if i.uploaded_file_id in files)
+        total = sum(int(files[i.uploaded_file_id].file_size or 0) for i in items
+                    if i.uploaded_file_id in files and i.id not in erased)
         if total > v.MAX_PACKAGE_BYTES:
             return fail(
                 package, "TOO_LARGE",
@@ -349,7 +355,7 @@ def build(db: Session, *, package: ExportPackage) -> ExportPackage:
                 prefix = f"{index:04d}-{safe_name(item.original_filename)}"
                 stem = prefix.rsplit(".", 1)[0]
                 file_path = None
-                if package.include_originals and item.stored_filename:
+                if package.include_originals and item.stored_filename and item.id not in erased:
                     uploaded = files.get(item.uploaded_file_id) if item.uploaded_file_id else None
                     entry = writer.add_stream(f"files/{prefix}", driver.iter_chunks(item.stored_filename, chunk_size=_CHUNK))
                     file_path = entry.path
@@ -431,25 +437,31 @@ def fail(package: ExportPackage, code: str, detail: str) -> ExportPackage:
     return package
 
 
-def expire(db: Session, *, now: Optional[datetime] = None) -> int:
-    """Delete the archives of packages past their expiry and mark them EXPIRED."""
+def expire_one(db: Session, *, package: ExportPackage) -> bool:
+    """Delete one package's archive and mark it EXPIRED; False when its storage could not be deleted
+    (the hourly sweep tries again). The digests stay: they still prove what was issued."""
     from app.core.storage import StorageError, get_storage_driver
 
+    try:
+        if package.storage_key:
+            get_storage_driver().delete(package.storage_key)
+    except StorageError:
+        return False
+    package.status = PACKAGE_EXPIRED
+    package.storage_key = None
+    db.flush()
+    return True
+
+
+def expire(db: Session, *, now: Optional[datetime] = None) -> int:
+    """Delete the archives of packages past their expiry and mark them EXPIRED (the hourly sweep)."""
     moment = now or datetime.now(timezone.utc)
-    driver = get_storage_driver()
     count = 0
     for package in db.execute(
         select(ExportPackage).where(ExportPackage.status == PACKAGE_READY, ExportPackage.expires_at <= moment)
     ).scalars():
-        try:
-            if package.storage_key:
-                driver.delete(package.storage_key)
-        except StorageError:
-            continue
-        package.status = PACKAGE_EXPIRED
-        package.storage_key = None  # the digests stay: they still prove what was issued
-        count += 1
-    db.flush()
+        if expire_one(db, package=package):
+            count += 1
     return count
 
 
@@ -479,6 +491,13 @@ def _parse_sums(text: str) -> dict[str, str]:
 _UNREADABLE_ENTRY: tuple[type[BaseException], ...] = (
     zipfile.BadZipFile, zlib.error, EOFError, OSError, NotImplementedError, RuntimeError,
 )
+
+
+def _added_by_macos(path: str) -> bool:
+    """`__MACOSX/…` (resource forks) and `.DS_Store` (Finder view settings) appear when a folder is
+    re-zipped on a Mac; they carry no package content (N-076)."""
+    parts = path.split("/")
+    return parts[0] == "__MACOSX" or parts[-1] == ".DS_Store"
 
 
 def _manifest_shape_ok(manifest: Any) -> bool:
@@ -523,6 +542,7 @@ def verify(db: Session, *, workspace_id: uuid.UUID, handle: BinaryIO) -> dict[st
         if len(infos) > v.VERIFY_MAX_ENTRIES or sum(i.file_size for i in infos) > v.VERIFY_MAX_UNCOMPRESSED_BYTES:
             return {**invalid, "message": "This archive is too large to verify here."}
         names = {i.filename for i in infos}
+        repeated = sorted(n for n, count in Counter(i.filename for i in infos).items() if count > 1)
         manifest_names = sorted(n for n in names if n == "manifest.json" or n.endswith("/manifest.json"))
         if not manifest_names:
             return {**invalid, "message": "This is not a Servabo export package: it has no manifest.json."}
@@ -576,7 +596,15 @@ def verify(db: Session, *, workspace_id: uuid.UUID, handle: BinaryIO) -> dict[st
             actual = digest.hexdigest()
             checks.append(FileCheck(path, expected, actual, "OK" if actual == expected else "MODIFIED"))
         for path in sorted(set(relative) - set(sums)):
-            checks.append(FileCheck(path, None, None, "UNEXPECTED"))
+            if not _added_by_macos(path):
+                checks.append(FileCheck(path, None, None, "UNEXPECTED"))
+        # N-076: nothing else may ride along. A file outside the package folder, and a name that
+        # appears twice (zipfile reads the last one; another tool may extract the first), are
+        # changes, except the two things macOS adds when someone re-zips the folder.
+        for name in sorted(n for n in names if not n.startswith(root) and not _added_by_macos(n)):
+            checks.append(FileCheck(name, None, None, "UNEXPECTED"))
+        for name in repeated:
+            checks.append(FileCheck(name[len(root):] if name.startswith(root) else name, None, None, "UNEXPECTED"))
         listed = {f.get("path"): f.get("sha256") for f in manifest.get("files") or [] if isinstance(f, dict)}
         for path, expected in listed.items():
             if sums.get(path) != expected:
@@ -627,6 +655,7 @@ __all__ = [
     "PackageError",
     "build",
     "expire",
+    "expire_one",
     "fail",
     "folder_name",
     "request_package",

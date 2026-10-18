@@ -8,6 +8,7 @@ import { FileArchive, Loader2, ShieldAlert, ShieldCheck, ShieldQuestion, ShieldX
 
 import { verifyPackage } from "@/services/api/batches";
 import { errorMessage } from "@/services/api/errors";
+import { problemRowKeys } from "@/components/batches/problemKeys";
 import { formatBytesShort, Modal, Sha } from "@/components/batches/shared";
 import type { Verdict, VerifyResult } from "@/types/batches";
 
@@ -28,6 +29,8 @@ const VERDICT: Readonly<Record<Verdict, { label: string; tone: string; Icon: Rea
 
 const Outcome: React.FC<{ readonly result: VerifyResult }> = ({ result }) => {
   const { label, tone, Icon } = VERDICT[result.verdict];
+  // One file can be listed twice with the same status (changed in the zip and in the manifest).
+  const rowKeys = problemRowKeys(result.problems);
   return (
     <section className="space-y-3" aria-live="polite" data-testid="verify-result" data-verdict={result.verdict}>
       <div className={`flex items-start gap-3 rounded-xl border p-3 ${tone}`}>
@@ -82,8 +85,8 @@ const Outcome: React.FC<{ readonly result: VerifyResult }> = ({ result }) => {
               </tr>
             </thead>
             <tbody>
-              {result.problems.map((problem) => (
-                <tr key={`${problem.path}:${problem.status}`} className="border-t border-border/60">
+              {result.problems.map((problem, index) => (
+                <tr key={rowKeys[index]} className="border-t border-border/60">
                   <td className="break-all px-2 py-1.5 font-mono">{problem.path}</td>
                   <td className="px-2 py-1.5">
                     {problem.status === "MODIFIED"

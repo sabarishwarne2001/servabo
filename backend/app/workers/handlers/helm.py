@@ -72,6 +72,23 @@ def _may_plan(db: Any, book: Any) -> bool:
     return book.kind == v.BOOK_SAMPLE or gate.helm_held(db, book.organization_id)
 
 
+def _report_ledger_drift(db: Any, workspace: Any, verified: Any) -> None:
+    """The nightly check found stored promises that a full recomputation does not produce: an incremental
+    update missed something. The rebuild that followed repaired them; the operator is told, because it
+    means a change reached the ledger by a path the incremental update does not follow."""
+    from app.services import operator_alert_service
+
+    operator_alert_service.record(
+        db, kind="HELM_LEDGER_DRIFT", dedupe_key=f"helm_ledger_drift:{workspace.id}",
+        subject=f"Helm's Promise ledger differed from a full recomputation in workspace {workspace.id}",
+        body=(f"The nightly check recomputed the workspace's ledger and {verified.mismatched} of "
+              f"{verified.checked} promises were not what the incremental updates had stored. The ledger was "
+              f"rebuilt, so what customers see is correct now. Example promise keys: "
+              f"{', '.join(verified.examples) or 'none'}. Something changed the documents without telling the "
+              f"ledger (a bulk database write, or a dependency the incremental update does not follow); "
+              f"find which, so the next change is not missed."))
+
+
 def handle_ledger_build(payload: dict[str, Any]) -> dict[str, Any]:
     from app.db.session import SessionLocal
     from app.services.helm import ledger_store, plan_store, value
@@ -94,7 +111,11 @@ def handle_ledger_build(payload: dict[str, Any]) -> dict[str, Any]:
                 if not books:
                     continue
                 try:
-                    ledger_store.rebuild_workspace(db, workspace_id=workspace_id)
+                    # The nightly rebuild is also the check on the incremental updates (Session B): the
+                    # stored ledger against a full recomputation, repaired and reported when they differ.
+                    verified = ledger_store.verify_workspace(db, workspace_id=workspace_id)
+                    if verified.mismatched:
+                        _report_ledger_drift(db, workspace, verified)
                     for book in books:
                         plan_store.enqueue(db, book, triggered_by=v.TRIGGER_SCHEDULE)
                     db.commit()
@@ -112,7 +133,7 @@ def handle_ledger_build(payload: dict[str, Any]) -> dict[str, Any]:
         books = [b for b in _books_reading(db, workspace_id) if _may_plan(db, b)]
         if not books:
             return {"skipped": "no Helm book reads this workspace on a plan that includes Helm"}
-        result = ledger_store.rebuild_workspace(db, workspace_id=workspace_id)
+        result = ledger_store.refresh_workspace(db, workspace_id=workspace_id)
         for book in books:
             value.sweep(db, book)
             if result.changed:

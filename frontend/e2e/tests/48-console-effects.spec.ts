@@ -202,7 +202,14 @@ test.describe("Enterprise BYOK and models", () => {
     await expect(card()).toContainText(/rejected this key|could not|unreachable|failed|invalid|error/i, { timeout: 30_000 });
     await expect(card()).not.toContainText(/Connected in \d+ ms/);
 
+    // Retiring a key asks first (Session B): Cancel keeps it, Retire key removes it.
     await card().getByRole("button", { name: "Retire" }).click();
+    const confirm = page.getByRole("alertdialog", { name: /Retire/ });
+    await expect(confirm).toBeVisible();
+    await confirm.getByRole("button", { name: "Cancel" }).click();
+    await expect(card()).toContainText("••••WXYZ");
+    await card().getByRole("button", { name: "Retire" }).click();
+    await page.getByRole("alertdialog", { name: /Retire/ }).getByRole("button", { name: "Retire key" }).click();
     await expect(card()).toContainText("Key retired.", { timeout: 15_000 });
     await expect(card()).not.toContainText("••••WXYZ");
     await expect(card().getByRole("button", { name: "Add key", exact: true })).toBeVisible();

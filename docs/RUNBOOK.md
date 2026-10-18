@@ -25,20 +25,21 @@ and every command that starts containers is marked *(not run here)*.
 | Disk | about 15 GB free | the Python packages alone are about 6.5 GB (torch with CUDA, paddle) |
 
 Ports used: 5432 (Postgres), 6379 (Redis), 9000/9001 (MinIO), 8000 (API),
-5173 (web app).
+5173 (web app). The dev compose file publishes Postgres, Redis and MinIO on 127.0.0.1 only, so
+they are not reachable from other computers on your network.
 
 ---
 
 ## 2. Quick start: one command
 
 ```bash
-git clone https://github.com/sabarishwarne2001/flowpilot-ai.git servabo
+git clone https://github.com/sabarishwarne2001/servabo.git servabo
 cd servabo
 ./start_dev.sh            # Linux / macOS
 ```
 
 ```powershell
-git clone https://github.com/sabarishwarne2001/flowpilot-ai.git servabo
+git clone https://github.com/sabarishwarne2001/servabo.git servabo
 cd servabo
 .\start_dev.ps1           # Windows PowerShell   (not run here: no Windows in the sandbox)
 ```
@@ -698,6 +699,10 @@ your mail relay when:
 - the API answers `OPERATOR_ALERT_5XX_THRESHOLD` (default 20) requests with a server error within five
   minutes (look for `Traceback` in `$COMPOSE logs --tail 200 web`);
 - a customer has two live subscriptions (section 9.8: they are being charged twice).
+- the nightly check of Helm's Promise ledger finds stored promises that a full recomputation does not
+  produce (alert "Helm's Promise ledger differed from a full recomputation"; it was repaired the same
+  night, so customers saw the right figures; the alert lists example promise keys, and a developer needs
+  to find which change reached the ledger without being marked, `docs/helm/ARCHITECTURE.md` section 4.5).
 
 The `ops.alerts` sweep runs every five minutes inside the stack (`worker-scheduler` and `worker-light`);
 the same alert repeats at most once an hour (`OPERATOR_ALERT_REPEAT_MINUTES`) while it keeps happening,
@@ -724,6 +729,7 @@ prints nothing and `0` when the site is up.
 | A cron job seems not to run | `/srv/servabo/logs`, `grep CRON /var/log/syslog`, and your Healthchecks page |
 | People in one office are told "Rate limit exceeded" when signing in | `RATE_LIMIT_LOGIN_IP_PER_5MIN` in `.env.production` (default 20 per address per 5 minutes; decided N-018), then `$COMPOSE up -d web` |
 | A Business/Enterprise tenant is refused BYOK ("included on higher plans") | the plan seed was not re-run after the Phase 5 release (section 9.3) |
+| An alert email says Helm's Promise ledger differed from a full recomputation | nothing to do tonight (it was repaired); send the example promise keys to a developer, who finds the unmarked write (`docs/helm/ARCHITECTURE.md` section 4.5) |
 | An alert email says "could not be applied" for a payment event | open Platform admin, Background jobs; compare the organization's plan and seats with the payment dashboard; then section 9.8 if money is involved |
 
 ### 9.8 Refunds, and a customer charged twice

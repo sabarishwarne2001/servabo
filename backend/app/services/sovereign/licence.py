@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping, Optional
 
-from app.core import legacy_names, licence_keys, signing
+from app.core import licence_keys, signing
 from app.core.exceptions import ServaboError
 
 logger = logging.getLogger("app.services.sovereign.licence")
@@ -127,9 +127,9 @@ def _settings() -> Any:
     except Exception:  # noqa: BLE001
         from types import SimpleNamespace
 
-        return SimpleNamespace(SERVABO_EDITION=legacy_names.env("EDITION"), ENVIRONMENT=os.environ.get("ENVIRONMENT"),
+        return SimpleNamespace(SERVABO_EDITION=os.environ.get("SERVABO_EDITION"), ENVIRONMENT=os.environ.get("ENVIRONMENT"),
                                LICENCE_FILE=os.environ.get("LICENCE_FILE"),
-                               SERVABO_DEPLOYMENT_ID=legacy_names.env("DEPLOYMENT_ID"))
+                               SERVABO_DEPLOYMENT_ID=os.environ.get("SERVABO_DEPLOYMENT_ID"))
 
 
 def edition() -> str:
@@ -218,7 +218,7 @@ def verify(doc: LicenceDocument, *, at: Optional[datetime] = None,
         return LicenceStatus(STATUS_WRONG_EDITION, reason=f"the licence is for edition {p.get('edition')!r}", **base)
     bound = p.get("deployment_id")
     if bound:
-        here = str(legacy_names.env("DEPLOYMENT_ID") or getattr(_settings(), "SERVABO_DEPLOYMENT_ID", "")
+        here = str(os.environ.get("SERVABO_DEPLOYMENT_ID") or getattr(_settings(), "SERVABO_DEPLOYMENT_ID", "")
                    or "")
         if here != str(bound):
             return LicenceStatus(STATUS_WRONG_DEPLOYMENT, reason="the licence is bound to another deployment", **base)

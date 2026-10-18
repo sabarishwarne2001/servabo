@@ -20,7 +20,7 @@ import {
 import { ApiError, errorMessage } from "@/services/api/errors";
 import {
   activateContract, createContract, createPriceBook, createPromoCode, deletePriceEntry, endContract, getContract, getPriceBook,
-  getRevenueMetrics, issueContractInvoices, liftDispute, listContracts, listDisputes, listPriceBooks, listPromoCodes,
+  getRevenueMetrics, issueContractInvoices, liftDispute, listContracts, listDisputes, listPriceBooks, listPromoCodes, listPromoRedemptions,
   listRevOpsOrganizations,
   payInvoice,
   publishPriceBook, revopsKeys, runRevOpsSweep, setPriceEntry, setPromoActive, voidInvoice,
@@ -259,8 +259,41 @@ const BooksTab: React.FC = () => {
   );
 };
 
+/** Each use of one promo code (the list shows only how many). */
+const PromoRedemptions: React.FC<{ readonly promoId: string; readonly colSpan: number }> = ({ promoId, colSpan }) => {
+  const uses = useQuery({ queryKey: revopsKeys.redemptions(promoId), queryFn: () => listPromoRedemptions(promoId) });
+  return (
+    <tr>
+      <td colSpan={colSpan} className="pb-3" data-testid="promo-redemptions">
+        {uses.isError ? <LoadFailed what="Redemptions" onRetry={() => void uses.refetch()} /> : uses.isLoading ? (
+          <p className={HINT}>Loading…</p>
+        ) : (uses.data?.length ?? 0) === 0 ? (
+          <p className={HINT}>Not redeemed yet.</p>
+        ) : (
+          <table className="w-full text-xs">
+            <thead><tr className={TABLE_HEAD}><th className="py-1 pr-3">Organization</th><th className="pr-3">State</th><th className="pr-3">Plan</th><th className="pr-3 text-right">List price</th><th className="pr-3 text-right">Discount</th><th className="pr-3">Reserved</th></tr></thead>
+            <tbody>
+              {uses.data!.map((use) => (
+                <tr key={use.id} className={TABLE_ROW}>
+                  <td className="py-1 pr-3">{use.organization_name}{use.contract_number ? <span className={HINT}> · contract {use.contract_number}</span> : null}</td>
+                  <td className="pr-3">{use.status.toLowerCase()}</td>
+                  <td className="pr-3">{use.tier_key} · {use.billing_interval.toLowerCase()}</td>
+                  <td className="pr-3 text-right tabular-nums">{money(use.list_amount_micros, use.currency)}</td>
+                  <td className="pr-3 text-right tabular-nums">{money(use.discount_micros, use.currency)}</td>
+                  <td className="pr-3">{formatTimestamp(use.reserved_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </td>
+    </tr>
+  );
+};
+
 const PromosTab: React.FC = () => {
   const queryClient = useQueryClient();
+  const [openPromo, setOpenPromo] = useState<string | null>(null);
   const promos = useQuery({ queryKey: revopsKeys.promos(), queryFn: listPromoCodes });
   const [code, setCode] = useState("");
   const [kind, setKind] = useState<"percent" | "amount">("percent");
@@ -293,11 +326,16 @@ const PromosTab: React.FC = () => {
           <thead><tr className={TABLE_HEAD}><th className="py-2 pr-3">Code</th><th className="pr-3">Discount</th><th className="pr-3">Duration</th><th className="pr-3 text-right">Redeemed</th><th className="pr-3">Online</th><th className="pr-3">Active</th></tr></thead>
           <tbody>
             {(promos.data ?? []).map((p) => (
-              <tr key={p.id} className={TABLE_ROW}>
+              <React.Fragment key={p.id}>
+              <tr className={TABLE_ROW}>
                 <td className="py-2 pr-3 font-mono">{p.code}</td>
                 <td className="pr-3">{p.percent_off !== null ? `${p.percent_off}%` : money(p.amount_off_micros, p.currency)}</td>
                 <td className="pr-3">{p.duration === "REPEATING" ? `${p.duration_in_months} months` : p.duration.toLowerCase()}</td>
-                <td className="pr-3 text-right tabular-nums">{COUNT.format(p.times_redeemed)}{p.max_redemptions ? ` / ${COUNT.format(p.max_redemptions)}` : ""}</td>
+                <td className="pr-3 text-right tabular-nums">
+                  {COUNT.format(p.times_redeemed)}{p.max_redemptions ? ` / ${COUNT.format(p.max_redemptions)}` : ""}
+                  <button type="button" className={`${BUTTON_SECONDARY} ml-2`} aria-expanded={openPromo === p.id}
+                          onClick={() => setOpenPromo(openPromo === p.id ? null : p.id)}>Redemptions</button>
+                </td>
                 <td className="pr-3">{p.gateway_coupon_id ? "yes" : "contracts only"}</td>
                 <td className="pr-3">
                   <button type="button" className={p.is_active ? BUTTON_DESTRUCTIVE : BUTTON_SECONDARY} disabled={toggle.isPending} onClick={() => toggle.mutate({ id: p.id, active: !p.is_active })}>
@@ -305,6 +343,8 @@ const PromosTab: React.FC = () => {
                   </button>
                 </td>
               </tr>
+              {openPromo === p.id ? <PromoRedemptions promoId={p.id} colSpan={6} /> : null}
+              </React.Fragment>
             ))}
             {promos.isError ? <tr><td colSpan={6} className="py-3"><LoadFailed what="Promo codes" onRetry={() => void promos.refetch()} /></td></tr> : promos.isLoading ? null : (promos.data?.length ?? 0) === 0 ? <tr><td colSpan={6} className={`py-3 ${HINT}`}>No promo codes.</td></tr> : null}
           </tbody>

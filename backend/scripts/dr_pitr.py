@@ -66,7 +66,6 @@ from typing import Any, Optional
 BACKEND = Path(__file__).resolve().parents[1]
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
-from app.core import legacy_names  # noqa: E402  (one release of SERVABO_* names)
 
 UTC = dt.timezone.utc
 TARGET_RPO_SECONDS = 300
@@ -477,14 +476,14 @@ def record(report: dict[str, Any]) -> str:
 
 
 def _dirs() -> tuple[Path, Path]:
-    archive = Path(legacy_names.env("WAL_ARCHIVE_DIR", str(legacy_names.local_directory(BACKEND, ".servabo_wal_archive"))))
-    backups = Path(legacy_names.env("BASEBACKUP_DIR", str(legacy_names.local_directory(BACKEND, ".servabo_basebackups"))))
+    archive = Path(os.environ.get("SERVABO_WAL_ARCHIVE_DIR", str(BACKEND / ".servabo_wal_archive")))
+    backups = Path(os.environ.get("SERVABO_BASEBACKUP_DIR", str(BACKEND / ".servabo_basebackups")))
     return archive, backups
 
 
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--run-as", default=legacy_names.env("PG_RUN_AS"))
+    parser.add_argument("--run-as", default=os.environ.get("SERVABO_PG_RUN_AS"))
     sub = parser.add_subparsers(dest="command", required=True)
     a = sub.add_parser("archive-wal")
     a.add_argument("path")
@@ -495,7 +494,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     r.add_argument("path")
     r.add_argument("--archive")
     b = sub.add_parser("base-backup")
-    b.add_argument("--keep", type=int, default=int(legacy_names.env("BASEBACKUP_KEEP", "7")))
+    b.add_argument("--keep", type=int, default=int(os.environ.get("SERVABO_BASEBACKUP_KEEP", "7")))
     sub.add_parser("heartbeat")
     rs = sub.add_parser("restore")
     rs.add_argument("--into", required=True)

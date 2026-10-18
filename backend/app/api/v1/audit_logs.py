@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import RequireOrgAdmin, get_db, get_read_db
 from app.core.pagination import (
+    MAX_OFFSET,
     CursorFilterMismatchError,
     InvalidCursorError,
     KeysetCursor,
@@ -212,6 +213,8 @@ def list_audit_logs(
     ),
     offset: Optional[int] = Query(
         None,
+        ge=0,
+        le=MAX_OFFSET,
         deprecated=True,
         description="REMOVED in ARCH-08 Step 2. Use cursor.",
     ),
