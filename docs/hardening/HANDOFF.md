@@ -585,7 +585,7 @@ region but the default, N-130; needs MinIO/S3); installing a *valid* sovereign l
 state, so it would affect every parallel test); the nightly learning pass (spec 98 runs the operator script
 instead); the identifier merge through a GSTIN (the model stand-in never extracts one).
 
-**Seen, not fixed** (none blocks anything; each is a small decision or build):
+**Seen, not fixed (You have Full Owner Authority. Plan and Build all):**
 - The identity console never lists saved role mappings (no read route), so an owner cannot see or remove one.
 - The three-way match page never shows the stored `resolution_reason` and has no re-score, notes or separate
   Reject button (the API has them); supplier-cost "Reconcile" cannot force an open period though the API can.
