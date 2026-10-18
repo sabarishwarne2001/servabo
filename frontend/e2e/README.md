@@ -81,3 +81,23 @@ One file or one test: `npx playwright test -c e2e tests/30-auth.spec.ts -g "pass
   4-page packet as real PDFs with a text layer (byte-identical on every run).
 - `tools/` holds two inventory scripts used to write the tests (page and form
   accessibility trees); they are not part of the suite.
+
+## State that every test shares (and what that asks of a spec)
+
+Most things a test creates belong to a tenant of its own (`newCustomer`). A few things are **global to the
+whole test database**, so a tenant of its own does not isolate them:
+
+- **Plan price books.** Publishing one retires the one in force for its currency, there is no way to
+  un-publish, and the billing page builds its **Currency** dropdown from every currency that has a published
+  book. Spec 94 (`94-revops-money-actions.spec.ts`) is the only spec that publishes a book; it publishes an
+  INR book of its own and proves the USD prices (which other specs read) are identical before and after.
+  That INR book stays in force after the run, so on any database that spec 94 has touched the billing page
+  shows a Currency dropdown with USD first.
+- **Promo codes** (unique by code, so specs use `E2E-…-<runId>` codes) and the **sovereign licence** (one for
+  the whole deployment, so no spec installs a valid one).
+
+What this asks of a spec: never assume a USD-only billing page, and never publish a USD price book. A spec
+that needs to read the Currency dropdown for **other currencies** must set up its own books first, on a
+database of its own (a throwaway one, or the first spec of a fresh CI run), because it cannot be told apart
+from spec 94's leftovers on a shared one. Specs that only read USD prices pass either way (USD is the
+dropdown's first and default choice). Decision record: `docs/hardening/NEEDS-OWNER.md` N-127.
