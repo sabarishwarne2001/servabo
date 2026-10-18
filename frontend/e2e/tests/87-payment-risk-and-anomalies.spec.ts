@@ -241,7 +241,7 @@ test.describe("Payment risk and anomalies — real findings, decided in the brow
     await expectHealthyPage(page);
   });
 
-  test("a viewer cannot decide an anomaly: the server refuses, the page says so, the finding stays open", async ({ page, problems }) => {
+  test("a viewer is not offered an anomaly decision, and the server refuses one; the finding stays open", async ({ page }) => {
     const target = await duplicateOf(NUMBER.a);
     const base = `/workspaces/${customer.wsId}/anomalies/${target.id}`;
     const confirm = await api(viewer.session, "POST", `${base}/confirm`, {});
@@ -249,17 +249,15 @@ test.describe("Payment risk and anomalies — real findings, decided in the brow
     const dismiss = await api(viewer.session, "POST", `${base}/dismiss`, { reason: "A viewer should not be able to say this" });
     expect(dismiss.status, dismiss.text.slice(0, 200)).toBe(403);
 
-    // In the browser the same refusal reaches the person instead of failing silently.
+    // In the browser the evidence is readable but there is nothing to press (as on the payment panel).
     await signInAs(page, viewer.email);
     await openRadar(page);
     await expandFinding(page, target);
     const row = findingRow(page, target);
-    await expect(row.getByRole("textbox")).toBeVisible();
-    problems.allowHttp(/\/anomalies\/[0-9a-f-]+\/confirm/, [403], "a viewer's decision is refused by the server");
-    const refused = page.waitForResponse((r) => r.url().includes(`/anomalies/${target.id}/confirm`) && r.request().method() === "POST");
-    await row.getByRole("button", { name: "This is a real finding" }).click();
-    expect((await refused).status()).toBe(403);
-    await expect(row.getByText(/permission|not allowed|forbidden|access/i)).toBeVisible();
+    await expect(row.getByRole("button", { name: "This is a real finding" })).toHaveCount(0);
+    await expect(row.getByRole("button", { name: "Not an anomaly" })).toHaveCount(0);
+    await expect(row.getByRole("textbox")).toHaveCount(0);
+    await expect(row.getByText("Only contributors and administrators can decide a finding.")).toBeVisible();
     expect((await api<Finding>(customer.session, "GET", base)).body.status).toBe("OPEN");
   });
 
