@@ -14,9 +14,9 @@ Local stack: Postgres 16 + pgvector 0.8.0 (built from source) on :5433, Redis, A
 
 - [x] 0. Start-up: docs read; stack up; specs 76 + 77 re-run green (10 passed); this checklist; draft PR.
 - [ ] C1. Browser specs, one file per feature (numbered after 85), each run `--repeat-each=3` before commit
-  - [ ] 1. ERP posting: "Post N", Retry, "Do not post"; target "Test connection", "Set credential"; mapping "Save as new version" / "Restore default"
+  - [x] 1. ERP posting (spec 86, 7 tests, 3x green; no app bug found): "Post N", Retry, "Do not post"; target "Test connection", "Set credential"; mapping "Save as new version" / "Restore default"
   - [ ] 2. Payment risk and anomalies: "Confirm risk"; "Not a risk…" + reason, "Dismiss"; "This is a real finding"; "Not an anomaly"
-  - [ ] 3. Legal holds: "Place hold" + reason; deleting a held document refused; "Release"
+  - [x] 3. Legal holds (spec 88; F-500, F-501 fixed test-first): "Place hold" + reason; deleting a held document refused; "Release"
   - [ ] 4. Sessions and SSO: "End session"; "Sign out everywhere" (fresh user); "Require single sign-on" + bypass; role mapping "Save mapping"
   - [ ] 5. Entity 360: "Rename", "Erase record", "Split into a new record", "Undo merge"
   - [ ] 6. Seats and RevOps money: "One seat fewer" → "Confirm"; "Remove N unused seats"; RevOps "Publish", "Create code", "Void", "Issue due invoices"
@@ -24,12 +24,12 @@ Local stack: Postgres 16 + pgvector 0.8.0 (built from source) on :5433, Redis, A
   - [ ] 8. Tables: "Accept figures", "Reject table", correct a cell
   - [ ] Long tail (Task 4's order, grouped by area): three-way-match "Flag dispute"; supplier-cost "Record invoice" / "Reconcile"; partner manifest → marketplace install; document bulk "Reprocess" / "Retry processing"; workspace archive and logo; corroboration decisions; packet "Approve split"; case detail actions; obligation "Waive" / feeds "Revoke"; identity OIDC and SCIM rotate/revoke; credential rotation (API keys, webhooks, BYOK); data residency "Save region"; egress rule removal; process agent "Save policy" and proposal "Reject" / "Undo"; leave organization / decline invitation; recovery codes and "Stop requiring two-factor"; automation rule toggle/test/edit/duplicate/delete; clause assertion "It passes" / "Wrong paragraph" / "Test on a document"; extraction memory "Reset" / "Retire"; AI / email / document settings "Test connection" / "Send test"; analytics "Sync now"; sovereign licence "Verify and install"; resumable upload tray
 - [ ] C2. The Dodo check kit
-  - [ ] 1. `backend/scripts/dodo_probe.py` (GET only, shapes not values, refuses live mode) + tests against `fake_dodo.py`
-  - [ ] 2. `start_dev.ps1 -DodoWebhooks` / `start_dev.sh --dodo-webhooks` (Dodo CLI first, Cloudflare quick tunnel fallback, `-Stop`) + tests
-  - [ ] 3. `docs/billing/DODO-LOCAL-TEST.md`, linked from DODO.md §6, RUNBOOK §9, the owner launch checklist (step 9)
+  - [x] 1. `backend/scripts/dodo_probe.py` (GET only, shapes not values, refuses live mode) + tests against `fake_dodo.py`
+  - [x] 2. `start_dev.ps1 -DodoWebhooks` / `start_dev.sh --dodo-webhooks` (Dodo CLI first, Cloudflare quick tunnel fallback, `-Stop`) + tests
+  - [x] 3. `docs/billing/DODO-LOCAL-TEST.md`, linked from DODO.md §6, RUNBOOK §9, the owner launch checklist (step 9)
 - [ ] Finish: full browser suite, `pytest -q`, `campaign_slices.py --check all` 0, one Alembic head, records (FINDINGS, COVERAGE.csv, STATE, HANDOFF "Session C → next sessions" incl. exactly what Session D must run, NEEDS-OWNER), CI green, PR description for a non-engineer, mark ready, stop.
 
-**Next action:** C1 feature 1 (ERP posting).
+**Next action:** specs 87 (payment risk) and 89 (sessions/SSO) are being written by helpers; spec 93 (tables) written; then features 5, 6, 7 (helpers), then the long tail.
 
 ## Previous phase — Session B: finish the rename, fix the carried-over defects, make the ledger fast
 Branch `claude/new-session-zo5d98` (the session's assigned branch), based on `main` at `682c9d5` (PR #26
