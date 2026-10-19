@@ -1847,3 +1847,48 @@ The data-residency card's "Save region" refuses, correctly, any region but the d
 deployment stores files locally ("requires an object-storage backend"). The browser suite runs on local
 storage, so it proves the refusal path (no bucket, disabled button, server 409) and not a successful
 repin. A successful repin is a test for a deployment with MinIO or S3.
+
+## N-131 — Three-way match: "Reject" and case notes do not exist in the API (OPEN — needs your decision; Session E)
+
+The Session C list said the three-way match page was missing a re-score button, notes and a separate Reject
+button "although the API has them". Only the re-score does exist (`POST …/procurement/cases/{id}/rematch`,
+now a "Re-score" button). The case API has exactly three actions: approve (with a written reason when lines
+did not match), dispute (a reason of 10 or more characters, which is what goes to the supplier) and rematch.
+There is no reject call and no notes call, and the page can only show what the server stores: the reason that
+came with the approval or the dispute, now shown on the page. Building the other two is a product decision,
+not a screen: "Reject" would be a new final status that every consumer of case statuses (ERP posting, the
+cash ledger, analytics, automation triggers, the review hub) must learn, and notes need a table. Recommended
+if you want them: *Reject* = "this invoice will not be paid and nothing goes to the supplier" (a reason
+required, audit row, no ERP posting), *notes* = free text with author and time that never changes a status.
+Until you decide, "Flag dispute" is the only way to refuse an invoice and the approval or dispute reason is
+the only note.
+
+## N-132 — A password sign-in is refused only when it would be useless everywhere (DECIDED (Session E))
+
+When a person's correct password would open a session that every organization they belong to refuses
+(`require single sign-on` is on and, for owners, break-glass is off), `POST /auth/login` now answers 403
+`SSO_SIGN_IN_REQUIRED` with the organization's name and no session. A person who belongs to another
+organization that does not require single sign-on, or an owner whose break-glass is on, still signs in
+with a password; the organization that requires it keeps refusing that session request by request, as
+before (`ORGANIZATION_SSO_REQUIRED`). The other reading, "refuse a member of any such organization", would
+lock a consultant out of every other customer's workspace because one of them turned the switch on. A wrong
+password still gets the plain 401, so a stranger learns nothing about which addresses are SSO-only. Sessions
+opened before the switch was turned on are not ended; they meet the per-request refusal and its notice.
+
+## N-133 — The process agent's Undo needs a fitted model, and stays that way (DECIDED (Session E))
+
+An automatic resolution (and so the Undo that cancels one before it takes effect) exists only for an
+organization whose calibration model has been fitted from at least 50 reviewed outcomes. That gate is the
+point of calibrated autonomy, so it is not loosened for tests. The browser test cannot wait months for
+reviews and 50 real ones would take longer than the rest of the suite, so the history is added by
+`scripts/e2e_stand_in.py calibration-history` (replacing inline SQL in the test support), and a backend test
+proves the added history lets the real endpoint fit a model. The model itself is fitted by the product.
+
+## N-134 — Shared platform state in the browser suite (DECIDED (Session E); extends N-127)
+
+Price books, promo codes and the sovereign licence are global to the test database. The rule for specs is
+written in `frontend/e2e/README.md` ("State that every test shares"): only spec 94 publishes a book (INR,
+its own); a spec that must read the billing page's Currency dropdown for other currencies sets up its own
+books on a database of its own. A tenant of its own does not isolate a price book, so "its own tenant" is
+not enough for that case.
+

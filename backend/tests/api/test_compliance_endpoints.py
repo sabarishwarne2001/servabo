@@ -114,6 +114,45 @@ def test_residency_lists_regions_and_marks_which_are_configured(client, tenant):
     assert options["GLOBAL"] is True
 
 
+def test_a_region_with_a_bucket_is_not_offered_while_files_are_stored_locally(client, tenant, monkeypatch):
+    """A bucket in the map is not enough: local file storage has no concept of a region, and Save is refused.
+
+    The card used to list EU as available (a bucket was named for it) and the owner's Save then
+    came back 409 "requires an object-storage backend". It is now listed as not available, with
+    the same words the refusal uses, so the two never disagree.
+    """
+    from app.services.compliance import residency_service
+
+    residency_service.reset_regional_drivers()
+    monkeypatch.setattr(residency_service.settings, "S3_REGIONAL_BUCKETS", {"EU": "eu-bucket"}, raising=False)
+    monkeypatch.setattr(residency_service.settings, "STORAGE_BACKEND", "local", raising=False)
+
+    listed = client.get(f"{base(tenant.organization.id)}/residency", headers=tenant.org_admin.headers)
+    options = {row["region"]: row["configured"] for row in listed.json()["available_regions"]}
+    assert options["EU"] is False
+    assert options["GLOBAL"] is True
+
+    refused = client.put(
+        f"{base(tenant.organization.id)}/residency",
+        json={"region": "EU", "acknowledge_no_migration": True},
+        headers=tenant.owner.headers,
+    )
+    assert refused.status_code == 409, "what the card does not offer, the server refuses"
+
+
+def test_a_region_with_a_bucket_is_offered_on_an_object_storage_backend(client, tenant, monkeypatch):
+    from app.services.compliance import residency_service
+
+    residency_service.reset_regional_drivers()
+    monkeypatch.setattr(residency_service.settings, "S3_REGIONAL_BUCKETS", {"EU": "eu-bucket"}, raising=False)
+    monkeypatch.setattr(residency_service.settings, "STORAGE_BACKEND", "minio", raising=False)
+
+    listed = client.get(f"{base(tenant.organization.id)}/residency", headers=tenant.org_admin.headers)
+    options = {row["region"]: row["configured"] for row in listed.json()["available_regions"]}
+    assert options["EU"] is True
+    assert options["US"] is False, "no bucket named for it"
+
+
 def test_repin_without_acknowledgement_is_rejected(client, tenant):
     response = client.put(
         f"{base(tenant.organization.id)}/residency",

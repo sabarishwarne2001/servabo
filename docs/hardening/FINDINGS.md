@@ -3491,3 +3491,27 @@ cannot hold (local file storage refuses it on Save).
 Do not post, targets, mapping versions), tables (93), seats (91), review hub decisions per kind and the
 bulk actions (92), RevOps price books / promo codes / contracts / invoices / disputes (94), credential
 rotation for API keys, webhooks and provider keys (97), the egress lockdown (99), entity 360 (90).
+
+## Session E: the UI gaps and defects Session C left open (2026-10-18)
+
+Each defect below was found by a test that failed before the fix and passed after it (backend tests run
+against the unfixed `app/` first; browser specs 89, 96, 99 and 101 were rewritten to the intended behaviour).
+New findings start at F-518.
+
+| ID | Severity | Area | Finding | Evidence | Status |
+|---|---|---|---|---|---|
+| F-518 | Medium | Single sign-on / identity console | **The console saved role mappings it could never show, and an owner could not remove one.** There was no read route and no delete route, so a wrong mapping (for example one that grants ADMIN to a broad group) stayed in force with no way to see or undo it. | `test_saved_role_mappings_are_listed_in_the_order_they_are_tried_and_an_owner_can_remove_one` and `test_role_mappings_of_another_organizations_connection_are_not_listed_or_removable` failed first; spec 89 | Fixed |
+| F-519 | Low | Three-way match | **The page never showed the reason a case was approved or disputed, and offered no re-score** (the server stores the reason and has a re-score call). A re-scored case (replaced by a new one) still showed live Approve and Flag dispute buttons that the server then refused with CASE_NOT_LIVE. | spec 96 (rewritten: the reason is shown; Re-score; the replaced case is history) | Fixed |
+| F-520 | Low | Supplier cost console | **"Reconcile" could not force a period that is not closed yet**, although the server accepts `force`. The refusal now offers "Reconcile anyway". | spec 96 (rewritten from "the page offers no way to force it") | Fixed |
+| F-521 | Medium | Single sign-on | **A correct password sign-in into an organization that requires single sign-on answered 200 and opened a session in which every request was refused (403 `ORGANIZATION_SSO_REQUIRED`).** The person signed in to a screen where nothing worked. The sign-in itself now refuses (403 `SSO_SIGN_IN_REQUIRED`, in words, no session) when the password would be useless everywhere (N-132); a wrong password still gets the plain 401. | `test_a_member_of_an_sso_required_organization_cannot_sign_in_with_a_password` failed first; spec 89 | Fixed |
+| F-522 | Low | Workspaces | **Refusing to archive an organization's last active workspace answered 403 `PERMISSION_DENIED`**, though the actor may archive and the organization's state is what forbids it. It is a conflict: 409 `LAST_WORKSPACE`. | `test_the_last_active_workspace_cannot_be_archived_and_that_is_a_conflict` failed first; spec 101 | Fixed |
+| F-523 | Low | Data residency | **The residency card listed a region as available when a bucket was named for it but files are stored on local disk**, which has no regions, so the owner's Save was refused (409). The card now lists exactly the regions Save accepts. | `test_a_region_with_a_bucket_is_not_offered_while_files_are_stored_locally` failed first; spec 99 | Fixed |
+
+**Session E — checked, not a defect, or not buildable from the API as it is:**
+- *Three-way match "Reject" and case notes*: the API has neither (only approve, dispute, rematch). Not built;
+  N-131 holds the decision for you.
+- *The process agent's Undo needs a fitted model*: by design (N-133). The history the browser test needs is
+  now added by a stand-in command that a backend test keeps honest instead of SQL inside the test support.
+- *Spec 94 leaves an INR price book in force*: global state that cannot be undone from the console (N-134).
+  The rule for specs is written in `frontend/e2e/README.md`.
+

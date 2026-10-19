@@ -213,6 +213,18 @@ class OrganizationSsoRequiredError(OrganizationPermissionDeniedError):
     pass
 
 
+class SsoSignInRequiredError(OrganizationError):
+    """
+    A correct password was presented, but every organization the person belongs to requires single
+    sign-on for their role, so a password session would be refused everywhere. Raised by the
+    sign-in itself (no session is opened). Its own code, not ORGANIZATION_SSO_REQUIRED: that one is
+    for a signed-in session and opens the in-app notice, which does not belong on the sign-in page.
+    """
+
+    status_code = 403
+    code = "SSO_SIGN_IN_REQUIRED"
+
+
 class OrganizationMemberError(OrganizationError):
     """Raised when an organization membership constraint is violated."""
     pass
@@ -268,6 +280,15 @@ class WorkspacePermissionDeniedError(WorkspaceError):
 
 class WorkspaceMemberError(WorkspaceError):
     """Raised when a membership constraint is violated."""
+    pass
+
+
+class LastWorkspaceError(WorkspaceError):
+    """
+    Raised when an operation would leave an organization without an active
+    workspace. The actor is allowed to archive; the organization's current
+    state does not permit it, which is a conflict, not a permission failure.
+    """
     pass
 
 

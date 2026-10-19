@@ -131,9 +131,26 @@ def _normalise(region: Optional[str]) -> str:
     return value
 
 
+_OBJECT_STORAGE_BACKENDS = frozenset({"s3", "r2", "minio"})
+
+
+def region_is_servable(region: str) -> bool:
+    """Whether this deployment can hold a region's files: the default always, any other only with
+    a bucket named for it AND an object-storage backend (local disk has no concept of a region).
+
+    The compliance card lists this, so it offers exactly the regions `set_organization_region`
+    would accept.
+    """
+    normalised = _normalise(region)
+    if normalised not in PINNED_REGIONS:
+        return True
+    backend = str(settings.STORAGE_BACKEND).strip().lower()
+    return normalised in regional_bucket_map() and backend in _OBJECT_STORAGE_BACKENDS
+
+
 def _build_regional_driver(region: str, bucket: str) -> StorageDriver:
     backend = settings.STORAGE_BACKEND.strip().lower()
-    if backend not in {"s3", "r2", "minio"}:
+    if backend not in _OBJECT_STORAGE_BACKENDS:
         raise ResidencyNotConfiguredError(
             f"Residency region {region} requires an object-storage backend. "
             f"STORAGE_BACKEND is {backend!r}, which has no concept of a region."

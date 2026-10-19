@@ -11,6 +11,7 @@ import type {
   IdpConfigCreate,
   IdpConfigRead,
   RoleMappingCreate,
+  RoleMappingRead,
   ScimKeyCreate,
   ScimKeyIssued,
   ScimKeyRead,
@@ -40,6 +41,8 @@ export const IDENTITY_ENDPOINTS = {
     `${base(o)}/idp-configs/${seg(c)}/certificates`,
   roleMappings: (o: string, c: string) =>
     `${base(o)}/idp-configs/${seg(c)}/role-mappings`,
+  roleMapping: (o: string, c: string, m: string) =>
+    `${base(o)}/idp-configs/${seg(c)}/role-mappings/${seg(m)}`,
   dryRun: (o: string, c: string) => `${base(o)}/idp-configs/${seg(c)}/dry-run`,
   activate: (o: string, c: string) =>
     `${base(o)}/idp-configs/${seg(c)}/activate`,
@@ -137,6 +140,26 @@ export const addRoleMapping = async (
     payload,
   );
   return response.data;
+};
+
+export const listRoleMappings = async (
+  organizationId: string,
+  configId: string,
+): Promise<RoleMappingRead[]> => {
+  const response = await apiClient.get<RoleMappingRead[]>(
+    IDENTITY_ENDPOINTS.roleMappings(organizationId, configId),
+  );
+  return response.data;
+};
+
+export const removeRoleMapping = async (
+  organizationId: string,
+  configId: string,
+  mappingId: string,
+): Promise<void> => {
+  await apiClient.delete(
+    IDENTITY_ENDPOINTS.roleMapping(organizationId, configId, mappingId),
+  );
 };
 
 export const dryRunRoleMapping = async (

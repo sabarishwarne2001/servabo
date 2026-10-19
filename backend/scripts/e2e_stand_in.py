@@ -29,6 +29,10 @@ and worker. Two things a browser cannot do in a sandbox are played here instead:
   the journeys' DNS server (`scripts/e2e_dns.py`) answers Servabo's real lookup, and `saml-idp`
   / `saml-response` play the SAML provider (a signing certificate, then a signed assertion that
   answers Servabo's own AuthnRequest), with the backend's test IdP (`tests/engines/saml_idp.py`);
+* **an organization's reviewed history** — `calibration-history` adds the outcomes of months of past
+  reviews (the engine's score, and whether the engine was right) to one organization, so the process
+  agent's calibration model can be FITTED by the product (the error limit saved through the real
+  endpoint) and an automatic resolution can be scheduled, then undone, in one browser test;
 * **a TruthMesh no click can reach** — `truthmesh-fill` adds filler conflicts or documents (the page
   lists 100 conflicts and 400 documents at a time) and `truthmesh-stick` leaves the build in
   BUILDING since an hour ago, as after a worker lost it.
@@ -484,12 +488,48 @@ def _truthmesh(args: argparse.Namespace) -> int:
         return 0
 
 
+def _calibration_history(args: argparse.Namespace) -> int:
+    """Add `--count` reviewed outcomes for the "verification.document" decision to one organization.
+
+    Calibrated autonomy only lets the process agent schedule an automatic resolution once the
+    organization has a fitted model, and a model needs reviewed outcomes (50 at least, hundreds for
+    a useful one) that accumulate over months of people reviewing documents. A browser test cannot
+    wait for that. This is the same history `tests/engines/test_autonomy_limit_changes_decisions_live.py`
+    writes; the model itself is fitted by the product, not here.
+    """
+    from decimal import Decimal
+
+    from sqlalchemy import text
+
+    from app.services.calibration import vocabulary as vocab
+
+    count = args.count
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as db, db.begin():
+        organization = _organization(db, args.org)
+        rows = []
+        for index in range(count):
+            score = Decimal(index) / Decimal(count)
+            # Right in a share of cases that rises with the score, as a real engine's are.
+            correct = (index * 7919) % 100 < int(score * 120) - 20
+            rows.append({"id": str(uuid.uuid4()), "org": str(organization.id),
+                         "decision": vocab.DECISION_VERIFICATION_DOCUMENT, "score": score, "correct": correct,
+                         "source": vocab.SOURCE_DOCUMENT_VERIFICATIONS, "source_id": str(uuid.uuid4()),
+                         "at": now - timedelta(hours=count - index)})
+        db.execute(text(
+            "INSERT INTO calibration_labels (id, organization_id, decision_type, raw_score, correct, source_table, "
+            "source_id, was_auto_approved, was_audit_sample, auto_eligible, sample_weight, observed_at) VALUES "
+            "(:id, :org, :decision, :score, :correct, :source, :source_id, false, false, true, 1, :at)"), rows)
+    print(json.dumps({"labels": count}))
+    return 0
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="The browser journeys' clock and gateway stand-ins.")
     parser.add_argument("command", choices=[
         "subscribe", "seats", "change-plan", "cancel", "cancel-at-period-end", "renewal-fails", "payment-fails-again", "mark-unpaid",
         "card-fixed", "refund", "dodo-catalogue", "trial-ending", "trial-ends", "run-job", "dns-publish", "saml-idp",
-        "saml-response", "truthmesh-fill", "truthmesh-stick", "fail-document"])
+        "saml-response", "truthmesh-fill", "truthmesh-stick", "fail-document", "calibration-history"])
     parser.add_argument("--gateway", choices=["dodo", "stripe"], type=str.lower,
                         default=_gateway_from_argv([]), help="whose side to play (default: E2E_GATEWAY, else dodo)")
     parser.add_argument("--amount", type=int, help="refund: in cents (default: the whole payment)")
@@ -503,6 +543,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--email", help="saml-response: who signs in")
     parser.add_argument("--saml-request", help="saml-response: the SAMLRequest Servabo sent (redirect binding)")
     parser.add_argument("--document", help="fail-document: the document (work item) id")
+    parser.add_argument("--count", type=int, default=600, help="calibration-history: how many reviewed outcomes to add")
     parser.add_argument("--conflicts", type=int, default=0, help="truthmesh-fill: how many open conflicts to add")
     parser.add_argument("--documents", type=int, default=0, help="truthmesh-fill: how many documents to add to the mesh")
     args = parser.parse_args(argv)
@@ -528,6 +569,9 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if args.command in ("truthmesh-fill", "truthmesh-stick"):
         return _truthmesh(args)
+
+    if args.command == "calibration-history":
+        return _calibration_history(args)
 
     if args.command == "fail-document":
         # A worker that died on a document: the document reads FAILED, as the "Retry processing" button expects.

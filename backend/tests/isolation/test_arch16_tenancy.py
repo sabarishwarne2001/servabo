@@ -13,6 +13,8 @@ IDENTITY_ROUTES = [
     ("POST", "/api/v1/organizations/{oid}/identity/idp-configs"),
     ("POST", "/api/v1/organizations/{oid}/identity/idp-configs/{config_id}/certificates"),
     ("POST", "/api/v1/organizations/{oid}/identity/idp-configs/{config_id}/role-mappings"),
+    ("GET", "/api/v1/organizations/{oid}/identity/idp-configs/{config_id}/role-mappings"),
+    ("DELETE", "/api/v1/organizations/{oid}/identity/idp-configs/{config_id}/role-mappings/{mapping_id}"),
     ("POST", "/api/v1/organizations/{oid}/identity/idp-configs/{config_id}/dry-run"),
     ("POST", "/api/v1/organizations/{oid}/identity/idp-configs/{config_id}/activate"),
     ("GET", "/api/v1/organizations/{oid}/identity/scim-keys"),

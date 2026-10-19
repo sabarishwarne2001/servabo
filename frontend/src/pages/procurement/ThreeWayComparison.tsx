@@ -9,7 +9,7 @@ import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 import { useCapabilityAccess } from "@/hooks/useCapabilityAccess";
 import { isAtLeast } from "@/permissions/workspacePermissions";
 import { ApiError } from "@/services/api/errors";
-import { approveCase, disputeCase, getCase } from "@/services/api/procurement";
+import { approveCase, disputeCase, getCase, rematchCase } from "@/services/api/procurement";
 import { procurementKeys } from "@/services/api/queryKeys";
 import {
   BUTTON_PRIMARY,
@@ -81,6 +81,8 @@ export const ThreeWayComparison: React.FC = () => {
   const [dialog, setDialog] = useState<"approve" | "dispute" | null>(null);
   const [reason, setReason] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
+  // idle -> queued (the server was asked) -> done (long enough for the worker; read the case again).
+  const [rescore, setRescoreState] = useState<"idle" | "queued" | "done">("idle");
 
   const rowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
 
@@ -89,9 +91,13 @@ export const ThreeWayComparison: React.FC = () => {
     queryFn: () => getCase(workspaceId, caseId),
     enabled: Boolean(workspaceId && caseId) && capability.granted,
     staleTime: 15_000,
+    // While a re-score is queued, look again every few seconds: it may replace this case.
+    refetchInterval: rescore === "queued" ? 3_000 : false,
   });
 
   const detail = caseQuery.data ?? null;
+  // Decided, or replaced by a re-score: the case is history and takes no more decisions.
+  const live = detail !== null && !["APPROVED", "DISPUTED", "SUPERSEDED"].includes(detail.status);
   const currency = detail?.currency ?? null;
   const lines = useMemo<readonly CaseLine[]>(() => detail?.lines ?? [], [detail]);
   // F-171: a case that compared nothing is approved only with a written reason, as one with exceptions.
@@ -156,6 +162,27 @@ export const ThreeWayComparison: React.FC = () => {
     onError: (error) => setActionError(describeFailure(error)),
   });
 
+  // Re-score: score the invoice again against the documents now on file (a late receipt, a corrected PO).
+  // The server queues it. If anything it reads has changed, this case is replaced by a new one; if not,
+  // this stays the current case.
+  const rescoreRequest = useMutation({
+    mutationFn: () => rematchCase(workspaceId, caseId, {}),
+    onSuccess: async () => {
+      setActionError(null);
+      setRescoreState("queued");
+      await queryClient.invalidateQueries({ queryKey: procurementKeys.all(workspaceId) });
+    },
+    onError: (error) => setActionError(describeFailure(error)),
+  });
+
+  useEffect(() => {
+    if (rescore !== "queued") {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setRescoreState("done"), 30_000);
+    return () => window.clearTimeout(timer);
+  }, [rescore]);
+
   const openEvidence = useCallback(
     (line: CaseLine | null) => {
       if (!line) {
@@ -208,11 +235,11 @@ export const ThreeWayComparison: React.FC = () => {
           break;
         case "a":
           event.preventDefault();
-          if (canDecide) {startApprove();}
+          if (canDecide && live) {startApprove();}
           break;
         case "d":
           event.preventDefault();
-          if (canDecide) {
+          if (canDecide && live) {
             setActionError(null);
             setDialog("dispute");
           }
@@ -223,7 +250,7 @@ export const ThreeWayComparison: React.FC = () => {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [activeLine, canDecide, dialog, lines.length, openEvidence, startApprove]);
+  }, [activeLine, canDecide, dialog, lines.length, live, openEvidence, startApprove]);
 
   useEffect(() => {
     rowRefs.current[cursor]?.scrollIntoView({ block: "nearest" });
@@ -261,7 +288,8 @@ export const ThreeWayComparison: React.FC = () => {
     return <p className={`${HINT} p-6`}>Loading case…</p>;
   }
 
-  const resolved = detail.status === "APPROVED" || detail.status === "DISPUTED";
+  // A re-score replaces the case with a new one; the old one is kept as history and can no longer be decided.
+  const superseded = detail.status === "SUPERSEDED";
 
   return (
     <div className="space-y-4 p-6">
@@ -285,7 +313,7 @@ export const ThreeWayComparison: React.FC = () => {
           <button
             type="button"
             className={BUTTON_PRIMARY}
-            disabled={resolved || !canDecide || approve.isPending}
+            disabled={!live || !canDecide || approve.isPending}
             onClick={startApprove}
           >
             Approve match
@@ -293,7 +321,7 @@ export const ThreeWayComparison: React.FC = () => {
           <button
             type="button"
             className={BUTTON_SECONDARY}
-            disabled={resolved || !canDecide || dispute.isPending}
+            disabled={!live || !canDecide || dispute.isPending}
             onClick={() => {
               setActionError(null);
               setDialog("dispute");
@@ -301,10 +329,54 @@ export const ThreeWayComparison: React.FC = () => {
           >
             Flag dispute
           </button>
+          <button
+            type="button"
+            className={BUTTON_SECONDARY}
+            disabled={!live || !canDecide || rescoreRequest.isPending || rescore === "queued" || !detail.invoice_work_item_id}
+            title="Score this invoice again against the documents now on file"
+            onClick={() => rescoreRequest.mutate()}
+          >
+            {rescoreRequest.isPending ? "Queuing…" : "Re-score"}
+          </button>
         </div>
       </header>
 
       <DocumentStrip detail={detail} />
+
+      {detail.resolution_reason ? (
+        <section className={`${SURFACE} space-y-1 p-4`} data-testid="resolution-reason">
+          <h2 className="text-sm font-semibold">
+            {detail.status === "DISPUTED"
+              ? "Why it was disputed"
+              : detail.status === "APPROVED"
+                ? "Why it was approved"
+                : "Reason on record"}
+          </h2>
+          <p className="whitespace-pre-wrap break-words text-sm">{detail.resolution_reason}</p>
+          {detail.resolved_at ? (
+            <p className={HINT}>Recorded {formatTimestamp(detail.resolved_at)}</p>
+          ) : null}
+        </section>
+      ) : null}
+
+      {rescore === "queued" && !superseded ? (
+        <p role="status" className="rounded-md border border-border bg-muted/40 p-3 text-sm">
+          Re-scoring is queued. If the documents on file have changed since this case was scored, it is replaced by
+          a new case; if not, nothing changes.
+        </p>
+      ) : null}
+      {rescore === "done" && live ? (
+        <p role="status" className="rounded-md border border-border bg-muted/40 p-3 text-sm">
+          Scored again against the documents on file. Nothing had changed, so this is still the current case.
+        </p>
+      ) : null}
+
+      {superseded ? (
+        <p role="status" className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+          This case was replaced by a newer score (a re-score, or a changed document or policy) and can no longer be decided. Open the current case for this invoice
+          from the match queue.
+        </p>
+      ) : null}
 
       {detail.duplicate_copies && detail.duplicate_copies.length > 0 ? (
         <section

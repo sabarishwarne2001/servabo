@@ -286,7 +286,7 @@ test.describe("Process agent: an automatic resolution can be undone", () => {
     await expect.poll(openReviews, { timeout: 120_000, intervals: [3_000] }).toBe(3);
 
     // The organization's reviewed history, and the error limit saved through the product: the model is fitted.
-    seedReviewedHistory(owner.orgId);
+    seedReviewedHistory(owner.orgSlug);
     const fitted = await api<{ ok: boolean; entry: { threshold: string | null } }>(owner.session, "PUT",
       `/organizations/${owner.orgId}/autonomy/verification.document`, { target_error_rate: "0.15", audit_sample_rate: "0.01" });
     expect(fitted.status, fitted.text).toBe(200);

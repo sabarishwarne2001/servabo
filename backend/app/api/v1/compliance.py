@@ -44,7 +44,6 @@ from app.core.config import settings
 from app.core.storage import StorageError
 from app.models.audit_log import AuditAction, AuditResourceType
 from app.models.compliance import (
-    PINNED_REGIONS,
     ComplianceExport,
     ErasedSubject,
     RetentionPolicy,
@@ -87,13 +86,14 @@ def _client_context(request: Request) -> dict[str, str | None]:
 
 
 def _residency_payload(context: OrganizationContext) -> DataResidencyResponse:
-    configured = set(residency_service.regional_bucket_map().keys())
     options = [
         ResidencyRegionOption(
             region=region,
             # GLOBAL is always available: it is the default bucket, which is
-            # what every tenant used before this phase existed.
-            configured=(region not in PINNED_REGIONS) or (region in configured),
+            # what every tenant used before this phase existed. Any other
+            # region needs a bucket AND an object-storage backend, the same
+            # test the Save applies.
+            configured=residency_service.region_is_servable(region),
         )
         for region in residency_service.known_regions()
     ]

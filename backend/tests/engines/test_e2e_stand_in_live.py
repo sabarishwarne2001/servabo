@@ -127,3 +127,21 @@ def test_commands_run_at_once_never_lose_each_others_state(tmp_path) -> None:
         assert run.wait(timeout=120) == 0, run.stderr.read().decode()[-1000:] if run.stderr else ""
     state = json.loads((tmp_path / "e2e-stand-in-gateway.json").read_text())
     assert sorted(state["identity_providers"]) == sorted(f"race-{n}.example" for n in range(10))
+
+
+def test_the_reviewed_history_stand_in_lets_the_product_fit_a_model(engines: Engines, stand_in) -> None:
+    """The browser test of the process agent's Undo needs a fitted calibration model and cannot wait months
+    for reviews. The stand-in adds the history; the model is fitted by the real endpoint, as the page does."""
+    from app.services.calibration import vocabulary as vocab
+
+    engines.plan("enterprise")
+    added = stand_in("calibration-history", "--count", "600")
+    assert added == {"labels": 600}
+
+    saved = engines.client.put(
+        f"/api/v1/organizations/{engines.org}/autonomy/{vocab.DECISION_VERIFICATION_DOCUMENT}",
+        json={"target_error_rate": "0.15", "audit_sample_rate": "0.01"},
+        headers=engines.tenant.owner.headers,
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["entry"]["threshold"] is not None, "a model was fitted from the added history"

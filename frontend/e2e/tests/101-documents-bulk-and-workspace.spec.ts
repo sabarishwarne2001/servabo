@@ -188,7 +188,7 @@ test.describe("Workspace: logo and archive", () => {
   });
 
   test("the organization's only workspace cannot be archived: the page says why, with no error behind it (F-508)", async ({ page, problems }) => {
-    problems.allowHttp(/\/workspaces\/[0-9a-f-]+\/archive$/, [400, 403, 409, 422], "the last active workspace cannot be archived");
+    problems.allowHttp(/\/workspaces\/[0-9a-f-]+\/archive$/, [409], "the last active workspace cannot be archived: a conflict, not a permission");
     await signInAs(page, customer.email);
     await page.goto(customer.ws("settings?section=workspace"));
     await settle(page);
@@ -196,6 +196,10 @@ test.describe("Workspace: logo and archive", () => {
     await page.getByRole("alertdialog", { name: "Archive workspace" }).getByRole("button", { name: "Archive", exact: true }).click();
     await expect(page.getByText(/must retain at least one active workspace/i)).toBeVisible();
     await expect(page.getByRole("button", { name: "Archive workspace" })).toBeVisible();
+    // The server says what kind of refusal it is: the owner may archive; the organization's state does not allow it.
+    const direct = await api<{ code?: string }>(customer.session, "POST", `/workspaces/${customer.wsId}/archive`);
+    expect(direct.status, direct.text.slice(0, 200)).toBe(409);
+    expect(direct.body.code).toBe("LAST_WORKSPACE");
     await expectHealthyPage(page);
   });
 

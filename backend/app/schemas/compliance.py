@@ -26,7 +26,9 @@ class ResidencyRegionOption(BaseModel):
     region: DataResidencyRegion
     configured: bool = Field(
         description=(
-            "True when a bucket is provisioned for this region. A region that "
+            "True when this deployment can hold the region's files: it is the "
+            "default region, or a bucket is provisioned for it and files are "
+            "kept in object storage (local disk has no regions). A region that "
             "is not configured is offered read-only: selecting it would pin a "
             "tenant to storage that does not exist."
         )

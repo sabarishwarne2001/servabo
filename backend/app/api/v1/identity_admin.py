@@ -446,6 +446,62 @@ def add_role_mapping(organization_id: str, config_id: str, payload: dict = Body(
     return {"id": str(mapping.id), "priority": mapping.priority}
 
 
+def _role_mapping_row(mapping) -> dict[str, Any]:
+    return {
+        "id": str(mapping.id),
+        "priority": mapping.priority,
+        "attribute_name": mapping.attribute_name,
+        "match_kind": mapping.match_kind,
+        "match_value": mapping.match_value,
+        "organization_role": getattr(mapping.organization_role, "value", mapping.organization_role),
+    }
+
+
+@router.get("/idp-configs/{config_id}/role-mappings")
+def list_role_mappings(organization_id: str, config_id: str,
+                       membership=Depends(deps.RequireOrgAdmin),
+                       db=Depends(deps.get_db)):
+    """The connection's saved role mappings, in the order they are tried (lowest priority first)."""
+    _cap_gate.require_capability(db, context=membership, capability_key=_ent.ENTERPRISE_IDENTITY_CAPABILITY, operation="identity.role_mapping.list")
+    config = _owned(db, EnterpriseIdpConfig, config_id, organization_id,
+                    "Configuration not found.")
+    rows = db.execute(
+        select(IdpRoleMapping)
+        .where(IdpRoleMapping.idp_config_id == config.id)
+        .order_by(IdpRoleMapping.priority)
+    ).scalars().all()
+    return [_role_mapping_row(row) for row in rows]
+
+
+@router.delete("/idp-configs/{config_id}/role-mappings/{mapping_id}", status_code=204)
+def remove_role_mapping(organization_id: str, config_id: str, mapping_id: str,
+                        membership=Depends(deps.RequireOrgOwner),
+                        db=Depends(deps.get_db),
+                        user=Depends(deps.get_current_active_user)):
+    """Remove one mapping. People it already placed keep their current role; the next sign-in uses
+    the mappings that are left."""
+    _cap_gate.require_capability(db, context=membership, capability_key=_ent.ENTERPRISE_IDENTITY_CAPABILITY, operation="identity.role_mapping.remove")
+    config = _owned(db, EnterpriseIdpConfig, config_id, organization_id,
+                    "Configuration not found.")
+    try:
+        key = uuid.UUID(str(mapping_id))
+    except ValueError:
+        key = None
+    mapping = db.get(IdpRoleMapping, key) if key is not None else None
+    if mapping is None or mapping.idp_config_id != config.id:
+        raise HTTPException(404, "Role mapping not found.")
+    removed = _role_mapping_row(mapping)
+    db.delete(mapping)
+    # Recorded against the connection it belongs to: a mapping has no audit resource type of its own.
+    write_audit(db, organization_id=organization_id, action="UPDATED",
+                resource_type="ENTERPRISE_IDP_CONFIG", resource_id=config.id,
+                principal=_principal(user),
+                details={"role_mapping_removed": str(mapping.id), "attribute_name": removed["attribute_name"],
+                         "match_kind": removed["match_kind"], "match_value": removed["match_value"],
+                         "organization_role": removed["organization_role"]})
+    db.commit()
+
+
 @router.post("/idp-configs/{config_id}/dry-run")
 def dry_run_mapping(organization_id: str, config_id: str, payload: dict = Body(...),
                     membership=Depends(deps.RequireOrgAdmin),

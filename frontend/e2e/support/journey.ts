@@ -86,7 +86,15 @@ export async function newCustomer(label: string, organizationName?: string): Pro
 
 /** Sign the page in as `email` (a fresh session), the way the strict fixture signs in seeded people. */
 export async function signInAs(page: Page, email: string): Promise<ApiSession> {
-  const session = await apiLogin(email);
+  return adoptSession(page, await apiLogin(email));
+}
+
+/**
+ * Put a session that was opened earlier into the browser. For a person who can no longer sign in
+ * with a password (their organization has since required single sign-on): the session they already
+ * held is what the page meets the organization's policy with.
+ */
+export async function adoptSession(page: Page, session: ApiSession): Promise<ApiSession> {
   await page.context().clearCookies();
   await page.context().addCookies([
     {

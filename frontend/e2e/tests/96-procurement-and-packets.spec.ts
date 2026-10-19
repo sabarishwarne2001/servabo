@@ -15,8 +15,10 @@
  * Each result is read on the page, through the API and after a reload. A viewer cannot do any of it
  * (the server answers 403), and the page does not offer it.
  *
- * Not reachable from the UI at all (reported, not tested): re-score ("rematch") and case notes have no
- * button; the supplier-cost "Reconcile" has no way to force a period that is not closed yet.
+ * Also on the page since the second pass: the stored reason is shown on a decided case; "Re-score" queues a
+ * new score and the old case is shown as replaced; supplier-cost "Reconcile anyway" forces a period that is
+ * not closed yet, after the server's refusal. Not reachable at all (the API has no such call): case notes
+ * and a "Reject" separate from "Flag dispute"; see NEEDS-OWNER N-131.
  */
 import fs from "node:fs";
 import os from "node:os";
@@ -227,6 +229,11 @@ test.describe("Procurement case actions — a tenant of its own, real three-way 
     await expect(statusBadge(page, "disputed")).toBeVisible();
     await expect(page.getByRole("button", { name: "Approve match" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Flag dispute" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Re-score" })).toBeDisabled();
+    // The reason on record is on the page: what went to the supplier, under a heading that says so.
+    const recorded = page.getByTestId("resolution-reason");
+    await expect(recorded).toContainText("Why it was disputed");
+    await expect(recorded).toContainText(reason);
 
     // The API: the dispute, its reason, and who made it.
     const stored = await caseDetail(id);
@@ -237,9 +244,10 @@ test.describe("Procurement case actions — a tenant of its own, real three-way 
     expect(audit).toHaveLength(1);
     expect(audit[0]?.actor_id).toBe(String(proc.session.me.id));
 
-    // After a reload it is still disputed and still locked.
+    // After a reload it is still disputed and still locked, and the reason is still shown.
     await page.reload();
     await expect(statusBadge(page, "disputed")).toBeVisible();
+    await expect(page.getByTestId("resolution-reason")).toContainText(reason);
     await expect(page.getByRole("button", { name: "Flag dispute" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Approve match" })).toBeDisabled();
 
@@ -344,6 +352,8 @@ test.describe("Procurement case actions — a tenant of its own, real three-way 
     await expect(dialog).toHaveCount(0);
     await expect(statusBadge(page, "approved")).toBeVisible();
     await expect(page.getByRole("button", { name: "Approve match" })).toBeDisabled();
+    await expect(page.getByTestId("resolution-reason")).toContainText("Why it was approved");
+    await expect(page.getByTestId("resolution-reason")).toContainText(reason);
 
     const stored = await caseDetail(id);
     expect(stored.status).toBe("APPROVED");
@@ -442,7 +452,7 @@ test.describe("Procurement case actions — a tenant of its own, real three-way 
     await signInAs(page, procViewer.email);
     await page.goto(proc.ws(`procurement/${id}`));
     await expect(page.getByRole("heading", { name: `Three-way match · ${SETS.watched.invoice}`, level: 1 })).toBeVisible();
-    for (const button of await page.getByRole("button", { name: /^(Approve match|Flag dispute)$/ }).all()) {
+    for (const button of await page.getByRole("button", { name: /^(Approve match|Flag dispute|Re-score)$/ }).all()) {
       await expect(button).toBeDisabled();
     }
     await page.getByRole("heading", { level: 1 }).click();
@@ -450,6 +460,57 @@ test.describe("Procurement case actions — a tenant of its own, real three-way 
     await page.keyboard.press("a");
     await expect(page.getByRole("heading", { name: /^(Flag a dispute|Approve with)/ })).toHaveCount(0);
     expect((await caseDetail(id)).status).toBe("NEEDS_REVIEW");
+  });
+
+  test("Re-score scores again: unchanged documents leave the case as it is; a changed policy replaces it, and the old one is history", async ({ page }) => {
+    const id = caseIds.watched;
+    const liveCases = async (): Promise<CaseRow[]> => {
+      const listed = await api<CaseRow[]>(proc.session, "GET", procApi("/cases?limit=100"));
+      return (Array.isArray(listed.body) ? listed.body : [])
+        .filter((c) => c.invoice_number === SETS.watched.invoice && c.status !== "SUPERSEDED");
+    };
+    await signInAs(page, proc.email);
+    await page.goto(proc.ws(`procurement/${id}`));
+    await expect(page.getByRole("heading", { name: `Three-way match · ${SETS.watched.invoice}`, level: 1 })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Re-score" })).toBeEnabled();
+
+    // Nothing on file has changed: the page says it is queued, then that this is still the current case.
+    await page.getByRole("button", { name: "Re-score" }).click();
+    await expect(page.getByText("Re-scoring is queued.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Re-score" })).toBeDisabled();
+    await expect(page.getByText("Nothing had changed, so this is still the current case.")).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("button", { name: "Re-score" })).toBeEnabled();
+    expect((await caseDetail(id)).status).toBe("NEEDS_REVIEW");
+    expect((await liveCases()).map((c) => c.id)).toEqual([id]);
+
+    // The inputs change (a new tolerance is published): the next score replaces this case with a new one,
+    // and the open page, which looks again while the score is queued, says so.
+    const published = await api(proc.session, "POST", procApi("/policies"), { price_tolerance_bps: 700 });
+    expect(published.status, published.text.slice(0, 200)).toBeLessThan(300);
+    await page.reload();
+    await page.getByRole("button", { name: "Re-score" }).click();
+    await expect(page.getByText("This case was replaced by a newer score")).toBeVisible({ timeout: 90_000 });
+    await expect
+      .poll(async () => (await caseDetail(id)).status, { timeout: 90_000, intervals: [1_000, 2_000, 3_000] })
+      .toBe("SUPERSEDED");
+    await expect.poll(async () => (await liveCases()).length, { timeout: 30_000 }).toBe(1);
+    const live = await liveCases();
+    expect(live[0]?.id).not.toBe(id);
+
+    // The old case, opened again, is plainly history: no decision is offered, and the server would refuse one.
+    await page.goto(proc.ws(`procurement/${id}`));
+    await expect(page.getByText("This case was replaced by a newer score")).toBeVisible();
+    for (const name of ["Approve match", "Flag dispute", "Re-score"]) {
+      await expect(page.getByRole("button", { name })).toBeDisabled();
+    }
+    const refused = await api<{ detail: { code: string } }>(proc.session, "POST", procApi(`/cases/${id}/approve`), { override_reason: "Too late." });
+    expect(refused.status).toBe(409);
+    expect(refused.body.detail.code).toBe("CASE_NOT_LIVE");
+
+    // The current case is live and can be decided.
+    await page.goto(proc.ws(`procurement/${live[0]?.id}`));
+    await expect(page.getByRole("button", { name: "Flag dispute" })).toBeEnabled();
+    await expectHealthyPage(page);
   });
 });
 
@@ -673,7 +734,7 @@ test.describe("Supplier cost console — Record invoice, Reconcile, Accept", () 
     await expectHealthyPage(page);
   });
 
-  test("Reconcile on a period that is not closed yet is refused in words, adds no run, and the page offers no way to force it", async ({ page, problems }) => {
+  test("Reconcile on a period that is not closed yet is refused in words and adds no run; \"Reconcile anyway\" then forces it", async ({ page, problems }) => {
     const young = `${provider}-y`.slice(0, 32);
     problems.allowHttp(/\/admin\/cogs\/supplier-invoices\/[0-9a-f-]+\/reconcile$/, [409], "the period has not closed yet");
     const created = await api<SupplierInvoice>(admin, "POST", "/admin/cogs/supplier-invoices", {
@@ -684,17 +745,21 @@ test.describe("Supplier cost console — Record invoice, Reconcile, Accept", () 
     const row = invoiceRow(page, young);
     await expect(row).toContainText("not reconciled");
     await row.getByRole("button", { name: "Reconcile" }).click();
-    await expect(page.getByRole("alert").filter({ hasText: /not\s+treated as final|T\+\d+ days/ })).toBeVisible();
+    const refusal = page.getByRole("alert").filter({ hasText: /not\s+treated as final|T\+\d+ days/ });
+    await expect(refusal).toBeVisible();
     await expect(invoiceRow(page, young)).toContainText("not reconciled");
     expect(await runsOf(created.body.id)).toHaveLength(0);
-    // The server offers force; the page never does (neither a button nor a checkbox).
-    await expect(page.getByRole("button", { name: /force/i })).toHaveCount(0);
-    await expect(page.getByRole("checkbox", { name: /force|anyway/i })).toHaveCount(0);
-    // The same call with force is accepted by the server: the refusal is about timing only.
-    const forced = await api<Reconciliation>(admin, "POST", `/admin/cogs/supplier-invoices/${created.body.id}/reconcile`, { force: true });
-    expect(forced.status, forced.text.slice(0, 300)).toBe(201);
-    expect(forced.body.status).toBe("INVESTIGATE");
-    expect(await runsOf(created.body.id)).toHaveLength(1);
+
+    // The refusal offers the way on, and only after the refusal: nothing is forced by the first press.
+    const anyway = refusal.getByRole("button", { name: "Reconcile anyway" });
+    await expect(anyway).toBeVisible();
+    await anyway.click();
+    await expect(invoiceRow(page, young)).not.toContainText("not reconciled");
+    await expect(page.getByRole("button", { name: "Reconcile anyway" })).toHaveCount(0);
+    await expect(page.getByRole("alert").filter({ hasText: /not\s+treated as final|T\+\d+ days/ })).toHaveCount(0);
+    const runs = await runsOf(created.body.id);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.status).toBe("INVESTIGATE");
   });
 
   test("only the platform administrator: an organization owner is refused every one of these (403 or 404)", async () => {

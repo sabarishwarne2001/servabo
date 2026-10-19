@@ -225,3 +225,63 @@ def test_several_role_mappings_can_be_saved_on_one_connection(engines: Engines, 
     taken = engines.post(url, {"attribute_name": "groups", "match_value": "x", "organization_role": "MEMBER",
                                "priority": first.json()["priority"]}, org=True)
     assert taken.status_code == 409 and "priority" in str(taken.json()).lower(), taken.text
+
+
+def test_saved_role_mappings_are_listed_in_the_order_they_are_tried_and_an_owner_can_remove_one(
+    engines: Engines, published
+) -> None:
+    """The console saved mappings it could never show: there was no read route, so an owner could
+    neither see nor remove one. They are listed lowest priority first (the order they are tried),
+    an organization administrator may read them, and only an owner may remove one."""
+    engines.plan("enterprise")
+    provider = TestIdp.create()
+    provider.install(engines.db, engines.org)
+    url = f"{ID}/idp-configs/{provider.config.id}/role-mappings"
+    assert engines.get(url, org=True).json() == [], "a connection with none says so"
+
+    admins = engines.post(url, {"attribute_name": "groups", "match_value": "admins", "organization_role": "ADMIN"}, org=True)
+    finance = engines.post(url, {"attribute_name": "groups", "match_kind": "prefix", "match_value": "fin-",
+                                 "organization_role": "BILLING"}, org=True)
+    assert (admins.status_code, finance.status_code) == (201, 201)
+
+    listed = engines.get(url, org=True)
+    assert listed.status_code == 200, listed.text
+    assert [(row["id"], row["priority"], row["attribute_name"], row["match_kind"], row["match_value"],
+             row["organization_role"]) for row in listed.json()] == [
+        (admins.json()["id"], admins.json()["priority"], "groups", "EQUALS", "admins", "ADMIN"),
+        (finance.json()["id"], finance.json()["priority"], "groups", "PREFIX", "fin-", "BILLING"),
+    ]
+
+    assert engines.get(url, as_user=engines.tenant.org_admin, org=True).status_code == 200
+    assert engines.get(url, as_user=engines.tenant.contributor, org=True).status_code == 403
+
+    one = f"{url}/{admins.json()['id']}"
+    assert engines.delete(one, as_user=engines.tenant.org_admin, org=True).status_code == 403
+    assert len(engines.get(url, org=True).json()) == 2, "an administrator removed nothing"
+
+    removed = engines.delete(one, org=True)
+    assert removed.status_code == 204, removed.text
+    assert [row["match_value"] for row in engines.get(url, org=True).json()] == ["fin-"]
+    # The removed rule no longer applies; the other one still does.
+    gone = engines.post(f"{ID}/idp-configs/{provider.config.id}/dry-run", {"attributes": {"groups": ["admins"]}}, org=True)
+    assert gone.json()["resolved_role"] != "ADMIN"
+    assert engines.delete(one, org=True).status_code == 404, "removing it twice is a plain 404"
+
+
+def test_role_mappings_of_another_organizations_connection_are_not_listed_or_removable(
+    engines: Engines, published
+) -> None:
+    engines.plan("enterprise")
+    mine = TestIdp.create()
+    mine.install(engines.db, engines.org)
+    saved = engines.post(f"{ID}/idp-configs/{mine.config.id}/role-mappings",
+                         {"attribute_name": "groups", "match_value": "admins", "organization_role": "ADMIN"}, org=True)
+    assert saved.status_code == 201
+
+    other = uuid.uuid4()
+    assert engines.get(f"{ID}/idp-configs/{other}/role-mappings", org=True).status_code == 404
+    assert engines.get(f"{ID}/idp-configs/not-a-uuid/role-mappings", org=True).status_code == 404
+    # A mapping id under a connection that does not hold it is a 404, never a deletion elsewhere.
+    wrong = engines.delete(f"{ID}/idp-configs/{other}/role-mappings/{saved.json()['id']}", org=True)
+    assert wrong.status_code == 404
+    assert len(engines.get(f"{ID}/idp-configs/{mine.config.id}/role-mappings", org=True).json()) == 1

@@ -544,6 +544,26 @@ Task 5 is deferred (N-124: Tailwind 4 is N-119, least-privilege database roles N
 was edited between them), the ledger now uses the latest scoring (F-499), but nothing tells a person that
 the cases disagree; re-scoring the older case would settle it.
 
+## Session E → next sessions
+
+_2026-10-18. Branch `claude/funny-sagan-n7gpqc`. Findings F-518 to F-523; decisions N-131 to N-134._
+
+**What changed.** An owner can now see and remove saved SSO role mappings; the three-way match page shows why
+a case was approved or disputed and can re-score it (a re-score keeps the case when nothing it reads has
+changed, and replaces it otherwise); supplier-cost "Reconcile" offers "Reconcile anyway" after the
+period-not-closed refusal; a correct password for an SSO-only organization is refused at sign-in instead of
+opening a useless session (only when no organization of the person would accept it); the last-workspace
+archive refusal is a 409; the residency card no longer lists a region that Save would refuse.
+
+**Needs you.** N-131: the API has no "Reject" and no case notes (the Session C list said it had). Building them
+is a product decision (a new final status that ERP posting, the ledger and automation must learn).
+
+**Not changed on purpose.** The process agent's Undo still needs a fitted model (N-133). Spec 94's INR price book
+still stays in force; the rule for specs is in `frontend/e2e/README.md` (N-134).
+
+**For whoever runs the suites here.** The sandbox needs Python 3.12 (the pinned libraries do not run on 3.13),
+pgvector 0.8 built from source, and `FRONTEND_URL=http://localhost:3000` in `backend/.env` for the SSO specs.
+
 ## Session C → next sessions
 
 _2026-10-18. Branch `claude/new-session-janwly`, draft PR sabarishwarne2001/servabo#28. Decisions N-125 to

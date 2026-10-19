@@ -106,6 +106,16 @@ export interface RoleMappingCreate {
   readonly organization_role: OrganizationRoleName;
 }
 
+/** A saved mapping, as the server lists it: lowest priority is tried first. */
+export interface RoleMappingRead {
+  readonly id: string;
+  readonly priority: number;
+  readonly attribute_name: string;
+  readonly match_kind: RoleMatchKind;
+  readonly match_value: string;
+  readonly organization_role: OrganizationRoleName;
+}
+
 export interface DryRunRequest {
   readonly attributes: Record<string, string | string[]>;
 }

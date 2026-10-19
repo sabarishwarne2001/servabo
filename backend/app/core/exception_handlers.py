@@ -35,6 +35,7 @@ from app.core.exceptions import (
     InvitationPermissionDeniedError,
     InvitationResendTooSoonError,
     LastOwnerError,
+    LastWorkspaceError,
     OrganizationAccessDeniedError,
     OrganizationAlreadyExistsError,
     OrganizationError,
@@ -126,6 +127,7 @@ _EXCEPTION_MAPPING: dict[type[Exception], tuple[int, str]] = {
     WorkspaceAccessDeniedError: (404, "RESOURCE_NOT_FOUND"),
     WorkspacePermissionDeniedError: (403, "PERMISSION_DENIED"),
     WorkspaceAlreadyExistsError: (409, "WORKSPACE_ALREADY_EXISTS"),
+    LastWorkspaceError: (409, "LAST_WORKSPACE"),
     WorkspaceMemberError: (400, "WORKSPACE_MEMBER_ERROR"),
     WorkspaceError: (400, "WORKSPACE_ERROR"),
 

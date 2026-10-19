@@ -1,6 +1,6 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Loader2, Play, Plus, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Loader2, Play, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -11,7 +11,10 @@ import {
   dryRunRoleMapping,
   listDomains,
   listIdpConfigs,
+  listRoleMappings,
+  removeRoleMapping,
 } from "@/services/api/identity";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { errorMessage } from "@/services/api/errors";
 import { identityKeys } from "@/services/api/queryKeys";
 import { useResolvedOrganization } from "@/routes/OrganizationGuard";
@@ -21,6 +24,7 @@ import type {
   IdpProtocol,
   JitProvisioningMode,
   OrganizationRoleName,
+  RoleMappingRead,
   RoleMatchKind,
 } from "@/types/identity";
 
@@ -576,6 +580,15 @@ const RoleMappingPanel: React.FC<{
   const [role, setRole] = useState<OrganizationRoleName>("MEMBER");
   const [testValue, setTestValue] = useState("");
   const [result, setResult] = useState<DryRunResult | null>(null);
+  const [removing, setRemoving] = useState<RoleMappingRead | null>(null);
+  const queryClient = useQueryClient();
+  const mappingsKey = identityKeys.roleMappings(organizationId, configId);
+
+  const mappingsQuery = useQuery({
+    queryKey: mappingsKey,
+    queryFn: () => listRoleMappings(organizationId, configId),
+    enabled: Boolean(organizationId) && Boolean(configId),
+  });
 
   const save = useMutation({
     mutationFn: () =>
@@ -585,9 +598,30 @@ const RoleMappingPanel: React.FC<{
         match_value: matchValue.trim(),
         organization_role: role,
       }),
-    onSuccess: () => toast.success("Role mapping saved. It applies from the next sign-in."),
+    onSuccess: async () => {
+      setMatchValue("");
+      await queryClient.invalidateQueries({ queryKey: mappingsKey });
+      toast.success("Role mapping saved. It applies from the next sign-in.");
+    },
     onError: (error) => toast.error(errorMessage(error, "The role mapping could not be saved.")),
   });
+
+  const remove = useMutation({
+    mutationFn: (mappingId: string) => removeRoleMapping(organizationId, configId, mappingId),
+    onSuccess: async () => {
+      setRemoving(null);
+      await queryClient.invalidateQueries({ queryKey: mappingsKey });
+      toast.success("Role mapping removed. It no longer applies from the next sign-in.");
+    },
+    onError: (error) => toast.error(errorMessage(error, "The role mapping could not be removed.")),
+  });
+
+  const removeRef = useRef<HTMLDivElement | null>(null);
+  useDialogFocus(removeRef, () => setRemoving(null), {
+    open: removing !== null,
+    busy: remove.isPending,
+  });
+  const mappings = mappingsQuery.data ?? [];
 
   const dryRun = useMutation({
     mutationFn: () =>
@@ -609,6 +643,52 @@ const RoleMappingPanel: React.FC<{
       <p className="mt-1 text-xs text-muted-foreground">
         Map an assertion attribute to an organization role.
       </p>
+
+      <div className="mt-2" data-testid="saved-role-mappings">
+        <p className="text-xs font-medium">Saved mappings</p>
+        {mappingsQuery.isError ? (
+          <p role="alert" className="mt-1 text-xs text-destructive">
+            {errorMessage(mappingsQuery.error, "The saved mappings could not be loaded.")}
+          </p>
+        ) : mappingsQuery.isLoading ? (
+          <p className="mt-1 text-xs text-muted-foreground">Loading…</p>
+        ) : mappings.length === 0 ? (
+          <p className="mt-1 text-xs text-muted-foreground">
+            None yet. Everyone this connection signs in gets the default role.
+          </p>
+        ) : (
+          <>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Tried in this order; the first that matches decides the role.
+            </p>
+            <ol className="mt-1 divide-y divide-border rounded border border-border">
+              {mappings.map((mapping) => (
+                <li
+                  key={mapping.id}
+                  className="flex items-center justify-between gap-2 px-2 py-1.5 text-xs"
+                >
+                  <span className="min-w-0 break-words">
+                    If <strong className="font-medium">{mapping.attribute_name}</strong>{" "}
+                    {mapping.match_kind.toLowerCase()}{" "}
+                    <strong className="font-medium">{mapping.match_value}</strong> → {mapping.organization_role}
+                  </span>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => setRemoving(mapping)}
+                      aria-label={`Remove mapping ${mapping.attribute_name} ${mapping.match_kind.toLowerCase()} ${mapping.match_value}`}
+                      className="inline-flex shrink-0 items-center gap-1 rounded border border-border px-2 py-1 text-xs hover:bg-muted"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                      Remove
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </>
+        )}
+      </div>
 
       <div className="mt-2 grid gap-2 sm:grid-cols-4">
         <input
@@ -717,6 +797,46 @@ const RoleMappingPanel: React.FC<{
           >
             {save.isPending ? "Saving…" : "Save mapping"}
           </button>
+        </div>
+      )}
+
+      {removing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div
+            ref={removeRef}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="remove-mapping-title"
+            className="w-full max-w-md fp-card p-5 shadow-2xl"
+          >
+            <h3 id="remove-mapping-title" className="text-base font-semibold">
+              Remove this role mapping?
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {removing.attribute_name} {removing.match_kind.toLowerCase()} {removing.match_value} →{" "}
+              {removing.organization_role}. People already placed keep their current role; from their
+              next sign-in the mappings that are left decide.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRemoving(null)}
+                disabled={remove.isPending}
+                className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => remove.mutate(removing.id)}
+                disabled={remove.isPending}
+                className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-sm text-destructive-foreground hover:opacity-90 disabled:opacity-50"
+              >
+                {remove.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Remove mapping
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </section>
