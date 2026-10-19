@@ -27,6 +27,7 @@ import ThemeToggle from "@/components/layout/ThemeToggle";
 import OrganizationNotificationBell from "@/components/notification/OrganizationNotificationBell";
 import DunningBanner from "@/components/billing/DunningBanner";
 import TrialBanner from "@/components/billing/TrialBanner";
+import { canSeeValueReceipt } from "@/components/billing/ValueReceipt";
 import { DisplayPreferencesBoundary } from "@/components/common/DisplayPreferencesBoundary";
 import { LoadFailed } from "@/components/common/LoadFailed";
 import { RouteErrorBoundary } from "@/components/common/RouteErrorBoundary";
@@ -291,7 +292,7 @@ const HelmChrome: React.FC = () => {
 
         {/* Every Helm role reads billing (owners, admins, billing), as in OrganizationLayout. */}
         <DunningBanner organizationId={organizationId} canManageBilling={role === "OWNER"} />
-        <TrialBanner organizationId={organizationId} organizationSlug={orgSlug} canChoosePlan={role === "OWNER"} />
+        <TrialBanner organizationId={organizationId} organizationSlug={orgSlug} canChoosePlan={role === "OWNER"} canSeeReceipt={canSeeValueReceipt(role)} />
         <PreviewBanner />
 
         <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 lg:px-9 lg:py-8">

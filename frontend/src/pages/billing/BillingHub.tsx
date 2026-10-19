@@ -5,6 +5,8 @@ import { CreditCard, ExternalLink, Loader2 } from "lucide-react";
 import ConsumptionDashboard from "@/pages/billing/ConsumptionDashboard";
 import InvoiceBrowser from "@/pages/billing/InvoiceBrowser";
 import PlanSelector from "@/pages/billing/PlanSelector";
+import TrialReceiptCard from "@/components/billing/TrialReceiptCard";
+import { canSeeValueReceipt } from "@/components/billing/ValueReceipt";
 // ARCH50-S2:billing-contract
 import InvoicedContractPanel from "@/components/billing/InvoicedContractPanel";
 import SeatManager from "@/pages/billing/SeatManager";
@@ -140,6 +142,7 @@ export const BillingHub: React.FC = () => {
         ) : (
           <>
             {/* Primary view when there is no subscription */}
+            {!state?.subscription && canSeeValueReceipt(role) && <TrialReceiptCard organizationId={organizationId} />}
             {!state?.subscription && (
               <PlanSelector
                 organizationId={organizationId}

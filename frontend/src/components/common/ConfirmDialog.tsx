@@ -15,6 +15,10 @@ export interface ConfirmDialogProps {
   open: boolean;
   title: string;
   message: string;
+  /** Session G: more to read under the message (the trial's value receipt), inside the same dialog. */
+  children?: React.ReactNode;
+  /** A wider dialog, for content that is more than a sentence. */
+  wide?: boolean;
   confirmText?: string;
   cancelText?: string;
   loading?: boolean;
@@ -52,6 +56,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   open,
   title,
   message,
+  children,
+  wide = false,
   confirmText = "Delete",
   cancelText = "Cancel",
   loading = false,
@@ -151,7 +157,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={messageId}
-        className="w-full max-w-md animate-scale-in rounded-2xl border border-border-strong/60 bg-popover p-6 text-popover-foreground shadow-elevation-3"
+        className={`max-h-[calc(100vh-2rem)] w-full ${wide ? "max-w-xl" : "max-w-md"} animate-scale-in overflow-y-auto rounded-2xl border border-border-strong/60 bg-popover p-6 text-popover-foreground shadow-elevation-3`}
       >
         <h2 id={titleId} className="text-base font-semibold tracking-tight text-foreground">
           {title}
@@ -160,6 +166,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <p id={messageId} className="mt-2 text-sm leading-relaxed text-muted-foreground">
           {message}
         </p>
+
+        {children ? <div className="mt-4">{children}</div> : null}
 
         {input ? (
           <div className="mt-4 space-y-1.5">

@@ -273,6 +273,12 @@ export const ownershipKeys = {
   mine: ["ownership-transfers", "mine"] as const,
 };
 
+/** Session G. Under the organization's scope, so leaving the organization drops it. */
+export const valueReceiptKeys = {
+  period: (organizationId: string, period: string) =>
+    [...organizationScope(organizationId), "value-receipt", period] as const,
+};
+
 export const billingKeys = {
   all: (organizationId: string) =>
     [...organizationScope(organizationId), "billing"] as const,

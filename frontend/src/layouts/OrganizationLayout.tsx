@@ -13,6 +13,7 @@ import DunningBanner from "@/components/billing/DunningBanner";
 // ARCH30-T4F:ts-member-notice-import — A5.
 import MemberAccessNotice from "@/components/billing/MemberAccessNotice";
 import TrialBanner from "@/components/billing/TrialBanner";
+import { canSeeValueReceipt } from "@/components/billing/ValueReceipt";
 import { DisplayPreferencesBoundary } from "@/components/common/DisplayPreferencesBoundary";
 import { RouteErrorBoundary } from "@/components/common/RouteErrorBoundary";
 import { authApi } from "@/services/api/auth";
@@ -160,6 +161,7 @@ export const OrganizationLayout: React.FC = () => {
           organizationId={organizationId}
           organizationSlug={organization.organization_slug}
           canChoosePlan={String(organizationRole).toUpperCase() === "OWNER"}
+          canSeeReceipt={canSeeValueReceipt(String(organizationRole))}
         />
 
         <main className="fp-canvas min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 lg:px-8 lg:py-7">
