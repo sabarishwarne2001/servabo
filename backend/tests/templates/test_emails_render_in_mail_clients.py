@@ -58,6 +58,12 @@ EMAILS = {
         action_label="Update card", preferences_url="https://app.example.com/prefs", brand_name="Servabo"),
     "trial": lambda: render_trial_notice(kind="ENDING", organization_names=["Acme"], ends_at=NOW + timedelta(days=2),
                                          plans_link=LINK, brand_name="Servabo"),
+    # Session G: the same notice with the value receipt's headline and findings.
+    "trial-with-figures": lambda: render_trial_notice(
+        kind="ENDED", organization_names=["Acme"], ends_at=NOW - timedelta(hours=2), plans_link=LINK, brand_name="Servabo",
+        value={"headline": "In your trial Servabo read 132 documents and found ₹2,40,000 of GST credit waiting on 6 suppliers.",
+               "findings": [{"label": "GST credit waiting on 6 suppliers", "amount_text": "₹2,40,000",
+                             "url": "https://app.example.com/acme/main/gst"}]}),
     "operator": lambda: render_operator_alert(subject="Dead jobs", body="3 jobs failed for good.", occurrences=3,
                                               first_seen_at=NOW, last_seen_at=NOW, console_url=LINK,
                                               brand_name="Servabo"),

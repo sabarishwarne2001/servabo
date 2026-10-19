@@ -11,6 +11,10 @@ of whose organizations subscribed gets nothing. Each email is recorded on the ac
 (`trial_reminder_sent_at`, `trial_ended_notice_sent_at`) under a row lock, so two
 workers never both send one; an email the relay did not accept is tried again on the
 next run, inside its window.
+
+Session G: both emails carry the value receipt of the account's FIRST organization in the list (the same one the
+plans link opens): the headline and up to three findings, each with a link to its evidence. An organization with
+nothing to show, or a receipt that cannot be read, sends the email exactly as it was.
 """
 
 from __future__ import annotations
@@ -58,7 +62,25 @@ def _organizations_on_trial(db: Any, user_id: Any, *, want: str, now: datetime) 
     return on_trial
 
 
-def _send(*, kind: str, recipient: str, organizations: list[Any], ends_at: datetime) -> bool:
+def _value_of(db: Any, organization: Any) -> Optional[dict[str, Any]]:
+    """The headline and up to three findings of the organization's trial, as the email renders them, or None."""
+    from app.services import value_receipt
+
+    try:
+        with db.begin_nested():  # a failed read must not poison the session that records the send
+            body = value_receipt.receipt(db, organization.id, value_receipt.TRIAL)
+    except Exception:  # noqa: BLE001 - the email goes out as it always did
+        logger.warning("trial.value_receipt_unavailable", exc_info=True)
+        return None
+    if not body.get("headline"):
+        return None
+    base = settings.FRONTEND_URL.rstrip("/")
+    return {"headline": body["headline"],
+            "findings": [{"label": f["label"], "amount_text": f.get("amount_text"), "url": f"{base}{f['source']}"}
+                         for f in body["found"][:3]]}
+
+
+def _send(*, db: Any, kind: str, recipient: str, organizations: list[Any], ends_at: datetime) -> bool:
     from app.core.platform_email import PlatformEmailNotConfigured, send_platform_email
     from app.templates.emails.trial_notice import render_trial_notice
 
@@ -68,6 +90,7 @@ def _send(*, kind: str, recipient: str, organizations: list[Any], ends_at: datet
         ends_at=ends_at,
         plans_link=_plans_link(organizations[0].slug),
         brand_name=settings.PROJECT_NAME,
+        value=_value_of(db, organizations[0]),
     )
     try:
         delivered, detail = send_platform_email(
@@ -105,7 +128,7 @@ def run_reminders(db: Any, *, now: Optional[datetime] = None) -> dict[str, int]:
         organizations = _organizations_on_trial(db, user.id, want="ACTIVE", now=moment)
         if not organizations:
             user.trial_reminder_sent_at = moment  # nothing on trial any more: nothing to say
-        elif _send(kind="ENDING", recipient=user.email, organizations=organizations, ends_at=user.trial_ends_at):
+        elif _send(db=db, kind="ENDING", recipient=user.email, organizations=organizations, ends_at=user.trial_ends_at):
             user.trial_reminder_sent_at = moment
             sent["ending"] += 1
         db.commit()  # an undelivered email is retried on the next run, inside its window
@@ -127,7 +150,7 @@ def run_reminders(db: Any, *, now: Optional[datetime] = None) -> dict[str, int]:
         organizations = _organizations_on_trial(db, user.id, want="ENDED", now=moment)
         if not organizations:
             user.trial_ended_notice_sent_at = moment
-        elif _send(kind="ENDED", recipient=user.email, organizations=organizations, ends_at=user.trial_ends_at):
+        elif _send(db=db, kind="ENDED", recipient=user.email, organizations=organizations, ends_at=user.trial_ends_at):
             user.trial_ended_notice_sent_at = moment
             sent["ended"] += 1
         db.commit()
