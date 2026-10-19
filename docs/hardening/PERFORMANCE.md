@@ -316,7 +316,7 @@ four (`--workers=4`) on COSTS.md's server (4 vCPU, 16 GB). Re-run this before a 
   | Reading the books (`load_books`, one Python view per document) | about 0.95 s | about 0.8 s |
   | Reconciling in memory (`reconcile`) | about 0.9 s | about 0.3 to 0.5 s |
   | Reading the records, building rows, IMS | about 0.4 s | about 0.4 s |
-  | **Matching, whole** | **4.0 to 4.3 s** | **2.3 to 3.2 s (median about 2.9 s)** |
+  | **Matching, whole** | **4.0 to 4.3 s** | **2.0 to 2.4 s** (2.3 to 3.2 s before the collector pause) |
   | **Import** (parse, store 10,000 records) | 2.7 to 3.2 s | 1.5 to 2.0 s |
 
 - **What the brief guessed, and what the measurement said:** the suggestion loop (every free record against every
@@ -335,8 +335,17 @@ four (`--workers=4`) on COSTS.md's server (4 vCPU, 16 GB). Re-run this before a 
   (`reference_matching.py`) and holds the new one to it, row for row, on five seeded random workloads of 400
   documents that reach exact, number-format, suggested, amount-off, duplicate, amended, credit-note, name-only
   supplier, entered-twice and decided cases. It was checked to fail when the new day window is narrowed by one day.
-- **Not done on purpose:** switching the cyclic garbage collector off during a recompute would save about 0.5 s more,
-  but it is a process-wide switch in a web server, so it stays on.
+- **What CI said about that first fix (and the second fix).** The first push still failed on CI: matching took **10.37 s**
+  (11.48 s before), against 10 s. On the build machine the same change had saved about 30%, on CI about 10%: CI's
+  processor is about 3 to 3.5 times slower than the build machine's, so the Python work (not the database) is what has
+  to shrink. A `cProfile` run showed the cyclic garbage collector as the largest single cost (about 0.9 s of 2.9 s here,
+  so about 3 s on CI): a recompute builds about half a million short-lived objects and none of them forms a cycle, but the
+  collector kept walking the growing heap. `app/services/gst/gcpause.py` now pauses it while a recompute or an import
+  runs. It is a process-wide switch, so it is counted (back on only when the last section ends, and only if it was on when
+  the first began), always undone, and a section lasts seconds; `test_gcpause.py` proves each of those. The `COPY` rows are
+  also written with Python 3.12's C `csv` writer (`QUOTE_STRINGS`) instead of one function call per value.
+  Matching on the build machine is now **2.0 to 2.4 s** and the import **1.3 to 1.7 s** (`PERF_BUDGET_MULTIPLIER=1`).
+  Expect about 6 to 8 s on CI; CI on this pull request is the proof.
 - **Why not a stricter test:** a second, tighter budget would flake on the same shared machines this fix is for.
   The existing budget stays as it was.
 - **Decision:** N-142.

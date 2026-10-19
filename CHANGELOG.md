@@ -20,8 +20,9 @@ All notable changes to this project will be documented here.
 
 ### Changed
 
-- **GST matching is faster** (storing results with one `COPY`, suggestion lookups by supplier and day): matching 10,000 records
-  against 10,000 invoices went from about 4.2 s to about 2.9 s on the build machine, because it took 11.48 s on CI and failed
+- **GST matching is faster** (storing results with one `COPY`, suggestion lookups by supplier and day, the garbage collector
+  paused while a recompute runs): matching 10,000 records against 10,000 invoices went from about 4.2 s to about 2.2 s on the
+  build machine, because it took 11.48 s on CI and failed
   `main`. The budget did not move.
 - **CI**: the frontend audit blocks on what ships (`npm audit --omit=dev`) and only reports build tools; every job runs on
   `ubuntu-24.04`; `checkout`, `setup-node`, `setup-python` on v7 and `upload-artifact` on v6 (Node.js 24).

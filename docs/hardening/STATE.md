@@ -26,8 +26,8 @@ environment blocks are in the session scratchpad (outside the repo): the CI vari
   `monthly_receipt` template (reuses the trial email's receipt block); 9 service tests + 4 template tests + the mail-client test
 - [x] Finish: records (N-142 to N-146, F-528 to F-530, COVERAGE, CHANGELOG, STATE, HANDOFF); `campaign_slices.py --check all`
   exits 0; one Alembic head (up/down/up); frontend `lint`, `typecheck`, `check:self` clean; PR ready; CI green (below)
-- **Verified (local).** Part 1: the GST budget test at `PERF_BUDGET_MULTIPLIER=1`: matching 4.0 to 4.3 s before, 2.3 to 3.2 s after
-  (median about 2.9); equivalence (`test_matching_equivalence.py`, 5 seeded workloads, fails when the day window is narrowed by one
+- **Verified (local).** Part 1: the GST budget test at `PERF_BUDGET_MULTIPLIER=1`: matching 4.0 to 4.3 s before, 2.0 to 2.4 s after
+  (the first attempt, 2.3 to 3.2 s, still took 10.37 s on CI; the collector pause is the second); equivalence (`test_matching_equivalence.py`, 5 seeded workloads, fails when the day window is narrowed by one
   day) and `test_bulk.py`; CI-contract test 8 passed (it failed first on 4 of 8). Part 2: add-on tests 11 + 1 + the Dodo
   reconciliation add-on case, value receipt 34, `dodo_setup` 4; website `typecheck`, `build`, `check:links`, `check:html`,
   `check:a11y` clean, Lighthouse 96 to 100; browser 108 (27), 105/106/107/68/91 (34), 60/62/64 (3), 20 "Billing" (5).

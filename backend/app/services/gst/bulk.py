@@ -10,16 +10,16 @@ columns the callers omit, such as `created_at`)."""
 
 from __future__ import annotations
 
+import csv
 import io
 import json
-from typing import Any, Callable, Mapping, Sequence, Type
+from typing import Any, Iterator, Mapping, Sequence, Type
 
 from sqlalchemy import JSON
 from sqlalchemy.orm import Session
 
 #: rows written per `COPY`: keeps the in-memory text small on a very large return
 CHUNK = 5000
-NULL = "\\N"
 
 
 def insert_rows(db: Session, model: Type[Any], rows: Sequence[Mapping[str, Any]]) -> None:
@@ -28,39 +28,31 @@ def insert_rows(db: Session, model: Type[Any], rows: Sequence[Mapping[str, Any]]
         return
     table = model.__table__
     names = list(rows[0].keys())
-    is_json = [isinstance(table.c[name].type, JSON) for name in names]
-    statement = "COPY {} ({}) FROM STDIN WITH (FORMAT csv, NULL '\\N')".format(
+    json_at = [i for i, name in enumerate(names) if isinstance(table.c[name].type, JSON)]
+    statement = "COPY {} ({}) FROM STDIN WITH (FORMAT csv)".format(
         table.name, ", ".join(f'"{name}"' for name in names))
     cursor = db.connection().connection.cursor()
     try:
         for start in range(0, len(rows), CHUNK):
-            lines = [",".join([_cell(row[name], as_json) for name, as_json in zip(names, is_json)])
-                     for row in rows[start:start + CHUNK]]
-            lines.append("")
-            cursor.copy_expert(statement, io.StringIO("\n".join(lines)))
+            buffer = io.StringIO()
+            # QUOTE_STRINGS (Python 3.12): every text value is quoted, so an empty string and the two characters
+            # backslash-N stay text; a missing value is written bare, which COPY reads as NULL. The csv module does
+            # the quoting in C; everything that is not text (numbers, dates, UUIDs, booleans) is written by `str`.
+            csv.writer(buffer, quoting=csv.QUOTE_STRINGS, lineterminator="\n").writerows(
+                _cells(rows[start:start + CHUNK], names, json_at))
+            buffer.seek(0)
+            cursor.copy_expert(statement, buffer)
     finally:
         cursor.close()
 
 
-def _quoted(text: str) -> str:
-    return '"' + text.replace('"', '""') + '"'
-
-
-#: how each plain Python type is written; text is always quoted, so only a missing value is the bare `\N` that COPY
-#: reads as NULL (a name that is literally backslash-N stays text)
-_WRITERS: dict[type, Callable[[Any], str]] = {
-    str: _quoted, int: str, bool: lambda value: "t" if value else "f", float: repr,
-}
-
-
-def _cell(value: Any, as_json: bool) -> str:
-    """One value as a CSV field."""
-    if value is None:
-        return NULL
-    if as_json:
-        return _quoted(json.dumps(value, default=str))
-    writer = _WRITERS.get(type(value))
-    return writer(value) if writer is not None else _quoted(str(value))
+def _cells(rows: Sequence[Mapping[str, Any]], names: list[str], json_at: list[int]) -> Iterator[list[Any]]:
+    for row in rows:
+        values = [row[name] for name in names]
+        for i in json_at:  # JSON columns go in as their text; None stays NULL
+            if values[i] is not None:
+                values[i] = json.dumps(values[i], default=str)
+        yield values
 
 
 __all__ = ["insert_rows"]

@@ -2,7 +2,7 @@
 
 Sent on the 1st of each month by `app.services.monthly_receipt_email` (`monthly_receipt.send`), only when the receipt
 holds at least one finding; this renderer refuses an empty one rather than write an email that says "nothing found".
-It reuses the trial email's receipt block (`trial_notice.render_receipt_block`): the headline and up to three
+It reuses the trial email's receipt block (`trial_notice.receipt_block`): the headline and up to three
 findings, each with a link to its evidence. One button, to the Overview. The footer names the switch that turns it off
 ("Monthly summary" in the person's notification settings).
 
@@ -15,7 +15,7 @@ from typing import Sequence
 
 from app.templates.emails.base import BASE_EMAIL_HTML_LAYOUT
 from app.templates.emails.common import esc, esc_attr, single_line
-from app.templates.emails.trial_notice import TrialFinding, render_receipt_block
+from app.templates.emails.trial_notice import TrialFinding, receipt_block
 
 NOT_ADVICE = "Figures come from your own documents in Servabo. Not financial or tax advice."
 
@@ -37,7 +37,7 @@ def render_monthly_receipt(
     month = single_line(month_label)
     subject = single_line(f"What {brand_name} found for {organization} in {month}")
     lead = f"Here is what {brand_name} found for {organization} in {month}."
-    found_text, found_html = render_receipt_block(headline, findings)
+    found_text, found_html = receipt_block(headline, findings)
     button = "Open the Overview"
     footer = (
         f"{brand_name} sends this on the 1st of each month to the owners of a paying organization. "

@@ -11,7 +11,7 @@ of their own, N-064; the same zone the receipt's month uses), through the end of
 is made up. The sweep runs hourly.
 
 WHAT. The receipt of the month before (`value_receipt.receipt(..., "month", previous=True)`): the headline and up to
-three findings, each with a link to its evidence (`trial_notice.render_receipt_block`), one button to the Overview.
+three findings, each with a link to its evidence (`trial_notice.receipt_block`), one button to the Overview.
 Nothing is sent when the month holds no finding: an email that says "nothing found" is never written.
 
 ONCE. One `monthly_receipt_sends` row per organization and month is inserted before anything is built (an insert that

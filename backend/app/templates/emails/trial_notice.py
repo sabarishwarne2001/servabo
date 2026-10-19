@@ -57,7 +57,7 @@ def _finding_html(item: TrialFinding) -> str:
     return f"{esc(_finding_line(item))}{link}"
 
 
-def render_receipt_block(headline: str, findings: Sequence[TrialFinding]) -> tuple[str, str]:
+def receipt_block(headline: str, findings: Sequence[TrialFinding]) -> tuple[str, str]:
     """The value receipt as it sits inside an email: `(text, html)` — the headline and at most three findings, each
     with a link to its evidence. Empty strings without a headline (the email carries no figures then). The monthly
     summary reuses this block (Session H)."""
@@ -114,7 +114,7 @@ def render_trial_notice(
         )
         button = "Subscribe"
 
-    found_text, found_html = render_receipt_block(headline, findings)
+    found_text, found_html = receipt_block(headline, findings)
 
     text_body = f"Hello,\n\n{lead}\n\n{found_text}{after}\n\n{button}: {plans_link}\n"
     content_html = f"""<p>Hello,</p>
@@ -136,4 +136,4 @@ def render_trial_notice(
     return subject, html_body, text_body
 
 
-__all__ = ["MAX_FINDINGS", "TrialFinding", "render_receipt_block", "render_trial_notice"]
+__all__ = ["MAX_FINDINGS", "TrialFinding", "receipt_block", "render_trial_notice"]

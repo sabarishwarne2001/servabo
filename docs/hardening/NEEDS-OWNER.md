@@ -2033,7 +2033,9 @@ invoices, budget 5 s times 2 for a shared machine) took 11.48 s there. It passed
 **The budget and the multiplier were not changed**; the code was. The slowest part was not the comparing but storing
 the 11,457 result rows (now one bulk `COPY`, proven to store exactly what the old insert stored), plus a lookup by
 supplier and day instead of scanning every invoice of the supplier. On the sandbox, matching went from 4.0 to 4.3 s to
-2.3 to 3.2 s, and the import from 2.7 to 3.2 s to 1.5 to 2.0 s. Figures and method: `PERFORMANCE.md`.
+2.0 to 2.4 s, and the import from 2.7 to 3.2 s to 1.3 to 1.7 s. The first attempt (bulk write only) still took 10.37 s on CI, so the
+collector is also paused while a recompute or an import builds its objects (`gcpause.py`; a process-wide switch, counted and
+always undone). Figures and method: `PERFORMANCE.md`.
 
 ## N-143 — The frontend audit blocks on what ships, and only reports the build tools (DECIDED (Session H))
 

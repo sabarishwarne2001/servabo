@@ -19,6 +19,7 @@ from app.models.gst import GstReturn, GstReturnRecord
 from app.models.workspace import Workspace
 from app.services import audit_service
 from app.services.gst import bulk, engine, parse
+from app.services.gst.gcpause import collector_paused
 from app.services.gst import vocabulary as v
 
 IMPORTED = "IMPORTED"
@@ -82,8 +83,9 @@ def import_parsed(db: Session, *, workspace: Workspace, parsed: parse.ParsedRetu
 def import_file(db: Session, *, workspace: Workspace, user_id: Optional[uuid.UUID], file_name: str,
                 data: bytes) -> list[dict[str, Any]]:
     """Import an uploaded `.json` or `.zip`. Raises `parse.ReturnFileError` (a sentence a person can act on)."""
-    return [import_parsed(db, workspace=workspace, parsed=parsed, user_id=user_id)
-            for parsed in parse.parse_file(file_name, data)]
+    with collector_paused():  # a return is tens of thousands of small objects and no cycles: see gcpause.py
+        return [import_parsed(db, workspace=workspace, parsed=parsed, user_id=user_id)
+                for parsed in parse.parse_file(file_name, data)]
 
 
 __all__ = ["IMPORTED", "REPLACED", "UNCHANGED", "import_file", "import_parsed"]
