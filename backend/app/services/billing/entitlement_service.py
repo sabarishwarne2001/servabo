@@ -81,6 +81,9 @@ class AddonOffer:
     #: and in the console, so it must be true of `addon_service.halt_resources`.
     halt_effect: str
     resource_noun: str
+    #: Plan keys (`quota_tier.key`) whose organizations may buy this add-on. Empty: any plan that does not already
+    #: bundle it. GST Credit is sold to Developer only: Free chooses a plan first, Business and Enterprise include it.
+    sold_on_tiers: tuple[str, ...] = ()
 
 
 ADDON_CATALOG: dict[str, AddonOffer] = {
@@ -115,6 +118,23 @@ ADDON_CATALOG: dict[str, AddonOffer] = {
             "kept"
         ),
         resource_noun="warehouse destination",
+    ),
+    entitlements.GST_CREDIT_ADDON: AddonOffer(
+        key=entitlements.GST_CREDIT_ADDON,
+        display_name="GST Credit",
+        description=(
+            "The full GST Credit list for your GSTR-2B: every supplier and invoice with the Invoice Management "
+            "System (IMS) recommendation, your decisions, the Excel export and reminders to suppliers."
+        ),
+        monthly_price_micros=49_000_000,
+        currency="USD",
+        product_setting="DODO_ADDON_PRODUCT_GST_CREDIT",
+        halt_effect=(
+            "the full GST Credit lists return to the preview. Your imports, matches and decisions are kept, "
+            "and everything comes back at once when you add it again"
+        ),
+        resource_noun="imported GSTR-2B statement",
+        sold_on_tiers=("developer",),
     ),
 }
 
@@ -241,9 +261,36 @@ def live_resource_count(
         stmt = select(func.count()).select_from(WarehouseDestination).where(
             WarehouseDestination.organization_id == organization_id,
         )
+    elif addon_key == entitlements.GST_CREDIT_ADDON:
+        return _gst_statements_at_stake(db, organization_id=organization_id)
     else:
         raise UnknownAddonError(f"{addon_key!r} is not a known add-on.")
     return int(db.execute(stmt).scalar_one() or 0)
+
+
+def _gst_statements_at_stake(db: Session, *, organization_id: uuid.UUID) -> int:
+    """Imported GSTR-2B statements an ended GST Credit add-on would put back behind the preview.
+
+    Nothing is switched off or deleted when it ends, so this only decides whether a cancellation is announced and
+    given the usual grace period. It counts only for an organization that actually bought the add-on: one that never
+    did has imported statements too (importing is part of the preview), and "resources that predate gating" must
+    not hand it fourteen days of the full list."""
+    from app.models.gst import GstReturn
+    from app.services.gst import vocabulary as gst_vocabulary
+
+    bought = db.execute(
+        select(OrganizationAddon.id).where(
+            OrganizationAddon.organization_id == organization_id,
+            OrganizationAddon.addon_key == entitlements.GST_CREDIT_ADDON,
+            OrganizationAddon.gateway_subscription_id.is_not(None),
+        )
+    ).first()
+    if bought is None:
+        return 0
+    return int(db.execute(
+        select(func.count()).select_from(GstReturn).where(
+            GstReturn.organization_id == organization_id, GstReturn.status == gst_vocabulary.RETURN_ACTIVE)
+    ).scalar_one() or 0)
 
 
 def addon_access(
@@ -301,6 +348,26 @@ def purchasable(addon_key: str) -> bool:
     )
 
 
+def sold_on(db: Session, addon_key: str) -> list[str]:
+    """Display names of the plans that may buy this add-on ([] means any plan that does not bundle it)."""
+    from app.services import quota_service
+
+    keys = offer_for(addon_key).sold_on_tiers
+    published = {tier.key: tier.display_name for tier in quota_service.list_published_tiers(db, at=utcnow())}
+    return [published.get(key, key.title()) for key in keys]
+
+
+def offered_on_plan(db: Session, *, organization_id: uuid.UUID, addon_key: str) -> bool:
+    """Whether this organization's plan is one the add-on is sold on (every plan, when the offer names none)."""
+    from app.services import quota_service
+
+    keys = offer_for(addon_key).sold_on_tiers
+    if not keys:
+        return True
+    tier = quota_service.resolve_tier(db, organization_id=organization_id)
+    return tier is not None and tier.key in keys
+
+
 def tiers_including(db: Session, addon_key: str) -> list[str]:
     """Display names of published tiers in force that bundle this add-on."""
     from app.services import quota_service
@@ -328,9 +395,11 @@ __all__ = [
     "ledger_row",
     "live_resource_count",
     "offer_for",
+    "offered_on_plan",
     "on_hold_grace_period",
     "purchasable",
     "purchase_grants",
+    "sold_on",
     "tier_grants",
     "tiers_including",
     "utcnow",

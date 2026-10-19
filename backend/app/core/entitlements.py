@@ -140,6 +140,7 @@ __all__ = [
     "CANONICAL_MAX_COST_MICROS",
     "CUSTOM_DOMAIN_ADDON",
     "WAREHOUSE_SYNC_ADDON",
+    "GST_CREDIT_ADDON",
     "CANONICAL_OVERAGE_POLICY",
     "CANONICAL_PERIOD",
     "ENTITLEMENT_KEYS",
@@ -170,6 +171,11 @@ CUSTOM_DOMAIN_ADDON: str = "addon.custom_domain"
 
 #: ARCH-30 Tranche 2 (D-8). Scheduled exports into the tenant's warehouse.
 WAREHOUSE_SYNC_ADDON: str = "addon.warehouse_sync"
+
+#: Session H (N-145). GST Credit for a Developer organization: the supplier and invoice lists, IMS recommendations,
+#: decisions, the export and the reminders, which Business and Enterprise get as `capability.gst_credit`. Bundled into
+#: Business and Enterprise, purchasable on Developer only.
+GST_CREDIT_ADDON: str = "addon.gst_credit"
 
 #: ARCH31-S0:capability-reconciliation-key. Three-way procurement
 #: matching. A CAPABILITY, not an ADDON, and the distinction is
@@ -431,7 +437,7 @@ CAPABILITY_KEYS: tuple[str, ...] = (
 
 #: Every add-on key. `entitlement_service` asserts its catalog equals this set
 #: at import, so a key cannot be registered without a price and a halt effect.
-ADDON_KEYS: tuple[str, ...] = (CUSTOM_DOMAIN_ADDON, WAREHOUSE_SYNC_ADDON)
+ADDON_KEYS: tuple[str, ...] = (CUSTOM_DOMAIN_ADDON, WAREHOUSE_SYNC_ADDON, GST_CREDIT_ADDON)
 
 _ENTITLEMENTS: tuple[Entitlement, ...] = (
     Entitlement(
@@ -454,6 +460,14 @@ _ENTITLEMENTS: tuple[Entitlement, ...] = (
         description=(
             "Warehouse sync: register destinations and run scheduled exports. "
             "Bundled with Enterprise; purchasable on other plans."
+        ),
+    ),
+    Entitlement(
+        name=GST_CREDIT_ADDON,
+        description=(
+            "GST Credit as an add-on: the supplier and invoice lists, IMS recommendations, decisions, the export and "
+            "supplier reminders, for a Developer organization. Bundled with Business and Enterprise (as "
+            "capability.gst_credit); purchasable on Developer only."
         ),
     ),
     # ARCH31-S0:capability-reconciliation-entitlement

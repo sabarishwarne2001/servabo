@@ -75,6 +75,7 @@ GRACE_ENDING_NOTICE = timedelta(days=3)
 _RESOURCE_TYPES = {
     entitlements.CUSTOM_DOMAIN_ADDON: AuditResourceType.CUSTOM_DOMAIN,
     entitlements.WAREHOUSE_SYNC_ADDON: AuditResourceType.WAREHOUSE_DESTINATION,
+    entitlements.GST_CREDIT_ADDON: AuditResourceType.GST_RETURN,
 }
 
 
@@ -84,6 +85,10 @@ class AddonError(Exception):
 
 class AddonAlreadyGrantedError(AddonError):
     """The organization already has this add-on; a checkout would double-bill."""
+
+
+class AddonNotOfferedError(AddonError):
+    """The add-on is not sold on this organization's plan (GST Credit is sold to Developer only)."""
 
 
 class AddonPurchaseConflictError(AddonError):
@@ -422,6 +427,11 @@ def halt_resources(
         )
         return {"schedules_paused": paused}
 
+    if addon_key == entitlements.GST_CREDIT_ADDON:
+        # Nothing is switched off and nothing is deleted: the page returns to the preview and the imports, matches
+        # and decisions stay where they are, ready for the day the add-on is bought again.
+        return {"returned_to_preview": True}
+
     raise entitlement_service.UnknownAddonError(f"{addon_key!r} is not a known add-on.")
 
 
@@ -504,6 +514,13 @@ def create_addon_checkout(
             "Starting a checkout would bill for something already provided."
         )
 
+    if not entitlement_service.offered_on_plan(db, organization_id=organization_id, addon_key=addon_key):
+        plans = " or ".join(entitlement_service.sold_on(db, addon_key)) or "a plan that sells it"
+        raise AddonNotOfferedError(
+            f"{offer.display_name} is an add-on for the {plans} plan. Choose {plans} first and add it there, "
+            "or choose a plan that includes it."
+        )
+
     if not entitlement_service.purchasable(addon_key):
         raise portal_service.CheckoutConfigurationError(
             f"{offer.display_name} is not available for self-serve purchase on "
@@ -555,6 +572,7 @@ def create_addon_checkout(
 __all__ = [
     "AddonAlreadyGrantedError",
     "AddonError",
+    "AddonNotOfferedError",
     "AddonPurchaseConflictError",
     "GRACE_ENDING_NOTICE",
     "create_addon_checkout",

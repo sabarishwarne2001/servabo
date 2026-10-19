@@ -8,7 +8,7 @@ adapter (D-9) and writes Servabo's state. Nothing is mocked between the webhook 
 
 Covered: subscription.active, renewed, on_hold, failed, cancelled, expired, plan_changed and
 updated; payment.succeeded and payment.failed; deliveries out of order and replayed; the on-hold
-grace ending in read-only, and recovery; add-on subscriptions (custom domain, warehouse sync);
+grace ending in read-only, and recovery; add-on subscriptions (custom domain, warehouse sync, GST Credit);
 adoption of the customer Dodo creates at checkout, including two checkouts racing.
 """
 
@@ -62,8 +62,10 @@ def dodo(monkeypatch: pytest.MonkeyPatch):
         fake.add_product(name="Developer", price=DEVELOPER_PRICE, product_id="pdt_developer")
         fake.add_product(name="Custom domains", price=19_900, product_id="pdt_custom_domain")
         fake.add_product(name="Warehouse sync", price=30_000, product_id="pdt_warehouse_sync")
+        fake.add_product(name="GST Credit", price=4_900, product_id="pdt_gst_credit")
         monkeypatch.setattr(settings, "DODO_ADDON_PRODUCT_CUSTOM_DOMAIN", "pdt_custom_domain")
         monkeypatch.setattr(settings, "DODO_ADDON_PRODUCT_WAREHOUSE_SYNC", "pdt_warehouse_sync")
+        monkeypatch.setattr(settings, "DODO_ADDON_PRODUCT_GST_CREDIT", "pdt_gst_credit")
         yield fake
     reset_dodo_gateway()
 
@@ -351,6 +353,7 @@ def test_a_replayed_delivery_is_stored_once_and_applied_once(dodo, client, db, o
 @pytest.mark.parametrize("addon,product", [
     (entitlements.CUSTOM_DOMAIN_ADDON, "pdt_custom_domain"),
     (entitlements.WAREHOUSE_SYNC_ADDON, "pdt_warehouse_sync"),
+    (entitlements.GST_CREDIT_ADDON, "pdt_gst_credit"),  # Session H
 ])
 def test_an_add_on_subscription_is_recorded_on_the_add_on_ledger(dodo, client, db, org, addon, product) -> None:
     subscribe(dodo, client, db, org)  # the plan first

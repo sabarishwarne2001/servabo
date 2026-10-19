@@ -96,6 +96,8 @@ def to_pdf(receipt: dict[str, Any], *, created: Optional[datetime] = None) -> by
     if receipt.get("also_on_business"):
         w.heading("Business also checks", size=11)
         w.para(", ".join(receipt["also_on_business"]) + ".", size=9)
+    if receipt.get("gst_add_on_line"):
+        w.para(receipt["gst_add_on_line"] + ".", size=9)
 
     return w.finish(title=f"Servabo value receipt - {receipt.get('organization_name') or ''}",
                     subject="What Servabo found in the organization's own documents", created=created,

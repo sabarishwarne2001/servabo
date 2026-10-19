@@ -14,7 +14,7 @@ in the containers unless you add it to the service's `environment:` in `docker-c
 is not read by any code, is missing from this page, or is one production cannot run without and
 is missing from `.env.production.template` (or does not stop the app from starting when unset).
 
-296 settings. Columns: name, type, default, where it appears (`example` =
+297 settings. Columns: name, type, default, where it appears (`example` =
 `.env.example`, `production` = `.env.production.template`, `guard` = checked by the production
 guard), and the comment written above it in the code.
 
@@ -297,6 +297,7 @@ guard), and the comment written above it in the code.
 | `DODO_MAX_WEBHOOK_BODY_BYTES` | `int` | `512 * 1024` | — |  |
 | `DODO_ADDON_PRODUCT_CUSTOM_DOMAIN` | `str \| None` | `None` | example, production | Dodo product ids for purchasable add-ons. Test and live ids differ, so these are environment values, never literals in code. Unset means the add-on is not self-serve on this deployment and the console says so. |
 | `DODO_ADDON_PRODUCT_WAREHOUSE_SYNC` | `str \| None` | `None` | example, production |  |
+| `DODO_ADDON_PRODUCT_GST_CREDIT` | `str \| None` | `None` | example, production |  |
 | `BILLING_ADDON_GRACE_DAYS` | `int` | `14` | — | D-6. Days existing add-on resources keep working after the grant ends. |
 | `BILLING_ON_HOLD_GRACE_DAYS` | `int` | `13` | — | D-11. Days of full access after a renewal failure. Matches Dodo's default Payment Retries recovery window, so access ends when retries do. |
 | `BILLING_LAPSED_TIER_KEY` | `str` | `'free'` | — | The tier an organization falls back to when its subscription ends. |

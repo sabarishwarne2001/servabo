@@ -67,7 +67,7 @@ class OrganizationAddon(Base, UUIDMixin, TimestampMixin):
 
     __table_args__ = (
         CheckConstraint(
-            "addon_key IN ('addon.custom_domain', 'addon.warehouse_sync')",
+            "addon_key IN ('addon.custom_domain', 'addon.warehouse_sync', 'addon.gst_credit')",
             name="ck_organization_addons_key_known",
         ),
         CheckConstraint(

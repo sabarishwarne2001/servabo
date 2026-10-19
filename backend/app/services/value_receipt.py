@@ -413,7 +413,9 @@ def headline(period: str, work: dict[str, int], found: list[dict[str, Any]]) -> 
 
 
 def _also_on_business(db: Session, organization_id: uuid.UUID, now: datetime) -> list[str]:
-    """The names of the checks Business adds that this organization does not have. Names only, never numbers."""
+    """The names of the checks Business adds that this organization does not have. Names only, never numbers.
+
+    On Developer the GST supplier list is named by `_gst_add_on_line` instead (it is also a $49 add-on there)."""
     from app.api import capability_gate
     from app.services import quota_service
 
@@ -424,9 +426,26 @@ def _also_on_business(db: Session, organization_id: uuid.UUID, now: datetime) ->
     if business is None:
         return []
     granted = {entry.limit_key for entry in business.entries}
+    skip = {entitlements.GST_CREDIT_CAPABILITY} if tier.key == "developer" else set()
     return [name for key, name in BUSINESS_ADDS
-            if key in granted and not capability_gate.has_capability(db, organization_id=organization_id,
-                                                                     capability_key=key)]
+            if key in granted and key not in skip
+            and not capability_gate.has_capability(db, organization_id=organization_id, capability_key=key)]
+
+
+def _gst_add_on_line(db: Session, organization_id: uuid.UUID) -> Optional[str]:
+    """For a Developer organization without GST Credit: the add-on or Business, in one sentence. Else None."""
+    from app.services import quota_service
+    from app.services.billing import entitlement_service
+
+    tier = quota_service.resolve_tier(db, organization_id=organization_id)
+    if tier is None or tier.key not in entitlement_service.offer_for(entitlements.GST_CREDIT_ADDON).sold_on_tiers:
+        return None
+    if entitlement_service.addon_access(db, organization_id=organization_id,
+                                        addon_key=entitlements.GST_CREDIT_ADDON).can_maintain:
+        return None
+    offer = entitlement_service.offer_for(entitlements.GST_CREDIT_ADDON)
+    return (f"{offer.display_name} add-on ({_SYMBOLS.get(offer.currency, '')}{offer.monthly_price_micros // 1_000_000}"
+            f"/month) or Business: GST's supplier list")
 
 
 # ------------------------------------------------------------------------------------------------ the receipt
@@ -470,6 +489,7 @@ def receipt(db: Session, organization_id: uuid.UUID, period: str, *, now: Option
         "period_start": start.isoformat(), "period_end": end.isoformat(), "timezone": zone_name,
         "work": work, "found": found, "headline": headline(period, work, found),
         "also_on_business": _also_on_business(db, organization_id, moment),
+        "gst_add_on_line": _gst_add_on_line(db, organization_id),
         "organization_name": organization.name,
         "note": "Figures come from your own documents in Servabo. Not financial or tax advice.",
     }

@@ -832,6 +832,7 @@ class Settings(BaseSettings):
     # add-on is not self-serve on this deployment and the console says so.
     DODO_ADDON_PRODUCT_CUSTOM_DOMAIN: str | None = None
     DODO_ADDON_PRODUCT_WAREHOUSE_SYNC: str | None = None
+    DODO_ADDON_PRODUCT_GST_CREDIT: str | None = None
     # D-6. Days existing add-on resources keep working after the grant ends.
     BILLING_ADDON_GRACE_DAYS: int = 14
     # D-11. Days of full access after a renewal failure. Matches Dodo's default

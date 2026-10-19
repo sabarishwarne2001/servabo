@@ -18,6 +18,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
+from app.core import entitlements
 from app.models.gst import GstMatch
 from app.models.helm import HelmBacktest, HelmBook, HelmValueEvent
 from app.models.payment_risk import PaymentRiskFlag
@@ -379,3 +380,27 @@ def test_the_receipt_reads_and_never_writes(db_session, world):
     after = {t: db_session.execute(__import__("sqlalchemy").text(f"select count(*) from {t}")).scalar_one()
              for t in before}
     assert before == after
+
+
+def test_a_developer_organization_is_offered_the_gst_credit_add_on_or_business(db_session, world):
+    """Session H: on Developer the GST list is not only a Business feature, it is also a $49 add-on, and the receipt says so."""
+    from app.services.billing import addon_service
+
+    put_on_plan(db_session, world.organization, "developer")
+    vr.forget(world.organization.id)
+    body = vr.receipt(db_session, world.organization.id, "trial", now=NOW)
+    assert body["gst_add_on_line"] == "GST Credit add-on ($49/month) or Business: GST's supplier list"
+    assert "GST's supplier list" not in body["also_on_business"]          # said once, in the add-on's own line
+    assert "Helm's full planning" in body["also_on_business"]
+
+    addon_service.record_purchase_state(db_session, organization_id=world.organization.id,
+                                        addon_key=entitlements.GST_CREDIT_ADDON, gateway="DODO",
+                                        gateway_subscription_id="sub_receipt", gateway_status="active", state_version=1)
+    vr.forget(world.organization.id)
+    bought = vr.receipt(db_session, world.organization.id, "trial", now=NOW)
+    assert bought["gst_add_on_line"] is None and "GST's supplier list" not in bought["also_on_business"]
+
+    put_on_plan(db_session, world.organization, "free")
+    vr.forget(world.organization.id)
+    free = vr.receipt(db_session, world.organization.id, "trial", now=NOW)
+    assert free["gst_add_on_line"] is None and "GST's supplier list" in free["also_on_business"]
