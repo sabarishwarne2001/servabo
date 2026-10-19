@@ -43,7 +43,9 @@ def _risk_view(risk: Optional[dict[str, Any]], today: date) -> Optional[dict[str
 
 def serialise(match: GstMatch, today: date) -> dict[str, Any]:
     return {
-        "id": str(match.id), "gstin": match.gstin, "record_id": str(match.record_id) if match.record_id else None,
+        # The match rows are rebuilt on every reconciliation, so their own ids do not last; a line is named by the
+        # supplier record (kept until the period is imported again) or, with none, by the book document.
+        "id": str(match.record_id or match.work_item_id), "gstin": match.gstin, "record_id": str(match.record_id) if match.record_id else None,
         "work_item_id": str(match.work_item_id) if match.work_item_id else None,
         "status": match.status, "status_text": v.STATUS_EXPLANATIONS.get(match.status, ""), "method": match.method,
         "supplier_gstin": match.supplier_gstin, "supplier_name": match.supplier_name, "number": match.doc_number,
