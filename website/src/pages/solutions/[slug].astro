@@ -63,6 +63,16 @@ const recommended = used
     </ol>
   </section>
 
+  {solution.more && (
+    <section class="page mt-12" aria-label="Read next">
+      <a href={solution.more.href} class="sheet block p-6 transition-shadow hover:shadow-elevation-2">
+        <p class="eyebrow">Read next</p>
+        <p class="h3 mt-2">{solution.more.label}</p>
+        <p class="mt-2 leading-relaxed text-muted-foreground">{solution.more.body}</p>
+      </a>
+    </section>
+  )}
+
   <section class="page mt-20" aria-labelledby="engines">
     <h2 id="engines" class="h2">The engines it uses</h2>
     <ul class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -125,6 +125,9 @@ class AuditResourceType(str, PyEnum):
     HELM_BACKTEST = "HELM_BACKTEST"
     HELM_TASK = "HELM_TASK"
     HELM_BANK = "HELM_BANK"
+    # Session F: GST Credit. Added to the PostgreSQL type by g1a1_gst_credit.
+    GST_RETURN = "GST_RETURN"
+    GST_MATCH = "GST_MATCH"
 
 
 class AuditAction(str, PyEnum):

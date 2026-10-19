@@ -247,6 +247,13 @@ def _store_extraction(db: Session, target: _Target, result: OCRResult) -> None:
             **result.summary(),
             "pages": [page.as_dict() for page in result.pages],
         }
+        # Session F (stretch): an e-invoice's QR code, read here because only this image has OpenCV. The enrich
+        # worker reads and trusts the token (app/services/gst/einvoice.py). Never raises.
+        from app.services.gst import einvoice_scan
+
+        codes = einvoice_scan.scan_work_item(work_item)
+        if codes:
+            work_item.extraction_metadata = {**work_item.extraction_metadata, "qr_codes": codes}
     db.flush([work_item])
 
 

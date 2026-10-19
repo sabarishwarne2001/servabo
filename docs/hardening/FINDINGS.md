@@ -3515,3 +3515,13 @@ New findings start at F-518.
 - *Spec 94 leaves an INR price book in force*: global state that cannot be undone from the console (N-134).
   The rule for specs is written in `frontend/e2e/README.md`.
 
+## Session F: finance-grade invoice reading and GST Credit (2026-10-19)
+
+Findings start at F-524.
+
+| ID | Severity | Area | Finding | Evidence | Status |
+|---|---|---|---|---|---|
+| F-524 | High | Extraction | **The real model was never asked for the fields Helm reads.** The production extraction prompt asked an invoice, receipt or purchase order for six fields (vendor name, total, currency, tax, line items, date). Helm's ledger, three-way matching, duplicate and bank-account checks, ERP posting and the corroborator read invoice number, due date, payment terms, PO number, GSTINs, the bank account, Udyam number and more. The browser suite's model stand-in (`frontend/e2e/support/llm-mock.mjs`) returned those fields although the prompt never asked for them, so every test passed while a real model would most likely have left Helm half-blind (no due dates from the invoice, no GSTIN to tell a purchase from a sale, no bank account to check). | `tests/services/test_extraction_prompt_contract.py`: 38 of 47 checks failed on the old prompt (for example the stand-in returned `invoice_number`, `due_date`, `po_number`, `vendor_address`, `vendor_bank_account`, `payment_terms`, `customer_name` that the prompt never asked for), all 47 pass on the new one; 478 reader tests (Helm, batches, corroboration, ERP posting, extraction memory) still pass. **Unverified with a real model**: HANDOFF asks Session D to run a real GST invoice through the new schema. | Fixed (unverified with a real model) |
+| F-525 | Low | Coverage ledger | **Two identity routes had no ledger row** (`GET` and `DELETE …/idp-configs/{id}/role-mappings`, added in Session E), so `campaign_slices.py --check all` failed on `main` too. They are proven by `test_identity_console_setup_live.py`; the rows are added. | `campaign_slices.py --check all`: 2 missing rows before, 0 after | Fixed |
+| F-526 | Medium | e-invoice QR (new) | **OpenCV's standard QR detector cannot read the dense codes an e-invoice has** (a signed token of about 900 characters is QR version 20 or more): it failed on every code above roughly version 18, and its own encoder's output above version 10. The WeChat detector (contrib, no model file) reads them all, so it is tried first, then the Aruco and standard ones. | `test_a_dense_qr_code_is_found_in_a_png_and_in_a_pdf` (generated codes, boxes 3 and 6; PDF render) | Fixed |
+

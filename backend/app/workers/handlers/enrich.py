@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import uuid
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -282,6 +283,14 @@ def _enrich(db: Session, target: _Target) -> dict[str, Any]:
                 "extraction_memory_filled": filled,
             }
     entities["classification_details"] = classification
+    if enrichment["entities"] and re.search(r"invoice|credit note|debit note", str(document_class), re.I):
+        # Session F (stretch): an e-invoice's QR code carries its IRN, GSTINs, number, date and value. Never raises.
+        from app.services.gst import einvoice
+
+        qr_record = einvoice.enrich_work_item(entities, work_item)  # from the OCR worker's `qr_codes`
+        if qr_record is not None:
+            stats["einvoice_qr"] = len(qr_record["filled"]) + len(qr_record["overridden"])
+            work_item.extraction_metadata = {**(work_item.extraction_metadata or {}), "einvoice_qr": qr_record}
 
     summary = None
     if enrichment["summary"]:

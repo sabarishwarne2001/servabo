@@ -1,1 +1,2 @@
 pytest-env
+qrcode==8.0  # tests: generated e-invoice QR codes (app/services/gst/einvoice.py)

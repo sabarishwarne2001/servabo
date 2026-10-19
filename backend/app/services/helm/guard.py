@@ -217,6 +217,12 @@ def guard(action: ActionView, snapshot: Snapshot, mandates: Sequence[base.Active
     else:
         checks.append(_skip("price", "Within the agreed price", "Not a payment."))
 
+    # GST credit (India): is the credit on this invoice secured by the supplier's report? ------------
+    if payable is not None and action.kind in PAYING_ACTIONS:
+        checks.append(_gst_check(payable))
+    else:
+        checks.append(_skip("gst", "GST credit secured", "Not a payment."))
+
     # account ----------------------------------------------------------------------------------
     checks.append(base.check("account", "The organization is writable", snapshot.account_writable,
                              detail="The organization is active and paid up." if snapshot.account_writable else
@@ -299,6 +305,30 @@ def guard(action: ActionView, snapshot: Snapshot, mandates: Sequence[base.Active
     passed = not any(c.result == v.CHECK_FAIL for c in checks)
     needs = any(c.result == v.CHECK_APPROVAL for c in checks)
     return GuardResult(passed=passed, needs_approval=needs, checks=checks)
+
+
+def _gst_check(payable) -> base.Check:
+    """Pass when the invoice is in the supplier's GSTR-2B; needs approval when it is not and a GSTR-2B for its month
+    was imported (the credit is not secured: Section 16(2)(aa)); not applicable when it carries no GST or no GSTR-2B
+    covers it. A recommendation: a person may still pay (the credit is deferred, not lost)."""
+    title = "GST credit secured"
+    if not payable.gst_micros:
+        return _skip("gst", title, "The invoice carries no GST.")
+    if payable.gst_status is None or not payable.gst_period_imported:
+        return _skip("gst", title, "No GSTR-2B has been imported for this invoice's month, so Helm cannot say.")
+    evidence = {"gst_status": payable.gst_status, "gst_micros": payable.gst_micros}
+    if payable.gst_status in ("MATCHED", "MATCHED_WITH_DIFFERENCES"):
+        return base.Check("gst", title, v.CHECK_PASS,
+                          "The supplier has reported this invoice in GSTR-2B"
+                          + (" (an amount differs; claim the lower figure)." if payable.gst_status ==
+                             "MATCHED_WITH_DIFFERENCES" else "."), evidence)
+    if payable.gst_waiting:
+        return base.Check("gst", title, v.CHECK_APPROVAL,
+                          f"The supplier has not reported this invoice in the GSTR-2B you imported, so "
+                          f"{money.say(payable.gst_micros, payable.currency)} of GST credit cannot be claimed yet "
+                          "(Section 16(2)(aa)). A person decides whether to pay now; it is a recommendation, not tax "
+                          "advice.", evidence)
+    return _skip("gst", title, "GSTR-2B gives no clear answer for this invoice yet.")
 
 
 def _pct(bps: int):

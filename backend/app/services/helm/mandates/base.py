@@ -266,6 +266,9 @@ class Template:
     #: Several mandates may use it, each with its own rule (the custom condition); the gallery keeps
     #: offering it after the first. An identical one is still refused as a duplicate.
     repeatable: bool = False
+    #: Offered to everyone on the first run (the book's business type permitting)? A mandate that is off until
+    #: someone chooses it (GST: hold until reported) is in the gallery but not among the recommended.
+    recommend: bool = True
 
 
 def hold_code_of(template: Template, mandate: ActiveMandate) -> Optional[str]:
@@ -288,6 +291,7 @@ CATEGORY_PAYMENT_PROTECTED = "PAYMENT_PROTECTED"  # a payment into an unverified
 CATEGORY_CONTROL = "CONTROL"  # an invoice paid without a required PO
 CATEGORY_CASH_FLOOR = "CASH_FLOOR"
 CATEGORY_MSME_LATE = "MSME_LATE"
+CATEGORY_GST_180 = "GST_180_LATE"
 CATEGORY_RENEWAL = "RENEWAL_MISSED"
 CATEGORY_DOCUMENT = "DOCUMENT_EXPIRED"
 CATEGORY_RECEIVABLE = "RECEIVABLE_LATE"
@@ -326,7 +330,7 @@ __all__ = [
     "ActiveMandate", "BREACHED", "Candidate", "Check", "Chip", "DRIFTING", "DRIFT_STATES", "Drift", "Finding",
     "GROUPS", "GROUP_CONTRACTS", "GROUP_CUSTOM", "GROUP_INDIA", "GROUP_OPERATIONS", "GROUP_PROTECT",
     "GROUP_RECEIVABLES", "GROUP_RUN", "HOLDING", "OptimizerTerms", "Readback", "Risk", "Template", "UNKNOWN",
-    "CATEGORY_CASH_FLOOR", "CATEGORY_CONTROL", "CATEGORY_DOCUMENT", "CATEGORY_MSME_LATE", "CATEGORY_PAYMENT_PROTECTED",
+    "CATEGORY_CASH_FLOOR", "CATEGORY_CONTROL", "CATEGORY_DOCUMENT", "CATEGORY_GST_180", "CATEGORY_MSME_LATE", "CATEGORY_PAYMENT_PROTECTED",
     "CATEGORY_CUSTOM", "CATEGORY_RECEIVABLE", "CATEGORY_RENEWAL", "Problems", "evidence_of", "hold_code_of",
     "release_candidate", "seen_on", "check", "in_scope", "payables_in_scope", "readback",
 ]

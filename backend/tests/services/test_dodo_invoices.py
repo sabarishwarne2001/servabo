@@ -39,7 +39,7 @@ def invoices(db, organization_id) -> list[Invoice]:
     db.expire_all()
     return list(db.execute(
         select(Invoice).join(BillingAccount, BillingAccount.id == Invoice.billing_account_id)
-        .where(BillingAccount.organization_id == organization_id).order_by(Invoice.created_at)).scalars())
+        .where(BillingAccount.organization_id == organization_id).order_by(Invoice.created_at, Invoice.number)).scalars())
 
 
 def payment_ids(dodo, subscription_id: str) -> list[str]:

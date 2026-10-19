@@ -16,6 +16,7 @@ import {
   CreditCard,
   FileText,
   GitCompareArrows,
+  ReceiptIndianRupee,
   GitCompare,
   Handshake,
   History,
@@ -87,7 +88,9 @@ import {
   platformRevopsPath,
   platformJobsPath,
   organizationEgressPath,
+  organizationGstPath,
   procurementPath,
+  gstPath,
   procurementPoliciesPath,
   radarPath,
   verificationPath,
@@ -334,6 +337,17 @@ export const buildWorkspaceNavigationGroups = (
         description: "Invoice, purchase order and receipt reconciliation cases",
         capability: CAPABILITY.reconciliation,
         keywords: ["procurement", "invoice matching", "po", "grn", "accounts payable"],
+      },
+      // Session F: GST Credit. No `capability` here on purpose: importing a GSTR-2B and the headline figures are
+      // the preview, open on every plan; the page itself locks the lists and opens the upgrade dialog.
+      {
+        id: "gst",
+        name: "GST credit",
+        route: "workspaceGst",
+        path: gstPath(orgSlug, workspaceSlug),
+        icon: ReceiptIndianRupee,
+        description: "Match your purchase invoices with GSTR-2B: credit you can claim, suppliers who have not reported, and what to do in IMS",
+        keywords: ["gst", "gstr-2b", "gstr2b", "input tax credit", "itc", "ims", "reconciliation", "supplier", "180 days", "india"],
       },
       // ARCH47-S2:nav-erp
       {
@@ -671,6 +685,17 @@ export const buildOrganizationNavigationItems = (
       name: "Audit log",
       path: organizationAuditPath(orgSlug),
       icon: ScrollText,
+    });
+  }
+
+  // GST credit across every workspace (Enterprise, read-only): owners, admins and billing, like Helm's plan across
+  // every workspace. Plan-gated on the page and on the API.
+  if (role === "OWNER" || role === "ADMIN" || role === "BILLING") {
+    items.push({
+      name: "GST credit, all workspaces",
+      path: organizationGstPath(orgSlug),
+      capability: CAPABILITY.gstCreditAllWorkspaces,
+      icon: ReceiptIndianRupee,
     });
   }
 

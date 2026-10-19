@@ -1,4 +1,4 @@
-// Lighthouse on the home page, pricing and Helm: every category at least 95 (performance,
+// Lighthouse on the home page, pricing, Helm and GST credit: every category at least 95 (performance,
 // accessibility, best practices, SEO). Runs Lighthouse's default (mobile) profile against the
 // built site served with its real headers, in Playwright's Chromium.
 import lighthouse from "lighthouse";
@@ -8,7 +8,7 @@ import { chromium } from "@playwright/test";
 import { serve } from "./serve-dist.mjs";
 
 const MIN = Number(process.env.LIGHTHOUSE_MIN ?? 95);
-const PAGES = ["/", "/pricing", "/helm"];
+const PAGES = ["/", "/pricing", "/helm", "/gst-credit"];
 const server = await serve(Number(process.env.PORT ?? 4324));
 const chrome = await launch({ chromePath: chromium.executablePath(), chromeFlags: ["--headless=new", "--no-sandbox"] });
 const failures = [];

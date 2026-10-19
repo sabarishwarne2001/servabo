@@ -101,6 +101,9 @@ HELM_JOB_TYPES: frozenset[str] = frozenset(
     {"helm.ledger_build", "helm.plan", "helm.backtest", "helm.execute", "helm.briefing", "helm.sample"}
 )
 
+#: Session F: GST Credit (docs/product/GST-CREDIT.md). On the LIGHT profile.
+GST_JOB_TYPES: frozenset[str] = frozenset({"gst.recompute"})
+
 #: Every job type this package claims to register, by phase.
 #:
 #: ARCH-27 carried-forward resolution 2. Before this, ARCH16_JOB_TYPES,
@@ -143,6 +146,7 @@ ALL_PHASE_JOB_TYPES: frozenset[str] = (
     | USAGE_ALERT_JOB_TYPES
     | OPS_ALERT_JOB_TYPES
     | HELM_JOB_TYPES
+    | GST_JOB_TYPES
 )
 
 
@@ -454,6 +458,12 @@ def _usage_limit_alerts(payload: dict[str, Any]) -> dict[str, Any]:
     return handle_limit_alerts(payload)
 
 
+def _gst_recompute(payload: dict[str, Any]) -> dict[str, Any]:
+    from app.workers.handlers import gst
+
+    return gst.handle_recompute(payload)
+
+
 def _helm(job: str):
     def run(payload: dict[str, Any]) -> dict[str, Any]:
         from app.workers.handlers import helm
@@ -585,6 +595,8 @@ _HANDLERS = {
     # Campaign session 4 (§C.4). On the LIGHT profile; every five minutes in DEFAULT_SCHEDULE.
     "ops.alerts": _operator_alerts,
     # Flagship session: Helm. On the LIGHT profile (app/workers/profiles.py).
+    # Session F: GST Credit. On the LIGHT profile; nightly in DEFAULT_SCHEDULE.
+    "gst.recompute": _gst_recompute,
     "helm.ledger_build": _helm("handle_ledger_build"),
     "helm.plan": _helm("handle_plan"),
     "helm.backtest": _helm("handle_backtest"),

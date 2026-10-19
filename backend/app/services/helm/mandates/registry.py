@@ -33,6 +33,8 @@ _MODULES = (
     "receivables",
     "review_backlog",
     "supplier_statements",
+    "gst_180",
+    "gst_hold",
     "custom_condition",
 )
 
@@ -244,7 +246,7 @@ def recommended(business_type: Optional[str]) -> list[str]:
     """First run (§10.3): the mandates recommended for this kind of business, in library order."""
     keys = []
     for found in TEMPLATES.values():
-        if found.plan == "enterprise":
+        if found.plan == "enterprise" or not found.recommend:
             continue
         if not found.recommended_for or (business_type and business_type in found.recommended_for):
             keys.append(found.key)

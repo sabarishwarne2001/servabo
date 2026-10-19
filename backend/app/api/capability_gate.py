@@ -84,6 +84,9 @@ _DISPLAY_NAMES = {
     entitlements.HELM_APPROVAL_CHAINS_CAPABILITY: "Helm approval chains",
     entitlements.HELM_ALL_WORKSPACES_CAPABILITY: "Helm planning across every workspace",
     entitlements.HELM_API_CAPABILITY: "Helm through the API and webhooks",
+    # Session F
+    entitlements.GST_CREDIT_CAPABILITY: "GST Credit: supplier and invoice lists, IMS recommendations, export",
+    entitlements.GST_CREDIT_ALL_WORKSPACES_CAPABILITY: "GST Credit across every workspace",
     # PHASE1:capability-display
     entitlements.BATCH_DISPATCH_CAPABILITY: "Batch operations and integrity-verified export packages",
     # PHASE2:capability-display

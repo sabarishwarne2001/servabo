@@ -321,6 +321,9 @@ class Settings(BaseSettings):
             "embedding.token": self.SPEND_DEFAULT_MONTHLY_EMBEDDING_TOKENS,
         }
 
+    #: NIC's published public key (PEM) for the e-invoice QR code's signature. None ships: without it the QR code's
+    #: values are read but marked "signature not verified" (app/services/gst/einvoice.py).
+    EINVOICE_QR_PUBLIC_KEY_PEM: Optional[str] = None
     S3_BUCKET: Optional[str] = None
     S3_REGION: Optional[str] = "auto"
     S3_ENDPOINT_URL: Optional[str] = None

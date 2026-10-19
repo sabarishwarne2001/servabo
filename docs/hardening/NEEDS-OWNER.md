@@ -1848,7 +1848,7 @@ deployment stores files locally ("requires an object-storage backend"). The brow
 storage, so it proves the refusal path (no bucket, disabled button, server 409) and not a successful
 repin. A successful repin is a test for a deployment with MinIO or S3.
 
-## N-131 — Three-way match: "Reject" and case notes do not exist in the API (OPEN — needs your decision; Session E)
+## N-131 — Three-way match: "Reject" and case notes do not exist in the API (DECIDED (Session F): not now; was OPEN from Session E)
 
 The Session C list said the three-way match page was missing a re-score button, notes and a separate Reject
 button "although the API has them". Only the re-score does exist (`POST …/procurement/cases/{id}/rematch`,
@@ -1891,4 +1891,79 @@ written in `frontend/e2e/README.md` ("State that every test shares"): only spec 
 its own); a spec that must read the billing page's Currency dropdown for other currencies sets up its own
 books on a database of its own. A tenant of its own does not isolate a price book, so "its own tenant" is
 not enough for that case.
+
+**DECIDED (Session F): not now.** "Flag dispute" with its reason covers rejection at launch, and the approval or
+dispute reason is the note. A "Reject" status and case notes are built when a customer asks. GST Credit uses
+this: a three-way-match case a person has flagged as disputed is the "dispute decided against the supplier" that
+may make Servabo recommend *Reject* in the GST portal's Invoice Management System (N-136).
+
+## N-135 — GST Credit: which plan gets what (DECIDED (Session F))
+
+A new capability, `capability.gst_credit`, on **Business and Enterprise**; no price changes. **GST Credit preview,
+on every plan** (no capability needed): importing GSTR-2B files, the six headline figures and their counts, and the
+full reconciliation of the sample company (which is read-only for everyone). **Business and up** also get the
+supplier list, the invoice list with the side-by-side drawer, IMS recommendations, decisions (confirm a suggested
+match, "not ours", link by hand), the Excel export and drafted supplier reminders. **Enterprise** also gets
+`capability.gst_credit_all_workspaces`: one reconciliation per GSTIN across every workspace, and `gst:read` API
+keys. The point of the split: a Developer or trial customer sees "₹X of GST credit waiting on 14 suppliers" on their
+own data, and the list that says which suppliers is the reason to upgrade. The numbers on the free side are the
+real numbers, and the lock card says plainly what Business adds. Why not gate the import: nobody can see any value
+before they have imported one file, and the import costs us one parse. The plan data (`TENANCY-AND-PLANS.md`, the
+website's `pricing.json`) is regenerated from the seed.
+
+## N-136 — GST Credit: the Invoice Management System (IMS) recommendation logic (DECIDED (Session F))
+
+Servabo recommends; a person acts on the GST portal. The reason is always shown. **Accept** when the record
+matched your books within the tolerance and, where three-way matching has the invoice, the goods are received
+and there is no open dispute or exception, or there is no purchase-order data to check. **Pending** when the goods
+are not yet received, a three-way-match exception is open, an amount differs (ask the supplier to amend), the
+match is only a suggestion, or the invoice is not in your books (the portal may limit how long a record can stay
+Pending: the screen says to check its IMS page, because the October 2025 limits could not be confirmed from the
+official pages here). **Reject** only on strong evidence: a person marked the record "not ours", the supplier
+reported the same document twice, or a three-way-match case a person flagged as disputed (N-131). **Never Reject
+merely because Servabo has not seen the invoice.** Records with no credit to claim (not eligible, reverse charge)
+get no recommendation. The same record is never recommended twice for the same document.
+
+## N-137 — GST Credit: rupees in Indian grouping on its page, like Helm (DECIDED (Session F); extends N-112)
+
+The GST Credit page and its export write INR the way Indian readers say it: 12,34,567 (lakh and crore grouping),
+for the same reason as N-112. Amounts in micros stay micros in the API; the page formats them. Other currencies
+(none are expected in GSTR-2B) would use the browser's own grouping.
+
+## N-138 — The extraction prompt asks for every field the product reads (DECIDED (Session F); F-524)
+
+The production prompt (`ENTITY_EXTRACTION_PROMPT_TEMPLATE`) now has one finance schema for invoices, receipts,
+purchase orders, credit and debit notes: numbers and dates (invoice, order, receipt and delivery dates, due date,
+payment terms, PO and receipt numbers), seller (name, GSTIN, PAN, address, email, bank account, IFSC, Udyam number),
+buyer (name, GSTIN, place of supply), amounts (currency, taxable value, CGST, SGST, IGST, cess, total tax, total,
+reverse charge), the e-invoice IRN, credit or debit note fields (type, the note's own number, the invoice and date
+it refers to) and per line (description, HSN or SAC, quantity, unit, unit price, taxable value, tax rate, amount,
+received quantity). A field that is absent is `null`, never a guess. The classification categories did not change.
+Added beyond the brief's list because a reader needs them and would otherwise stay half-blind: `po_date`,
+`receipt_date`, `delivery_date`, `credit_note_number` and, for contracts, `agreement_number`. Two tests keep it
+honest: every concept a reader looks for must be asked for under a name that reader accepts, and the browser
+suite's model stand-in may only return keys the prompt asks for. **Session D must test a real GST invoice through
+the new schema** (HANDOFF).
+
+## N-139 — GST Credit across every workspace is computed when opened, read-only (DECIDED (Session F))
+
+Enterprise only (`capability.gst_credit_all_workspaces`). The organization page matches a GSTIN's GSTR-2B returns,
+imported in any workspace, with the purchase invoices of every workspace that holds that GSTIN's purchases. It is
+**read-only** (import, decisions, export and supplier reminders stay in each workspace) and **not stored**: the
+stored rows are tied to one workspace's documents by the database itself (ARCH-41), so the answer is computed when
+the page is opened and kept for 60 seconds. Owners, admins and billing may open it; the figures are the
+organization's, and the supplier and invoice lists show only the workspaces the person can read (billing: the ones it
+has a grant on). The sample company is never part of it. A workspace with no return of the GSTIN contributes only
+documents that name the GSTIN as their buyer. Why: the smallest thing that answers "one reconciliation per GSTIN"
+without a second set of tables, a second recompute job and a second place for decisions to live. If a customer has
+tens of thousands of invoices per GSTIN, store it (a new table and a job); the budget test shows where.
+
+## N-140 — The e-invoice QR code is read, but its signature is not verified until you give Servabo NIC's key (OPEN)
+
+Servabo reads the QR code on an e-invoice (IRN, GSTINs, number, date, value) during processing. It **does not claim
+the signature is genuine**: no NIC public key is shipped. Without a key the values only fill what the model left empty
+and any difference is shown as a conflict; with `EINVOICE_QR_PUBLIC_KEY_PEM` set to NIC's published key, a code that
+verifies wins over the model's reading. **Needs you (or your CA):** the current NIC public key and a real e-invoice
+PDF to try (Session D). Nothing on screen shows the QR provenance yet: it is stored in the document's extraction
+metadata (`einvoice_qr`).
 

@@ -91,7 +91,6 @@ function lineItems(text) {
     const pricedRow = table === "priced" && /^(\d+)\s+(.+?)\s+(\d+(?:\.\d+)?)\s+([\d.,]+)\s+([\d.,]+)$/.exec(line);
     if (pricedRow) {
       items.push({
-        line: Number(pricedRow[1]),
         description: pricedRow[2].trim(),
         quantity: Number(pricedRow[3]),
         unit_price: pricedRow[4].replace(/,/g, ""),
@@ -102,14 +101,13 @@ function lineItems(text) {
     const receivedRow = table === "received" && /^(\d+)\s+(.+?)\s+(\d+(?:\.\d+)?)$/.exec(line);
     if (receivedRow) {
       const quantity = Number(receivedRow[3]);
-      items.push({ line: Number(receivedRow[1]), description: receivedRow[2].trim(), received_quantity: quantity, quantity });
+      items.push({ description: receivedRow[2].trim(), received_quantity: quantity, quantity });
       continue;
     }
     if (table && !/^\d+\s/.test(line)) table = null;
     const priced = /^(\d+)\.\s+(.+?)\s+Qty\s+(\d+(?:\.\d+)?)\s+Unit Price\s+([\d.,]+)\s+Amount\s+([\d.,]+)/i.exec(line);
     if (priced) {
       items.push({
-        line: Number(priced[1]),
         description: priced[2].trim(),
         quantity: Number(priced[3]),
         unit_price: priced[4].replace(/,/g, ""),
@@ -119,7 +117,7 @@ function lineItems(text) {
     }
     const received = /^(\d+)\.\s+(.+?)\s+Qty received\s+(\d+(?:\.\d+)?)/i.exec(line);
     if (received) {
-      items.push({ line: Number(received[1]), description: received[2].trim(), received_quantity: Number(received[3]), quantity: Number(received[3]) });
+      items.push({ description: received[2].trim(), received_quantity: Number(received[3]), quantity: Number(received[3]) });
     }
   }
   return items;
@@ -151,24 +149,53 @@ function extractEntities(text, documentType) {
   const type = documentType || classify(text);
   const out = {};
   if (["Invoice", "Purchase Order", "Receipt"].includes(type)) {
+    // Only keys the production prompt asks for (tests/services/test_extraction_prompt_contract.py
+    // holds this file to that): the stand-in may not know more than the prompt says.
     const vendor = kv.vendor ?? kv.supplier;
     if (vendor) out.vendor_name = vendor;
     if (kv.vendor_address) out.vendor_address = kv.vendor_address;
     if (kv.vendor_bank_account) out.vendor_bank_account = kv.vendor_bank_account;
+    const gstin = kv.vendor_gstin ?? kv.supplier_gstin ?? kv.seller_gstin;
+    if (gstin) out.vendor_gstin = gstin;
+    if (kv.vendor_pan) out.vendor_pan = kv.vendor_pan;
+    if (kv.vendor_email) out.vendor_email = kv.vendor_email;
+    if (kv.vendor_ifsc) out.vendor_ifsc = kv.vendor_ifsc;
+    if (kv.udyam_number) out.udyam_number = kv.udyam_number;
     if (kv.bill_to ?? kv.buyer) out.customer_name = kv.bill_to ?? kv.buyer;
+    if (kv.buyer_gstin ?? kv.customer_gstin) out.buyer_gstin = kv.buyer_gstin ?? kv.customer_gstin;
+    if (kv.place_of_supply) out.place_of_supply = kv.place_of_supply;
     if (kv.invoice_number) out.invoice_number = kv.invoice_number;
     if (kv.po_number) out.po_number = kv.po_number;
     if (kv.receipt_number) out.receipt_number = kv.receipt_number;
-    const date = kv.invoice_date ?? kv.po_date ?? kv.received_date ?? kv.date;
-    if (date) out.date = date;
+    if (kv.invoice_date) out.invoice_date = kv.invoice_date;
+    if (kv.po_date) out.po_date = kv.po_date;
+    if (kv.received_date ?? kv.receipt_date) out.receipt_date = kv.received_date ?? kv.receipt_date;
+    if (kv.delivery_date) out.delivery_date = kv.delivery_date;
+    // A document that prints only "Date:" is an invoice date on an invoice, an order date on an order.
+    if (kv.date && !out.invoice_date && !out.po_date && !out.receipt_date) {
+      if (type === "Purchase Order") out.po_date = kv.date;
+      else if (type === "Receipt") out.receipt_date = kv.date;
+      else out.invoice_date = kv.date;
+    }
     if (kv.due_date) out.due_date = kv.due_date;
     const currency = kv.currency ?? (/\b(USD|EUR|GBP|INR)\b/.exec(text) || [])[1];
     if (currency) out.currency = currency;
     const total = money(kv.total_amount_due ?? kv.po_total ?? kv.total);
     if (total) out.total_amount = total;
-    const tax = Object.entries(kv).find(([key]) => key.startsWith("tax"));
-    if (tax) out.tax_amount = money(tax[1]);
-    if (kv.subtotal) out.subtotal = money(kv.subtotal);
+    const tax = money(kv.tax_amount ?? kv.tax ?? kv.total_tax);
+    if (tax) out.tax_amount = tax;
+    const subtotal = money(kv.subtotal ?? kv.taxable_value);
+    if (subtotal) out.subtotal = subtotal;
+    if (kv.cgst !== undefined) out.cgst_amount = money(kv.cgst);
+    if (kv.sgst !== undefined) out.sgst_amount = money(kv.sgst);
+    if (kv.igst !== undefined) out.igst_amount = money(kv.igst);
+    if (kv.cess !== undefined) out.cess_amount = money(kv.cess);
+    if (kv.reverse_charge) out.reverse_charge = /^(yes|y|true)$/i.test(kv.reverse_charge);
+    if (kv.irn) out.irn = kv.irn;
+    if (kv.note_type) out.note_type = kv.note_type.toLowerCase();
+    if (kv.credit_note_number) out.credit_note_number = kv.credit_note_number;
+    if (kv.original_invoice_number) out.original_invoice_number = kv.original_invoice_number;
+    if (kv.original_invoice_date) out.original_invoice_date = kv.original_invoice_date;
     if (kv.payment_terms) out.payment_terms = kv.payment_terms;
     const items = lineItems(text);
     if (items.length) out.line_items = items;

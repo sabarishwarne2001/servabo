@@ -63,6 +63,11 @@ export const CAPABILITY = {
   helmApprovalChains: "capability.helm_approval_chains",
   helmAllWorkspaces: "capability.helm_all_workspaces",
   helmApi: "capability.helm_api",
+  // Session F: GST Credit. The supplier and invoice lists, IMS recommendations, decisions, export and reminders on
+  // Business and Enterprise (importing and the headline figures are on every plan); one reconciliation per GSTIN
+  // across every workspace on Enterprise.
+  gstCredit: "capability.gst_credit",
+  gstCreditAllWorkspaces: "capability.gst_credit_all_workspaces",
 } as const;
 
 export type CapabilityKey = (typeof CAPABILITY)[keyof typeof CAPABILITY];

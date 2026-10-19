@@ -31,6 +31,7 @@ import { runDisplayFormatSelfCheck } from "@/utils/displayTime";
 import { runBrandColourSelfCheck } from "@/utils/brandTheme";
 import { runHelmMoneySelfCheck } from "@/components/helm/money";
 import { runProblemKeySelfCheck } from "@/components/batches/problemKeys";
+import { runGstFormatSelfCheck } from "@/components/gst/gstFormat";
 export const checks = {
   "tenant resolution": runTenantResolutionSelfCheck,
   "tenant paths": runTenantPathSelfCheck,
@@ -40,6 +41,7 @@ export const checks = {
   "brand colours": runBrandColourSelfCheck,
   "helm money": runHelmMoneySelfCheck,
   "package problem keys": runProblemKeySelfCheck,
+  "gst credit format": runGstFormatSelfCheck,
 };
 `,
 );

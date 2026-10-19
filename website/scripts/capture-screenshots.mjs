@@ -82,6 +82,28 @@ const SHOTS = {
   },
   identity: { path: org("identity") },
   egress: { path: org("egress") },
+  // GST credit (the sample company's GSTR-2B, which has planted cases of every status).
+  "gst-credit-summary": { path: ws("gst") },
+  "gst-credit-invoices": {
+    path: ws("gst"),
+    prepare: async (page) => {
+      await page.getByRole("tab", { name: "Invoices" }).click();
+      await page.getByRole("button", { name: "Waiting for supplier" }).click();
+      await page.getByTestId("gst-line-row").first().waitFor({ timeout: 15_000 }).catch(() => {});
+      await page.getByTestId("gst-invoices").evaluate((el) => el.scrollIntoView({ block: "start" }));
+      await settle(page);
+    },
+  },
+  "gst-credit-ims": {
+    path: ws("gst"),
+    prepare: async (page) => {
+      await page.getByRole("tab", { name: "IMS actions" }).click();
+      await page.getByRole("button", { name: /^Accept/ }).click();
+      await page.getByTestId("gst-ims-row").first().waitFor({ timeout: 15_000 }).catch(() => {});
+      await page.getByTestId("gst-ims-tab").evaluate((el) => el.scrollIntoView({ block: "start" }));
+      await settle(page);
+    },
+  },
   "helm-cockpit": { path: helm(), helm: true },
   // The payment run, with the payments approved by demoActivity() on their run days.
   "helm-plan": { path: helm("plan"), helm: true },

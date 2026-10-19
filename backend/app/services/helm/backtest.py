@@ -42,6 +42,7 @@ CATEGORY_WORDS = {
     base.CATEGORY_CONTROL: "invoices without a required PO",
     base.CATEGORY_CASH_FLOOR: "days below the cash floor",
     base.CATEGORY_MSME_LATE: "late MSME payments",
+    base.CATEGORY_GST_180: "GST invoices paid after 180 days",
     base.CATEGORY_RENEWAL: "renewal deadlines missed",
     base.CATEGORY_DOCUMENT: "supplier documents that expired",
     base.CATEGORY_RECEIVABLE: "customers who paid late",

@@ -15,12 +15,16 @@ export const API_KEY_SCOPES = [
   "billing:read",
   "helm:read",
   "helm:write",
+  "gst:read",
 ] as const;
 
 export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
 
 /** Helm's scopes: a key with them reaches Helm only on a plan with capability.helm_api (Enterprise). */
 export const HELM_API_KEY_SCOPES: ReadonlySet<ApiKeyScope> = new Set<ApiKeyScope>(["helm:read", "helm:write"]);
+
+/** GST credit's scope: a key reads the organization's GST figures only on a plan with capability.gst_credit_all_workspaces. */
+export const GST_API_KEY_SCOPES: ReadonlySet<ApiKeyScope> = new Set<ApiKeyScope>(["gst:read"]);
 
 export interface ApiKeyRead {
   readonly id: string;

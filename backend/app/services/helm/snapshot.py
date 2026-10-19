@@ -20,6 +20,9 @@ from app.services.helm import terms as terms_parser
 from app.services.helm import vocabulary as v
 
 
+GST_LIMIT_DAYS = 180
+
+
 @dataclass(frozen=True)
 class Flag:
     kind: str  # DUPLICATE | BANK_ACCOUNT_CHANGED | CONFLICT
@@ -80,6 +83,26 @@ class Payable:
     #: What was paid and its reference, from the ledger's payment fulfilment (reconciliation evidence).
     paid_amount_micros: Optional[int] = None
     paid_reference: Optional[str] = None
+    #: GST Credit (Session F). The GST the invoice carries (None: it prints none); its place in the reconciliation
+    #: against GSTR-2B (a `gst.vocabulary` status, None while no return covers it); the recipient GSTIN of that
+    #: return; and whether a GSTR-2B for the invoice's own period has been imported.
+    gst_micros: Optional[int] = None
+    gst_status: Optional[str] = None
+    gst_gstin: Optional[str] = None
+    gst_supplier_gstin: Optional[str] = None
+    gst_period_imported: bool = False
+
+    @property
+    def gst_deadline(self) -> Optional[date]:
+        """Section 16(2), second proviso and Rule 37: 180 days from the invoice date for an invoice with GST."""
+        if not self.gst_micros or self.invoice_date is None:
+            return None
+        return self.invoice_date + timedelta(days=GST_LIMIT_DAYS)
+
+    @property
+    def gst_waiting(self) -> bool:
+        """In the books, in no GSTR-2B, and a GSTR-2B for its period was imported: the supplier has not reported it."""
+        return self.gst_status == "WAITING_FOR_SUPPLIER" and self.gst_period_imported
 
     @property
     def open(self) -> bool:
@@ -279,7 +302,7 @@ def digest_content(snapshot: Snapshot) -> dict[str, Any]:
                 [f.id for f in p.flags], [(b.promise_id, b.above_micros) for b in p.price_breaches],
                 p.has_matched_po, p.msme_deadline, p.hold_code, list(p.waived), p.paid_on, p.paid_amount_micros,
                 p.document_number, p.counterparty_name, p.gross_micros, p.paid_reference, p.settlement_source,
-                p.workspace_id]
+                p.workspace_id, p.gst_micros, p.gst_status, p.gst_period_imported]
 
     return {
         "book": snapshot.book_id, "as_of": snapshot.as_of, "horizon": snapshot.horizon_days,

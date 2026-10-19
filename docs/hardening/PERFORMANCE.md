@@ -274,3 +274,30 @@ four (`--workers=4`) on COSTS.md's server (4 vCPU, 16 GB). Re-run this before a 
   (a bulk import). The nightly rebuild is a full one by design (23 s at 10,000 documents, in the worker,
   at 02:40 UTC).
 - **Decision:** N-122.
+
+## GST Credit: importing 10,000 GSTR-2B records and matching them against 10,000 documents (Session F, 2026-10-19)
+
+- **Question:** the brief asks that importing 10,000 records and matching them against 10,000 book documents each
+  stay under 5 s on the sandbox.
+- **Measured by** `tests/performance/test_gst_budgets.py`: a workspace with 10,000 purchase invoices from 40
+  suppliers (bulk inserts), and a 10,000-record GSTR-2B built from them (about 75% reported as booked, 10% with
+  an amount off, 5% with another number format, 15% not reported at all, plus records Servabo has not seen).
+  The first run (before any tuning) took **3.55 s** to import and **9.51 s** to match: over budget.
+- **What made matching slow, and the change:** the full money reader ran six times per document (plain numbers,
+  which is what the extraction prompt asks for, now take a fast path); every unmatched pair was compared by
+  number with `difflib` before the cheap date and value tests (now last, behind `quick_ratio`); a UUID was turned
+  into text to sort 10,000 times (now sorted by its integer); the reconciliation read each document's text and
+  verification state it does not use (a lean loader reads only what it needs); the matches were inserted through
+  the ORM (now one Core insert in chunks of 2,000).
+- **After:**
+
+  | | 10,000 records / 10,000 books |
+  |---|---|
+  | Import (parse the file, store the return and its records) | **3.3 s** |
+  | Matching (read the books, reconcile, store the result) | **4.4 s** |
+
+  Matching reads the books (about 1.3 s), reconciles in memory (about 1.0 s) and writes 10,000 rows (the rest).
+  The test holds each to 5 s times `PERF_BUDGET_MULTIPLIER` (2 by default so a shared CI machine does not flake;
+  set it to 1 to hold the sandbox to the brief's figure). A change of one document re-reconciles the whole GSTIN
+  for the workspace, debounced to one job every ten seconds.
+- **Decision:** N-136.

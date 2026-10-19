@@ -24,7 +24,7 @@ import { PlanLockBanner } from "@/components/billing/PlanLockBanner";
 import { CAPABILITY } from "@/constants/capabilities";
 import { useCapabilityAccess } from "@/hooks/useCapabilityAccess";
 import { canManageMembers } from "@/permissions/organizationPermissions";
-import { API_KEY_SCOPES, HELM_API_KEY_SCOPES } from "@/types/apiKey";
+import { API_KEY_SCOPES, GST_API_KEY_SCOPES, HELM_API_KEY_SCOPES } from "@/types/apiKey";
 import type { ApiKeyRead, ApiKeyScope } from "@/types/apiKey";
 import type { OrganizationRole } from "@/types/tenancy";
 import { ApiError } from "@/services/api/client";
@@ -48,6 +48,8 @@ const SCOPE_BLURB: Readonly<Record<string, string>> = {
   "helm:write":
     "Feed Helm: re-plan, add cash positions, mark invoices paid, import bank statements. " +
     "Approving actions and changing mandates stay with people. Enterprise.",
+  "gst:read":
+    "Read the organization's GST credit across every workspace: figures, suppliers and invoices. Read-only. Enterprise.",
 };
 
 export const OrganizationApiKeys: React.FC = () => {
@@ -64,6 +66,8 @@ export const OrganizationApiKeys: React.FC = () => {
   const [scopes, setScopes] = useState<Set<ApiKeyScope>>(new Set());
   // A key reaches Helm only on the Enterprise plan (capability.helm_api); elsewhere it is refused.
   const helmApi = useCapabilityAccess(organizationId, CAPABILITY.helmApi);
+  // The same for GST credit across every workspace (gst:read).
+  const gstApi = useCapabilityAccess(organizationId, CAPABILITY.gstCreditAllWorkspaces);
   const [expiresAt, setExpiresAt] = useState("");
 
   const [revealed, setRevealed] = useState<{ token: string; name: string } | null>(
@@ -462,7 +466,8 @@ export const OrganizationApiKeys: React.FC = () => {
               <div className="grid gap-1.5 sm:grid-cols-2">
                 {API_KEY_SCOPES.map((scope) => {
                   const helm = HELM_API_KEY_SCOPES.has(scope);
-                  const locked = helm && !helmApi.granted;
+                  const gst = GST_API_KEY_SCOPES.has(scope);
+                  const locked = (helm && !helmApi.granted) || (gst && !gstApi.granted);
                   return (
                     <label
                       key={scope}
@@ -479,7 +484,7 @@ export const OrganizationApiKeys: React.FC = () => {
                         className="mt-0.5"
                       />
                       <span className="font-mono text-xs">{scope}</span>
-                      {helm && (
+                      {(helm || gst) && (
                         <span className="rounded border border-border px-1 text-[10px] text-muted-foreground">
                           Enterprise
                         </span>
@@ -492,6 +497,10 @@ export const OrganizationApiKeys: React.FC = () => {
                 {helmApi.granted
                   ? "A Helm key can read Helm and feed it facts. Approving actions and changing mandates stay with people signed in."
                   : "Helm keys work on the Enterprise plan."}
+                {" "}
+                {gstApi.granted
+                  ? "A gst:read key reads the organization's GST credit figures; importing and deciding stay with people signed in."
+                  : "gst:read keys work on the Enterprise plan."}
               </p>
             </fieldset>
 

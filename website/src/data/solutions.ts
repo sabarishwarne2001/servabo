@@ -12,6 +12,8 @@ export interface Solution {
   steps: { title: string; body: string }[];
   engines: string[];
   notThis: string[];
+  /** A page to read next, shown under the steps. */
+  more?: { href: string; label: string; body: string };
 }
 
 export const SOLUTIONS: Solution[] = [
@@ -32,11 +34,16 @@ export const SOLUTIONS: Solution[] = [
       { title: "A plan you approve", body: "Helm schedules each payable by its due date and your cash floor, takes the early-payment discounts worth taking, and lists the payment run for a person to approve and pay from your bank." },
       { title: "Posted and reconciled", body: "Approved bills post to your ERP exactly once. Import the bank statement and payments are matched back to their invoices; supplier statements are reconciled each month." },
     ],
-    engines: ["extraction", "matching", "radar", "helm", "erp", "entities"],
+    engines: ["extraction", "matching", "gst", "radar", "helm", "erp", "entities"],
     notThis: [
       "Servabo does not pay suppliers. It plans the payment run; your team pays it from your bank.",
       "It does not replace your accounting system: it posts approved documents into it.",
     ],
+    more: {
+      href: "/gst-credit",
+      label: "GST credit for Indian businesses",
+      body: "Import your GSTR-2B and see which input tax credit you can claim, which suppliers have not reported an invoice, and which unpaid invoices are nearing 180 days.",
+    },
   },
   {
     slug: "procurement",

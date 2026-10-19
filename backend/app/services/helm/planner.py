@@ -22,7 +22,8 @@ from app.services.helm.mandates.registry import TEMPLATES
 from app.services.helm.snapshot import Snapshot
 
 #: Templates whose presence means Helm plans payment timing at all.
-TIMING_TEMPLATES = ("pay_on_time", "capture_early_discounts", "keep_cash_above", "msme_pay_within_limit")
+TIMING_TEMPLATES = ("pay_on_time", "capture_early_discounts", "keep_cash_above", "msme_pay_within_limit",
+                    "gst_pay_within_180_days")
 DEFAULT_TIME_LIMIT_S = 5.0
 #: Why a hold can end, by its reason code.
 RELEASE_WHY = {
@@ -31,6 +32,8 @@ RELEASE_WHY = {
     "BANK_ACCOUNT_CHANGED": "The new bank account was verified.",
     "NO_MATCHED_PO": "It now has a matching purchase order (or is no longer above the amount).",
     "CUSTOM_CONDITION": "It no longer matches the custom condition that held it.",
+    "GST_NOT_REPORTED": "The supplier has reported it in GSTR-2B, or a legal deadline (the MSMED Act or the 180th "
+                        "day) is near enough that it must be paid on time; the GST follow-up stays listed.",
 }
 
 
@@ -99,8 +102,9 @@ def _merge(terms: Sequence[base.OptimizerTerms]) -> base.OptimizerTerms:
             merged.exclude.setdefault(key, why)
         for key, (deadline, kind, why) in t.deadlines.items():
             current = merged.deadlines.get(key)
-            # The earlier deadline wins; at the same date, the law (MSME) outranks the company's rule.
-            if current is None or deadline < current[0] or (deadline == current[0] and kind == "MSME"):
+            # The earlier deadline wins; at the same date, the law (MSME, the 180-day rule) outranks the company's rule.
+            if current is None or deadline < current[0] or (deadline == current[0] and kind in optimizer.LAW_KINDS
+                                                            and current[1] not in optimizer.LAW_KINDS):
                 merged.deadlines[key] = (deadline, kind, why)
         for key, value in t.discounts.items():
             merged.discounts[key] = max(value, merged.discounts.get(key, 0))
@@ -120,8 +124,9 @@ def _plan_destination(candidate: base.Candidate, snapshot: Snapshot) -> tuple[Op
         return None, ""
     if candidate.kind == v.ACTION_WEBHOOK:
         return None, "The webhook destination is checked when the action runs."
-    if candidate.kind in v.DRAFT_ACTIONS and (candidate.mandate is None
-                                                      or candidate.mandate.mode != v.AUTONOMY_ACT):
+    if (candidate.kind in v.DRAFT_ACTIONS or (candidate.kind == v.ACTION_REQUEST_DOCUMENT
+                                              and candidate.params.get("topic") == "GST_REPORTING")) and (
+            candidate.mandate is None or candidate.mandate.mode != v.AUTONOMY_ACT):
         return True, "A draft only: nothing is sent."
     counterparty = snapshot.counterparties.get(candidate.counterparty_key or "")
     contact = candidate.params.get("to") or (counterparty.contact_email if counterparty else None)
@@ -215,6 +220,8 @@ def compose(snapshot: Snapshot, mandates: Sequence[base.ActiveMandate], *, issue
                                            and day <= item.discount_deadline) else 0
         if deadline and deadline[1] == "MSME":
             owner = _owner(active, "msme_pay_within_limit")
+        elif deadline and deadline[1] == "GST180":
+            owner = _owner(active, "gst_pay_within_180_days")
         elif discount:
             owner = _owner(active, "capture_early_discounts")
         else:

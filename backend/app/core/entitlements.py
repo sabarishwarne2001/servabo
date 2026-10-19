@@ -134,6 +134,9 @@ __all__ = [
     "HELM_APPROVAL_CHAINS_CAPABILITY",
     "HELM_ALL_WORKSPACES_CAPABILITY",
     "HELM_API_CAPABILITY",
+    # Session F: GST Credit
+    "GST_CREDIT_CAPABILITY",
+    "GST_CREDIT_ALL_WORKSPACES_CAPABILITY",
     "CANONICAL_MAX_COST_MICROS",
     "CUSTOM_DOMAIN_ADDON",
     "WAREHOUSE_SYNC_ADDON",
@@ -320,6 +323,13 @@ HELM_ALL_WORKSPACES_CAPABILITY: str = "capability.helm_all_workspaces"
 #: Enterprise: Helm through API keys (`helm:read`, `helm:write`) and Helm's outgoing webhooks.
 HELM_API_CAPABILITY: str = "capability.helm_api"
 
+#: Session F. GST Credit: the supplier list, the invoice list with IMS recommendations, decisions, the export
+#: and supplier reminders (Business, Enterprise). Importing a GSTR-2B and seeing the headline figures, and the
+#: whole reconciliation of the sample company, need no capability (the GST Credit preview, N-135).
+GST_CREDIT_CAPABILITY: str = "capability.gst_credit"
+#: Session F. Enterprise: one reconciliation per GSTIN across every workspace, and `gst:read` API keys.
+GST_CREDIT_ALL_WORKSPACES_CAPABILITY: str = "capability.gst_credit_all_workspaces"
+
 #: ARCH45-S1:capability-universal-corroborator. The Universal Document
 #: Corroborator & Discrepancy Matrix: 2 to 5 documents aligned by fields,
 #: canonical entities, clauses and line items, with materiality, ARCH-33 rules
@@ -415,6 +425,8 @@ CAPABILITY_KEYS: tuple[str, ...] = (
     HELM_APPROVAL_CHAINS_CAPABILITY,
     HELM_ALL_WORKSPACES_CAPABILITY,
     HELM_API_CAPABILITY,
+    GST_CREDIT_CAPABILITY,  # Session F
+    GST_CREDIT_ALL_WORKSPACES_CAPABILITY,
 )
 
 #: Every add-on key. `entitlement_service` asserts its catalog equals this set
@@ -606,6 +618,18 @@ _ENTITLEMENTS: tuple[Entitlement, ...] = (
     Entitlement(
         name=HELM_API_CAPABILITY,
         description="Helm through API keys (helm:read, helm:write) and Helm's outgoing webhooks. Bundled into a tier.",
+    ),
+    Entitlement(
+        name=GST_CREDIT_CAPABILITY,
+        description=(
+            "GST Credit: GSTR-2B reconciliation against the purchase invoices read from the documents, supplier "
+            "and invoice lists, IMS recommendations, decisions, export and supplier reminders. Importing a "
+            "GSTR-2B and the headline figures are available on every plan. Bundled into a tier."
+        ),
+    ),
+    Entitlement(
+        name=GST_CREDIT_ALL_WORKSPACES_CAPABILITY,
+        description="GST Credit across every workspace of the organization, and gst:read API keys. Bundled into a tier.",
     ),
     # ARCH45-S1:capability-corroborator-entitlement
     Entitlement(

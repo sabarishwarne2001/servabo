@@ -522,6 +522,26 @@ export const procurementKeys = {
     [...procurementKeys.all(workspaceId), "policies"] as const,
 };
 
+export const gstKeys = {
+  all: (workspaceId: string) => [...workspaceScope(workspaceId), "gst"] as const,
+  summary: (workspaceId: string, gstin: string | null, period: string | null) =>
+    [...gstKeys.all(workspaceId), "summary", gstin, period] as const,
+  suppliers: (workspaceId: string, gstin: string | null, period: string | null) =>
+    [...gstKeys.all(workspaceId), "suppliers", gstin, period] as const,
+  lines: (workspaceId: string, filters: unknown) => [...gstKeys.all(workspaceId), "lines", filters] as const,
+  line: (workspaceId: string, lineId: string) => [...gstKeys.all(workspaceId), "line", lineId] as const,
+};
+
+/** GST credit across every workspace (Enterprise): scoped to the organization, not to a workspace. */
+export const gstOrgKeys = {
+  all: (organizationId: string) => [...organizationScope(organizationId), "gst"] as const,
+  summary: (organizationId: string, gstin: string | null, period: string | null) =>
+    [...gstOrgKeys.all(organizationId), "summary", gstin, period] as const,
+  suppliers: (organizationId: string, gstin: string | null, period: string | null) =>
+    [...gstOrgKeys.all(organizationId), "suppliers", gstin, period] as const,
+  lines: (organizationId: string, filters: unknown) => [...gstOrgKeys.all(organizationId), "lines", filters] as const,
+};
+
 export const invalidatePartner = async (
   queryClient: QueryClient,
   partnerId: string,

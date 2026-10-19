@@ -198,7 +198,8 @@ def _destination(db: Session, action: HelmAction, snapshot) -> tuple[Optional[bo
     if action.kind not in (v.ACTION_SEND_REMINDER, *v.DRAFT_ACTIONS, v.ACTION_REQUEST_DOCUMENT,
                            v.ACTION_WEBHOOK):
         return None, ""
-    if action.kind in v.DRAFT_ACTIONS and action.autonomy != v.AUTONOMY_ACT:
+    gst_request = action.kind == v.ACTION_REQUEST_DOCUMENT and (action.params or {}).get("topic") == "GST_REPORTING"
+    if (action.kind in v.DRAFT_ACTIONS or gst_request) and action.autonomy != v.AUTONOMY_ACT:
         return True, "A draft only: nothing is sent."
     if action.kind == v.ACTION_WEBHOOK:
         from app.services.helm import hands, webhooks

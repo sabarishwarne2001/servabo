@@ -144,6 +144,8 @@ Free is a **trial of 7 days per owner account** (owner decision N-052). The acco
 | The entity graph (`capability.entity_graph`) | — | — | yes | yes |
 | ERP posting (`capability.erp_posting`) | — | — | yes | yes |
 | Extraction memory (`capability.extraction_memory`) | — | — | yes | yes |
+| GST Credit: supplier and invoice lists, IMS recommendations, export (`capability.gst_credit`) | — | — | yes | yes |
+| GST Credit across every workspace (`capability.gst_credit_all_workspaces`) | — | — | — | yes |
 | Helm (`capability.helm`) | — | — | yes | yes |
 | Helm planning across every workspace (`capability.helm_all_workspaces`) | — | — | — | yes |
 | Helm through the API and webhooks (`capability.helm_api`) | — | — | — | yes |
