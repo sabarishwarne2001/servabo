@@ -18,6 +18,7 @@ Two guards:
 
 from __future__ import annotations
 
+import importlib
 import json
 import re
 import shutil
@@ -30,7 +31,6 @@ from typing import Iterable
 
 import pytest
 
-from app.services import llm_service
 from app.services.batches import canonical
 from app.services.corroboration import fields as corroboration_fields
 from app.services.erp import sources as erp_sources
@@ -41,6 +41,9 @@ from app.services.procurement_matching import line_extraction as lines
 from app.services.truthmesh import facts as truthmesh_facts
 
 pytestmark = pytest.mark.no_db
+
+#: `app.services.llm_service` the module (the package also exports an instance under that name).
+llm_service = importlib.import_module("app.services.llm_service")
 
 REPO = Path(__file__).resolve().parents[3]
 MOCK = REPO / "frontend" / "e2e" / "support" / "llm-mock.mjs"
@@ -98,6 +101,9 @@ CONCEPTS: dict[str, set[str]] = {
         erp_sources._KEYS["invoice_date"], lines._DATE_KEYS, truthmesh_facts.DATE_SELF_KEYS,
         obligations_extract.INVOICE_DATE_KEYS, gst_fields.INVOICE_DATE_KEYS,
     ),
+    "PO date": _union(erp_sources._KEYS["po_date"]),
+    "receipt date": _union(erp_sources._KEYS["receipt_date"]),
+    "delivery date": _union(ledger.DELIVERY_KEYS),
     "due date": _union(ledger.DUE_DATE_KEYS, erp_sources._KEYS["due_date"]),
     "payment terms": _union(
         ledger.TERMS_KEYS, erp_sources._KEYS["payment_terms"], obligations_extract.TERMS_KEYS,
@@ -135,6 +141,7 @@ CONCEPTS: dict[str, set[str]] = {
     "IRN": _union(gst_fields.IRN_KEYS),
     "credit note: original invoice number": _union(ledger.CREDIT_REFERENCE_KEYS,
                                                    gst_fields.ORIGINAL_INVOICE_NUMBER_KEYS),
+    "credit note: original invoice date": _union(gst_fields.ORIGINAL_INVOICE_DATE_KEYS),
     "credit note: its own number": _union(lines.ROLE_NUMBER_KEYS["CREDIT_NOTE"],
                                           truthmesh_facts.OWN_NUMBER_KEYS["CREDIT_NOTE"]),
     "credit note: type": _union(gst_fields.NOTE_TYPE_KEYS),
@@ -236,7 +243,7 @@ RICH = {
     ]),
     "Purchase Order": "\n".join([
         "PURCHASE ORDER", "Supplier: Sahyadri Packaging Industries Pvt Ltd", "PO Number: PO-2026-007",
-        "PO Date: 2026-03-20", "Buyer: Meridian Wholesale Distributors Pvt Ltd", "Currency: INR", "PO Total: 5,000.00",
+        "PO Date: 2026-03-20", "Delivery Date: 2026-04-10", "Buyer: Meridian Wholesale Distributors Pvt Ltd", "Currency: INR", "PO Total: 5,000.00",
         "Payment Terms: Net 30", "#   Description   Qty   Unit Price   Amount", "1 Industrial safety gloves 100 5.00 500.00",
     ]),
     "Contract": "\n".join([
