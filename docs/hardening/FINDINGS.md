@@ -3525,3 +3525,11 @@ Findings start at F-524.
 | F-525 | Low | Coverage ledger | **Two identity routes had no ledger row** (`GET` and `DELETE …/idp-configs/{id}/role-mappings`, added in Session E), so `campaign_slices.py --check all` failed on `main` too. They are proven by `test_identity_console_setup_live.py`; the rows are added. | `campaign_slices.py --check all`: 2 missing rows before, 0 after | Fixed |
 | F-526 | Medium | e-invoice QR (new) | **OpenCV's standard QR detector cannot read the dense codes an e-invoice has** (a signed token of about 900 characters is QR version 20 or more): it failed on every code above roughly version 18, and its own encoder's output above version 10. The WeChat detector (contrib, no model file) reads them all, so it is tried first, then the Aruco and standard ones. | `test_a_dense_qr_code_is_found_in_a_png_and_in_a_pdf` (generated codes, boxes 3 and 6; PDF render) | Fixed |
 
+
+## Session G: the value receipt (2026-10-19)
+
+Findings start at F-527.
+
+| ID | Severity | Area | Finding | Evidence | Status |
+|---|---|---|---|---|---|
+| F-527 | Low | Accessibility | **The plan-locked rows of the organization sidebar failed the light-theme colour-contrast check.** A row for a feature the plan does not include (Transactional email, Service levels, Branding & custom domains on Free) was drawn in the muted text colour at 80% opacity, which falls below the 4.5:1 ratio. The lock icon already says the row is locked, so the dimming added nothing. Found by the first axe scan of the plan page for a Free customer (no earlier spec scanned the organization console as a Free customer). | Spec 107's light-theme axe test failed first (`serious color-contrast` on three `span[title]` rows); with `opacity-80` removed from the locked row it passes, 3 repeats, light and dark. | Fixed (`OrganizationSidebarNavigation.tsx`) |
