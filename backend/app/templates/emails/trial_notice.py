@@ -57,6 +57,20 @@ def _finding_html(item: TrialFinding) -> str:
     return f"{esc(_finding_line(item))}{link}"
 
 
+def render_receipt_block(headline: str, findings: Sequence[TrialFinding]) -> tuple[str, str]:
+    """The value receipt as it sits inside an email: `(text, html)` — the headline and at most three findings, each
+    with a link to its evidence. Empty strings without a headline (the email carries no figures then). The monthly
+    summary reuses this block (Session H)."""
+    said = single_line(headline or "", max_length=300)
+    if not said:
+        return "", ""
+    shown = list(findings)[:MAX_FINDINGS]
+    text = f"{said}\n" + "".join(f"  - {_finding_text(item)}\n" for item in shown) + "\n"
+    html = f"""<p><strong>{esc(said)}</strong></p>""" + (
+        "<ul>" + "".join(f"<li>{_finding_html(item)}</li>" for item in shown) + "</ul>" if shown else "")
+    return text, html
+
+
 def render_trial_notice(
     *,
     kind: str,
@@ -100,13 +114,7 @@ def render_trial_notice(
         )
         button = "Subscribe"
 
-    said = single_line(headline or "", max_length=300)
-    shown = list(findings)[:MAX_FINDINGS] if said else []
-    found_text = found_html = ""
-    if said:
-        found_text = f"{said}\n" + "".join(f"  - {_finding_text(item)}\n" for item in shown) + "\n"
-        found_html = f"""<p><strong>{esc(said)}</strong></p>""" + (
-            "<ul>" + "".join(f"<li>{_finding_html(item)}</li>" for item in shown) + "</ul>" if shown else "")
+    found_text, found_html = render_receipt_block(headline, findings)
 
     text_body = f"Hello,\n\n{lead}\n\n{found_text}{after}\n\n{button}: {plans_link}\n"
     content_html = f"""<p>Hello,</p>
@@ -128,4 +136,4 @@ def render_trial_notice(
     return subject, html_body, text_body
 
 
-__all__ = ["TrialFinding", "render_trial_notice"]
+__all__ = ["MAX_FINDINGS", "TrialFinding", "render_receipt_block", "render_trial_notice"]

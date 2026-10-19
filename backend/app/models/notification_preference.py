@@ -4,6 +4,10 @@
 means the default (on). The essential categories (security, billing) have no switch and never
 get a row (`notification_preferences_service`).
 
+`monthly_receipt_sends` (Session H): one row per organization and month ("2026-09") the monthly summary was looked at,
+written before anything is sent, so a month goes out once however often the hourly sweep runs and however many workers
+run it. `recipients` and `findings` are 0 when the month had nothing to say (nothing was sent).
+
 `usage_limit_alerts`: one row per organization, meter, level ("NEAR" at 80%, "REACHED" at 100%),
 limit and billing period, written before the alert is sent, so an alert goes out once per period
 however often the hourly sweep runs and however many workers run it.
@@ -14,7 +18,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import UUID
 
@@ -55,3 +59,16 @@ class UsageLimitAlert(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class MonthlyReceiptSend(Base):
+    __tablename__ = "monthly_receipt_sends"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True
+    )
+    #: The month the summary is about, "YYYY-MM" (the month BEFORE the day it was sent).
+    period: Mapped[str] = mapped_column(String(7), primary_key=True)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    recipients: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    findings: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")

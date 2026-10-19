@@ -773,3 +773,37 @@ zone, duplicates coming from the radar rather than payment-risk flags, the unaud
 - Test tooling: `e2e_stand_in.py trial-ends --backdate-days N` moves the organization's usage events back by lifting the append-only
   trigger for one statement on the throwaway test database. Never used outside the browser tests.
 - `ConfirmDialog` gained optional `children` and `wide`, and now scrolls inside a short window; other dialogs are unchanged.
+
+## Session H → next sessions
+
+_2026-10-19. Branch `claude/new-session-rtxwwe`, PR #33. Decisions N-142 to N-146; findings F-528 to F-530. Two migrations (one Alembic head)._
+
+**What changed.** (1) **`main`'s red CI.** Both red runs had one failing job: the GST speed test on a slower CI machine
+(matching took 11.48 s against a 10 s budget). The budget did not move; matching is now faster (a bulk `COPY` for the results,
+lookups by supplier and day), and a test proves the rows are exactly the earlier ones. The frontend `npm audit` now blocks on what
+ships and only reports build tools (`braces` under Tailwind 3, no fix exists, Tailwind 4 removes it, N-119); CI runs on
+`ubuntu-24.04` and on Node 24 actions. (2) **GST Credit is the third add-on**: $49 a month per organization, Developer only;
+Business and Enterprise include it; on lapse the page returns to the preview and the data is kept (N-145). (3) **The monthly
+summary email** to owners of paying organizations on the 1st (N-146).
+
+**For Session D / the owner.**
+- **Create the eighth Dodo product.** `scripts/dodo_setup.py --create-test-products` now creates five plan products and **three**
+  add-ons and prints **eight** lines (the new one: `DODO_ADDON_PRODUCT_GST_CREDIT`, $49, monthly, one per organization, tax not
+  included). Paste it into `backend/.env`, run `dodo_setup.py` until all eight say OK, and later do the same in live mode and
+  in `.env.production`. The launch checklist above says eight everywhere it said seven.
+- **Buy the add-on once in test mode** (DODO-LOCAL-TEST.md, journey H): on a Developer organization open GST credit, import a
+  GSTR-2B, press "Add GST Credit — $49 a month for your organization" (an owner), pay with the test card, see the lists open and
+  Billing → Add-ons say "Active"; then cancel it from Dodo's customer portal and see "Ends on …" for 14 days, then the preview
+  with every import still there.
+- Set `BILLING_CHECKOUT_SUCCESS_URL` / `_CANCEL_URL` only if you want a different return page; unset, an add-on's checkout now
+  returns to the organization's Billing page (F-530).
+- **The monthly email** needs the platform mail relay (the same one the trial emails use). Look at one on the 1st with a real
+  paying organization that has a finding; the selection rules are tested with a controlled clock, the rendering in a mail-client
+  checklist (not a real mail client).
+- After the merge, confirm the CI run on `main` is green (the point of Part 1). If the GST speed test is red again on CI,
+  `PERFORMANCE.md` ("the matching step on a shared CI machine") says where the time goes; the next step would be reading the
+  books faster (about 0.8 s) and the insert (about 0.7 s, indexes and foreign keys).
+- Possible follow-ups, none started: an annual price for the add-on; the monthly summary for organizations on an invoiced
+  contract; a rupee price for the add-on; `upload-artifact` v7 and `setup-node` v7 are newer than the versions used for
+  upload-artifact (v6); moving CI to the next Ubuntu image on purpose (N-144).
+

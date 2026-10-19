@@ -174,6 +174,14 @@ DEFAULT_SCHEDULE: tuple[ScheduledJob, ...] = (
         description="Email owners two days before their free trial ends, and when it ends (N-052).",
     ),
     ScheduledJob(
+        job_type="receipt.monthly",
+        interval_seconds=3_600,
+        description=(
+            "On the 1st of each month from 09:00 in the organization's zone, email the owners of a paying "
+            "organization last month's value receipt, once per month and only when it found something (Session H)."
+        ),
+    ),
+    ScheduledJob(
         job_type="usage.limit_alerts",
         interval_seconds=3_600,
         description="Tell owners at 80% and at 100% of a monthly plan limit, once per period (N-062).",

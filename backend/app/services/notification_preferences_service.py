@@ -33,6 +33,8 @@ WORKFLOW = "workflow"
 #: needs approval) and its Monday briefing, each with its own switch.
 HELM = "helm"
 HELM_BRIEFING = "helm_briefing"
+#: Session H: last month's value receipt, on the 1st, to the owners of a paying organization.
+MONTHLY_SUMMARY = "monthly_summary"
 
 
 @dataclass(frozen=True)
@@ -41,10 +43,14 @@ class Category:
     label: str
     description: str
     essential: bool
-    #: Who is offered the switch: everyone, or only people Helm notifies (organization owners, admins
-    #: and the billing role); a member never gets a Helm notice, so is never shown its switch.
+    #: Who is offered the switch: everyone; only people Helm notifies (organization owners, admins
+    #: and the billing role; a member never gets a Helm notice, so is never shown its switch); or only
+    #: organization owners (the monthly summary).
     audience: str = "everyone"
 
+
+#: Organization roles that get the monthly summary (it is about the organization's money and its plan).
+OWNER_AUDIENCE_ROLES: tuple[str, ...] = ("OWNER",)
 
 #: Organization roles Helm notifies (brief §5.4).
 HELM_AUDIENCE_ROLES: tuple[str, ...] = ("OWNER", "ADMIN", "BILLING")
@@ -63,6 +69,10 @@ CATEGORIES: tuple[Category, ...] = (
     Category(WORKFLOW, "Documents and automations",
              "A document that could not be processed, an automation that failed or needs attention.",
              essential=False),
+    Category(MONTHLY_SUMMARY, "Monthly summary",
+             "On the 1st of each month: what Servabo found in your documents last month, for each paying "
+             "organization you own. Not sent when there is nothing to report.",
+             essential=False, audience="owners"),
     Category(HELM, "Helm",
              "A mandate breached or drifting, a conflict in the plan, a payment action waiting for approval.",
              essential=False, audience="helm"),
@@ -115,8 +125,18 @@ def _sees_helm(db: Session, user_id: uuid.UUID) -> bool:
     return any(str(role).upper() in HELM_AUDIENCE_ROLES for role in roles)
 
 
+def _is_owner(db: Session, user_id: uuid.UUID) -> bool:
+    from app.models.organization import MembershipStatus, OrganizationMember
+
+    roles = [getattr(r, "value", r) for (r,) in db.execute(
+        select(OrganizationMember.role).where(OrganizationMember.user_id == user_id,
+                                              OrganizationMember.status == MembershipStatus.ACTIVE)).all()]
+    return any(str(role).upper() in OWNER_AUDIENCE_ROLES for role in roles)
+
+
 def list_for_user(db: Session, *, user_id: uuid.UUID) -> list[dict[str, Any]]:
     helm = _sees_helm(db, user_id)
+    owner = _is_owner(db, user_id)
     rows = {
         row.category: row.email_enabled
         for row in db.execute(
@@ -132,7 +152,7 @@ def list_for_user(db: Session, *, user_id: uuid.UUID) -> list[dict[str, Any]]:
             "locked": c.essential,
         }
         for c in CATEGORIES
-        if c.audience == "everyone" or (c.audience == "helm" and helm)
+        if c.audience == "everyone" or (c.audience == "helm" and helm) or (c.audience == "owners" and owner)
     ]
 
 

@@ -6,6 +6,30 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Added — A green main, the GST Credit add-on, the monthly summary (Session H, 2026-10-19)
+
+- **GST Credit add-on**: a Developer organization can buy the GST Credit lists (suppliers, invoices with IMS recommendations,
+  decisions, export, reminders) for $49 a month for the whole organization, as the third add-on. Business and Enterprise
+  include it through their plan. When it ends the page returns to the preview and every import, match and decision is kept.
+  Offered on the GST page (and both ways on the trial), listed on Billing → Add-ons, named in the value receipt, and on the
+  website's pricing page (a new Add-ons section) and `/gst-credit`. One migration (`h1a6_gst_credit_addon`); the Dodo setup
+  now creates eight products.
+- **Monthly summary email**: on the 1st of each month the owners of a paying organization get last month's value receipt,
+  only when it found something, once per organization per month, with a "Monthly summary" switch (on by default). One
+  migration (`h1a7_monthly_receipt_sends`), one worker job (`receipt.monthly`).
+
+### Changed
+
+- **GST matching is faster** (storing results with one `COPY`, suggestion lookups by supplier and day): matching 10,000 records
+  against 10,000 invoices went from about 4.2 s to about 2.9 s on the build machine, because it took 11.48 s on CI and failed
+  `main`. The budget did not move.
+- **CI**: the frontend audit blocks on what ships (`npm audit --omit=dev`) and only reports build tools; every job runs on
+  `ubuntu-24.04`; `checkout`, `setup-node`, `setup-python` on v7 and `upload-artifact` on v6 (Node.js 24).
+
+### Fixed
+
+- An add-on's checkout returned the customer to an empty address (F-530).
+
 ### Added — The value receipt (Session G, 2026-10-19)
 
 - **Value receipt**: real figures from a customer's own documents, in rupees, shown where a purchase is decided and every

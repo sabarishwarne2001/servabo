@@ -2,7 +2,41 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-19 (Session G, finished)_
+_Last updated: 2026-10-19 (Session H)_
+
+## Current phase — Session H: a green main, the GST Credit add-on, the monthly summary (2026-10-19)
+Branch `claude/new-session-rtxwwe` (the session's assigned branch), based on `main` at `25bf99b` (PR #32 merged), draft PR #33.
+Founder authority: decisions in NEEDS-OWNER.md as `DECIDED (Session H)` (used N-142 to N-146; next free N-147); findings F-528 to
+F-530 (next free F-531). Two migrations (`h1a6_gst_credit_addon`, `h1a7_monthly_receipt_sends`); one Alembic head. **If cut off,
+type `continue`: carry on from the first unticked box. Never restart.**
+Local stack this session: Postgres 16 + pgvector 0.8.0 (built from source) on :5433 (e2e, DB `servabo_e2e`) and :5434 (backend
+tests, DB `flowpilot_test`), Redis (db 0 tests, db 1 e2e), backend venv with the FULL `requirements.txt`, `npm ci` done. The two
+environment blocks are in the session scratchpad (outside the repo): the CI variables with `POSTGRES_USER=postgres`, trust auth.
+
+- [x] 0. Start-up: docs and code read; sandbox databases and venv; this checklist; draft PR #33
+- [x] 1. (P0) Part 1: `main` green. Both red runs (#387, #394) had ONE red job, `pytest (shard 2/4)` (the GST speed test); the
+  Frontend job was green because its audit step was `continue-on-error` (F-529, N-143). GST matching: `COPY` for the results,
+  lookups by supplier and day (F-528, N-142, PERFORMANCE.md); audit gate (blocking on `--omit=dev`, report-only for build tools,
+  `tests/infra/test_ci_workflow_contract.py` failed first); `ubuntu-24.04`; actions on Node 24 (N-144)
+- [x] 2. (P0) Part 2: GST Credit add-on for Developer (N-145): catalogue + migration + seed rows + gate + checkout rules; GST page
+  offer, Billing add-on list, value receipt line; Dodo (eight products) and docs; pricing export, website Add-ons section,
+  `/gst-credit` line; backend tests (`test_gst_addon.py`, `test_gst_addon_api.py`, the Dodo reconciliation case); browser spec 108
+  (9 tests, 3 repeats = 27 passed, axe light and dark)
+- [x] 3. (P1) Part 3: the monthly summary email (N-146): `receipt.monthly` job, `monthly_receipt_sends`, "Monthly summary" category,
+  `monthly_receipt` template (reuses the trial email's receipt block); 9 service tests + 4 template tests + the mail-client test
+- [x] Finish: records (N-142 to N-146, F-528 to F-530, COVERAGE, CHANGELOG, STATE, HANDOFF); `campaign_slices.py --check all`
+  exits 0; one Alembic head (up/down/up); frontend `lint`, `typecheck`, `check:self` clean; PR ready; CI green (below)
+- **Verified (local).** Part 1: the GST budget test at `PERF_BUDGET_MULTIPLIER=1`: matching 4.0 to 4.3 s before, 2.3 to 3.2 s after
+  (median about 2.9); equivalence (`test_matching_equivalence.py`, 5 seeded workloads, fails when the day window is narrowed by one
+  day) and `test_bulk.py`; CI-contract test 8 passed (it failed first on 4 of 8). Part 2: add-on tests 11 + 1 + the Dodo
+  reconciliation add-on case, value receipt 34, `dodo_setup` 4; website `typecheck`, `build`, `check:links`, `check:html`,
+  `check:a11y` clean, Lighthouse 96 to 100; browser 108 (27), 105/106/107/68/91 (34), 60/62/64 (3), 20 "Billing" (5).
+  Part 3: 9 service + 5 template tests.
+- **Not run locally, on purpose** (the brief says CI runs the full suites): the full backend and browser suites.
+- **Unverified.** The add-on bought on a real Dodo test account (Session D: the eighth product and one purchase); the monthly email in
+  a real mail client and on the 1st in a real zone (selection is proven with a controlled clock); the 390 px phone view of the new
+  Billing "Add-ons" list and the GST offer (checked by axe, not by eye).
+- **Next action:** CI on PR #33 (below), then mark ready; after the merge confirm the run on `main` is green. Then Session D.
 
 ## Current phase — Session G: the value receipt (2026-10-19)
 Branch `claude/new-session-awa8gh` (the session's assigned branch), based on `main` at `e8509ac` (PR #31 merged).
