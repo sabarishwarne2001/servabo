@@ -58,6 +58,14 @@
           "shot": "matching"
         },
         {
+          "id": "gst",
+          "name": "GST credit",
+          "result": "Your GSTR-2B matched with the purchase invoices Servabo has read: what you can claim, what a supplier has not reported, and which unpaid invoices near 180 days.",
+          "detail": "Import the portal's GSTR-2B JSON; each invoice gets a status with its reason, an Invoice Management System recommendation, and a reminder you can send to the supplier. Recommendations, not tax advice; Servabo never files or acts on the portal.",
+          "capability": "capability.gst_credit",
+          "shot": "gst-credit-summary"
+        },
+        {
           "id": "radar",
           "name": "Duplicate and anomaly radar",
           "result": "Duplicate invoices, changed supplier bank details and unusual amounts flagged with the evidence.",

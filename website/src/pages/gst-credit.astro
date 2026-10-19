@@ -1,0 +1,248 @@
+---
+import Base from "../layouts/Base.astro";
+import Shot from "../components/Shot.astro";
+import SectionHead from "../components/SectionHead.astro";
+import PlanBadge from "../components/PlanBadge.astro";
+import ClosingCta from "../components/ClosingCta.astro";
+import { APP, SITE, absolute } from "../config/site";
+import { TRIAL_DAYS, lowestPlanWith } from "../lib/pricing";
+
+/** The one source of each rule: the section, and the official page that carries it. */
+const LAW = {
+  act: "https://cbic-gst.gov.in/pdf/CGST-Act-2017-amended-01012022.pdf",
+  itc: "https://cbic-gst.gov.in/input-tax-credit-rules.html",
+  portal: "https://tutorial.gst.gov.in",
+  msmed: "https://www.indiacode.nic.in/",
+};
+
+const lowest = lowestPlanWith("capability.gst_credit");
+const everyWorkspace = lowestPlanWith("capability.gst_credit_all_workspaces");
+
+const steps = [
+  { title: "Import your GSTR-2B", body: "Download the GSTR-2B JSON from the GST portal (Returns Dashboard, GSTR-2B, Download) and drop it in, or a zip that holds it. Import as many months as you like; a month imported twice is replaced, never counted twice." },
+  { title: "Servabo has already read your invoices", body: "Nobody types a purchase register. The invoices your team uploaded are read with the page every field came from, including the supplier’s GSTIN, the taxable value and each tax head." },
+  { title: "Each invoice is matched, one to one", body: "A document matches at most one record in GSTR-2B and the other way round. Exact matches use the IRN or the supplier’s GSTIN with the document number; a close one is only suggested and waits for a person." },
+  { title: "You act on what is left", body: "See what is claimable, what differs, which suppliers have not reported, and what the supplier reported that you do not have. Draft a reminder to a supplier, export to Excel, and make your choices in the portal." },
+];
+
+const statuses = [
+  { name: "Matched", body: "Reported by the supplier and the same as your books: claimable." },
+  { name: "Matched with differences", body: "Reported, but an amount differs. Claim the lower figure and ask the supplier to amend." },
+  { name: "Waiting for supplier", body: "In your books and in no GSTR-2B you imported. The credit is deferred until the supplier reports it." },
+  { name: "Not in your books", body: "The supplier reported it and Servabo has no matching invoice: upload it, or deal with it in the portal." },
+  { name: "Not eligible", body: "GSTR-2B itself says the credit is not available, with the reason code as the portal gives it." },
+  { name: "Suggested", body: "A probable match that is never confirmed automatically. A person decides." },
+];
+
+const ims = [
+  { action: "Accept", body: "The record matches an invoice you have: nothing more to do." },
+  { action: "Pending", body: "The record is probably yours but something is unresolved: an amount differs, or the invoice is not here yet." },
+  { action: "Reject", body: "The record is not yours, or it is wrong in a way the supplier must fix." },
+];
+
+const helm = [
+  { title: "The 180-day rule", body: "If a supplier is not paid within 180 days of the invoice date, the credit you took is added back to your output tax, with interest. Helm makes the 180th day a deadline in the payment plan, next to the legal deadline for micro and small suppliers, and neither is ever relaxed." },
+  { title: "The MSMED Act deadline", body: "Micro and small suppliers must be paid within the period the MSMED Act sets (45 days with a written agreement). Helm already plans that; the GST mandates never push a payment past it." },
+  { title: "Hold until reported", body: "An optional mandate that holds the payment of an invoice the supplier has not reported, and lets go in time to pay inside the earlier of the two deadlines. It then lists the follow-up: ask the supplier to report the invoice." },
+];
+
+const faqs = [
+  { q: "Which file do I import?", a: "The GSTR-2B JSON you download from the GST portal for a month, or a zip containing it. Servabo reads the invoice, credit-note and e-commerce sections and keeps the rest for the totals. If a file has a shape Servabo does not expect, it says so in words instead of dropping anything." },
+  { q: "Is this tax advice?", a: "No. Servabo recommends; a person acts on the portal and files. Check anything that matters with your chartered accountant. Each rule on this page cites its section and an official page." },
+  { q: "Does Servabo file my return or connect to the GST portal?", a: "No. It does not log in to the portal, file GSTR-3B or take any action in the Invoice Management System. You import a file you downloaded and you make the choices on the portal yourself." },
+  { q: "What is not verified?", a: "The file layout has been tested on invented files that follow the portal’s documented layout, not yet on a customer’s download. The 180-day figure depends on the payments Servabo knows about (Helm’s records and the bank statements you import). Interest is not calculated, and some financial years have special rules for the time limit in Section 16(4); the product says so where it matters." },
+  { q: "What happens to the file and my invoices?", a: "They stay in your workspace, isolated from every other organization, like any document you upload. GSTR-2B is read by deterministic code, not by an AI model. A supplier reminder is only a draft until a person sends it, and the sample company never sends anything." },
+  { q: "What does it cost?", a: `Every plan can import a file and see the six figures; the sample company is there to look at during the ${TRIAL_DAYS}-day trial. The supplier list, invoice list, IMS actions, Excel export and reminders come with ${lowest?.name ?? "Business"} and up.` },
+];
+
+const product = {
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  name: "GST credit by Servabo",
+  url: absolute("/gst-credit"),
+  description: "Match the purchase invoices Servabo has read with your GSTR-2B and see which input tax credit you can claim, what the supplier has not reported and which unpaid invoices are nearing 180 days.",
+  isPartOf: { "@type": "WebSite", name: SITE.name, url: SITE.url },
+};
+const faqLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })),
+};
+---
+<Base title="GST credit — GSTR-2B matched to your invoices" description="Import your GSTR-2B and see which input tax credit you can claim, which suppliers have not reported, and which unpaid invoices are nearing 180 days. Recommendations, not tax advice." structuredData={[product, faqLd]}>
+  <section class="page pt-16 sm:pt-24" aria-labelledby="gst-title">
+    <div class="grid items-center gap-12 lg:grid-cols-[1fr_1.2fr]">
+      <div>
+        <p class="eyebrow">GST credit · for Indian businesses</p>
+        <h1 id="gst-title" class="display mt-4">Know which GST credit is yours before you file.</h1>
+        <p class="lede mt-6">
+          Import your GSTR-2B. Servabo matches it with the purchase invoices it has already read, and
+          shows what you can claim, what a supplier has not reported, and which unpaid invoices are
+          nearing the 180-day limit.
+        </p>
+        <div class="mt-9 flex flex-col gap-3 sm:flex-row">
+          <a href={APP.register} class="btn-primary">Start free trial</a>
+          <a href="#plans" class="btn-quiet">Where it is included</a>
+        </div>
+        <p class="mt-4 text-sm text-muted-foreground">Recommendations, not tax advice. The sample company has a GSTR-2B you can open during the {TRIAL_DAYS}-day trial.</p>
+      </div>
+      <Shot name="gst-credit-summary" eager alt="The GST credit page for the sample company: six figures for credit you can claim, credit that differs, credit waiting for suppliers, records not in your books, credit not eligible and invoices at risk of the 180-day rule." />
+    </div>
+  </section>
+
+  <section class="page mt-24" aria-labelledby="problem">
+    <div class="grid gap-10 lg:grid-cols-[1fr_1.4fr]">
+      <div>
+        <p class="eyebrow">The problem, in rupees</p>
+        <h2 id="problem" class="h2 mt-3">A supplier’s silence costs you the credit.</h2>
+      </div>
+      <div class="space-y-4 text-lg leading-relaxed text-muted-foreground">
+        <p>
+          An example of the arithmetic, not a customer result: a purchase invoice of INR 1,00,000 with 18% GST
+          carries INR 18,000 of input tax credit. You can claim it only if the supplier reported the invoice, so
+          that it shows in your GSTR-2B (Section 16(2)(aa) of the CGST Act). If it does not show, the credit waits.
+        </p>
+        <p>
+          Paying is not the end of it. If the supplier is not paid within 180 days of the invoice date, the credit
+          taken is added back, with interest (second proviso to Section 16(2), Rule 37 and Section 50). Finance
+          teams compare the statement with their books by hand in Excel, and the invoices that fall between the
+          two are the ones that cost money.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="page mt-24" aria-labelledby="how">
+    <SectionHead eyebrow="How it works" title="From the portal’s file to a list of what to do." id="how" />
+    <ol class="mt-10 grid gap-6 md:grid-cols-2">
+      {steps.map((s, i) => (
+        <li class="sheet p-6">
+          <span class="figure text-sm text-primary dark:text-[hsl(var(--primary-on-dark))]">{String(i + 1).padStart(2, "0")}</span>
+          <h3 class="h3 mt-3">{s.title}</h3>
+          <p class="mt-2 leading-relaxed text-muted-foreground">{s.body}</p>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <section class="page mt-24 grid items-center gap-12 lg:grid-cols-2" aria-labelledby="statuses">
+    <Shot name="gst-credit-invoices" alt="The invoices tab of the GST credit page: each invoice with its supplier, its status in GSTR-2B and the amount of credit, filtered to those waiting for the supplier." class="lg:order-2" />
+    <div class="lg:order-1">
+      <p class="eyebrow">Every invoice has a status</p>
+      <h2 id="statuses" class="h2 mt-3">Six answers, each with its reason.</h2>
+      <dl class="mt-6 space-y-4">
+        {statuses.map((s) => (
+          <div class="border-l-2 border-border-strong pl-4">
+            <dt class="font-semibold">{s.name}</dt>
+            <dd class="mt-1 text-[0.95rem] leading-relaxed text-muted-foreground">{s.body}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  </section>
+
+  <section class="page mt-24 grid items-center gap-12 lg:grid-cols-2" aria-labelledby="ims">
+    <div>
+      <p class="eyebrow">Invoice Management System</p>
+      <h2 id="ims" class="h2 mt-3">What to do in the portal, and why.</h2>
+      <p class="lede mt-5">
+        Since October 2024 the portal lets you accept, reject or keep pending each record a supplier
+        reported before you file GSTR-3B. Servabo recommends one of the three for each record and
+        gives the reason. You make the choice on the portal; Servabo never does it for you.
+      </p>
+      <ul class="mt-6 space-y-3">
+        {ims.map((i) => (
+          <li class="ledger-row"><span><strong>{i.action}</strong> · {i.body}</span></li>
+        ))}
+      </ul>
+    </div>
+    <Shot name="gst-credit-ims" alt="The IMS actions tab, filtered to Accept: each record with the action Servabo recommends on the portal and the reason, for example that it matches your books within the tolerance." />
+  </section>
+
+  <section class="mt-24 border-y border-border bg-sidebar py-20" aria-labelledby="helm">
+    <div class="page">
+      <SectionHead eyebrow="With Helm" title="GST credit, the MSME law and your cash are one plan." id="helm" lede="Helm already plans what to pay and when. With the GST mandates it also knows which invoices have a credit riding on them." />
+      <div class="mt-10 grid gap-4 md:grid-cols-3">
+        {helm.map((h) => (
+          <div class="sheet p-6">
+            <h3 class="h3">{h.title}</h3>
+            <p class="mt-2 text-[0.95rem] leading-relaxed text-muted-foreground">{h.body}</p>
+          </div>
+        ))}
+      </div>
+      <p class="mt-6 text-sm text-muted-foreground">
+        Helm never pays: a person pays from the bank. Neither GST mandate can make a payment late under the
+        MSMED Act or the 180-day rule. <a href="/helm" class="link">About Helm</a>
+      </p>
+    </div>
+  </section>
+
+  <section id="plans" class="page mt-24 scroll-mt-24" aria-labelledby="plans-title">
+    <SectionHead eyebrow="Where it is included" title="A preview on every plan; everything on Business and Enterprise." id="plans-title" />
+    <div class="mt-10 grid gap-4 md:grid-cols-3">
+      <div class="sheet p-6">
+        <p class="font-semibold">Every plan</p>
+        <ul class="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
+          <li>Import GSTR-2B files</li>
+          <li>The six figures and how many invoices are behind each</li>
+          <li>The sample company’s full reconciliation, to look at</li>
+        </ul>
+      </div>
+      <div class="sheet p-6 ring-2 ring-primary">
+        <div class="flex items-start justify-between gap-3">
+          <p class="font-semibold">{lowest?.name ?? "Business"} and up</p>
+          <PlanBadge feature="capability.gst_credit" />
+        </div>
+        <ul class="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
+          <li>The supplier list, the invoice list and the side-by-side view</li>
+          <li>IMS recommendations and your decisions, kept across imports</li>
+          <li>Excel export and supplier reminders</li>
+          <li>The 180-day exposure from Helm’s payment records</li>
+        </ul>
+      </div>
+      <div class="sheet p-6">
+        <div class="flex items-start justify-between gap-3">
+          <p class="font-semibold">{everyWorkspace?.name ?? "Enterprise"}</p>
+          <PlanBadge feature="capability.gst_credit_all_workspaces" />
+        </div>
+        <ul class="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
+          <li>One reconciliation for a GSTIN across every workspace that holds its purchases</li>
+          <li>An organization page for owners, admins and billing</li>
+          <li>API keys that can read the summary and records</li>
+        </ul>
+      </div>
+    </div>
+    <p class="mt-4 text-sm text-muted-foreground">From the same price list as the <a class="link" href="/pricing">pricing page</a>. </p>
+  </section>
+
+  <section class="page mt-24" aria-labelledby="law">
+    <div class="sheet-fold p-6 sm:p-10">
+      <p class="eyebrow">The rules, with their sources</p>
+      <h2 id="law" class="h2 mt-3">Read the law itself.</h2>
+      <ul class="mt-6 space-y-3 leading-relaxed text-muted-foreground">
+        <li>Credit only on invoices the supplier reported: Section 16(2)(aa), CGST Act, 2017. <a class="link" href={LAW.act}>CGST Act, CBIC</a></li>
+        <li>The 180-day rule and its interest: second proviso to Section 16(2), Rule 37 and Section 50. <a class="link" href={LAW.itc}>Input tax credit, CBIC</a></li>
+        <li>Downloading GSTR-2B and using the Invoice Management System. <a class="link" href={LAW.portal}>GST portal tutorials</a></li>
+        <li>Payment to micro and small suppliers: Section 15, MSMED Act, 2006. <a class="link" href={LAW.msmed}>India Code</a></li>
+      </ul>
+      <p class="mt-6 text-sm text-muted-foreground">Servabo shows recommendations and decision support, not tax or legal advice. Check with your chartered accountant before you act.</p>
+    </div>
+  </section>
+
+  <section class="page mt-24" aria-labelledby="faq">
+    <SectionHead eyebrow="Questions" title="Asked before importing a file." id="faq" />
+    <div class="mt-8 max-w-3xl divide-y divide-border border-y border-border">
+      {faqs.map((f) => (
+        <details class="group py-4">
+          <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-medium [&::-webkit-details-marker]:hidden">
+            {f.q}
+            <span class="text-muted-foreground transition-transform group-open:rotate-45" aria-hidden="true">+</span>
+          </summary>
+          <p class="mt-3 leading-relaxed text-muted-foreground">{f.a}</p>
+        </details>
+      ))}
+    </div>
+  </section>
+
+  <ClosingCta />
+</Base>
