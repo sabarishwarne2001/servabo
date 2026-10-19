@@ -2,7 +2,7 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-19 (Session F)_
+_Last updated: 2026-10-19 (Session F, finished)_
 
 ## Current phase — Session F: GST Credit (2026-10-19)
 Branch `claude/new-session-5oe22r` (the session's assigned branch), based on `main` at `7185674` (PR #30 merged).
@@ -13,18 +13,23 @@ Local stack: Postgres 16 + pgvector 0.8.0 (built from source) on :5433 (e2e) and
 backend venv Python 3.12 (`backend/.venv`), `npm ci` done. Environment variables live outside the repo.
 
 - [x] 0. Start-up: docs read; sandbox databases and venv; this checklist; draft PR.
-- [ ] 1. (P0) Finance-grade invoice reading
-  - [ ] 1a. Contract tests written and failing on today's prompt (`tests/services/test_extraction_prompt_contract.py`)
-  - [ ] 1b. Prompt rewritten as one finance schema; stand-in answers only what the prompt asks
-  - [ ] 1c. Reader specs and tests re-run (Helm, procurement, ERP, documents); FINDINGS and HANDOFF note
-- [ ] 2. (P0) GST Credit engine: tables (one migration), GSTR-2B parser, matching, statuses, IMS, API, export, tests,
-  PERFORMANCE.md, docs/product/GST-CREDIT.md
-- [ ] 3. (P0) GST Credit page, `capability.gst_credit`, preview, sample company GSTR-2B, browser spec
-- [ ] 4. (P1) Helm: 180-day mandate, hold-until-reported mandate, Guard check, Request action
-- [ ] 5. (P2) Website `/gst-credit`; Enterprise every-workspace view
-- [ ] 6. (Stretch) e-invoice QR code
-- [ ] Finish: full backend + browser suites once, `campaign_slices.py --check all`, one Alembic head (up/down/up),
-  frontend lint / typecheck / check:self, records, CI green, PR ready, stop.
+- [x] 1. (P0) Finance-grade invoice reading (F-524, N-138): contract tests, prompt rewritten, stand-in answers only what is asked
+- [x] 2. (P0) GST Credit engine: tables (migration `g1a1_gst_credit`), GSTR-2B parser, matching, statuses, IMS, API, export, tests, PERFORMANCE.md, docs/product/GST-CREDIT.md
+- [x] 3. (P0) GST Credit page, `capability.gst_credit`, preview, sample company GSTR-2B, browser spec 105 (3 repeats, axe)
+- [x] 4. (P1) Helm: 180-day mandate, hold-until-reported mandate, Guard check, Request action; equivalence test (60 seeds) passes
+- [x] 5. (P2) Website `/gst-credit` (build, check, Lighthouse 96-97); Enterprise every-workspace page, API and `gst:read` scope (spec 106)
+- [x] 6. (Stretch) e-invoice QR code: pictures read in the OCR worker, token trusted in the enrich worker (N-140)
+- [x] Finish: suites run once (below), `campaign_slices.py --check all` exits 0, one Alembic head (up/down/up), frontend lint / typecheck / check:self clean, records, PR ready.
+- **Verified.** Full backend suite: 5,456 passed / 14 failed / 13 skipped. Of the 14: 8 fail identically on unmodified
+  `origin/main` (no embedding model in the sandbox), 2 Dodo-invoice tests pass alone (order-dependent, as Session E noted),
+  1 GST budget test failed only because the browser suite was running at the same time (passes alone), and 3 were mine
+  and are fixed (setting undocumented in CONFIGURATION.md x2; the web image must not carry OpenCV, so the QR picture
+  reading moved to the OCR worker). Full browser suite: 972 passed / 3 failed / 2 skipped / 9 did not run; spec 85 passed
+  alone (load), spec 26 failed because my specs created organizations named "... Plan ..." (fixed, passes), spec 105 matched
+  two toasts (fixed, 11 of 11 pass). Not re-run in full after those two spec fixes.
+- **Unverified.** See HANDOFF "Session F": real GSTR-2B file, real GST invoice through a real model, the wording of the
+  sections against the official pages, the e-invoice payload and NIC's key.
+- **Next action:** Session D (Dodo walk-through; now also a real GST invoice, a real GSTR-2B and an e-invoice PDF).
 
 ## Session E (2026-10-18): the UI gaps and defects Session C left open
 Branch `claude/funny-sagan-n7gpqc` (the session's assigned branch), based on `main` at `b4b4c9c`. Findings F-518 to
