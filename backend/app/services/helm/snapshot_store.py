@@ -356,6 +356,8 @@ def take(db: Session, book: HelmBook, *, as_of: Optional[date] = None) -> snap.S
                 "hold_code": (row.evidence or {}).get("reason") if held else None,
                 "waived": sorted((row.evidence or {}).get("waived") or ()), "version": row.version}
 
+    gst_facts = _gst_facts(db, workspace_ids)
+
     payables: list[snap.Payable] = []
     receivables: list[snap.Receivable] = []
     notices: list[snap.Notice] = []
@@ -396,6 +398,8 @@ def take(db: Session, book: HelmBook, *, as_of: Optional[date] = None) -> snap.S
                 paid_amount_micros=payment.get("amount_micros") if payment else None,
                 paid_reference=(payment.get("reference") or (payment.get("statement") or {}).get("reference")
                                 or None) if payment else None,
+                gst_micros=details.get("gst_micros"),
+                **_gst_of(gst_facts.get(promise.work_item_id), _date(details.get("invoice_date"))),
             ))
         elif promise.kind == v.KIND_PAYMENT_EXPECTED:
             settlement = _settlement(promise)
@@ -464,6 +468,44 @@ def take(db: Session, book: HelmBook, *, as_of: Optional[date] = None) -> snap.S
         account_reason=reason, promise_counts=counts, visibility=visibility,
     )
     return result.with_digest()
+
+
+def _gst_of(facts: Optional[dict[str, Any]], invoice_date: Optional[date]) -> dict[str, Any]:
+    if not facts:
+        return {}
+    month = f"{invoice_date.year:04d}-{invoice_date.month:02d}" if invoice_date else None
+    return {"gst_status": facts["gst_status"], "gst_gstin": facts["gst_gstin"],
+            "gst_supplier_gstin": facts["gst_supplier_gstin"],
+            "gst_period_imported": bool(month and month in facts["periods"])}
+
+
+def _gst_facts(db: Session, workspace_ids: list[uuid.UUID]) -> dict[uuid.UUID, dict[str, Any]]:
+    """Where each invoice stands in the GSTR-2B reconciliation (GST Credit): its status, the return's GSTIN and
+    whether a return for the invoice's own month was imported. Empty for a workspace with no return."""
+    if not workspace_ids:
+        return {}
+    from app.models.gst import GstMatch, GstReturn
+    from app.services.gst import vocabulary as gv
+
+    periods: dict[tuple[uuid.UUID, str], set[str]] = {}
+    for workspace_id, gstin, period in db.execute(
+        select(GstReturn.workspace_id, GstReturn.gstin, GstReturn.period).where(
+            GstReturn.workspace_id.in_(workspace_ids), GstReturn.status == gv.RETURN_ACTIVE)
+    ).all():
+        periods.setdefault((workspace_id, gstin), set()).add(period)
+    if not periods:
+        return {}
+    out: dict[uuid.UUID, dict[str, Any]] = {}
+    for row in db.execute(
+        select(GstMatch.work_item_id, GstMatch.workspace_id, GstMatch.gstin, GstMatch.status, GstMatch.doc_date,
+               GstMatch.supplier_gstin).where(
+            GstMatch.workspace_id.in_(workspace_ids), GstMatch.work_item_id.is_not(None))
+    ).all():
+        out[row.work_item_id] = {
+            "gst_status": row.status, "gst_gstin": row.gstin, "gst_supplier_gstin": row.supplier_gstin,
+            "periods": periods.get((row.workspace_id, row.gstin), set()),
+        }
+    return out
 
 
 def _visibility(payables: list[snap.Payable], promises: list[HelmPromise]) -> dict[str, Any]:

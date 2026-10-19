@@ -65,7 +65,8 @@ class Item:
     amount: int
     due: date
     hard_deadline: Optional[date] = None
-    #: "MSME" (the law) or "ON_TIME" (the company's own hard "pay on time") — relaxed in that order: ON_TIME first.
+    #: "MSME" or "GST180" (the law: MSMED Act section 15, the 180-day rule) or "ON_TIME" (the company's own hard
+    #: "pay on time") — only ON_TIME is ever relaxed.
     deadline_kind: Optional[str] = None
     discount_deadline: Optional[date] = None
     discount_value: int = 0
@@ -201,6 +202,10 @@ def _cash_rows(problem: Problem, index: dict[tuple[int, int], int]):
             upper.append((opening + int(inflow[k]) - floor) / UNIT)
             labels.append((currency, problem.run_days[k]))
     return rows, cols, vals, upper, labels
+
+
+#: Deadlines the law sets: never relaxed to keep cash above a floor (the conflict report says what falls short).
+LAW_KINDS = ("MSME", "GST180")
 
 
 def _solve_milp(problem: Problem, *, hard_kinds: set[str], soft_cash: bool, time_limit: float):
@@ -339,7 +344,7 @@ def _report(problem: Problem, schedule: dict[str, Optional[date]], shortfalls: l
                     f"{worst.on.strftime('%d %b')} if every legal payment deadline is met.")
         soft_paid = sorted(
             (item for item in problem.items
-             if item.currency == worst.currency and item.deadline_kind != "MSME"
+             if item.currency == worst.currency and item.deadline_kind not in LAW_KINDS
              and schedule.get(item.key) is not None and schedule[item.key] <= worst.on),
             key=lambda item: -item.amount)
         if soft_paid:
@@ -370,9 +375,9 @@ def solve(problem: Problem) -> Solution:
         return max(0.5, deadline - time.monotonic())
 
     attempts = [
-        ({"MSME", "ON_TIME"}, False, []),
-        ({"MSME"}, False, ["pay_on_time hard deadlines"]),
-        ({"MSME"}, True, ["pay_on_time hard deadlines", "cash floor"]),
+        ({*LAW_KINDS, "ON_TIME"}, False, []),
+        (set(LAW_KINDS), False, ["pay_on_time hard deadlines"]),
+        (set(LAW_KINDS), True, ["pay_on_time hard deadlines", "cash floor"]),
     ]
     for hard, soft_cash, relaxed in attempts:
         try:
@@ -413,4 +418,4 @@ def greedy(problem: Problem) -> Solution:
                     discounts_micros=discounts, late_penalties_micros=late, early_cost_micros=early)
 
 
-__all__ = ["ConflictReport", "Item", "Problem", "Shortfall", "Solution", "effective_deadline", "greedy", "solve"]
+__all__ = ["ConflictReport", "Item", "LAW_KINDS", "Problem", "Shortfall", "Solution", "effective_deadline", "greedy", "solve"]

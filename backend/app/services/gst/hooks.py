@@ -53,4 +53,28 @@ def document_changed(db: Any, *, workspace_id: Optional[uuid.UUID], organization
         return False
 
 
-__all__ = ["JOB_RECOMPUTE", "document_changed"]
+def replan(db: Any, workspace: Any) -> int:
+    """GST facts changed (an import, a decision, a reconciliation): ask each Helm book that reads this workspace for
+    a plan soon (debounced), because the 180-day rule, the hold-until-reported mandate and the Guard's GST check read
+    them. Never raises into the caller."""
+    asked = 0
+    try:
+        from app.models.helm import HelmBook
+        from app.services.helm import plan_store
+        from app.services.helm import vocabulary as hv
+
+        with db.begin_nested():
+            reads = HelmBook.workspace_id == workspace.id
+            if not workspace.is_sample:
+                reads = reads | (HelmBook.kind == hv.BOOK_ORGANIZATION)
+            for book in db.execute(select(HelmBook).where(
+                    HelmBook.organization_id == workspace.organization_id, HelmBook.status == hv.BOOK_ACTIVE,
+                    reads)).scalars():
+                plan_store.enqueue(db, book, triggered_by=hv.TRIGGER_LEDGER)
+                asked += 1
+    except Exception:  # noqa: BLE001
+        logger.exception("gst.replan_failed", extra={"workspace_id": str(getattr(workspace, "id", ""))})
+    return asked
+
+
+__all__ = ["JOB_RECOMPUTE", "document_changed", "replan"]

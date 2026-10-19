@@ -815,7 +815,7 @@ def _match(db: Session, items: list[tuple[WorkItem, Doc]]) -> None:
 
 DEFAULT_MANDATES = ("never_pay_above_agreed_price", "never_pay_duplicate", "never_pay_changed_bank_account",
                     "po_required_above", "pay_on_time", "capture_early_discounts", "keep_cash_above",
-                    "msme_pay_within_limit", "decide_renewals", "compliance_docs_current",
+                    "msme_pay_within_limit", "gst_pay_within_180_days", "decide_renewals", "compliance_docs_current",
                     "chase_overdue_customers", "reconcile_supplier_statements")
 
 

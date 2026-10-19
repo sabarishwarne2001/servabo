@@ -262,6 +262,7 @@ id, a plain description, the result and its evidence:
 | `destination` | egress lockdown allows the email or webhook destination (`app/core/egress.py`) |
 | `idempotency` | the action key has not already run |
 | `cash` | the P10 cash path stays above every active floor after this payment |
+| `gst` | (GST Credit) pass when the supplier reported the invoice in GSTR-2B; needs approval when it did not and a GSTR-2B for its month was imported; not applicable when the invoice carries no GST or none was imported (`_gst_check`) |
 | `autonomy` | in Act mode, the amount is within the mandate's act cap; otherwise approval |
 
 It runs at plan time and again in `helm.execute`; a check that now fails blocks the action and
@@ -607,3 +608,26 @@ Nothing is saved: no plan, action, certificate, audit row or notice, and the rou
 rollback. Same gate and roles as "Re-plan" (`capability.helm`, or the sample company). Every value is
 checked by `what_if.parse`, which refuses in plain words ("The delay is a whole number of days.");
 an invoice to hold must be one we owe in this book and in a workspace the person can read.
+
+## 22. GST Credit (`services/gst/`, library mandates 14 and 15)
+
+Helm reads GST Credit from the **ledger**, not from the GST tables at plan time, so a plan stays a pure
+function of the snapshot. `ledger.gst_tax_micros()` stores the tax of each payable in the promise's
+`details["gst_micros"]`; `snapshot_store._gst_facts` adds, per payable, the match status of its
+GSTR-2B line (`gst_status`), the recipient and supplier GSTIN, and whether a GSTR-2B for the invoice's
+month was imported (`gst_period_imported`). `Payable.gst_deadline` is the invoice date plus 180 days;
+`gst_waiting` means "a GSTR-2B for its month was imported and the supplier did not report it". All of it
+is in the snapshot digest, so a new import changes the digest and asks for a new plan.
+
+- **Law kinds.** The optimizer's `LAW_KINDS = ("MSME", "GST180")` are deadlines that are never relaxed.
+  `planner._merge` lets a law deadline win over any goal; a person's own choice of date is honoured for
+  `GST180` only inside the deadline. The conflict report says so in words.
+- **Hold mandate.** `gst_hold_until_reported` excludes a waiting invoice from the optimizer and proposes a
+  hold, but only while the earlier legal deadline is further off than its safety days; after that it
+  releases the hold (`RELEASE_WHY["GST_NOT_REPORTED"]`) and the forecast lists the follow-up as a risk.
+- **Request.** For an invoice waiting on the supplier the planner proposes `request_document` with
+  `params.topic == "GST_REPORTING"`; `hands.request_gst_report` drafts the email (a draft unless the
+  mandate acts), with the section and the official link.
+- **Triggers.** Where the ledger reads non-ORM changes (a GST import, a decision, the nightly recompute)
+  `services/gst/hooks.replan` enqueues a plan for every book reading the workspace, and the ledger marks
+  `helm_dirty`. The incremental-equals-full-rebuild equivalence test keeps covering the new field.

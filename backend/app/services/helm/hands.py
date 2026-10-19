@@ -209,6 +209,8 @@ def request_document(db: Session, *, action: HelmAction, book: HelmBook, snapsho
     from app.templates.emails import helm as mail
 
     params = dict(action.params or {})
+    if params.get("topic") == "GST_REPORTING":
+        return request_gst_report(db, action=action, book=book, snapshot=snapshot)
     counterparty = snapshot.counterparties.get(action.counterparty_key or "") if snapshot else None
     supplier = (counterparty.name if counterparty else None) or "Supplier"
     to = params.get("to") or (counterparty.contact_email if counterparty else None)
@@ -231,6 +233,32 @@ def request_document(db: Session, *, action: HelmAction, book: HelmBook, snapsho
                      subject=subject, html_body=html_body, text_body=text_body)
     return {"case_id": str(case.id), "request_id": str(request.id), "sent": sent,
             "expires_at": request.expires_at.isoformat()}
+
+
+def request_gst_report(db: Session, *, action: HelmAction, book: HelmBook, snapshot=None) -> dict[str, Any]:
+    """Ask a supplier to report the invoices missing from our GSTR-2B: GST Credit's reminder, drafted from the
+    reconciliation. Sent only in Act mode, only to a contact Helm knows, never from the sample company."""
+    from app.models.workspace import Workspace
+    from app.services.gst import reminder
+
+    params = dict(action.params or {})
+    workspace = db.get(Workspace, action.workspace_id) if action.workspace_id else None
+    if workspace is None:
+        raise HandError("HELM_REQUEST_NO_WORKSPACE", "A GST request needs the workspace the invoices are in.")
+    draft = reminder.draft(db, workspace, str(params.get("gstin") or ""), str(params.get("supplier_gstin") or ""))
+    counterparty = snapshot.counterparties.get(action.counterparty_key or "") if snapshot else None
+    to = params.get("to") or (counterparty.contact_email if counterparty else None) or draft.get("to")
+    shown = {"subject": draft.get("subject"), "text": draft.get("text"), "to": to}
+    if not draft.get("lines"):
+        return {"draft": shown, "sent": None, "note": "The supplier has reported everything in the meantime."}
+    if book.kind == v.BOOK_SAMPLE:
+        return {"draft": shown, "sent": None, "note": "The sample company sends no email."}
+    if action.autonomy != v.AUTONOMY_ACT or not to:
+        return {"draft": shown, "sent": None,
+                "note": "A draft: copy it into your email, or switch the mandate to Act mode with a known contact."}
+    sent = send_mail(db, organization_id=action.organization_id, workspace_id=action.workspace_id, to=to,
+                     subject=draft["subject"], html_body=draft["html"], text_body=draft["text"])
+    return {"draft": shown, "sent": sent}
 
 
 def send_reminder(db: Session, *, action: HelmAction, book: HelmBook, snapshot=None) -> dict[str, Any]:

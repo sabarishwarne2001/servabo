@@ -139,3 +139,13 @@ NOT_ADVICE: Final = "A recommendation, not tax advice. Check with your chartered
 
 #: Reason codes (`rsn`) GSTN documents; any other code is shown as given.
 REASON_WORDS: Final[dict[str, str]] = {}
+
+#: The law links Helm's GST mandates show (same shape as Helm's MSME links).
+HELM_LAW_LINKS: Final = (
+    {"title": "Section 16(2), second proviso, CGST Act, 2017, and Rule 37, CGST Rules, 2017 (CBIC)",
+     "url": "https://cbic-gst.gov.in/input-tax-credit-rules.html"},
+    {"title": "Section 16(2)(aa) and Section 16(4), CGST Act, 2017 (CBIC)",
+     "url": "https://cbic-gst.gov.in/pdf/CGST-Act-2017-amended-01012022.pdf"},
+)
+HELM_NOT_ADVICE: Final = ("Helm gives recommendations, not legal or tax advice. Check the 180-day rule and your "
+                          "input tax credit with your chartered accountant.")

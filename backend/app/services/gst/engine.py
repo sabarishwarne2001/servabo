@@ -136,6 +136,9 @@ def recompute(db: Session, workspace: Workspace, gstin: Optional[str] = None, *,
             db.execute(GstMatch.__table__.insert(), rows[start:start + 2000])
         summary[target] = len(rows)
     db.flush()
+    from app.services.gst import hooks
+
+    hooks.replan(db, workspace)
     return summary
 
 

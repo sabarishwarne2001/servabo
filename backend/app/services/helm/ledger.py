@@ -183,6 +183,20 @@ def _first(entities: Mapping[str, Any], keys: Sequence[str]) -> Optional[str]:
     return None
 
 
+def gst_tax_micros(entities: Mapping[str, Any], currency: Optional[str]) -> Optional[int]:
+    """The GST an invoice carries (its stated tax, else the sum of the heads it prints), or None when it prints none.
+    GST Credit's 180-day mandate and Guard check read it (Session F); the key lists are `gst.fields`."""
+    from app.services.gst import fields as gf
+
+    total = read_money(_first(entities, gf.TAX_TOTAL_KEYS), currency)
+    if total is None:
+        heads = [read_money(_first(entities, keys), currency) for keys in
+                 (gf.CGST_KEYS, gf.SGST_KEYS, gf.IGST_KEYS, gf.CESS_KEYS)]
+        known = [h for h in heads if h]
+        total = sum(known) if known else None
+    return total if total and total > 0 else None
+
+
 def read_date(raw: Optional[str], date_format: Optional[str]) -> Optional[date]:
     if not raw:
         return None
@@ -760,6 +774,7 @@ def build(inputs: LedgerInputs) -> list[PromiseRow]:
                                "version": settlement.version if settlement else 0},
                 "bank_account": masked_account(doc.entities) if not receivable else None,
                 "udyam_number": udyam, "msme_deadline": msme_deadline,
+                "gst_micros": gst_tax_micros(doc.entities, currency) if not receivable else None,
                 "goods_receipt_on": receipt_dates_by_invoice.get(doc.work_item_id),
                 "days_late": max(0, days_late), "received_on": doc.received_on,
             },
