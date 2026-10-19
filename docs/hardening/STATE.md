@@ -2,7 +2,27 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-19 (Session F, finished)_
+_Last updated: 2026-10-19 (Session G, started)_
+
+## Current phase — Session G: the value receipt (2026-10-19)
+Branch `claude/new-session-awa8gh` (the session's assigned branch), based on `main` at `e8509ac` (PR #31 merged).
+Draft PR opened after the first push. Founder authority: decisions in NEEDS-OWNER.md as `DECIDED (Session G)`
+(next free N-number: N-141); new findings start at the next free F-number (F-527). No migration. **If cut off,
+paste the prompt again: continue on this branch and PR from the first unticked box. Never restart.**
+Local stack: Postgres 16 + pgvector 0.8.0 (built from source) on :5433 (e2e) and :5434 (backend tests), Redis,
+backend venv Python 3.12 (`backend/.venv`), `npm ci` done. The test environment block is in the session scratchpad
+(outside the repo): the CI variables with `POSTGRES_PORT=5434`, `POSTGRES_USER=postgres`, trust auth.
+
+- [x] 0. Start-up: docs and code read; sandbox databases and venv; this checklist
+- [ ] 1. (P0) Tests first (fail before the service exists), then `app/services/value_receipt.py`
+- [ ] 2. (P0) `GET /organizations/{org}/value-receipt?period=trial|month`, Redis 10 min, ledger rows, role-matrix entries
+- [ ] 3. (P0) Trial banner headline (last three days) and the receipt card in the "Your free trial has ended" dialog
+- [ ] 4. (P0) Trial emails (ENDING, ENDED) carry the headline and up to three findings; render tests with and without
+- [ ] 5. (P0) Browser spec 107 (3 repeats, axe light and dark); specs 33 and 61 still green
+- [ ] 6. (P1) Overview "Found this month" card (every plan) and Billing "Your trial so far" card; spec 107 extended
+- [ ] 7. (P2) `value-receipt.pdf` (reportlab), "Download as PDF" links, tests
+- [ ] Finish: records (NEEDS-OWNER, FINDINGS, COVERAGE, CHANGELOG, STATE, HANDOFF), `campaign_slices.py --check all`
+  exits 0, frontend lint / typecheck / check:self clean, PR ready, CI green.
 
 ## Current phase — Session F: GST Credit (2026-10-19)
 Branch `claude/new-session-5oe22r` (the session's assigned branch), based on `main` at `7185674` (PR #30 merged).
