@@ -46,6 +46,7 @@
 export type MeterKey =
   | "addon.custom_domain"
   | "addon.warehouse_sync"
+  | "addon.gst_credit"
   | "*"
   | "llm.input_token"
   | "llm.output_token"
@@ -170,6 +171,11 @@ export const KNOWN_METERS: Record<MeterKey, MeterDisplay> = {
   },
   "addon.warehouse_sync": {
     label: "Data warehouse sync",
+    unit: "none",
+    capability: true,
+  },
+  "addon.gst_credit": {
+    label: "GST Credit add-on",
     unit: "none",
     capability: true,
   },

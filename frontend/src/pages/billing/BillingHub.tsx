@@ -8,6 +8,7 @@ import PlanSelector from "@/pages/billing/PlanSelector";
 import TrialReceiptCard from "@/components/billing/TrialReceiptCard";
 import { canSeeValueReceipt } from "@/components/billing/ValueReceipt";
 // ARCH50-S2:billing-contract
+import AddOnList from "@/components/billing/AddOnList";
 import InvoicedContractPanel from "@/components/billing/InvoicedContractPanel";
 import SeatManager from "@/pages/billing/SeatManager";
 import SpendLimitForm from "@/pages/billing/SpendLimitForm";
@@ -164,6 +165,8 @@ export const BillingHub: React.FC = () => {
               organizationId={organizationId}
               canManageBilling={canManageBilling}
             />
+
+            <AddOnList organizationId={organizationId} isOwner={role === "OWNER"} />
 
             <InvoicedContractPanel organizationId={organizationId} />
 

@@ -3,6 +3,7 @@ import Base from "../layouts/Base.astro";
 import ClosingCta from "../components/ClosingCta.astro";
 import { APP, SITE, absolute } from "../config/site";
 import {
+  ADDONS,
   ALLOWANCE_LABELS,
   FEATURE_LABELS,
   FEATURE_ORDER,
@@ -24,10 +25,14 @@ function noteFor(planKey: string, note: string): string {
   return planKey === "free" ? "hard limit during the trial" : note;
 }
 
+/** "Business and Enterprise", "Developer, Business and Enterprise". */
+const list = (names: string[]): string => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
+
 const faqs = [
   { q: `How does the ${TRIAL_DAYS}-day trial work?`, a: `Create an account and an organization; the trial starts then and lasts ${TRIAL_DAYS} days, once per account. No payment details are asked for, so there is nothing to cancel and nothing to refund. When it ends your organization becomes read-only: you can still read, search, export and delete everything, and subscribing to any paid plan lifts it at once.` },
   { q: "What is a seat?", a: "Each person in your organization occupies one seat. You buy the seats you need and see the exact price before you confirm; adding someone past your seats asks for a seat first, so your bill never changes without someone deciding it. Monthly allowances are per seat and pooled across the organization." },
   { q: "What happens when we reach a monthly limit?", a: USAGE_BILLING ? "Limits marked hard stop at the ceiling; soft limits let work continue and show it on your usage page; limits marked billed per unit continue and are charged on your next invoice at the rate on your billing page." : "Hard monthly limits stop at the ceiling until the next month: add seats (allowances are per seat) or upgrade for more. Soft limits let work continue and show it on your usage page. Nothing is ever charged for usage." },
+  { q: "What is an add-on?", a: "An extra you add to a plan for one price for the whole organization, not per seat. It is a separate monthly subscription: you see the price before you confirm, and you can cancel it on its own. Where a higher plan already includes it, you are not sold it twice." },
   { q: "Can we change plans or cancel?", a: "Upgrade at any time: it takes effect immediately, and the confirmation screen shows the exact amount charged for the rest of the period before you confirm. A downgrade takes effect at your next renewal. Cancel any time: your plan stays active to the end of the period you paid for and nothing more is charged." },
   { q: "Do you offer refunds?", a: "Every new paid subscription has a 14-day money-back guarantee on its first payment, once per organization; a duplicate or mistaken charge is always refunded in full. The refund and cancellation policy has the details." },
   { q: "Who will charge my card, and what about tax?", a: `${SITE.merchantOfRecord} is our merchant of record: it processes your payment, calculates and collects the tax that applies where you are, and issues your invoice. Your card statement names ${SITE.merchantOfRecord}.` },
@@ -160,6 +165,26 @@ const offerCatalog = {
         </table>
       </div>
       <p class="mt-3 text-sm text-muted-foreground">Per-seat allowances are pooled across your organization. Workspaces, file size and pages per document are per organization.</p>
+    </section>
+
+    <section id="add-ons" class="page mt-20 scroll-mt-24" aria-labelledby="addons-title">
+      <h2 id="addons-title" class="h2">Add-ons</h2>
+      <p class="lede mt-3 max-w-2xl">Extras you add to a plan. One price for the whole organization, not per seat, billed monthly on its own.</p>
+      <div class="mt-8 grid gap-5 md:grid-cols-3">
+        {ADDONS.map((a) => (
+          <article class="sheet flex flex-col p-7" aria-labelledby={`addon-${a.key.replace(".", "-")}`} data-addon={a.key}>
+            <h3 id={`addon-${a.key.replace(".", "-")}`} class="text-lg font-semibold">{a.name}</h3>
+            <p class="mt-3"><span class="figure text-3xl font-semibold">{dollars(a.monthly)}</span> <span class="text-sm text-muted-foreground">a month for the organization</span></p>
+            <p class="mt-3 text-sm leading-relaxed text-muted-foreground">{a.words}</p>
+            <ul class="mt-5 space-y-2 text-sm leading-relaxed">
+              {a.includedIn.length > 0 && <li class="flex gap-2"><span class="text-success" aria-hidden="true">✓</span><span>Included in {list(a.includedIn.map((p) => p.name))}</span></li>}
+              {a.soldOn.length > 0
+                ? <li class="flex gap-2"><span class="text-success" aria-hidden="true">+</span><span>Add it on {list(a.soldOn.map((p) => p.name))}</span></li>
+                : <li class="flex gap-2 text-muted-foreground"><span aria-hidden="true">·</span><span>Not sold on its own: choose a plan that includes it</span></li>}
+            </ul>
+          </article>
+        ))}
+      </div>
     </section>
 
     <section class="page mt-20" aria-labelledby="billing-faq">

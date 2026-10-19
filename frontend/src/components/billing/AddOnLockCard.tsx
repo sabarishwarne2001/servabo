@@ -17,7 +17,7 @@ import AskPlanOwners from "@/components/billing/AskPlanOwners";
  * would answer 403.
  */
 
-const formatPrice = (micros: number, currency: string): string =>
+export const formatAddonPrice = (micros: number, currency: string): string =>
   numberFormat({
     style: "currency",
     currency,
@@ -32,14 +32,14 @@ const includedPhrase = (addon: AddonAccess): string =>
     ? `It's included with ${addon.included_in.join(" and ")}.`
     : "";
 
-interface PurchaseProps {
+export interface PurchaseProps {
   readonly organizationId: string;
   readonly addon: AddonAccess;
   readonly canPurchase: boolean;
   readonly label: string;
 }
 
-const PurchaseAction: React.FC<PurchaseProps> = ({
+export const PurchaseAction: React.FC<PurchaseProps> = ({
   organizationId,
   addon,
   canPurchase,
@@ -95,7 +95,7 @@ export const AddOnLockCard: React.FC<AddOnLockCardProps> = ({
   addon,
   canPurchase,
 }) => {
-  const price = formatPrice(addon.monthly_price_micros, addon.currency);
+  const price = formatAddonPrice(addon.monthly_price_micros, addon.currency);
 
   return (
     <section className={`${SURFACE} p-6`} aria-labelledby={`lock-${addon.addon_key}`}>

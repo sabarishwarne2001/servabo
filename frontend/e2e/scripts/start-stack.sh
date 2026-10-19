@@ -112,6 +112,8 @@ if [[ "$E2E_GATEWAY" == "dodo" ]]; then
   echo $! >"$RUN_DIR/dodo.pid"
   export BILLING_GATEWAY=DODO DODO_API_BASE="$E2E_DODO_URL" DODO_LIVEMODE=false
   export DODO_API_KEY="${E2E_DODO_API_KEY:-e2e_dodo_test_key}"
+  # Session H: the GST Credit add-on is for sale (the stand-in is given this product by `dodo-catalogue`).
+  export DODO_ADDON_PRODUCT_GST_CREDIT="${DODO_ADDON_PRODUCT_GST_CREDIT:-pdt_e2e_gst_credit}"
   DODO_WEBHOOK_SECRET="$("$PY" -c 'from tests.fakes.fake_dodo import DEFAULT_SECRET; print(DEFAULT_SECRET)')"
   export DODO_WEBHOOK_SECRET
 else

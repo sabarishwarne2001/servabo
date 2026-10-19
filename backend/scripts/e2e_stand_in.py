@@ -73,6 +73,8 @@ if __name__ == "__main__" and _gateway_from_argv(sys.argv[1:]) == "dodo":
     os.environ.update(BILLING_GATEWAY="DODO", DODO_API_BASE=DODO_URL, DODO_LIVEMODE="false",
                       DODO_API_KEY=os.environ.get("E2E_DODO_API_KEY", "e2e_dodo_test_key"),
                       DODO_WEBHOOK_SECRET=_DODO_SECRET)
+    # Session H: the GST Credit add-on is for sale in the browser journeys (start-stack.sh gives the API the same id).
+    os.environ.setdefault("DODO_ADDON_PRODUCT_GST_CREDIT", "pdt_e2e_gst_credit")
 
 from app.core.config import settings  # noqa: E402
 
@@ -265,8 +267,9 @@ def _dodo_call(method: str, path: str, body: Optional[dict[str, Any]] = None) ->
 
 
 def _dodo_catalogue(db) -> list[str]:
-    """Every priced plan as a product at the stand-in Dodo, under its configured product id."""
+    """Every priced plan, and every add-on that has a product id, as a product at the stand-in Dodo."""
     from app.services import quota_service
+    from app.services.billing.entitlement_service import ADDON_CATALOG
 
     quota_service.clear_cache()
     added = []
@@ -278,6 +281,13 @@ def _dodo_catalogue(db) -> list[str]:
             "product_id": tier.gateway_price_id, "name": tier.display_name, "interval": interval,
             "price": int(tier.unit_amount_micros) // 10_000, "currency": tier.currency or "USD"})
         added.append(tier.gateway_price_id)
+    for offer in ADDON_CATALOG.values():  # Session H: an add-on is one product per organization
+        product_id = getattr(settings, offer.product_setting, None)
+        if product_id:
+            _dodo_call("POST", "/_fake/product", {
+                "product_id": product_id, "name": offer.display_name, "interval": "Month",
+                "price": int(offer.monthly_price_micros) // 10_000, "currency": offer.currency})
+            added.append(product_id)
     return added
 
 

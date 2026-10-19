@@ -14,7 +14,8 @@ plan therefore changes the endpoint, the in-app plan cards and, after this scrip
 The overage policies are the ones the configured gateway can honour: where it cannot bill usage
 (`supports_usage_billing` false, Dodo Payments today) the seed publishes "bill overage" limits as
 hard ceilings, and so does this file. Plus, per plan, what Helm offers (`helm`): the website's
-flagship page reads it rather than restating it.
+flagship page reads it rather than restating it. And the add-ons (`addons`): key, name, price, which plans include
+each and which may buy it, from `entitlement_service.ADDON_CATALOG` and the same plan table.
 
 Needs no database and no network: run it anywhere the backend's dependencies are installed.
 """
@@ -104,6 +105,34 @@ def _helm(tier: SimpleNamespace) -> dict[str, Any]:
     }
 
 
+#: Add-on keys that a plan carries only to mean "included" for an add-on that is also a plan capability: the
+#: comparison table already has the capability's row ("GST credit"), and a second row would say the same thing twice.
+ADDON_KEYS_SHOWN_AS_CAPABILITY = ("addon.gst_credit",)
+
+
+def _addons(tiers: list[SimpleNamespace]) -> list[dict[str, Any]]:
+    """The add-ons: key, name, price, which plans include each and which may buy it (Session H).
+
+    "May buy": the plans the offer names (GST Credit: Developer) else every paid plan that does not include it, the
+    same rule as TENANCY-AND-PLANS.md 4.6. The price is the catalogue's, in cents."""
+    from app.services.billing.entitlement_service import ADDON_CATALOG
+
+    paid = [t.key for t in tiers if t.unit_amount_micros]
+    out = []
+    for key, offer in ADDON_CATALOG.items():
+        included = [t.key for t in tiers if any(e.limit_key == key for e in t.entries)]
+        sold_on = list(offer.sold_on_tiers) or [k for k in paid if k not in included]
+        out.append({
+            "key": key,
+            "name": offer.display_name,
+            "monthly_price": {"currency": offer.currency, "unit_amount": int(offer.monthly_price_micros) // 10_000},
+            "per": "organization",
+            "included_in": included,
+            "sold_on": [k for k in sold_on if k not in included],
+        })
+    return out
+
+
 def build(gateway: Optional[str] = None) -> dict[str, Any]:
     from app.core.config import settings
     from app.services import plan_catalog
@@ -122,6 +151,7 @@ def build(gateway: Optional[str] = None) -> dict[str, Any]:
     helm = {tier.key: _helm(tier) for tier in tiers}
     for plan in catalog["plans"]:
         plan["helm"] = helm[plan["key"]]
+        plan["features"] = [f for f in plan["features"] if f not in ADDON_KEYS_SHOWN_AS_CAPABILITY]
     return {
         "generated_by": "backend/scripts/export_public_pricing.py",
         "as_of": AS_OF.date().isoformat(),
@@ -131,6 +161,7 @@ def build(gateway: Optional[str] = None) -> dict[str, Any]:
         },
         "trial": catalog["trial"],
         "plans": catalog["plans"],
+        "addons": _addons(tiers),
     }
 
 

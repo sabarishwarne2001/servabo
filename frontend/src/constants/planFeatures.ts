@@ -9,7 +9,7 @@ import { CAPABILITY, type CapabilityKey } from "@/constants/capabilities";
  * `Record<PlanFeatureKey, string>` makes a new capability without a label a
  * compile error rather than a schema key on a pricing page.
  */
-export type AddonFeatureKey = "addon.custom_domain" | "addon.warehouse_sync";
+export type AddonFeatureKey = "addon.custom_domain" | "addon.warehouse_sync" | "addon.gst_credit";
 export type PlanFeatureKey = CapabilityKey | AddonFeatureKey;
 
 export const PLAN_FEATURE_LABELS: Record<PlanFeatureKey, string> = {
@@ -47,6 +47,9 @@ export const PLAN_FEATURE_LABELS: Record<PlanFeatureKey, string> = {
   // ARCH50-S2:plan-feature
   [CAPABILITY.egressLockdown]: "Egress lockdown (every connection made for your organization — webhooks, warehouses, ERP, SSO metadata, SMTP, AI providers — confined to destinations you allow; refusals recorded and audited)",
   "addon.warehouse_sync": "Analytics warehouse egress",
+  // Session H: not in PLAN_FEATURE_ORDER, because the plan card already lists GST credit (the capability); this
+  // names the add-on key Business and Enterprise carry so that it is "included", and a Developer buys it.
+  "addon.gst_credit": "GST Credit add-on (included)",
   [CAPABILITY.calibratedAutonomy]: "Calibrated autonomy & conformal risk",
   [CAPABILITY.redaction]: "Zero-leakage geometric PII redaction",
   [CAPABILITY.semanticAssertions]: "Semantic clause assertions",
