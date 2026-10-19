@@ -8,16 +8,17 @@ subscribes. Neither says the data is at risk: nothing is deleted when a trial en
 
 Session G: an account whose first organization has something to show gets the value receipt's headline and up to
 three findings (what Servabo found in its own documents, each with a link to the evidence) between the lead and the
-rest. Without figures the email is exactly what it was. The figures arrive as plain data (`value`), computed by the
-caller from `app.services.value_receipt`; this module stays pure.
+rest. Without figures the email is exactly what it was. The figures arrive as plain data (`headline` and
+`findings`), computed by the caller from `app.services.value_receipt`; this module stays pure.
 
 Pure function: no Session, no model import, no clock. See common.py.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Mapping, Optional, Sequence
+from typing import Optional, Sequence
 
 from app.templates.emails.base import BASE_EMAIL_HTML_LAYOUT
 from app.templates.emails.common import esc, esc_attr, format_timestamp, single_line
@@ -32,20 +33,27 @@ def _organization_list(names: Sequence[str]) -> str:
 MAX_FINDINGS = 3
 
 
-def _finding_line(item: Mapping[str, Any]) -> str:
-    label = single_line(str(item.get("label") or ""), max_length=200)
-    amount = item.get("amount_text")
-    return f"{label}: {single_line(str(amount), max_length=40)}" if amount else label
+@dataclass(frozen=True)
+class TrialFinding:
+    """One line of the value receipt: what was found, the amount as the server writes it, and the evidence link."""
+
+    label: str
+    amount_text: Optional[str] = None
+    url: Optional[str] = None
 
 
-def _finding_text(item: Mapping[str, Any]) -> str:
-    url = item.get("url")
+def _finding_line(item: TrialFinding) -> str:
+    label = single_line(item.label or "", max_length=200)
+    return f"{label}: {single_line(item.amount_text, max_length=40)}" if item.amount_text else label
+
+
+def _finding_text(item: TrialFinding) -> str:
+    url = single_line(item.url, max_length=500) if item.url else ""
     return f"{_finding_line(item)} ({url})" if url else _finding_line(item)
 
 
-def _finding_html(item: Mapping[str, Any]) -> str:
-    url = item.get("url")
-    link = f' <a href="{esc_attr(str(url))}">See the evidence</a>' if url else ""
+def _finding_html(item: TrialFinding) -> str:
+    link = f' <a href="{esc_attr(item.url)}">See the evidence</a>' if item.url else ""
     return f"{esc(_finding_line(item))}{link}"
 
 
@@ -56,12 +64,13 @@ def render_trial_notice(
     ends_at: datetime,
     plans_link: str,
     brand_name: str,
-    value: Optional[Mapping[str, Any]] = None,
+    headline: str = "",
+    findings: Sequence[TrialFinding] = (),
 ) -> tuple[str, str, str]:
     """Render `(subject, html, text)`. `kind` is "ENDING" (two days before) or "ENDED".
 
-    `value` is `{"headline": str, "findings": [{"label", "amount_text" (or None), "url" (or None)}, ...]}`; at most
-    three findings are written. Without a headline the email carries no figures."""
+    `headline` and `findings` are the value receipt's: at most three findings are written. Without a headline the
+    email carries no figures."""
     if kind not in ("ENDING", "ENDED"):
         raise ValueError(f"unknown trial notice {kind!r}")
     organizations = _organization_list([single_line(name) for name in organization_names])
@@ -91,14 +100,13 @@ def render_trial_notice(
         )
         button = "Subscribe"
 
-    headline = single_line((value or {}).get("headline") or "", max_length=300)
-    findings = list((value or {}).get("findings") or [])[:MAX_FINDINGS] if headline else []
+    said = single_line(headline or "", max_length=300)
+    shown = list(findings)[:MAX_FINDINGS] if said else []
     found_text = found_html = ""
-    if headline:
-        found_text = f"{headline}\n" + "".join(
-            f"  - {_finding_text(item)}\n" for item in findings) + "\n"
-        found_html = f"""<p><strong>{esc(headline)}</strong></p>""" + (
-            "<ul>" + "".join(f"<li>{_finding_html(item)}</li>" for item in findings) + "</ul>" if findings else "")
+    if said:
+        found_text = f"{said}\n" + "".join(f"  - {_finding_text(item)}\n" for item in shown) + "\n"
+        found_html = f"""<p><strong>{esc(said)}</strong></p>""" + (
+            "<ul>" + "".join(f"<li>{_finding_html(item)}</li>" for item in shown) + "</ul>" if shown else "")
 
     text_body = f"Hello,\n\n{lead}\n\n{found_text}{after}\n\n{button}: {plans_link}\n"
     content_html = f"""<p>Hello,</p>
@@ -120,4 +128,4 @@ def render_trial_notice(
     return subject, html_body, text_body
 
 
-__all__ = ["render_trial_notice"]
+__all__ = ["TrialFinding", "render_trial_notice"]

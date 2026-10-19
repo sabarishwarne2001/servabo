@@ -62,35 +62,38 @@ def _organizations_on_trial(db: Any, user_id: Any, *, want: str, now: datetime) 
     return on_trial
 
 
-def _value_of(db: Any, organization: Any) -> Optional[dict[str, Any]]:
-    """The headline and up to three findings of the organization's trial, as the email renders them, or None."""
+def _value_of(db: Any, organization: Any) -> tuple[str, list[Any]]:
+    """The headline and up to three findings of the organization's trial, as the email renders them (empty when
+    there is nothing to say or the receipt cannot be read)."""
     from app.services import value_receipt
+    from app.templates.emails.trial_notice import TrialFinding
 
     try:
         with db.begin_nested():  # a failed read must not poison the session that records the send
             body = value_receipt.receipt(db, organization.id, value_receipt.TRIAL)
     except Exception:  # noqa: BLE001 - the email goes out as it always did
         logger.warning("trial.value_receipt_unavailable", exc_info=True)
-        return None
+        return "", []
     if not body.get("headline"):
-        return None
+        return "", []
     base = settings.FRONTEND_URL.rstrip("/")
-    return {"headline": body["headline"],
-            "findings": [{"label": f["label"], "amount_text": f.get("amount_text"), "url": f"{base}{f['source']}"}
-                         for f in body["found"][:3]]}
+    return body["headline"], [TrialFinding(label=f["label"], amount_text=f.get("amount_text"), url=f"{base}{f['source']}")
+                              for f in body["found"][:3]]
 
 
 def _send(*, db: Any, kind: str, recipient: str, organizations: list[Any], ends_at: datetime) -> bool:
     from app.core.platform_email import PlatformEmailNotConfigured, send_platform_email
     from app.templates.emails.trial_notice import render_trial_notice
 
+    headline, findings = _value_of(db, organizations[0])
     subject, html_body, text_body = render_trial_notice(
         kind=kind,
         organization_names=[org.name for org in organizations],
         ends_at=ends_at,
         plans_link=_plans_link(organizations[0].slug),
         brand_name=settings.PROJECT_NAME,
-        value=_value_of(db, organizations[0]),
+        headline=headline,
+        findings=findings,
     )
     try:
         delivered, detail = send_platform_email(
