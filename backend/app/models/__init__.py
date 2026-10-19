@@ -788,3 +788,6 @@ from app.models.helm import (  # noqa: E402,F401
 
 # Session B: the Promise ledger is told what changed where the data is written (mapper events).
 from app.models import helm_dirty  # noqa: E402,F401
+
+# Session F: GST Credit (docs/product/GST-CREDIT.md).
+from app.models.gst import GstDecision, GstMatch, GstReturn, GstReturnRecord, GstSettings  # noqa: E402,F401

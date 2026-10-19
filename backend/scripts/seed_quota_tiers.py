@@ -127,6 +127,7 @@ BUSINESS_CAPABILITIES = [
     _capability("capability.erp_posting"),  # ARCH47-S1:tier-business
     _capability("capability.byok"),  # N-021:tier-business
     _capability("capability.helm"),  # flagship session: Helm (N-082)
+    _capability("capability.gst_credit"),  # Session F: GST Credit (N-135)
 ]
 BUSINESS_FEATURES = [*DEVELOPER_FEATURES, *BUSINESS_CAPABILITIES, ADDON_WAREHOUSE_SYNC]
 ENTERPRISE_CAPABILITIES = [
@@ -157,6 +158,8 @@ ENTERPRISE_CAPABILITIES = [
     _capability("capability.helm_approval_chains"),
     _capability("capability.helm_all_workspaces"),
     _capability("capability.helm_api"),
+    _capability("capability.gst_credit"),  # Session F: GST Credit (N-135)
+    _capability("capability.gst_credit_all_workspaces"),
 ]
 ENTERPRISE_FEATURES = [*DEVELOPER_FEATURES, *ENTERPRISE_CAPABILITIES, ADDON_WAREHOUSE_SYNC]
 
