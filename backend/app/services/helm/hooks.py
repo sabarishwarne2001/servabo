@@ -23,6 +23,9 @@ def document_changed(db: Any, *, workspace_id: Optional[uuid.UUID], organization
                      reason: str, work_item_ids: Optional[Collection[uuid.UUID]] = None) -> None:
     if workspace_id is None:
         return
+    from app.services.gst import hooks as gst_hooks
+
+    gst_hooks.document_changed(db, workspace_id=workspace_id, organization_id=organization_id, reason=reason)
     try:
         if organization_id is None:
             from app.models.workspace import Workspace

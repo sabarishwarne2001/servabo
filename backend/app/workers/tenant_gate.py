@@ -63,6 +63,7 @@ TENANT_ACTIVITY_JOB_TYPES: frozenset[str] = frozenset(
         "batch.expand_archive",
         # Flagship session: Helm. Every one is about one organization (the payload names it); the
         # scheduled sweeps (no organization in the payload) filter inactive tenants themselves.
+        "gst.recompute",
         "helm.ledger_build",
         "helm.plan",
         "helm.backtest",

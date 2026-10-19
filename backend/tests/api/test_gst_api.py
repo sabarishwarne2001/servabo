@@ -16,38 +16,7 @@ from app.models.gst import GstDecision, GstMatch, GstReturn, GstReturnRecord
 from app.services.gst import builder as b
 from app.services.gst import vocabulary as v
 from tests.security.plans import put_on_plan
-from tests.services.gst.helpers import RECIPIENT, SUPPLIER_A, SUPPLIER_B, M, supplier_invoices
-from tests.services.helm import factories
-
-SEP = date(2026, 9, 1)
-
-
-def book_invoice(db, tenant, *, number, supplier, gstin, on, taxable, rate=18, name="Sahyadri Packaging",
-                 buyer_gstin=RECIPIENT, extra=None):
-    line = b.item(taxable, rate)
-    tax = line["cgst"] + line["sgst"]
-    entities = {"vendor_gstin": gstin, "buyer_gstin": buyer_gstin, "subtotal": f"{taxable:.2f}",
-                "cgst_amount": f"{line['cgst']:.2f}", "sgst_amount": f"{line['sgst']:.2f}", "tax_amount": f"{tax:.2f}",
-                "invoice_date": on.isoformat(), **(extra or {})}
-    return factories.invoice(db, workspace=tenant.workspace, organization_id=tenant.organization.id, number=number,
-                             supplier=name, amount=taxable + tax, on=on, supplier_gstin=gstin, extra=entities)
-
-
-def statement(extra_sections=None, *, period="2026-09"):
-    return b.to_bytes(b.gstr2b(RECIPIENT, period, {
-        "b2b": [
-            supplier_invoices([
-                b.document("INV-1001", date(2026, 9, 5), 1000),
-                b.document("INV-1003", date(2026, 9, 12), 2100),          # the books say 2000
-                b.document("INV-2001", date(2026, 9, 14), 500),            # the books say INV-2002: suggested
-                b.document("NE-1", date(2026, 9, 15), 300, itc_available="N", reason="P"),
-            ]),
-            supplier_invoices([b.document("X-7", date(2026, 9, 16), 700)], gstin=SUPPLIER_B, name="Deccan Plastics"),
-        ],
-        "cdnr": [supplier_invoices([b.document("CN-1", date(2026, 9, 20), 100, note="C")], notes=True)],
-        **(extra_sections or {}),
-    }))
-
+from tests.services.gst.helpers import RECIPIENT, SUPPLIER_A, SUPPLIER_B, M, book_invoice, statement, supplier_invoices
 
 @pytest.fixture()
 def world(client, db_session, tenant):

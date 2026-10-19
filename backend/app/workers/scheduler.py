@@ -276,6 +276,16 @@ DEFAULT_SCHEDULE: tuple[ScheduledJob, ...] = (
         ),
     ),
     ScheduledJob(
+        job_type="gst.recompute",
+        interval_seconds=86_400,
+        at_hour=3,
+        at_minute=10,
+        description=(
+            "Reconcile every workspace's imported GSTR-2B returns against its documents (GST Credit), which also "
+            "moves the 180-day and Section 16(4) clocks forward."
+        ),
+    ),
+    ScheduledJob(
         job_type="helm.plan",
         interval_seconds=3_600,
         description="Re-plan every Helm book hourly (kept as is when nothing changed).",

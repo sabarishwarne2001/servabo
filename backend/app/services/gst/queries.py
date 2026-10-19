@@ -78,7 +78,7 @@ def list_lines(db: Session, *, workspace_ids: Sequence[uuid.UUID], gstin: Option
 
 
 def _book_side(db: Session, workspace: Workspace, work_item_id: uuid.UUID, gstin: str) -> Optional[dict[str, Any]]:
-    facts = ledger_store.document_facts(db, workspace, ids=[work_item_id])
+    facts = books_module.load_documents(db, workspace, ids=[work_item_id])
     if not facts:
         return None
     fact = facts[0]

@@ -45,21 +45,40 @@ def active_periods(db: Session, workspace_id: uuid.UUID, gstin: str) -> list[str
         GstReturn.status == v.RETURN_ACTIVE).order_by(GstReturn.period)).scalars())
 
 
+_RECORD_COLUMNS = (
+    GstReturnRecord.id, GstReturnRecord.section, GstReturnRecord.kind, GstReturnRecord.period,
+    GstReturnRecord.supplier_gstin, GstReturnRecord.supplier_name, GstReturnRecord.doc_number, GstReturnRecord.doc_key,
+    GstReturnRecord.doc_date, GstReturnRecord.value_micros, GstReturnRecord.taxable_micros, GstReturnRecord.igst_micros,
+    GstReturnRecord.cgst_micros, GstReturnRecord.sgst_micros, GstReturnRecord.cess_micros,
+    GstReturnRecord.reverse_charge, GstReturnRecord.itc_available, GstReturnRecord.reason, GstReturnRecord.irn,
+    GstReturnRecord.original_key, GstReturnRecord.supplier_period,
+)
+
+
 def record_views(db: Session, workspace_id: uuid.UUID, gstin: str) -> list[RecView]:
+    """The active returns' records, as plain views. Only the columns matching needs: the raw copy stays in the table."""
     rows = db.execute(
-        select(GstReturnRecord).join(GstReturn, GstReturn.id == GstReturnRecord.return_id)
+        select(*_RECORD_COLUMNS).join(GstReturn, GstReturn.id == GstReturnRecord.return_id)
         .where(GstReturn.workspace_id == workspace_id, GstReturn.gstin == gstin, GstReturn.status == v.RETURN_ACTIVE)
-        .execution_options(yield_per=2000)
-    ).scalars()
+    ).all()
+    name_keys: dict[str, Optional[str]] = {}
+
+    def name_key(name: Optional[str]) -> Optional[str]:
+        if not name:
+            return None
+        if name not in name_keys:
+            name_keys[name] = ident.key_for(name)
+        return name_keys[name]
+
     return [
         RecView(
             id=r.id, section=r.section, kind=r.kind, period=r.period, supplier_gstin=r.supplier_gstin,
-            supplier_name=r.supplier_name, supplier_name_key=ident.key_for(r.supplier_name) if r.supplier_name else None,
-            number=r.doc_number, doc_key=r.doc_key, doc_date=r.doc_date, value_micros=r.value_micros,
-            taxable_micros=r.taxable_micros, igst_micros=r.igst_micros, cgst_micros=r.cgst_micros,
-            sgst_micros=r.sgst_micros, cess_micros=r.cess_micros, reverse_charge=r.reverse_charge,
-            itc_available=r.itc_available, reason=r.reason, irn=r.irn.strip().lower() if r.irn else None,
-            original_key=r.original_key, supplier_period=r.supplier_period,
+            supplier_name=r.supplier_name, supplier_name_key=name_key(r.supplier_name), number=r.doc_number,
+            doc_key=r.doc_key, doc_date=r.doc_date, value_micros=r.value_micros, taxable_micros=r.taxable_micros,
+            igst_micros=r.igst_micros, cgst_micros=r.cgst_micros, sgst_micros=r.sgst_micros, cess_micros=r.cess_micros,
+            reverse_charge=r.reverse_charge, itc_available=r.itc_available, reason=r.reason,
+            irn=r.irn.strip().lower() if r.irn else None, original_key=r.original_key,
+            supplier_period=r.supplier_period,
         )
         for r in rows
     ]
@@ -114,7 +133,7 @@ def recompute(db: Session, workspace: Workspace, gstin: Optional[str] = None, *,
         db.execute(delete(GstMatch).where(GstMatch.workspace_id == workspace.id, GstMatch.gstin == target))
         rows = [_row(workspace, target, out, now) for out in outputs]
         for start in range(0, len(rows), 2000):
-            db.execute(insert(GstMatch), rows[start:start + 2000])
+            db.execute(GstMatch.__table__.insert(), rows[start:start + 2000])
         summary[target] = len(rows)
     db.flush()
     return summary

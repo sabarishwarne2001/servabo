@@ -203,6 +203,9 @@ LIGHT = WorkerProfile(
             # scipy.optimize.milp (HiGHS, inside SciPy) and NumPy; execution writes rows and sends mail
             # through the existing services; the backtest replays stored facts; the briefing is SMTP.
             # No model, OCR or PDF engine. Not optional bookkeeping (see above).
+            # Session F: GST Credit. Reads stored rows and runs deterministic matching in Python; no model,
+            # OCR or PDF engine.
+            "gst.recompute",
             "helm.ledger_build",
             "helm.plan",
             "helm.backtest",

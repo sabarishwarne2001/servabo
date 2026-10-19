@@ -150,7 +150,9 @@ def numbers_similar(a: Optional[str], b: Optional[str]) -> bool:
     da, db = _digits(a), _digits(b)
     if len(da) >= 3 and da == db:
         return True
-    return difflib.SequenceMatcher(None, a, b).ratio() >= SUGGEST_NUMBER_RATIO
+    matcher = difflib.SequenceMatcher(None, a, b)
+    return (matcher.real_quick_ratio() >= SUGGEST_NUMBER_RATIO and matcher.quick_ratio() >= SUGGEST_NUMBER_RATIO
+            and matcher.ratio() >= SUGGEST_NUMBER_RATIO)
 
 
 def _supplier_identity(gstin: Optional[str], name_key: Optional[str]) -> tuple[str, str]:
@@ -177,7 +179,7 @@ def effective_records(records: Sequence[RecView]) -> tuple[list[RecView], dict[u
             if other.id != rec.id and (other.section not in v.AMENDMENT_SECTIONS or other.period < rec.period):
                 superseded.add(other.id)
     standing = [r for r in records if r.section in v.MATCHABLE_SECTIONS and r.id not in superseded]
-    standing.sort(key=lambda r: (r.period, str(r.id)))
+    standing.sort(key=lambda r: (r.period, r.id.int))
     keep: list[RecView] = []
     duplicates: dict[uuid.UUID, uuid.UUID] = {}
     seen: dict[tuple[Any, ...], RecView] = {}
@@ -261,7 +263,7 @@ def reconcile(
     book_dupes: dict[uuid.UUID, uuid.UUID] = {}
     seen_books: dict[tuple[Any, ...], BookView] = {}
     usable: list[BookView] = []
-    for book in sorted(books, key=lambda b: (b.doc_date or date.max, str(b.work_item_id))):
+    for book in sorted(books, key=lambda b: (b.doc_date or date.max, b.work_item_id.int)):
         if book.number_key:
             key = (_supplier_identity(book.supplier_gstin, book.supplier_name_key), book.group, book.number_key)
             first = seen_books.get(key)
@@ -335,17 +337,19 @@ def reconcile(
         if rec.supplier_name_key:
             pools += rest_books.get(("n", rec.supplier_name_key), ())
         for b in pools:
-            if b.group != rec.group or not numbers_similar(b.number_key, rec.doc_key):
-                continue
-            if b.doc_date is None or rec.doc_date is None or abs((b.doc_date - rec.doc_date).days) > SUGGEST_DAYS:
+            # the cheap tests first; comparing numbers is the expensive one
+            if b.group != rec.group or b.doc_date is None or rec.doc_date is None \
+                    or abs((b.doc_date - rec.doc_date).days) > SUGGEST_DAYS:
                 continue
             mine = b.total_micros if b.total_micros is not None else b.taxable_micros
             theirs = rec.value_micros if (rec.value_micros is not None and b.total_micros is not None) else rec.taxable_micros
             if mine is None or theirs is None or abs(mine - theirs) > tolerance_micros:
                 continue
+            if not numbers_similar(b.number_key, rec.doc_key):
+                continue
             ratio = difflib.SequenceMatcher(None, b.number_key or "", rec.doc_key or "").ratio()
             candidates.append(((-ratio, abs((b.doc_date - rec.doc_date).days), abs(mine - theirs)), rec.id, b.work_item_id))
-    for _, rec_id, wid in sorted(candidates, key=lambda c: (c[0], str(c[1]), str(c[2]))):
+    for _, rec_id, wid in sorted(candidates, key=lambda c: (c[0], c[1].int, c[2].int)):
         if rec_id not in pairs and rec_id not in suggested and wid not in book_taken:
             suggested[rec_id] = (wid, v.METHOD_SUGGESTED)
             book_taken.add(wid)
