@@ -804,6 +804,6 @@ summary email** to owners of paying organizations on the 1st (N-146).
   `PERFORMANCE.md` ("the matching step on a shared CI machine") says where the time goes; the next step would be reading the
   books faster (about 0.8 s) and the insert (about 0.7 s, indexes and foreign keys).
 - Possible follow-ups, none started: an annual price for the add-on; the monthly summary for organizations on an invoiced
-  contract; a rupee price for the add-on; `upload-artifact` v7 and `setup-node` v7 are newer than the versions used for
-  upload-artifact (v6); moving CI to the next Ubuntu image on purpose (N-144).
+  contract; a rupee price for the add-on; moving CI to the next Ubuntu image on purpose (N-144); `upload-artifact` has a newer major (v7, twelve
+  days old when chosen) than the v6 CI uses.
 

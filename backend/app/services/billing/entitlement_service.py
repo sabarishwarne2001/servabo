@@ -133,7 +133,7 @@ ADDON_CATALOG: dict[str, AddonOffer] = {
             "the full GST Credit lists return to the preview. Your imports, matches and decisions are kept, "
             "and everything comes back at once when you add it again"
         ),
-        resource_noun="imported GSTR-2B statement",
+        resource_noun="GSTR-2B import",
         sold_on_tiers=("developer",),
     ),
 }
