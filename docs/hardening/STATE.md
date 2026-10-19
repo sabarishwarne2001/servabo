@@ -2,7 +2,29 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-18 (Session E)_
+_Last updated: 2026-10-19 (Session F)_
+
+## Current phase — Session F: GST Credit (2026-10-19)
+Branch `claude/new-session-5oe22r` (the session's assigned branch), based on `main` at `7185674` (PR #30 merged).
+Draft PR opened at the start. Founder authority: decisions in NEEDS-OWNER.md as `DECIDED (Session F)` (next free
+N-number: N-135); new findings start at the next free F-number (F-524). **If cut off, paste the prompt again:
+continue on this branch and PR from the first unticked box. Never restart.**
+Local stack: Postgres 16 + pgvector 0.8.0 (built from source) on :5433 (e2e) and :5434 (backend tests), Redis,
+backend venv Python 3.12 (`backend/.venv`), `npm ci` done. Environment variables live outside the repo.
+
+- [x] 0. Start-up: docs read; sandbox databases and venv; this checklist; draft PR.
+- [ ] 1. (P0) Finance-grade invoice reading
+  - [ ] 1a. Contract tests written and failing on today's prompt (`tests/services/test_extraction_prompt_contract.py`)
+  - [ ] 1b. Prompt rewritten as one finance schema; stand-in answers only what the prompt asks
+  - [ ] 1c. Reader specs and tests re-run (Helm, procurement, ERP, documents); FINDINGS and HANDOFF note
+- [ ] 2. (P0) GST Credit engine: tables (one migration), GSTR-2B parser, matching, statuses, IMS, API, export, tests,
+  PERFORMANCE.md, docs/product/GST-CREDIT.md
+- [ ] 3. (P0) GST Credit page, `capability.gst_credit`, preview, sample company GSTR-2B, browser spec
+- [ ] 4. (P1) Helm: 180-day mandate, hold-until-reported mandate, Guard check, Request action
+- [ ] 5. (P2) Website `/gst-credit`; Enterprise every-workspace view
+- [ ] 6. (Stretch) e-invoice QR code
+- [ ] Finish: full backend + browser suites once, `campaign_slices.py --check all`, one Alembic head (up/down/up),
+  frontend lint / typecheck / check:self, records, CI green, PR ready, stop.
 
 ## Session E (2026-10-18): the UI gaps and defects Session C left open
 Branch `claude/funny-sagan-n7gpqc` (the session's assigned branch), based on `main` at `b4b4c9c`. Findings F-518 to
