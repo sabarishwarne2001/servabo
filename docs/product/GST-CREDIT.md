@@ -135,6 +135,26 @@ purchases.
   (`g1a1_gst_credit`) as the tables; Billing keys may hold it, Member keys may not.
 - **Not stored:** nothing here is written, so nothing needs a recompute job; the cache is dropped on restart.
 
+## The e-invoice QR code (stretch)
+
+An Indian e-invoice carries a signed QR code (a JWT) holding the supplier and buyer GSTIN, the document number, type
+and date, the invoice value, the item count, the main HSN code and the **IRN**. `services/gst/einvoice.py` reads it
+during document processing (`document.enrich`, for invoices and notes; never raises):
+
+- **Finding it:** OpenCV decodes the code from the first three pages of a PDF (rendered with PDFium) or from an image:
+  the WeChat detector first (contrib, no model file; the one that reads the dense codes an e-invoice has), then the
+  Aruco-based and standard detectors (the standard one fails on dense codes, which the tests show).
+- **Trust:** the signature is verified **only if `EINVOICE_QR_PUBLIC_KEY_PEM` (NIC's published key) is configured; none
+  is shipped**. Without it the values say "signature not verified": they fill fields the model left empty, never replace
+  what it read, and a difference is recorded as a conflict. With a key that verifies, the code's values **win**.
+- **Where it shows:** each field it supplied or checked is listed in `extraction_metadata["einvoice_qr"]` ("from the
+  e-invoice QR code": filled, confirmed, overridden, conflicts, whether the signature was verified).
+- **Effect on GST Credit:** the IRN in the entities matches GSTR-2B exactly (method IRN), even when the model misread the
+  number.
+- **Unverified:** the payload layout follows the NIC e-invoice schema as publicly described; it was not tried on a real
+  e-invoice. The tests use generated codes (`qrcode`, a dev-only dependency) and an invented RSA key. There is no screen
+  for the provenance yet.
+
 ## API (workspace-scoped, `/api/v1/workspaces/{id}/gst`)
 
 `POST /returns` (upload `.json` or `.zip`: 25 MB, 50,000 records, zip limits as for archives, JSON nested at most 12
@@ -165,6 +185,7 @@ are matched against invoices; the rest are stored for the totals.
 - The IMS "Pending" limits from October 2025 are not stated (see above).
 - The reason codes (`rsn`) are shown as given: no official source for their meanings was available.
 - The 180-day figure depends on payments Servabo knows about (Helm's settlements and bank imports).
+- The e-invoice QR payload layout and a real signed code (see above).
 - A real model reading a real GST invoice through the new extraction schema (F-524, N-138) has not been run.
 - Section 16(4) dates ignore the special cases noted above.
 
