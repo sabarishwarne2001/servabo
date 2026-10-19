@@ -45,6 +45,7 @@ from app.api.v1 import (
     mfa,
     partner,
     procurement,
+    gst,
     redactions,
     notifications,
     organization_email_settings,
@@ -139,6 +140,7 @@ api_router.include_router(entitlements.router)  # ARCH-30 add-on entitlements (D
 api_router.include_router(partner.router)
 api_router.include_router(marketplace.router)
 api_router.include_router(procurement.router)  # ARCH-31 three-way matching
+api_router.include_router(gst.router)  # Session F: GST Credit
 # ARCH-32 zero-leakage redaction. Every route in it is capability-gated,
 # including the reads: the detection output is a map of where every
 # identifier in a tenant's corpus sits, which IS the product.
