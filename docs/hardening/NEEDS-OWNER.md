@@ -1945,3 +1945,25 @@ honest: every concept a reader looks for must be asked for under a name that rea
 suite's model stand-in may only return keys the prompt asks for. **Session D must test a real GST invoice through
 the new schema** (HANDOFF).
 
+## N-139 — GST Credit across every workspace is computed when opened, read-only (DECIDED (Session F))
+
+Enterprise only (`capability.gst_credit_all_workspaces`). The organization page matches a GSTIN's GSTR-2B returns,
+imported in any workspace, with the purchase invoices of every workspace that holds that GSTIN's purchases. It is
+**read-only** (import, decisions, export and supplier reminders stay in each workspace) and **not stored**: the
+stored rows are tied to one workspace's documents by the database itself (ARCH-41), so the answer is computed when
+the page is opened and kept for 60 seconds. Owners, admins and billing may open it; the figures are the
+organization's, and the supplier and invoice lists show only the workspaces the person can read (billing: the ones it
+has a grant on). The sample company is never part of it. A workspace with no return of the GSTIN contributes only
+documents that name the GSTIN as their buyer. Why: the smallest thing that answers "one reconciliation per GSTIN"
+without a second set of tables, a second recompute job and a second place for decisions to live. If a customer has
+tens of thousands of invoices per GSTIN, store it (a new table and a job); the budget test shows where.
+
+## N-140 — The e-invoice QR code is read, but its signature is not verified until you give Servabo NIC's key (OPEN)
+
+Servabo reads the QR code on an e-invoice (IRN, GSTINs, number, date, value) during processing. It **does not claim
+the signature is genuine**: no NIC public key is shipped. Without a key the values only fill what the model left empty
+and any difference is shown as a conflict; with `EINVOICE_QR_PUBLIC_KEY_PEM` set to NIC's published key, a code that
+verifies wins over the model's reading. **Needs you (or your CA):** the current NIC public key and a real e-invoice
+PDF to try (Session D). Nothing on screen shows the QR provenance yet: it is stored in the document's extraction
+metadata (`einvoice_qr`).
+

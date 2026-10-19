@@ -544,6 +544,43 @@ Task 5 is deferred (N-124: Tailwind 4 is N-119, least-privilege database roles N
 was edited between them), the ledger now uses the latest scoring (F-499), but nothing tells a person that
 the cases disagree; re-scoring the older case would settle it.
 
+## Session F → next sessions
+
+_2026-10-19. Branch `claude/new-session-5oe22r`, PR #31. Finding F-524 to F-526; decisions N-131 (closed: not now), N-135 to N-140. Migration `g1a1_gst_credit` (one head)._
+
+**What changed.** (1) The production extraction prompt now asks a model for every field the product reads (F-524).
+(2) **GST Credit**: import a GSTR-2B (JSON, or a zip of it), match it one-to-one with the purchase invoices Servabo has
+read, six figures, a supplier list, an invoice list with the books beside GSTR-2B, IMS recommendations, the 180-day
+exposure, an Excel export and a supplier reminder; Documents → GST credit. A preview on every plan, everything on
+Business and Enterprise, the sample company's own GSTR-2B with planted cases. (3) **Helm** learned GST: the 180th day is
+a law deadline next to the MSME one, and "hold until reported" is an optional mandate that never makes a payment late;
+the Guard asks a person before paying an invoice the supplier has not reported; Helm drafts a request to the supplier.
+(4) The website has `/gst-credit`. (5) Enterprise: GST credit across every workspace (page, API, `gst:read` key scope).
+(6) Stretch: the e-invoice QR code is read during processing (IRN etc.).
+
+**Session D must also check, with the owner's help.** (a) **A real GST invoice through the new extraction schema**
+with the real model (F-524, N-138): every invoice field Helm and GST Credit read, in particular `vendor_gstin`,
+`buyer_gstin`, the tax heads and the IRN. (b) **A real GSTR-2B JSON** from the GST portal, if the owner or the CA can get
+one: the parser follows the documented layout and the fixtures are invented; anything unexpected is reported in words on
+import and never dropped silently. (c) A real e-invoice PDF and NIC's public key (N-140).
+
+**Unverified (say so to customers).** The GSTR-2B file layout against a real download; the wording of Section 16(2)(aa),
+16(4), the second proviso, Rule 37 and the IMS tutorial (the official pages could not be opened from the build sandbox;
+each statement cites its section and an official link, "not tax advice"); the IMS "Pending" limits from October 2025 are
+not stated; the `rsn` reason codes are shown as given; the 180-day figure counts only payments Servabo knows about; the
+e-invoice QR payload layout and signature (no NIC key); a real model on a real GST invoice.
+
+**What is left, in order of value.** The QR provenance is not shown on the document screen. The Helm UI shows the new
+mandates through its generic mandate cards only (no GST-specific copy beyond the readback). The organization page is
+computed on demand (N-139): store it if a GSTIN has tens of thousands of invoices. "Flag dispute" with its reason covers
+rejection (N-131); case notes and a Reject status wait for a customer to ask. Tally and Zoho Books posting of GST fields is
+unchanged.
+
+**For whoever runs the suites here.** Browser specs 105 (workspace page; ran three times in a row) and 106 (all
+workspaces) need the stack from `frontend/e2e/scripts/start-stack.sh`; both read real PDFs through the worker with the
+model stand-in. The website's screenshots (`gst-credit-*`) come from `website/scripts/capture-screenshots.mjs`.
+`qrcode` is a dev-only dependency (generated QR images in tests).
+
 ## Session E → next sessions
 
 _2026-10-18. Branch `claude/funny-sagan-n7gpqc`. Findings F-518 to F-523; decisions N-131 to N-134._

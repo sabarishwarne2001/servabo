@@ -6,6 +6,21 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Added — GST Credit (Session F, 2026-10-19)
+
+- **GST credit**: import a GSTR-2B and see which input tax credit you can claim, which suppliers have not reported your
+  invoices, what differs, and what to do in the GST portal's Invoice Management System; the 180-day exposure; an Excel
+  export and a supplier reminder. Documents → GST credit. Every plan can import and see the six figures; Business and
+  Enterprise get the lists, decisions, export and reminders. Recommendations, not tax advice.
+- **Enterprise**: GST credit across every workspace (Organization → GST credit, all workspaces) and the `gst:read` API
+  key scope. Migration `g1a1_gst_credit` adds five tables and the key scope.
+- **Helm**: mandates "Pay within 180 days of the invoice date" (recommended, on in the sample company) and "Hold payment
+  until the supplier has reported the invoice in GSTR-2B" (off by default); neither can make a payment late under the MSMED
+  Act or the 180-day rule. A Guard check "GST credit secured" and a drafted request to suppliers who have not reported.
+- **Reading**: the extraction prompt now asks a model for every field the product reads (F-524); the e-invoice QR code
+  (IRN) is read during processing.
+- **Website**: a `/gst-credit` page.
+
 ### Changed — FlowPilot AI is now Servabo (2026-10-16)
 
 There are no customers yet, so every protocol identifier that carried the old name changes once,
