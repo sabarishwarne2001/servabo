@@ -6,6 +6,18 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Added — The value receipt (Session G, 2026-10-19)
+
+- **Value receipt**: real figures from a customer's own documents, in rupees, shown where a purchase is decided and every
+  month after: GST credit waiting on suppliers (and at risk under the 180-day rule, and claimable now), the Time machine's
+  latest replay (confirmed, likely and potential kept apart), probable duplicate invoices, supplier bank-account changes,
+  overcharges against purchase orders, and Helm's value held. Nothing is estimated, currencies and honesty classes are never
+  added, zero is left out, and the sample company is never counted.
+- **Where**: the trial banner's last three days (the headline), the "Your free trial has ended" dialog (a receipt card with
+  links to the evidence), the plan page ("Your trial so far"), the Documents Overview ("Found this month", every plan), a
+  one-page PDF ("Download as PDF"), and both trial emails. For owners, admins and the billing role; members see today's text.
+- **API**: `GET /organizations/{org}/value-receipt?period=trial|month` and `.pdf`, kept ten minutes in Redis. No migration.
+
 ### Added — GST Credit (Session F, 2026-10-19)
 
 - **GST credit**: import a GSTR-2B and see which input tax credit you can claim, which suppliers have not reported your

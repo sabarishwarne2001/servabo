@@ -26,6 +26,7 @@ import { canInviteMembers } from "@/permissions/organizationPermissions";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { HelmOverviewCard } from "@/components/helm/HelmOverviewCard";
+import { ReceiptCard, canSeeValueReceipt } from "@/components/billing/ValueReceipt";
 import { CountUp, DailyColumns, KindsDonut, PipelineStrip, SuccessRing, kindTone } from "@/pages/Dashboard/OverviewParts";
 import { useMeContext } from "@/hooks/useMeContext";
 import { formatNumber } from "@/utils/displayTime";
@@ -338,6 +339,16 @@ export const Dashboard: React.FC = () => {
           testId="kpi-success"
         />
       </section>
+
+      {resolvedTenant ? (
+        <ReceiptCard
+          organizationId={resolvedTenant.organization.organization_id}
+          period="month"
+          title="Found this month"
+          testId="overview-found-month"
+          enabled={canSeeValueReceipt(String(resolvedTenant.organizationRole))}
+        />
+      ) : null}
 
       {resolvedTenant && workspaceId ? (
         <HelmOverviewCard

@@ -302,7 +302,8 @@ class _Writer:
                           rgb=(colours or {}).get(index, rgb))
         self.y -= height
 
-    def finish(self, *, title: str, subject: str, created: datetime, footer: Sequence[str]) -> bytes:
+    def finish(self, *, title: str, subject: str, created: datetime, footer: Sequence[str],
+               author: str = "Helm", creator: str = "Helm Time machine") -> bytes:
         from reportlab.pdfgen import canvas
 
         buffer = io.BytesIO()
@@ -311,8 +312,8 @@ class _Writer:
         pdf.setDateFormatter(lambda *_: stamp)  # the replay's own moment, not the time of download
         pdf.setTitle(clean(title))
         pdf.setSubject(clean(subject))
-        pdf.setAuthor("Helm")
-        pdf.setCreator("Helm Time machine")
+        pdf.setAuthor(author)
+        pdf.setCreator(creator)
         total = len(self.pages)
         state: dict[str, Any] = {}
 

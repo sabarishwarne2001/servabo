@@ -195,7 +195,7 @@ const OrganizationSidebarNavigation: React.FC<
                     aria-haspopup="dialog"
                     title="Not included in your plan"
                     data-testid="nav-locked-row"
-                    className="group relative flex h-8 w-full items-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground opacity-80 hover:bg-accent/70 hover:text-foreground"
+                    className="group relative flex h-8 w-full items-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground hover:bg-accent/70 hover:text-foreground"
                   >
                     {content}
                   </button>

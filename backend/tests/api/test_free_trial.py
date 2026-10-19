@@ -427,3 +427,75 @@ def test_the_reminder_sweep_is_registered_and_scheduled() -> None:
         profile.job_types is not None and "trial.reminders" in profile.job_types
         for profile in profiles.PROFILES.values()
     ), "no worker profile claims the sweep, so it would never run"
+
+
+# --- Session G: the emails carry the value receipt ------------------------------------------------
+
+
+def _waiting_credit(db: Session, tenant) -> None:
+    """One purchase invoice whose GST credit waits on its supplier: ₹180."""
+    from tests.services.test_value_receipt import _gst_book
+
+    _gst_book(db, tenant, tenant.workspace, "W-1", 1000, "WAITING_FOR_SUPPLIER")
+    db.commit()
+
+
+def test_both_emails_carry_what_servabo_found(db_session: Session, on_trial, outbox) -> None:
+    from app.workers.handlers.trial import run_reminders
+
+    _waiting_credit(db_session, on_trial)
+    _account_trial(db_session, on_trial, datetime.now(timezone.utc) + timedelta(days=1, hours=20))
+    assert run_reminders(db_session)["ending"] == 1
+    mail = outbox[0]
+    assert "found ₹180 of GST credit waiting on 1 supplier" in mail["text"]
+    assert f"/{on_trial.organization.slug}/{on_trial.workspace.slug}/gst" in mail["text"]
+    assert "See the evidence" in mail["html"]
+
+
+def test_the_ended_email_carries_it_too(db_session: Session, trial_over, outbox) -> None:
+    from app.workers.handlers.trial import run_reminders
+
+    _waiting_credit(db_session, trial_over)
+    _account_trial(db_session, trial_over, datetime.now(timezone.utc) - timedelta(hours=2))
+    assert run_reminders(db_session)["ended"] == 1
+    assert "found ₹180 of GST credit waiting on 1 supplier" in outbox[0]["text"]
+
+
+def test_an_email_without_figures_is_unchanged(db_session: Session, on_trial, outbox) -> None:
+    from app.workers.handlers.trial import run_reminders
+
+    _account_trial(db_session, on_trial, datetime.now(timezone.utc) + timedelta(days=1, hours=20))
+    run_reminders(db_session)
+    assert "Servabo read" not in outbox[0]["text"] and "See the evidence" not in outbox[0]["html"]
+
+
+def test_only_the_first_organizations_figures_are_written(db_session: Session, on_trial, outbox) -> None:
+    """The email names every organization still on the trial, but the figures are the first one's only."""
+    from types import SimpleNamespace
+
+    from app.models.organization import MembershipStatus, OrganizationStatus
+    from app.models.workspace import Workspace, WorkspaceStatus
+    from app.workers.handlers.trial import run_reminders
+    from tests.services.test_value_receipt import _gst_book
+
+    ends = datetime.now(timezone.utc) + timedelta(days=1, hours=20)
+    second = Organization(slug=f"second-{uuid.uuid4().hex[:6]}", name="Second Co", status=OrganizationStatus.ACTIVE,
+                          trial_ends_at=ends)
+    db_session.add(second)
+    db_session.flush()
+    db_session.add(OrganizationMember(organization_id=second.id, user_id=on_trial.owner.user.id,
+                                      role=OrganizationRole.OWNER, status=MembershipStatus.ACTIVE))
+    other_ws = Workspace(organization_id=second.id, slug="main", workspace_name="Main", status=WorkspaceStatus.ACTIVE)
+    db_session.add(other_ws)
+    db_session.flush()
+    put_on_plan(db_session, second, "free")
+    _gst_book(db_session, on_trial, on_trial.workspace, "W-1", 1000, "WAITING_FOR_SUPPLIER")                 # ₹180
+    _gst_book(db_session, SimpleNamespace(organization=second), other_ws, "W-9", 50_000, "WAITING_FOR_SUPPLIER")  # ₹9,000
+    _account_trial(db_session, on_trial, ends)
+    second.trial_ends_at = ends
+    db_session.commit()
+
+    run_reminders(db_session)
+    text = outbox[0]["text"]
+    assert "Second Co" in text, "the email still names every organization on the trial"
+    assert "₹180" in text and "9,000" not in text

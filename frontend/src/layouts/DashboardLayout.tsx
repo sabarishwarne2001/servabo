@@ -14,6 +14,7 @@ import DunningBanner from "@/components/billing/DunningBanner";
 // ARCH30-T4F:ts-member-notice-import-dash — A5.
 import MemberAccessNotice from "@/components/billing/MemberAccessNotice";
 import TrialBanner from "@/components/billing/TrialBanner";
+import { canSeeValueReceipt } from "@/components/billing/ValueReceipt";
 import { DisplayPreferencesBoundary } from "@/components/common/DisplayPreferencesBoundary";
 import { RouteErrorBoundary } from "@/components/common/RouteErrorBoundary";
 import { useTenant } from "@/hooks/useTenant";
@@ -109,6 +110,7 @@ export const DashboardLayout: React.FC = () => {
             organizationId={tenantState.organization.organization_id}
             organizationSlug={tenantState.organization.organization_slug}
             canChoosePlan={String(tenantState.organizationRole).toUpperCase() === "OWNER"}
+            canSeeReceipt={canSeeValueReceipt(String(tenantState.organizationRole))}
           />
         ) : null}
 

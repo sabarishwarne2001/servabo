@@ -56,6 +56,7 @@ from app.api.v1 import (
     tenant_branding,
     upload,
     usage,
+    value_receipt,
     review,  # ARCH40-S1:review-import
     review_collab,  # ARCH48-S1:review-collab-import
     process_intel,  # ARCH49-S1:process-intel-import
@@ -141,6 +142,7 @@ api_router.include_router(partner.router)
 api_router.include_router(marketplace.router)
 api_router.include_router(procurement.router)  # ARCH-31 three-way matching
 api_router.include_router(gst.router)  # Session F: GST Credit
+api_router.include_router(value_receipt.router)  # Session G: the value receipt
 # ARCH-32 zero-leakage redaction. Every route in it is capability-gated,
 # including the reads: the detection output is a map of where every
 # identifier in a tenant's corpus sits, which IS the product.

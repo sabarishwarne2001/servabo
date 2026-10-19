@@ -26,7 +26,7 @@ from app.templates.emails.common import GrantLine
 from app.templates.emails.operator_alert import render_operator_alert
 from app.templates.emails.organization_invitation import render_organization_invitation
 from app.templates.emails.password_reset import render_password_reset
-from app.templates.emails.trial_notice import render_trial_notice
+from app.templates.emails.trial_notice import TrialFinding, render_trial_notice
 from app.templates.emails.verify_email import render_verify_email
 from app.templates.emails.helm import (render_briefing, render_dispute, render_document_request,
                                         render_reconciliation, render_reminder)
@@ -58,6 +58,11 @@ EMAILS = {
         action_label="Update card", preferences_url="https://app.example.com/prefs", brand_name="Servabo"),
     "trial": lambda: render_trial_notice(kind="ENDING", organization_names=["Acme"], ends_at=NOW + timedelta(days=2),
                                          plans_link=LINK, brand_name="Servabo"),
+    # Session G: the same notice with the value receipt's headline and findings.
+    "trial-with-figures": lambda: render_trial_notice(
+        kind="ENDED", organization_names=["Acme"], ends_at=NOW - timedelta(hours=2), plans_link=LINK, brand_name="Servabo",
+        headline="In your trial Servabo read 132 documents and found ₹2,40,000 of GST credit waiting on 6 suppliers.",
+        findings=[TrialFinding("GST credit waiting on 6 suppliers", "₹2,40,000", "https://app.example.com/acme/main/gst")]),
     "operator": lambda: render_operator_alert(subject="Dead jobs", body="3 jobs failed for good.", occurrences=3,
                                               first_seen_at=NOW, last_seen_at=NOW, console_url=LINK,
                                               brand_name="Servabo"),

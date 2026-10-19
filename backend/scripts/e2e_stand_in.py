@@ -79,7 +79,9 @@ from app.core.config import settings  # noqa: E402
 if str(settings.ENVIRONMENT).strip().lower() == "production":
     raise SystemExit("e2e_stand_in.py refuses to run against a production deployment.")
 
-from sqlalchemy import select  # noqa: E402
+from sqlalchemy import select, text, update  # noqa: E402
+
+from app.models.usage_event import UsageEvent  # noqa: E402
 
 from app.db.session import SessionLocal  # noqa: E402
 from app.models.billing_account import BillingAccount  # noqa: E402
@@ -537,6 +539,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--plan", default="developer")
     parser.add_argument("--seats", type=int, default=1)
     parser.add_argument("--job", help="job type for run-job")
+    parser.add_argument("--backdate-days", type=int, default=0,
+                        help="trial-ends: also move this organization's usage events that many days back, so the "
+                             "work it did sits inside the trial that has now 'ended' (the clock is played here, so "
+                             "the work moves with it; the value receipt reads the trial's own window)")
     parser.add_argument("--name", help="dns-publish: the DNS name")
     parser.add_argument("--value", help="dns-publish: the TXT value")
     parser.add_argument("--domain", help="saml-idp, saml-response: the customer's email domain")
@@ -641,6 +647,14 @@ def main(argv: Optional[list[str]] = None) -> int:
                     OrganizationMember.role == OrganizationRole.OWNER)).scalars()
                 for member in owners:
                     member.user.trial_ends_at = ends
+                if args.backdate_days:
+                    # The usage ledger is append-only (a trigger refuses UPDATE). Playing the clock means the work
+                    # done "just now" must have been done before the end that is now in the past: the trigger is
+                    # lifted for this one statement, inside this transaction, on the throwaway test database.
+                    db.execute(text("ALTER TABLE usage_events DISABLE TRIGGER trg_usage_events_immutable"))
+                    db.execute(update(UsageEvent).where(UsageEvent.organization_id == organization.id)
+                               .values(occurred_at=UsageEvent.occurred_at - timedelta(days=args.backdate_days)))
+                    db.execute(text("ALTER TABLE usage_events ENABLE TRIGGER trg_usage_events_immutable"))
                 print(json.dumps({"organization": args.org, "trial_ends_at": ends.isoformat()}))
                 return 0
 

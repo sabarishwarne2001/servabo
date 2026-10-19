@@ -1967,3 +1967,57 @@ verifies wins over the model's reading. **Needs you (or your CA):** the current 
 PDF to try (Session D). Nothing on screen shows the QR provenance yet: it is stored in the document's extraction
 metadata (`einvoice_qr`).
 
+
+## N-141 — The value receipt: what it counts, in what order, who sees it (DECIDED (Session G))
+
+A new customer used to be told **that** the trial ends, never **what Servabo found**. The value receipt puts real
+figures from the customer's own documents in front of them at the moments that decide a purchase: the last three days
+of the trial (banner), its end (the dialog), the plan page ("Your trial so far"), the two trial emails, and every month
+after ("Found this month" on the Documents Overview, on every plan). No price, plan or capability changed.
+
+**What it counts** (`app/services/value_receipt.py`; one read-only service, no migration):
+
+- *Work*: documents read, pages read and assistant answers in the period, from the same usage ledger the Usage page and
+  the plan meters read (`document.upload`, `ocr.page`, `assistant.message`).
+- *Findings*, always in this order, each with the page that holds its evidence:
+  1. GST credit waiting on suppliers (with the number of suppliers), 2. GST credit at risk under the 180-day rule,
+  3. GST credit claimable now (all from the stored reconciliation; they stand as of today, because a credit waiting is
+  waiting until the supplier reports it); 4. the **latest finished Time machine replay** of the organization's own books
+  in the period, as separate findings for confirmed, likely and potential; 5. probable duplicate invoices (radar
+  findings that are open or confirmed; the amount is the repeated document's total where it was read, else a count);
+  6. supplier bank-account changes flagged (a count; open or confirmed payment-risk flags); 7. overcharges against
+  purchase orders (invoice lines priced above the order in live matching cases: the sum of the positive price
+  differences); 8. Helm's value held, which is confirmed by construction.
+- *The headline*: one sentence from the work counts and the **first** finding that is confirmed or has no honesty class
+  ("In your trial Servabo read 132 documents and found ₹2,40,000 of GST credit waiting on 6 suppliers.").
+- *Business also checks*: for an organization below Business, the names of what Business adds (payment risks, prices
+  checked against purchase orders, Helm's full planning, GST's supplier list). Names only, never numbers.
+
+**The honesty rules** (they are the feature, and each has a test): every figure is a stored row (no estimates, no hours
+saved, no projections); amounts in different currencies are never added (INR and USD are two findings); the Time machine's
+confirmed, likely and potential are three findings, never added; a figure of zero, or one that was not computed, is
+left out; the sample company (`workspaces.is_sample`, its Helm book, its usage) is never counted; an engine the plan does
+not include produces nothing even if old rows exist (a downgraded organization).
+
+**Who sees it**: owners, admins and the billing role (the same roles as the Usage page). Members and viewers get a 403 and
+the screens never ask. **Where**: the banner's headline, the receipt card in the "trial has ended" dialog, the plan page
+card, the Overview card, a one-page PDF (reportlab, like the Time machine's), and both trial emails (the first
+organization's figures only; without figures the email is exactly what it was).
+
+**Judgement calls made without asking you** (change any of them by telling me):
+
+- *The trial window* is the seven days that end at the organization's `trial_ends_at` (clipped to now). *The month* is the
+  calendar month in the time zone of the organization's **oldest active workspace**, because organizations have no time
+  zone of their own (workspaces do).
+- *Duplicates* are radar findings (`anomaly_findings`, kind `DUPLICATE_DOCUMENT`), not `payment_risk_flags`: the brief said
+  payment-risk flags, but those hold only bank-account changes and round amounts; the duplicates live in the radar.
+- *Overcharge currency* is the workspace's currency (the matching compares a purchase order with its invoice, which share one).
+- *Rupees* are written in whole rupees with Indian grouping (₹2,40,000), like N-112 and N-137; under one rupee the paise show.
+- *Kept ten minutes* in Redis per organization and period; a new import shows within ten minutes.
+- *The PDF is not an audited export*: that would need a new audit action (a database enum, so a migration), and the
+  receipt shows what the person already sees on screen. If you want it audited, that is a small follow-up.
+- *The sample company's GSTR-2B and replay never appear*, even for an organization whose only workspace is the sample.
+- *The end-to-end clock*: the browser tests play "the trial ended" by moving `trial_ends_at`; so that the work done earlier
+  still sits inside the trial, the test stand-in can also move that organization's usage events back
+  (`e2e_stand_in.py trial-ends --backdate-days N`, which lifts the append-only trigger for that one statement on the
+  throwaway test database). Production never does this.
