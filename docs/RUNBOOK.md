@@ -415,9 +415,9 @@ let the setup script create them and print their ids:
 $COMPOSE exec -T web python scripts/dodo_setup.py --create-test-products
 ```
 
-Paste the seven lines it prints (`GATEWAY_PRICE_ID_DEVELOPER`, `_BUSINESS`, `_ENTERPRISE`,
+Paste the eight lines it prints (`GATEWAY_PRICE_ID_DEVELOPER`, `_BUSINESS`, `_ENTERPRISE`,
 `_DEVELOPER_YEARLY`, `_BUSINESS_YEARLY`, `DODO_ADDON_PRODUCT_CUSTOM_DOMAIN`,
-`DODO_ADDON_PRODUCT_WAREHOUSE_SYNC`) into `.env.production`, run `$COMPOSE up -d`, then check them:
+`DODO_ADDON_PRODUCT_WAREHOUSE_SYNC`, `DODO_ADDON_PRODUCT_GST_CREDIT`) into `.env.production`, run `$COMPOSE up -d`, then check them:
 
 ```bash
 $COMPOSE exec -T web python scripts/dodo_setup.py      # every line must say OK

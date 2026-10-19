@@ -2051,7 +2051,7 @@ Tailwind 4 (N-119) removes the cause.
 
 GitHub moves `ubuntu-latest` to Ubuntu 26 from 2026-10-19. A new image can lack the prebuilt Python 3.12 that
 `setup-python` downloads, and that would break every backend job without any change of ours. Every job now says
-`ubuntu-24.04`. `actions/checkout`, `actions/setup-node` and `actions/setup-python` moved to v7 (their `action.yml`
+`ubuntu-24.04`. `actions/checkout`, `actions/setup-node` and `actions/setup-python` moved to v7 (and `actions/upload-artifact` to v6, the first major on Node.js 24) (their `action.yml`
 says `node24`; v4 and v5 run on the Node.js 20 that GitHub is retiring; we use none of the inputs the v6 and v7 notes
 say changed). **Revisit after launch**: move to the next Ubuntu on purpose, in its own pull request, when the backend jobs
 can be tried on it.

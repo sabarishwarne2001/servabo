@@ -54,7 +54,7 @@ def test_every_job_runs_on_a_pinned_runner_image(jobs):
 
 
 #: the first major of each action whose `action.yml` says `using: node24` (checked against the tags, Session H)
-FIRST_NODE_24 = {"actions/checkout": 5, "actions/setup-node": 5, "actions/setup-python": 6}
+FIRST_NODE_24 = {"actions/checkout": 5, "actions/setup-node": 5, "actions/setup-python": 6, "actions/upload-artifact": 6}
 
 
 @pytest.mark.parametrize("action", sorted(FIRST_NODE_24))

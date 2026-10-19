@@ -626,8 +626,8 @@ N-130; findings F-500 to F-517._
 **Session D: what to run, exactly** (needs the owner's PC, a Dodo *test-mode* account and its keys; never a
 live key). Follow `docs/billing/DODO-LOCAL-TEST.md` from the top:
 1. Test mode on; put the test API key and webhook key in `backend/.env` (§1–2).
-2. `cd backend; .\.venv\Scripts\python.exe scripts\dodo_setup.py --create-test-products`, paste the seven
-   `GATEWAY_PRICE_ID_…` lines into `.env`, then `scripts\dodo_setup.py` until every line says `OK` (§3).
+2. `cd backend; .\.venv\Scripts\python.exe scripts\dodo_setup.py --create-test-products`, paste the eight
+   `GATEWAY_PRICE_ID_…` / `DODO_ADDON_PRODUCT_…` lines into `.env`, then `scripts\dodo_setup.py` until every line says `OK` (§3).
 3. `.\start_dev.ps1 -Stop; .\start_dev.ps1` (§4), then `.\start_dev.ps1 -Stop; .\start_dev.ps1 -DodoWebhooks` (§5).
 4. Walk journeys A to E in the browser (§6).
 5. `scripts\dodo_probe.py`, then with `--subscription-id sub_… --after-plan-change --payment-id pay_…`, once
@@ -692,8 +692,8 @@ template (secrets generated with the commands shown; Postmark, Groq, R2 from ste
 migrations and the start. *Done when:* `https://app.servabo.app/api/v1/health/ready` says ready.
 
 **Step 8 — Create the plans in Dodo (test mode) and publish them.**
-RUNBOOK §9.2 step 8: `dodo_setup.py --create-test-products` creates the five plan products and two
-add-ons and prints seven lines for `.env.production`; then `dodo_setup.py` must say OK for all seven;
+RUNBOOK §9.2 step 8: `dodo_setup.py --create-test-products` creates the five plan products and three
+add-ons (Session H added GST Credit) and prints eight lines for `.env.production`; then `dodo_setup.py` must say OK for all eight;
 then the two seed commands and the first administrator. *Done when:* signed in as a new user, the
 Billing page shows Developer $49, Business $299 and Enterprise $799 per seat.
 
@@ -716,9 +716,9 @@ prints its restore time and every Healthchecks.io check is green.
 
 **Step 11 — Go live with Dodo.**
 Only after step 4 says verified and step 9 worked. In Dodo, switch off Test Mode, create the same
-seven products in live mode (same prices: plan products per seat, recurring, tax not included), a
+eight products in live mode (same prices: plan products per seat, recurring, tax not included), a
 live webhook endpoint (same URL) and a live API key. In `.env.production`: the live key, the live
-webhook secret, the seven live product ids, `DODO_LIVEMODE=true`; restart, and run the seed commands
+webhook secret, the eight live product ids, `DODO_LIVEMODE=true`; restart, and run the seed commands
 again (step 8). Buy one seat of Developer with your own card, then refund it from Dodo's dashboard.
 *Done when:* your own live payment shows in Billing and the refund shows as "Refunded".
 

@@ -23,6 +23,7 @@ from app.core import entitlements
 from app.core.billing_errors import AddonRequiredError, CapabilityRequiredError
 from app.core.config import settings
 from app.models.gst import GstDecision, GstMatch, GstReturn
+from app.models.organization import Organization
 from app.models.organization_addon import ADDON_STATUS_ACTIVE, ADDON_STATUS_GRACE, ADDON_STATUS_LAPSED
 from app.services.billing import addon_service, entitlement_service
 from app.services.gst import gate, store
@@ -171,6 +172,9 @@ def test_a_developer_organization_can_check_out_through_the_stand_in(dodo, db_se
     assert created["product_id"] == settings.DODO_ADDON_PRODUCT_GST_CREDIT
     assert created["quantity"] == 1  # one per organization, not per seat
     assert created["metadata"]["addon_key"] == GST
+    # With no addresses configured, the customer comes back to the organization's billing page (not a client's choice).
+    slug = db_session.get(Organization, tenant.organization.id).slug
+    assert created["return_url"] == f"{settings.FRONTEND_URL.rstrip('/')}/organizations/{slug}/billing?addon=success"
 
 
 @pytest.mark.parametrize("plan", ["business", "enterprise"])

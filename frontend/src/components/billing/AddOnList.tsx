@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 
 import AskPlanOwners from "@/components/billing/AskPlanOwners";
 import { PurchaseAction, formatAddonPrice } from "@/components/billing/AddOnLockCard";
@@ -28,11 +29,17 @@ export const AddOnList: React.FC<{ readonly organizationId: string; readonly isO
   organizationId,
   isOwner,
 }) => {
+  // The payment page sends the customer back here with ?addon=success. The payment is confirmed a moment later (the
+  // gateway's webhook), so the list is re-read every few seconds for a minute.
+  const [params] = useSearchParams();
+  const returned = params.get("addon") === "success";
+  const [watchUntil] = useState(() => Date.now() + 60_000);
   const { data } = useQuery({
     queryKey: entitlementKeys.all(organizationId),
     queryFn: () => getOrganizationEntitlements(organizationId),
     enabled: Boolean(organizationId),
-    staleTime: 60_000,
+    staleTime: returned ? 0 : 60_000,
+    refetchInterval: () => (returned && Date.now() < watchUntil ? 3_000 : false),
   });
   if (!data || data.addons.length === 0) {
     return null;
@@ -45,6 +52,11 @@ export const AddOnList: React.FC<{ readonly organizationId: string; readonly isO
         </h2>
         <p className={`${HINT} mt-1`}>Extras you can add to your plan. Each is one price for the whole organization.</p>
       </div>
+      {returned ? (
+        <p role="status" className="text-sm text-foreground" data-testid="addon-returned">
+          Thank you. The add-on turns on as soon as the payment is confirmed, usually within a minute.
+        </p>
+      ) : null}
       <ul className="divide-y divide-border">
         {data.addons.map((addon) => {
           const buyable = addon.purchasable && (addon.state === "NOT_GRANTED" || addon.state === "LAPSED");

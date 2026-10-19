@@ -490,6 +490,20 @@ def sweep(
 # ============================================================================
 
 
+def _return_addresses(db: Session, organization_id: uuid.UUID) -> tuple[str, str]:
+    """Where the payment page sends the customer back: the deployment's configured addresses, else the
+    organization's billing page (Billing -> Add-ons shows the add-on as soon as the payment is confirmed).
+
+    Never taken from the client: a caller-supplied return address on a payment flow is an open redirect."""
+    from app.models.organization import Organization
+
+    slug = db.execute(select(Organization.slug).where(Organization.id == organization_id)).scalar_one_or_none()
+    billing = f"{str(settings.FRONTEND_URL).rstrip('/')}/organizations/{slug}/billing" if slug else ""
+    success = str(settings.BILLING_CHECKOUT_SUCCESS_URL or (f"{billing}?addon=success" if billing else ""))
+    cancel = str(settings.BILLING_CHECKOUT_CANCEL_URL or billing)
+    return success, cancel
+
+
 def create_addon_checkout(
     db: Session,
     *,
@@ -527,6 +541,7 @@ def create_addon_checkout(
             "this deployment. Contact sales, or upgrade to a plan that includes it."
         )
 
+    success_url, cancel_url = _return_addresses(db, organization_id)
     gateway_name = active_gateway_name()
     product_id = str(getattr(settings, offer.product_setting))
     account = account_service.get_for_organization(db, organization_id=organization_id)
@@ -546,8 +561,8 @@ def create_addon_checkout(
         customer_email=customer_email,
         price_id=product_id,
         quantity=1,
-        success_url=str(settings.BILLING_CHECKOUT_SUCCESS_URL or ""),
-        cancel_url=str(settings.BILLING_CHECKOUT_CANCEL_URL or ""),
+        success_url=success_url,
+        cancel_url=cancel_url,
         client_reference_id=str(organization_id),
         metadata={"organization_id": str(organization_id), "addon_key": addon_key},
     )

@@ -42,8 +42,8 @@ cd backend
 .\.venv\Scripts\python.exe scripts\dodo_setup.py --create-test-products
 ```
 
-It creates the five plan products and two add-ons in your **test** account and prints seven lines like
-`GATEWAY_PRICE_ID_DEVELOPER=pdt_…`. Paste all seven lines into `backend/.env`. Then run the check until
+It creates the five plan products and three add-ons in your **test** account and prints eight lines like
+`GATEWAY_PRICE_ID_DEVELOPER=pdt_…`. Paste all eight lines into `backend/.env`. Then run the check until
 every line says `OK`:
 
 ```powershell
@@ -117,6 +117,7 @@ After each journey, run the probe (step 7) with the ids it produced, and fill th
 | D | **Scheduled downgrade** | Business → **Developer**, choose "Schedule the change for …". | Billing says "Changing to Developer" on the renewal date; nothing is charged now. "Keep the current plan" cancels it. (This exercises `do_not_bill` and `on_payment_failure`, point 2.) |
 | E | **Refund from Dodo** | In Dodo's dashboard open the payment of journey A → **Refund**. | Within a minute the invoice in Servabo says "Refunded" and the owner gets a notification (this reads `refunds[]`, point 1). |
 | F | **Cancel from the customer portal** | Billing → **Manage payment method**: this must open **Dodo's** customer portal (the address is Dodo's, not Servabo's). Cancel the subscription there. | Back in Servabo, Billing says the plan "cancels at the end of the period". |
+| H | **Buy the GST Credit add-on on a Developer organization** (Session H) | On a Developer organization open **GST credit**, import a GSTR-2B, and press **Add GST Credit — $49 a month for your organization** (an owner). Pay with the successful test card on Dodo's page. Then cancel it from Dodo's customer portal. | After payment the supplier and invoice lists unlock within a minute (Billing → Add-ons says "Active"). After the cancellation Billing says "Ends on …" for 14 days, then "Not added", the page goes back to the preview and **nothing is deleted**. On a Business organization the button is not offered and the checkout is refused ("already included"). |
 | G | **A dispute (if Dodo's test mode can simulate one)** | Look in Dodo's dashboard / documentation (Disputes) for a way to open a test dispute on a payment. | Servabo records a dispute (platform admin → Revenue → Disputes) and, if it is *lost*, the organization turns read-only until a later payment succeeds. If Test Mode cannot simulate one, write **Not checked** and move on: the stand-in covers the code path. |
 
 One more check for point 4 (Dodo keeps the checkout's `metadata` after a plan change): after journey C, run
