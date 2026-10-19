@@ -101,3 +101,8 @@ that needs to read the Currency dropdown for **other currencies** must set up it
 database of its own (a throwaway one, or the first spec of a fresh CI run), because it cannot be told apart
 from spec 94's leftovers on a shared one. Specs that only read USD prices pass either way (USD is the
 dropdown's first and default choice). Decision record: `docs/hardening/NEEDS-OWNER.md` N-127.
+
+**Names of organizations a spec creates.** Do not put the word "Plan" in them. The revenue-operations spec (26) finds its
+"Plan" field by its label, and the accessible name of the "Organization" list beside it is made of every organization's
+name, so "Business Plan Traders Ltd" in a shared database makes that label ambiguous (found in Session F).
+

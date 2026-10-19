@@ -134,7 +134,7 @@ test.describe("GST Credit across every workspace", () => {
 
   test("on a Business plan the page says it is part of Enterprise and the API asks for an upgrade", async ({ page, problems }) => {
     problems.allowHttp(/\/organizations\/[^/]+\/gst\//, [402], "the plan has no GST credit across workspaces");
-    const small = await newCustomer("gstallbiz", "Business Plan Traders Ltd");
+    const small = await newCustomer("gstallbiz", "Midsize Traders Ltd");
     standIn("subscribe", small.orgSlug, "--plan", "business", "--seats", "2");
     const session = await apiLogin(small.email);
     expect((await api(session, "GET", `/organizations/${small.orgId}/gst/summary`)).status).toBe(402);

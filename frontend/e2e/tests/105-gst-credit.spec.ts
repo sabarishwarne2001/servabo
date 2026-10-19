@@ -154,7 +154,7 @@ test.describe("GST Credit", () => {
 
     await row("B-2001").getByRole("button", { name: "B-2001" }).click();
     await page.getByRole("button", { name: "Confirm this match" }).click();
-    await expect(page.getByText("Decision saved.")).toBeVisible();
+    await expect(page.getByText("Decision saved.").first()).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(row("B-2001")).toContainText("Matched");
 
@@ -167,7 +167,7 @@ test.describe("GST Credit", () => {
     await row("X-9").getByRole("button", { name: "X-9" }).click();
     await expect(page.getByTestId("gst-ims")).toContainText("Keep pending");
     await page.getByRole("button", { name: "Not ours", exact: true }).click();
-    await expect(page.getByText("Decision saved.")).toBeVisible();
+    await expect(page.getByText("Decision saved.").first()).toBeVisible();
     await expect(page.getByTestId("gst-ims")).toContainText("Reject");
     await page.keyboard.press("Escape");
 
@@ -240,7 +240,7 @@ test.describe("GST Credit", () => {
   });
 
   test("on a Developer plan the figures are open, the lists are locked and the upgrade dialog opens", async ({ page }) => {
-    const small = await newCustomer("gstdev", "GST Developer Plan Ltd");
+    const small = await newCustomer("gstdev", "GST Starter Traders Ltd");
     standIn("subscribe", small.orgSlug, "--plan", "developer", "--seats", "1");
     expect((await upload(small, statement())).status).toBe(200);
     await signInAs(page, small.email);
