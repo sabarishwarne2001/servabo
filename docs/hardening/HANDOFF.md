@@ -745,3 +745,31 @@ again (step 8). Buy one seat of Developer with your own card, then refund it fro
   pass (N-077).
 - **Next release:** remove the one-release aliases for the old name (HANDOFF, "Website and payments
   session → next sessions").
+
+
+## Session G → next sessions
+
+_2026-10-19. Branch `claude/new-session-awa8gh`, PR #32. Decision N-141; finding F-527. No migration (one Alembic head)._
+
+**What changed.** The **value receipt**: real figures from a customer's own documents, in rupees, at the moments that decide a
+purchase and every month after. One read-only service (`app/services/value_receipt.py`), two routes
+(`GET /organizations/{org}/value-receipt` and `.pdf`, owners, admins and billing, kept ten minutes in Redis), and these
+places: the trial banner's headline in the last three days, a receipt card in the "Your free trial has ended" dialog, "Your
+trial so far" above the plan cards, "Found this month" on the Documents Overview (every plan), "Download as PDF", and both
+trial emails (the first organization's figures only). Members see exactly what they saw before.
+
+**The honesty rules are tested** (`tests/services/test_value_receipt.py`): stored figures only, currencies and the Time machine's
+confirmed / likely / potential never added, zero left out, the sample company never counted, a locked engine silent, windows
+in the zone of the oldest workspace. What it counts and the judgement calls are in N-141 (read them: the trial window, the month's
+zone, duplicates coming from the radar rather than payment-risk flags, the unaudited PDF).
+
+**For Session D / the owner.**
+- Try the receipt on a **real account**: upload real invoices, import a real GSTR-2B, open the Overview. The browser test proves the
+  wiring and the GST figures on invented invoices; the radar, procurement and Helm figures are proven on planted rows only.
+- The receipt reads the usage ledger for "documents read"; it counts what the plan meters count (uploads accepted), not documents that
+  finished reading.
+- Possible follow-ups, none started: audit the PDF as an export (needs a new audit action, so a migration); a monthly email of the
+  receipt for paying customers (the retention loop, reuses `trial_notice.py`'s block); the receipt on the website's pricing page.
+- Test tooling: `e2e_stand_in.py trial-ends --backdate-days N` moves the organization's usage events back by lifting the append-only
+  trigger for one statement on the throwaway test database. Never used outside the browser tests.
+- `ConfirmDialog` gained optional `children` and `wide`, and now scrolls inside a short window; other dialogs are unchanged.

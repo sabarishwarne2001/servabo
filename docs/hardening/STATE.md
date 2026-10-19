@@ -2,27 +2,39 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-19 (Session G, started)_
+_Last updated: 2026-10-19 (Session G, finished)_
 
 ## Current phase — Session G: the value receipt (2026-10-19)
 Branch `claude/new-session-awa8gh` (the session's assigned branch), based on `main` at `e8509ac` (PR #31 merged).
 Draft PR opened after the first push. Founder authority: decisions in NEEDS-OWNER.md as `DECIDED (Session G)`
-(next free N-number: N-141); new findings start at the next free F-number (F-527). No migration. **If cut off,
+(used N-141; next free N-142); new findings start at the next free F-number (F-528; F-527 used). No migration. **If cut off,
 paste the prompt again: continue on this branch and PR from the first unticked box. Never restart.**
 Local stack: Postgres 16 + pgvector 0.8.0 (built from source) on :5433 (e2e) and :5434 (backend tests), Redis,
 backend venv Python 3.12 (`backend/.venv`), `npm ci` done. The test environment block is in the session scratchpad
 (outside the repo): the CI variables with `POSTGRES_PORT=5434`, `POSTGRES_USER=postgres`, trust auth.
 
 - [x] 0. Start-up: docs and code read; sandbox databases and venv; this checklist
-- [ ] 1. (P0) Tests first (fail before the service exists), then `app/services/value_receipt.py`
-- [ ] 2. (P0) `GET /organizations/{org}/value-receipt?period=trial|month`, Redis 10 min, ledger rows, role-matrix entries
-- [ ] 3. (P0) Trial banner headline (last three days) and the receipt card in the "Your free trial has ended" dialog
-- [ ] 4. (P0) Trial emails (ENDING, ENDED) carry the headline and up to three findings; render tests with and without
-- [ ] 5. (P0) Browser spec 107 (3 repeats, axe light and dark); specs 33 and 61 still green
-- [ ] 6. (P1) Overview "Found this month" card (every plan) and Billing "Your trial so far" card; spec 107 extended
-- [ ] 7. (P2) `value-receipt.pdf` (reportlab), "Download as PDF" links, tests
-- [ ] Finish: records (NEEDS-OWNER, FINDINGS, COVERAGE, CHANGELOG, STATE, HANDOFF), `campaign_slices.py --check all`
-  exits 0, frontend lint / typecheck / check:self clean, PR ready, CI green.
+- [x] 1. (P0) `app/services/value_receipt.py` + 23 service tests (they fail without it: the import is the first error)
+- [x] 2. (P0) `GET /organizations/{org}/value-receipt?period=trial|month` (owner, admin, billing; Redis 10 min), ledger rows, API tests
+- [x] 3. (P0) Trial banner headline (last three days) and the receipt card in the "trial has ended" dialog
+- [x] 4. (P0) Trial emails (ENDING, ENDED) carry the headline and up to three findings; render tests with and without; first organization only
+- [x] 5. (P0) Browser spec 107: 11 tests, 3 repeats = 33 passed, axe light and dark; specs 33 and 61: 6 passed
+- [x] 6. (P1) Overview "Found this month" (every plan) and plan page "Your trial so far"; in spec 107
+- [x] 7. (P2) `value-receipt.pdf` (reportlab), "Download as PDF" on the dialog and the Overview card; tests
+- [x] Finish: records (N-141, F-527, COVERAGE, CHANGELOG, STATE, HANDOFF); `campaign_slices.py --check all` exits 0; frontend lint, typecheck and
+  check:self clean; PR ready; CI (below).
+- **Verified (local).** New backend tests: 23 service, 10 API (roles, cache, PDF), the email render tests and 4 handler tests added to `test_free_trial.py`, all pass; they failed first (import
+  error without the service). Route walkers and role matrix (102 tests) pass with the new routes; Helm backtest report tests
+  (18) pass after the writer gained `author`/`creator`; trial tests (50) pass. Browser: spec 107 33/33, specs 33 and 61 6/6.
+  Spec 107's first axe run found F-527 (sidebar locked rows), fixed.
+- **Not run locally, on purpose** (the brief says CI runs the full suites): the full backend and browser suites. The
+  `ConfirmDialog` (a wider, scrollable variant) and the sidebar's locked rows are shared by other pages: CI covers them.
+- **Unverified.** A real customer's GSTR-2B and invoices (the figures are proven on planted rows and on the model stand-in's
+  invoices); the Time machine, duplicate, bank-change, overcharge and Helm-value findings are proven in service tests with
+  planted rows but not in a browser (the browser customer is on Free, where only GST and the Time machine can show);
+  the email in a real mail client; the 390 px phone view and the Overview card's look at 1440 px were checked by the
+  card's classes (the Overview's own `fp-card`) and axe, not by eye.
+- **Next action:** Session D (Dodo walk-through, a real GSTR-2B, an e-invoice PDF), plus a look at the receipt on a real account.
 
 ## Current phase — Session F: GST Credit (2026-10-19)
 Branch `claude/new-session-5oe22r` (the session's assigned branch), based on `main` at `7185674` (PR #30 merged).
