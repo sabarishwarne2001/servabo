@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.models.gst import GstDecision, GstMatch, GstReturn, GstReturnRecord, GstSettings
 from app.models.workspace import Workspace
 from app.services.gst import books as books_module
+from app.services.gst import bulk
 from app.services.gst import ims
 from app.services.gst import vocabulary as v
 from app.services.gst.matching import DecisionView, MatchOut, RecView, period_window, reconcile
@@ -142,8 +143,7 @@ def recompute(db: Session, workspace: Workspace, gstin: Optional[str] = None, *,
         now = datetime.now(timezone.utc)
         db.execute(delete(GstMatch).where(GstMatch.workspace_id == workspace.id, GstMatch.gstin == target))
         rows = [_row(workspace, target, out, now) for out in outputs]
-        for start in range(0, len(rows), 2000):
-            db.execute(GstMatch.__table__.insert(), rows[start:start + 2000])
+        bulk.insert_rows(db, GstMatch, rows)
         summary[target] = len(rows)
     db.flush()
     from app.services.gst import hooks

@@ -324,31 +324,37 @@ def reconcile(
                 break
 
     # --- 3. suggestions (never confirmed by the engine)
+    # Books are indexed by supplier, kind and day, so a record looks at the seven days it can match and not at every
+    # book of its supplier. The candidates are sorted below by a total order, so the order they are found in is free.
     suggested: dict[uuid.UUID, tuple[uuid.UUID, str]] = {}
-    rest_books: dict[tuple[str, str], list[BookView]] = {}
+    rest_books: dict[tuple[str, str], dict[tuple[str, date], list[BookView]]] = {}
     for b in usable:
-        if b.work_item_id not in book_taken:
-            rest_books.setdefault(_supplier_identity(b.supplier_gstin, b.supplier_name_key), []).append(b)
+        if b.work_item_id not in book_taken and b.doc_date is not None:
+            rest_books.setdefault(_supplier_identity(b.supplier_gstin, b.supplier_name_key), {}) \
+                .setdefault((b.group, b.doc_date), []).append(b)
     candidates: list[tuple[tuple[float, int, int], uuid.UUID, uuid.UUID]] = []
     for rec in free_recs:
-        if rec.id in pairs:
+        if rec.id in pairs or rec.doc_date is None:
             continue
-        pools = list(rest_books.get(("g", rec.supplier_gstin or ""), ()))
+        identities = [("g", rec.supplier_gstin or "")]
         if rec.supplier_name_key:
-            pools += rest_books.get(("n", rec.supplier_name_key), ())
-        for b in pools:
-            # the cheap tests first; comparing numbers is the expensive one
-            if b.group != rec.group or b.doc_date is None or rec.doc_date is None \
-                    or abs((b.doc_date - rec.doc_date).days) > SUGGEST_DAYS:
+            identities.append(("n", rec.supplier_name_key))
+        for identity in identities:
+            by_day = rest_books.get(identity)
+            if not by_day:
                 continue
-            mine = b.total_micros if b.total_micros is not None else b.taxable_micros
-            theirs = rec.value_micros if (rec.value_micros is not None and b.total_micros is not None) else rec.taxable_micros
-            if mine is None or theirs is None or abs(mine - theirs) > tolerance_micros:
-                continue
-            if not numbers_similar(b.number_key, rec.doc_key):
-                continue
-            ratio = difflib.SequenceMatcher(None, b.number_key or "", rec.doc_key or "").ratio()
-            candidates.append(((-ratio, abs((b.doc_date - rec.doc_date).days), abs(mine - theirs)), rec.id, b.work_item_id))
+            for offset in range(-SUGGEST_DAYS, SUGGEST_DAYS + 1):
+                for b in by_day.get((rec.group, rec.doc_date + timedelta(days=offset)), ()):
+                    mine = b.total_micros if b.total_micros is not None else b.taxable_micros
+                    theirs = rec.value_micros if (rec.value_micros is not None and b.total_micros is not None) \
+                        else rec.taxable_micros
+                    if mine is None or theirs is None or abs(mine - theirs) > tolerance_micros:
+                        continue
+                    if not numbers_similar(b.number_key, rec.doc_key):
+                        continue
+                    ratio = difflib.SequenceMatcher(None, b.number_key or "", rec.doc_key or "").ratio()
+                    candidates.append(((-ratio, abs((b.doc_date - rec.doc_date).days), abs(mine - theirs)),
+                                       rec.id, b.work_item_id))
     for _, rec_id, wid in sorted(candidates, key=lambda c: (c[0], c[1].int, c[2].int)):
         if rec_id not in pairs and rec_id not in suggested and wid not in book_taken:
             suggested[rec_id] = (wid, v.METHOD_SUGGESTED)
@@ -405,9 +411,11 @@ def reconcile(
         if window is not None and book.doc_date is None:
             continue
         out.append(MatchOut(record=None, book=book, status=v.WAITING_FOR_SUPPLIER, itc_micros=book.tax_micros))
-    for dupe_id, first_id in book_dupes.items():
-        for row in out:
-            if row.book is not None and row.book.work_item_id == first_id:
+    if book_dupes:
+        row_of_book = {row.book.work_item_id: row for row in out if row.book is not None}
+        for dupe_id, first_id in book_dupes.items():
+            row = row_of_book.get(first_id)
+            if row is not None:
                 row.notes.append({"code": "DUPLICATE_IN_BOOKS", "label": "Entered twice in your books",
                                   "work_item_id": str(dupe_id)})
     return out
