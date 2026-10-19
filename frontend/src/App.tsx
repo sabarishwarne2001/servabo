@@ -91,6 +91,7 @@ const DashboardLayout = lazy(() => import("@/layouts/DashboardLayout"));
 const OrganizationLayout = lazy(() => import("@/layouts/OrganizationLayout"));
 // HELM:routes. Helm, the flagship engine: a mode with its own layout (brief §10.1).
 const HelmLayout = lazy(() => import("@/layouts/HelmLayout"));
+const GstCreditOrganization = lazy(() => import("@/pages/gst/GstCreditOrganization"));
 const HelmCockpit = lazy(() => import("@/pages/helm/HelmCockpit"));
 const HelmPlan = lazy(() => import("@/pages/helm/HelmPlan"));
 const HelmMandates = lazy(() => import("@/pages/helm/HelmMandates"));
@@ -393,6 +394,10 @@ function AppRoutes() {
                 <Route
                   path={ROUTE_PATTERNS.organizationEgress}
                   element={<RequireOrganizationRole allowed={OWNERS_AND_ADMINS}><OrganizationEgress /></RequireOrganizationRole>}
+                />
+                <Route
+                  path={ROUTE_PATTERNS.organizationGst}
+                  element={<RequireOrganizationRole allowed={BILLING_READERS}><GstCreditOrganization /></RequireOrganizationRole>}
                 />
                 <Route
                   path={ROUTE_PATTERNS.organizationAnalytics}

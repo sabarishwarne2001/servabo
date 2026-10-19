@@ -61,6 +61,11 @@ def record_views(db: Session, workspace_id: uuid.UUID, gstin: str) -> list[RecVi
         select(*_RECORD_COLUMNS).join(GstReturn, GstReturn.id == GstReturnRecord.return_id)
         .where(GstReturn.workspace_id == workspace_id, GstReturn.gstin == gstin, GstReturn.status == v.RETURN_ACTIVE)
     ).all()
+    return views_of(rows)
+
+
+def views_of(rows: Any) -> list[RecView]:
+    """`_RECORD_COLUMNS` rows as matching views."""
     name_keys: dict[str, Optional[str]] = {}
 
     def name_key(name: Optional[str]) -> Optional[str]:
@@ -90,9 +95,14 @@ def decision_views(db: Session, workspace_id: uuid.UUID, gstin: str) -> list[Dec
 
 
 def _row(workspace: Workspace, gstin: str, out: MatchOut, now: datetime) -> dict[str, Any]:
+    return row_of(workspace.organization_id, workspace.id, gstin, out, now)
+
+
+def row_of(organization_id: uuid.UUID, workspace_id: Optional[uuid.UUID], gstin: str, out: MatchOut,
+           now: datetime) -> dict[str, Any]:
     rec, book = out.record, out.book
     return {
-        "id": uuid.uuid4(), "organization_id": workspace.organization_id, "workspace_id": workspace.id, "gstin": gstin,
+        "id": uuid.uuid4(), "organization_id": organization_id, "workspace_id": workspace_id, "gstin": gstin,
         "record_id": rec.id if rec is not None else None,
         "work_item_id": book.work_item_id if book is not None else None,
         "status": out.status, "method": out.method,
@@ -147,4 +157,4 @@ def count_records(db: Session, workspace_id: uuid.UUID) -> int:
                           .where(GstReturnRecord.workspace_id == workspace_id)).scalar_one())
 
 
-__all__ = ["active_gstins", "active_periods", "recompute", "tolerance_micros"]
+__all__ = ["active_gstins", "active_periods", "recompute", "row_of", "tolerance_micros", "views_of"]

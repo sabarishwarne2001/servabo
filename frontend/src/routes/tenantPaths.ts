@@ -111,6 +111,8 @@ export const ROUTE_PATTERNS = {
   // ARCH50-S2:route-patterns. The organization's egress lockdown; "organizations" is
   // already reserved, so no new reserved segment is needed.
   organizationEgress: "egress",
+  // GST credit across every workspace (Enterprise). "organizations" is already reserved: no new reserved segment.
+  organizationGst: "gst",
   organizationNewWorkspace: `/organizations/${P_ORG}/workspaces/new`,
 
   // ARCH-18 platform administration. No tenant parameter, by design: these
@@ -303,6 +305,7 @@ export const platformSovereignPath = (): string => "/admin/sovereign";
 export const platformRevopsPath = (): string => "/admin/revops";
 export const platformJobsPath = (): string => "/admin/jobs";
 export const organizationEgressPath = (orgSlug: string): string => `${organizationPath(orgSlug)}/egress`;
+export const organizationGstPath = (orgSlug: string): string => `${organizationPath(orgSlug)}/gst`;
 
 export const createWorkspacePath = (orgSlug: string): string =>
   `${organizationPath(orgSlug)}/workspaces/new`;

@@ -6,6 +6,8 @@ import type {
   GstImportResponse,
   GstLineDetail,
   GstLinePage,
+  GstOrgLinePage,
+  GstOrgSummary,
   GstReminder,
   GstStatus,
   GstSummary,
@@ -106,3 +108,38 @@ export const downloadGstWorkbook = async (workspaceId: string, scope: GstScope):
       responseType: "blob",
     })
   ).data;
+
+// ---------------------------------------------------------------------------------- every workspace (Enterprise)
+
+const orgBase = (organizationId: string): string => `/organizations/${encodeURIComponent(organizationId)}/gst`;
+
+export const getGstOrgSummary = async (organizationId: string, scope: GstScope = {}): Promise<GstOrgSummary> =>
+  (await apiClient.get<GstOrgSummary>(`${orgBase(organizationId)}/summary?${scopeParams(scope).toString()}`)).data;
+
+export const listGstOrgSuppliers = async (
+  organizationId: string,
+  scope: GstScope,
+  offset = 0,
+  limit = 50,
+): Promise<GstSupplierPage> => {
+  const params = scopeParams(scope);
+  params.set("offset", String(offset));
+  params.set("limit", String(limit));
+  return (await apiClient.get<GstSupplierPage>(`${orgBase(organizationId)}/suppliers?${params.toString()}`)).data;
+};
+
+export interface GstOrgLineFilters extends GstLineFilters {
+  readonly workspaceId?: string;
+}
+
+export const listGstOrgLines = async (organizationId: string, filters: GstOrgLineFilters = {}): Promise<GstOrgLinePage> => {
+  const params = scopeParams(filters);
+  filters.status?.forEach((value) => params.append("status", value));
+  if (filters.supplier) {params.set("supplier", filters.supplier);}
+  if (filters.q) {params.set("q", filters.q);}
+  if (filters.atRisk) {params.set("at_risk", "true");}
+  if (filters.workspaceId) {params.set("workspace_id", filters.workspaceId);}
+  params.set("offset", String(filters.offset ?? 0));
+  params.set("limit", String(filters.limit ?? 50));
+  return (await apiClient.get<GstOrgLinePage>(`${orgBase(organizationId)}/records?${params.toString()}`)).data;
+};

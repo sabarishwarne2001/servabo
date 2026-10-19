@@ -8,10 +8,11 @@
   gst_decisions        what a person decided (confirm a suggested match, "not ours", link by hand). Keyed by the
                        document's natural key, not a record id, so a re-import does not lose it
   gst_settings         per workspace: the per-head rounding tolerance
+  api_keys             the scope vocabulary gains gst:read (Enterprise: the organization's GST summary and records)
 
 Money is in micros (millionths of a rupee). Every row carries organization_id and workspace_id with the
 ARCH-41 composite keys, so PostgreSQL refuses a row that names another tenant's data. The audit vocabulary gains
-GST_RETURN and GST_MATCH. Expand only: the downgrade drops the five tables (enum values cannot be removed).
+GST_RETURN and GST_MATCH. Expand only: the downgrade drops the five tables (enum values cannot be removed) and takes gst:read off the keys.
 
 Revision ID: g1a1_gst_credit
 Revises: h1a5_helm_ledger_incremental
@@ -35,8 +36,25 @@ SECTIONS = ("b2b", "b2ba", "cdnr", "cdnra", "isd", "isda", "impg", "impgsez", "e
 KINDS = ("INVOICE", "CREDIT_NOTE", "DEBIT_NOTE", "OTHER")
 
 
+#: h1a4_helm_api_vocabulary's scopes, with gst:read after Helm's (the order of the model's check constraint).
+SCOPES_AFTER: tuple[str, ...] = (
+    "organizations:read", "workspaces:read", "workspaces:write", "members:read", "work_items:read", "work_items:write",
+    "audit_logs:read", "files:read", "files:write", "webhooks:read", "webhooks:write", "webhooks:admin", "billing:read",
+    "helm:read", "helm:write", "gst:read", "public_documents:read", "public_query:write", "public_workflows:read",
+    "public_workflows:write",
+)
+GST_SCOPES: tuple[str, ...] = ("gst:read",)
+SCOPES_BEFORE: tuple[str, ...] = tuple(s for s in SCOPES_AFTER if s not in GST_SCOPES)
+
+
 def _in(values: tuple[str, ...]) -> str:
     return ", ".join(f"'{value}'" for value in values)
+
+
+def _scopes(values: tuple[str, ...]) -> None:
+    op.execute("ALTER TABLE api_keys DROP CONSTRAINT IF EXISTS ck_api_keys_scopes_allowed")
+    op.execute("ALTER TABLE api_keys ADD CONSTRAINT ck_api_keys_scopes_allowed "
+               f"CHECK (scopes <@ ARRAY[{_in(values)}]::text[])")
 
 
 def upgrade() -> None:
@@ -202,8 +220,17 @@ def upgrade() -> None:
             CONSTRAINT ck_gst_settings_tolerance CHECK (tolerance_micros >= 0 AND tolerance_micros <= 1000000000)
         )""")
     op.execute("CREATE INDEX ix_gst_settings_organization ON gst_settings (organization_id)")
+    _scopes(SCOPES_AFTER)
 
 
 def downgrade() -> None:
+    scopes = _in(GST_SCOPES)
+    # A key that held only gst:read has nothing left: it is deactivated, as h1a4 does for Helm's scopes.
+    op.execute("UPDATE api_keys SET deactivated_at = COALESCE(deactivated_at, now()), "
+               "deactivated_reason = COALESCE(deactivated_reason, 'SCOPE_DOWNGRADE'), "
+               f"scopes = ARRAY['organizations:read']::text[] WHERE scopes <@ ARRAY[{scopes}]::text[]")
+    op.execute("UPDATE api_keys SET scopes = ARRAY(SELECT s FROM unnest(scopes) AS s "
+               f"WHERE s NOT IN ({scopes}))::text[] WHERE scopes && ARRAY[{scopes}]::text[]")
+    _scopes(SCOPES_BEFORE)
     for table in ("gst_settings", "gst_decisions", "gst_matches", "gst_return_records", "gst_returns"):
         op.execute(f"DROP TABLE IF EXISTS {table}")

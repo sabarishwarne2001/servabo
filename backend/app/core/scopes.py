@@ -24,6 +24,8 @@ class ApiKeyScope(str, Enum):
     # --- Helm (Enterprise: capability.helm_api, checked again in Helm's own gate) ---
     HELM_READ = "helm:read"
     HELM_WRITE = "helm:write"
+    # --- GST Credit across every workspace (Enterprise: capability.gst_credit_all_workspaces) ---
+    GST_READ = "gst:read"
     # --- ARCH-21 Public Gateway Scopes ---
     PUBLIC_DOCUMENTS_READ = "public_documents:read"
     PUBLIC_QUERY_WRITE = "public_query:write"
@@ -58,6 +60,8 @@ SCOPES_BY_ROLE: dict[OrganizationRole, frozenset[ApiKeyScope]] = {
         ApiKeyScope.BILLING_READ,
         # Billing sees all of Helm's figures; what it may change in Helm it changes signed in.
         ApiKeyScope.HELM_READ,
+        # ... and the organization's GST credit figures (the page's own roles: owners, admins and billing).
+        ApiKeyScope.GST_READ,
     }),
 }
 
@@ -128,6 +132,12 @@ _HELM_PEOPLE_ONLY: dict[tuple[str, str], str] = {
     ("DELETE", "/sample"): _HELM_RULES,
 }
 
+#: GST Credit across every workspace (app/api/v1/gst.py): the organization's figures, supplier list and invoice
+#: list, read-only. A key reaches them only on a plan with capability.gst_credit_all_workspaces (402 otherwise).
+#: Importing, deciding, exporting and the per-workspace routes stay with people signed in.
+_GST_ORG = "/organizations/{organization_id}/gst"
+_GST_KEY_ROUTES: tuple[str, ...] = ("/summary", "/suppliers", "/records")
+
 ROUTE_SCOPE_MAP: dict[tuple[str, str], ApiKeyScope] = {
     ("GET", "/organizations/{organization_id}"): ApiKeyScope.ORGANIZATIONS_READ,
     ("GET", "/organizations/{organization_id}/workspaces"): ApiKeyScope.WORKSPACES_READ,
@@ -169,6 +179,8 @@ ROUTE_SCOPE_MAP: dict[tuple[str, str], ApiKeyScope] = {
     # --- Helm (see _HELM_KEY_ROUTES) ---
     **{(method, f"{_HELM}{path}"): ApiKeyScope.HELM_READ if method == "GET" else ApiKeyScope.HELM_WRITE
        for method, path in _HELM_KEY_ROUTES},
+    # --- GST Credit across every workspace (see _GST_KEY_ROUTES) ---
+    **{("GET", f"{_GST_ORG}{path}"): ApiKeyScope.GST_READ for path in _GST_KEY_ROUTES},
 }
 
 #: Routes no API key may call whatever scopes it holds, each with the words it is refused with (403).

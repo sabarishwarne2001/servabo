@@ -107,6 +107,34 @@ payment made outside Servabo and its bank import is invisible to it.
 processing (debounced to one job every ten seconds per workspace, through the worker) and nightly; a recompute is
 idempotent.
 
+## Enterprise: one reconciliation per GSTIN across every workspace
+
+`capability.gst_credit_all_workspaces` (Enterprise), the same pattern as Helm's `helm_all_workspaces`. An organization
+that books its purchases in several workspaces (a branch each, a client each) gets one answer per GSTIN: the GSTR-2B
+returns imported **in any workspace**, matched with the purchase invoices of **every workspace** that holds that GSTIN's
+purchases.
+
+- **Where:** Organization → **GST credit, all workspaces** (`/organizations/{org}/gst`), for owners, admins and billing.
+  Read-only: importing, deciding, exporting and reminders stay in each workspace's own page. Workspace members who are
+  not owners, admins or billing never see the organization page; their own workspace's page is unchanged.
+- **Which workspaces and documents:** active workspaces, never the sample company. A workspace with an active return
+  of the GSTIN is a "home" workspace and its documents count as they do in its own reconciliation (buyer GSTIN, else
+  "not ours"). Any other workspace contributes only documents that name the GSTIN as their buyer, so a workspace is
+  never made to claim documents that belong to another GSTIN. Where the same period was imported in more than one
+  workspace, the latest import is used. The tolerance is the strictest of the workspaces'; people's decisions are the
+  union of the workspaces' (the latest wins).
+- **How it is computed:** the stored rows cannot hold it (their composite keys tie a row to one workspace's
+  documents, ARCH-41), so `services/gst/org.py` runs the same pure matching when the page is opened and keeps the
+  answer for 60 seconds (an import or a decision shows at once; documents and payments within the minute). With one
+  workspace, the organization's figures and list equal the workspace's own (a test compares them).
+- **Roles:** the figures are the organization's. The supplier and invoice lists are cut to the workspaces the person may
+  read: owners and admins all, billing the ones it has grants on.
+- **API:** `GET /organizations/{id}/gst/summary | suppliers | records` (the workspace routes' filters, plus
+  `workspace_id` on records). **API keys** with the scope `gst:read` read exactly these three, on a plan with the
+  capability (402 otherwise); a key can import, decide or export nothing. The scope is in the same migration
+  (`g1a1_gst_credit`) as the tables; Billing keys may hold it, Member keys may not.
+- **Not stored:** nothing here is written, so nothing needs a recompute job; the cache is dropped on restart.
+
 ## API (workspace-scoped, `/api/v1/workspaces/{id}/gst`)
 
 `POST /returns` (upload `.json` or `.zip`: 25 MB, 50,000 records, zip limits as for archives, JSON nested at most 12

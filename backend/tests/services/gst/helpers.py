@@ -57,13 +57,13 @@ def supplier_invoices(documents, *, gstin: str = SUPPLIER_A, name: str = "Sahyad
 
 
 def book_invoice(db, tenant, *, number, supplier, gstin, on, taxable, rate=18, name="Sahyadri Packaging",
-                 buyer_gstin=RECIPIENT, extra=None):
+                 buyer_gstin=RECIPIENT, extra=None, workspace=None):
     line = b.item(taxable, rate)
     tax = line["cgst"] + line["sgst"]
     entities = {"vendor_gstin": gstin, "buyer_gstin": buyer_gstin, "subtotal": f"{taxable:.2f}",
                 "cgst_amount": f"{line['cgst']:.2f}", "sgst_amount": f"{line['sgst']:.2f}", "tax_amount": f"{tax:.2f}",
                 "invoice_date": on.isoformat(), **(extra or {})}
-    return factories.invoice(db, workspace=tenant.workspace, organization_id=tenant.organization.id, number=number,
+    return factories.invoice(db, workspace=workspace or tenant.workspace, organization_id=tenant.organization.id, number=number,
                              supplier=name, amount=taxable + tax, on=on, supplier_gstin=gstin, extra=entities)
 
 

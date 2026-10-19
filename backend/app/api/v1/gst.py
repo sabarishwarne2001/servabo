@@ -13,6 +13,13 @@
     POST   /workspaces/{wid}/gst/suppliers/{gstin}/reminder/send   send it to a known contact        [CONTRIBUTOR, plan]
     GET    /workspaces/{wid}/gst/settings | PATCH              the rounding tolerance                [VIEWER | ADMIN]
 
+Enterprise, across every workspace (`capability.gst_credit_all_workspaces`), read-only, for organization owners, admins
+and billing, and for API keys holding `gst:read`:
+
+    GET    /organizations/{oid}/gst/summary                    the six figures of one GSTIN across the workspaces
+    GET    /organizations/{oid}/gst/suppliers                  who has not reported what
+    GET    /organizations/{oid}/gst/records                    the invoice list (the workspaces the person may read)
+
 "plan" = `capability.gst_credit` (Business, Enterprise). Importing and the headline figures need no capability (the GST
 Credit preview), and the sample company is open to everyone, read-only. Viewers read; owners, admins and workspace
 contributors import, decide and export. Everything is a recommendation, never tax advice.
@@ -28,13 +35,17 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, Up
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import RequireWorkspaceRole, TenantContext, get_db
+from app.api import capability_gate
+from app.api.deps import OrganizationContext, RequireOrgRole, RequireWorkspaceRole, TenantContext, get_db
+from app.core import entitlements
 from app.core.pagination import MAX_OFFSET
 from app.models.audit_log import AuditAction, AuditResourceType
 from app.models.gst import GstReturn, GstSettings
+from app.models.organization import OrganizationRole
 from app.models.workspace import Workspace, WorkspaceRole
 from app.services import audit_service
 from app.services.gst import engine, export, gate, parse, queries, reminder, store, summary
+from app.services.gst import org as gst_org
 from app.services.gst import fields as gst_fields
 from app.services.gst import vocabulary as v
 
@@ -322,3 +333,84 @@ def patch_settings(workspace_id: uuid.UUID, body: SettingsIn, db: Session = Depe
     engine.recompute(db, workspace)
     db.commit()
     return {"tolerance_micros": row.tolerance_micros}
+
+
+# --------------------------------------------------------------------------------------------- every workspace
+
+O = "/organizations/{organization_id}/gst"
+RequireOrgReader = RequireOrgRole([OrganizationRole.OWNER, OrganizationRole.ADMIN, OrganizationRole.BILLING])
+LAW = {"itc": v.LAW_ITC_2B, "days_180": v.LAW_180_DAYS, "time_limit": v.LAW_TIME_LIMIT, "ims": v.LAW_IMS,
+       "gstr2b": v.LAW_GSTR2B}
+
+
+def _org_scope(db: Session, context: OrganizationContext, gstin: Optional[str], operation: str):
+    """The plan's capability, the GSTIN (the one asked for, else the first imported) and the workspaces this person
+    may read: owners and admins all of them, billing the ones it has grants on."""
+    from app.services.helm import gate as helm_gate
+
+    capability_gate.require_capability(db, context=context,
+                                       capability_key=entitlements.GST_CREDIT_ALL_WORKSPACES_CAPABILITY,
+                                       operation=operation)
+    workspaces = gst_org.workspaces_of(db, context.organization_id)
+    ids = [w.id for w in workspaces]
+    available = gst_org.overview(db, ids)
+    wanted = _gstin(gstin) or (available["gstins"][0] if available["gstins"] else None)
+    result = gst_org.reconciliation(db, context.organization_id, wanted) if wanted else None
+    readable = helm_gate.readable_workspaces(db, organization_id=context.organization_id, user_id=context.user_id,
+                                             role=context.role) & set(ids)
+    return workspaces, available, wanted, result, readable
+
+
+@router.get(O + "/summary")
+def get_org_summary(organization_id: uuid.UUID, gstin: Optional[str] = Query(default=None, max_length=20),
+                    period: Optional[str] = Query(default=None, max_length=7), db: Session = Depends(get_db),
+                    context: OrganizationContext = Depends(RequireOrgReader)) -> dict[str, Any]:
+    """The six figures of one GSTIN across every workspace, and what each workspace contributes."""
+    month = _period(period)
+    workspaces, available, wanted, result, _readable = _org_scope(db, context, gstin, "gst.org.summary")
+    lines = gst_org.scoped(result, period=month) if result else []
+    return {
+        **gst_org.figures(lines), **available, "gstin": wanted, "period": month,
+        "workspaces": gst_org.by_workspace(result, lines) if result else [],
+        "workspace_count": len(workspaces), "kept_for_seconds": gst_org.CACHE_SECONDS,
+        "law": LAW,
+        "note": "Computed when you open the page from the GSTR-2B returns imported in any workspace and the purchase "
+                "invoices of every workspace that holds this GSTIN's purchases. The sample company is not included. "
+                "Imports, decisions and exports are made in each workspace.",
+    }
+
+
+@router.get(O + "/suppliers")
+def get_org_suppliers(organization_id: uuid.UUID, gstin: Optional[str] = Query(default=None, max_length=20),
+                      period: Optional[str] = Query(default=None, max_length=7),
+                      offset: int = Query(default=0, ge=0, le=MAX_OFFSET), limit: int = Query(default=50, ge=1, le=200),
+                      db: Session = Depends(get_db),
+                      context: OrganizationContext = Depends(RequireOrgReader)) -> dict[str, Any]:
+    month = _period(period)
+    _workspaces, _available, _wanted, result, readable = _org_scope(db, context, gstin, "gst.org.suppliers")
+    lines = gst_org.scoped(result, period=month, workspace_ids=readable) if result else []
+    return gst_org.suppliers(lines, offset=offset, limit=limit)
+
+
+@router.get(O + "/records")
+def get_org_records(organization_id: uuid.UUID, gstin: Optional[str] = Query(default=None, max_length=20),
+                    period: Optional[str] = Query(default=None, max_length=7),
+                    line_status: Optional[list[str]] = Query(default=None, alias="status"),
+                    supplier: Optional[str] = Query(default=None, max_length=100),
+                    ims: Optional[str] = Query(default=None, max_length=8),
+                    q: Optional[str] = Query(default=None, max_length=64), at_risk: Optional[bool] = Query(default=None),
+                    workspace_id: Optional[uuid.UUID] = Query(default=None),
+                    offset: int = Query(default=0, ge=0, le=MAX_OFFSET), limit: int = Query(default=50, ge=1, le=200),
+                    db: Session = Depends(get_db),
+                    context: OrganizationContext = Depends(RequireOrgReader)) -> dict[str, Any]:
+    month = _period(period)
+    for value in line_status or ():
+        if value not in v.STATUSES:
+            raise HTTPException(status_code=422, detail={"code": "STATUS_UNKNOWN", "message": f"Unknown status {value}."})
+    if ims and ims not in v.IMS_ACTIONS:
+        raise HTTPException(status_code=422, detail={"code": "IMS_UNKNOWN", "message": "ims is ACCEPT, PENDING or REJECT."})
+    workspaces, _available, _wanted, result, readable = _org_scope(db, context, gstin, "gst.org.records")
+    lines = gst_org.scoped(result, period=month, workspace_ids=readable) if result else []
+    return gst_org.page(lines, statuses=line_status, supplier=supplier, ims_action=ims, q=q, at_risk=at_risk,
+                        workspace_id=workspace_id, offset=offset, limit=limit,
+                        names={w.id: w.workspace_name for w in workspaces})

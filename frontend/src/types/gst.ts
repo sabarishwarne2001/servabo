@@ -239,3 +239,46 @@ export const IMS_LABEL: Readonly<Record<ImsAction, string>> = {
   PENDING: "Keep pending",
   REJECT: "Reject",
 };
+
+/** What one workspace contributes to the organization's reconciliation of a GSTIN. */
+export interface GstOrgWorkspace {
+  readonly workspace_id: string;
+  readonly workspace_name: string;
+  readonly lines: number;
+  readonly claimable_micros: number;
+  readonly waiting_micros: number;
+  readonly waiting_count: number;
+}
+
+/** GST credit across every workspace (Enterprise, read-only): one reconciliation per GSTIN. */
+export interface GstOrgSummary {
+  readonly figures: readonly GstFigure[];
+  readonly suggested: number;
+  readonly reverse_charge: number;
+  readonly notes: number;
+  readonly lines: number;
+  readonly currency: "INR";
+  readonly disclaimer: string;
+  readonly gstins: readonly string[];
+  readonly periods: readonly string[];
+  readonly last_import: GstSummary["last_import"];
+  readonly gstin: string | null;
+  readonly period: string | null;
+  readonly workspaces: readonly GstOrgWorkspace[];
+  readonly workspace_count: number;
+  readonly kept_for_seconds: number;
+  readonly law: GstSummary["law"];
+  readonly note: string;
+}
+
+export interface GstOrgLine extends GstLine {
+  readonly workspace_id: string;
+  readonly workspace_name: string | null;
+}
+
+export interface GstOrgLinePage {
+  readonly total: number;
+  readonly items: readonly GstOrgLine[];
+  readonly offset: number;
+  readonly limit: number;
+}

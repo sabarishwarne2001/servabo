@@ -150,14 +150,16 @@ def load_documents(db: Session, workspace: Workspace, *, ids: Optional[Sequence[
 
 def book_view(fact: BookDocument, *, identities: ident.Identities, gstin: str,
               cases: Mapping[uuid.UUID, ProcurementCase], settlements: Mapping[uuid.UUID, Any],
-              name_keys: Optional[dict[str, Optional[str]]] = None) -> Optional[BookView]:
-    """The document as a book entry for the return of `gstin`, or None when it is not expected in that GSTR-2B."""
+              name_keys: Optional[dict[str, Optional[str]]] = None, explicit_only: bool = False) -> Optional[BookView]:
+    """The document as a book entry for the return of `gstin`, or None when it is not expected in that GSTR-2B.
+    `explicit_only`: a document counts only when it names `gstin` as its buyer (a workspace that holds no return of
+    that GSTIN, read for the organization-wide reconciliation, must not claim every document it has)."""
     flat = _flat(fact.entities or {})
     buyer_gstin = f.gstin_of(f.first(flat, f.BUYER_GSTIN_KEYS))
     if buyer_gstin is not None:
         if buyer_gstin != gstin:
             return None
-    elif ident.we_are_seller(fact.entities, identities):
+    elif explicit_only or ident.we_are_seller(fact.entities, identities):
         return None
     seller_party = ident.seller(fact.entities)
     seller_gstin = f.gstin_of(f.first(flat, f.SELLER_GSTIN_KEYS)) or f.gstin_of(seller_party.tax_id)
@@ -219,7 +221,7 @@ def _name_key(party: ident.Party, cache: Optional[dict[str, Optional[str]]]) -> 
     return cache[party.name]
 
 
-def load_books(db: Session, workspace: Workspace, gstin: str) -> list[BookView]:
+def load_books(db: Session, workspace: Workspace, gstin: str, *, explicit_only: bool = False) -> list[BookView]:
     facts = load_documents(db, workspace)
     if not facts:
         return []
@@ -233,7 +235,7 @@ def load_books(db: Session, workspace: Workspace, gstin: str) -> list[BookView]:
     identities = our_identities(db, workspace.id, gstin)
     name_keys: dict[str, Optional[str]] = {}
     books = (book_view(fact, identities=identities, gstin=gstin, cases=cases, settlements=settlements,
-                       name_keys=name_keys) for fact in facts)
+                       name_keys=name_keys, explicit_only=explicit_only) for fact in facts)
     return [b for b in books if b is not None]
 
 

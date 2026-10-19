@@ -88,6 +88,7 @@ import {
   platformRevopsPath,
   platformJobsPath,
   organizationEgressPath,
+  organizationGstPath,
   procurementPath,
   gstPath,
   procurementPoliciesPath,
@@ -684,6 +685,17 @@ export const buildOrganizationNavigationItems = (
       name: "Audit log",
       path: organizationAuditPath(orgSlug),
       icon: ScrollText,
+    });
+  }
+
+  // GST credit across every workspace (Enterprise, read-only): owners, admins and billing, like Helm's plan across
+  // every workspace. Plan-gated on the page and on the API.
+  if (role === "OWNER" || role === "ADMIN" || role === "BILLING") {
+    items.push({
+      name: "GST credit, all workspaces",
+      path: organizationGstPath(orgSlug),
+      capability: CAPABILITY.gstCreditAllWorkspaces,
+      icon: ReceiptIndianRupee,
     });
   }
 
