@@ -17,6 +17,9 @@ from tests.services.gst.helpers import RECIPIENT, SUPPLIER_A, SUPPLIER_B, book_i
 
 API = "/api/v1"
 
+#: Workspace isolation of the GST Credit routes is proved below (and through the role matrix in tests/api/test_gst_api.py).
+ISOLATION_PROVEN_HERE = ("gst",)
+
 
 @pytest.fixture()
 def imported(client, db_session, tenant, test_sessions):
@@ -82,3 +85,23 @@ def test_the_nightly_sweep_reconciles_every_workspace_with_a_return(db_session, 
     assert result["reconciled"] >= 1 and result["failed"] == 0
     db_session.expire_all()
     assert len(shape(db_session, imported.workspace.id)) == 6
+
+
+def test_a_second_workspace_sees_nothing_of_the_first(client, db_session, imported):
+    """Every list route of another organization's workspace is empty, and ours answers 404/403 to its people."""
+    tenant = imported
+    mine = client.get(f"{API}/workspaces/{tenant.workspace.id}/gst/records", headers=tenant.viewer.headers).json()
+    assert mine["total"] == 6
+    foreign = tenant.foreign_workspace
+    for tail in ("/records", "/suppliers"):
+        response = client.get(f"{API}/workspaces/{foreign.id}/gst{tail}", headers=tenant.other_org_member.headers)
+        assert response.status_code in (200, 402), response.text
+        if response.status_code == 200:
+            assert response.json()["total"] == 0
+    summary = client.get(f"{API}/workspaces/{foreign.id}/gst/summary", headers=tenant.other_org_member.headers).json()
+    assert summary["gstins"] == [] and summary["lines"] == 0
+    for item in mine["items"]:
+        assert client.get(f"{API}/workspaces/{foreign.id}/gst/records/{item['id']}",
+                          headers=tenant.other_org_member.headers).status_code in (402, 404)
+        assert client.get(f"{API}/workspaces/{tenant.workspace.id}/gst/records/{item['id']}",
+                          headers=tenant.other_org_member.headers).status_code in (403, 404)

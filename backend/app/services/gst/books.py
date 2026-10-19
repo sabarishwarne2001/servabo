@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.core import normalize as nz
 from app.models.document_role import DocumentRole
-from app.models.helm import HelmSettlement
+from app.models.helm import HelmPromise, HelmSettlement
 from app.models.procurement import ProcurementCase
 from app.models.work_item import WorkItem
 from app.models.workspace import Workspace
@@ -89,6 +89,35 @@ def _flat(entities: Mapping[str, Any]) -> Mapping[str, Any]:
 
 
 @dataclass(frozen=True)
+class Payment:
+    """What Servabo knows about the payment of one invoice: Helm's Promise ledger first (which reads bank
+    statements too), else a settlement a person or a bank import recorded."""
+
+    paid: bool
+    paid_on: Optional[date]
+    paid_amount_micros: Optional[int]
+
+
+def load_payments(db: Session, workspace_id: uuid.UUID, ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, Payment]:
+    out: dict[uuid.UUID, Payment] = {}
+    if not ids:
+        return out
+    for row in db.execute(select(HelmPromise.work_item_id, HelmPromise.details).where(
+            HelmPromise.workspace_id == workspace_id, HelmPromise.kind == "PAYMENT_DUE",
+            HelmPromise.work_item_id.in_(list(ids)))):
+        settlement = (row.details or {}).get("settlement") or {}
+        if settlement.get("state") == "PAID" and settlement.get("paid_on"):
+            # The ledger marks a promise PAID against what is still owed after credit notes, so a payment of the
+            # invoice less its credit note is a full payment: no amount to compare.
+            out[row.work_item_id] = Payment(True, date.fromisoformat(str(settlement["paid_on"])[:10]), None)
+    for settlement in db.execute(select(HelmSettlement).where(
+            HelmSettlement.workspace_id == workspace_id, HelmSettlement.work_item_id.in_(list(ids)),
+            HelmSettlement.state == "PAID")).scalars():
+        out.setdefault(settlement.work_item_id, Payment(True, settlement.paid_on, settlement.paid_amount_micros))
+    return out
+
+
+@dataclass(frozen=True)
 class BookDocument:
     """The few things about a document that the reconciliation reads (no text, no verification state)."""
 
@@ -120,7 +149,7 @@ def load_documents(db: Session, workspace: Workspace, *, ids: Optional[Sequence[
 
 
 def book_view(fact: BookDocument, *, identities: ident.Identities, gstin: str,
-              cases: Mapping[uuid.UUID, ProcurementCase], settlements: Mapping[uuid.UUID, HelmSettlement],
+              cases: Mapping[uuid.UUID, ProcurementCase], settlements: Mapping[uuid.UUID, Any],
               name_keys: Optional[dict[str, Optional[str]]] = None) -> Optional[BookView]:
     """The document as a book entry for the return of `gstin`, or None when it is not expected in that GSTR-2B."""
     flat = _flat(fact.entities or {})
@@ -163,7 +192,7 @@ def book_view(fact: BookDocument, *, identities: ident.Identities, gstin: str,
 
     case = cases.get(fact.work_item_id)
     settlement = settlements.get(fact.work_item_id)
-    paid_on = settlement.paid_on if settlement is not None and settlement.state == "PAID" else None
+    paid_on = settlement.paid_on if settlement is not None and settlement.paid else None
     paid_fully = bool(paid_on) and (settlement.paid_amount_micros is None or total is None
                                     or settlement.paid_amount_micros + PAID_SLACK_MICROS >= total)
     return BookView(
@@ -200,9 +229,7 @@ def load_books(db: Session, workspace: Workspace, gstin: str) -> list[BookView]:
             ProcurementCase.workspace_id == workspace.id, ProcurementCase.invoice_work_item_id.in_(ids),
             ProcurementCase.status != CASE_LIVE_EXCLUDED).order_by(ProcurementCase.created_at)).scalars():
         cases[case.invoice_work_item_id] = case  # the latest case wins
-    settlements = {s.work_item_id: s for s in db.execute(
-        select(HelmSettlement).where(HelmSettlement.workspace_id == workspace.id,
-                                     HelmSettlement.work_item_id.in_(ids))).scalars()}
+    settlements = load_payments(db, workspace.id, ids)
     identities = our_identities(db, workspace.id, gstin)
     name_keys: dict[str, Optional[str]] = {}
     books = (book_view(fact, identities=identities, gstin=gstin, cases=cases, settlements=settlements,

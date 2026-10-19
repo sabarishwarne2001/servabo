@@ -211,7 +211,7 @@ class GstMatch(Base):
     ims_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     period_first_seen: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)
     reported_late: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
-    risk: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    risk: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB(none_as_null=True), nullable=True)
     decision: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     computed_at: Mapped[datetime] = _ts()
 

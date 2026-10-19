@@ -50,7 +50,17 @@ from app.services.helm import vocabulary as v
 logger = logging.getLogger("app.services.helm.sample_company")
 
 NAME = "Meridian Wholesale Pvt Ltd"
-GSTIN = "27AAACM1234F1Z5"
+
+
+def _valid(gstin: str) -> str:
+    """The sample's GSTINs are invented; each gets the check character a real one carries, so GSTR-2B files built
+    from the sample read like a portal download (GST Credit, Session F)."""
+    from app.services.entities.normalize import gstin_check_char
+
+    return gstin[:14] + gstin_check_char(gstin[:14])
+
+
+GSTIN = _valid("27AAACM1234F1Z5")
 WORKSPACE_NAME = "Meridian Wholesale (sample)"
 WORKSPACE_SLUG = "sample-meridian"
 MONTHS = 9
@@ -84,38 +94,38 @@ class Supplier:
 
 
 SUPPLIERS: tuple[Supplier, ...] = (
-    Supplier("sahyadri", "Sahyadri Packaging Industries", "27ABMPS4821K1Z3", "Chakan, Pune", "Net 30", 30,
+    Supplier("sahyadri", "Sahyadri Packaging Industries", _valid("27ABMPS4821K1Z3"), "Chakan, Pune", "Net 30", 30,
              (Item("Corrugated cartons 5-ply 18x12x12", "pcs", Decimal("38.50"), (1800, 2600)),
               Item("BOPP tape 48mm x 65m", "rolls", Decimal("62.00"), (300, 500))),
              "accounts@sahyadripack.example", "HDFC0001234 50200012345678", 26,
              udyam="UDYAM-MH-26-0012345", msme_category="MICRO"),
-    Supplier("deccan", "Deccan Polymers Pvt Ltd", "27AAFCD7714M1Z8", "Bhosari, Pune", "Net 60 days", 60,
+    Supplier("deccan", "Deccan Polymers Pvt Ltd", _valid("27AAFCD7714M1Z8"), "Bhosari, Pune", "Net 60 days", 60,
              (Item("HDPE granules (film grade)", "kg", Decimal("118.00"), (900, 1400)),
               Item("LDPE shrink film 50 micron", "kg", Decimal("142.00"), (400, 700))),
              "finance@deccanpolymers.example", "ICIC0004411 004405012345", 52,
              udyam="UDYAM-MH-25-0044321", msme_category="SMALL"),
-    Supplier("ganesh", "Shree Ganesh Steel Traders", "27AHSPG9921L1Z1", "Pimpri, Pune", "Net 45", 45,
+    Supplier("ganesh", "Shree Ganesh Steel Traders", _valid("27AHSPG9921L1Z1"), "Pimpri, Pune", "Net 45", 45,
              (Item("MS angle 40x40x5 mm", "kg", Decimal("72.00"), (1500, 2200)),
               Item("GI sheet 0.8 mm", "kg", Decimal("96.00"), (600, 900))),
              "billing@shreeganeshsteel.example", "SBIN0009876 32109876543", 40),
-    Supplier("vidarbha", "Vidarbha Agro Foods Pvt Ltd", "27AACCV5530N1Z6", "Nagpur", "2/10 net 30", 30,
+    Supplier("vidarbha", "Vidarbha Agro Foods Pvt Ltd", _valid("27AACCV5530N1Z6"), "Nagpur", "2/10 net 30", 30,
              (Item("Toor dal (premium)", "kg", Decimal("128.00"), (900, 1300)),
               Item("Basmati rice 25 kg bag", "bags", Decimal("1840.00"), (40, 70))),
              "receivables@vidarbhaagro.example", "BARB0NAGPUR 12340100009876", 28),
-    Supplier("narmada", "Narmada Electricals", "27AAPFN3301P1Z4", "Bhosari, Pune", "Net 30", 30,
+    Supplier("narmada", "Narmada Electricals", _valid("27AAPFN3301P1Z4"), "Bhosari, Pune", "Net 30", 30,
              (Item("LED panel light 36W", "pcs", Decimal("1150.00"), (40, 80)),
               Item("Copper cable 2.5 sq mm (90 m)", "coils", Decimal("2380.00"), (15, 30))),
              "accounts@narmadaelectricals.example", "UTIB0000123 917020012345678", 27),
-    Supplier("pos", "Pune Office Supplies Co.", "27AAKFP1102Q1Z2", "Shivajinagar, Pune", "Net 15", 15,
+    Supplier("pos", "Pune Office Supplies Co.", _valid("27AAKFP1102Q1Z2"), "Shivajinagar, Pune", "Net 15", 15,
              (Item("Printer paper A4 75 gsm (box)", "boxes", Decimal("1420.00"), (12, 26)),
               Item("Toner cartridge 88A", "pcs", Decimal("2650.00"), (2, 6))),
              "sales@puneofficesupplies.example", "KKBK0001777 0412987654", 14, needs_po=False),
-    Supplier("gases", "Bharat Industrial Gases Ltd", "27AABCB6640R1Z9", "Taloja, Navi Mumbai",
+    Supplier("gases", "Bharat Industrial Gases Ltd", _valid("27AABCB6640R1Z9"), "Taloja, Navi Mumbai",
              "Net 30. Interest at 1.5% per month on overdue amounts.", 30,
              (Item("Industrial oxygen cylinder 7 m3", "cyl", Decimal("410.00"), (90, 140)),
               Item("Argon cylinder 10 m3", "cyl", Decimal("1680.00"), (10, 20))),
              "collections@bharatgases.example", "HDFC0000060 50200099887766", 30),
-    Supplier("konkan", "Konkan Logistics LLP", "27AAQFK8810S1Z7", "Bhiwandi", "Net 15", 15,
+    Supplier("konkan", "Konkan Logistics LLP", _valid("27AAQFK8810S1Z7"), "Bhiwandi", "Net 15", 15,
              (Item("Line haul Pune-Mumbai (32 ft MXL)", "trips", Decimal("21500.00"), (3, 7)),
               Item("Line haul Pune-Nashik (19 ft)", "trips", Decimal("12800.00"), (1, 5)),
               Item("Detention charges", "hours", Decimal("450.00"), (0, 14)),
@@ -135,15 +145,15 @@ class Customer:
 
 
 CUSTOMERS: tuple[Customer, ...] = (
-    Customer("kesarbagh", "Kesarbagh Retail Pvt Ltd", "27AADCK4410D1Z5", "accounts@kesarbagh.example", (9, 15),
+    Customer("kesarbagh", "Kesarbagh Retail Pvt Ltd", _valid("27AADCK4410D1Z5"), "accounts@kesarbagh.example", (9, 15),
              (900_000, 1_400_000)),
-    Customer("orchid", "Orchid Supermarkets LLP", "27AAJFO2231E1Z2", "payables@orchidsuper.example", (0, 2),
+    Customer("orchid", "Orchid Supermarkets LLP", _valid("27AAJFO2231E1Z2"), "payables@orchidsuper.example", (0, 2),
              (700_000, 1_000_000)),
-    Customer("lotus", "Lotus Hospitality Group", "27AABCL9902F1Z8", "ap@lotushospitality.example", (20, 30),
+    Customer("lotus", "Lotus Hospitality Group", _valid("27AABCL9902F1Z8"), "ap@lotushospitality.example", (20, 30),
              (500_000, 800_000)),
-    Customer("sai", "Sai Medicals Distributors", "27AAQPS3378G1Z1", "finance@saimedicals.example", (3, 7),
+    Customer("sai", "Sai Medicals Distributors", _valid("27AAQPS3378G1Z1"), "finance@saimedicals.example", (3, 7),
              (400_000, 650_000)),
-    Customer("greenleaf", "Greenleaf Foods Pvt Ltd", "27AADCG7745H1Z6", "accounts@greenleaffoods.example", (4, 8),
+    Customer("greenleaf", "Greenleaf Foods Pvt Ltd", _valid("27AADCG7745H1Z6"), "accounts@greenleaffoods.example", (4, 8),
              (300_000, 500_000)),
 )
 
@@ -170,6 +180,9 @@ class Planted:
     #: received, one billed at another amount, our latest payment not yet applied; and the balance gap.
     statement_differences: tuple[str, ...] = ()
     statement_gap_micros: int = 0
+    #: GST Credit (Session F): a purchase invoice with GST that is 150 to 180 days old and never paid, so the
+    #: 180-day rule has something to warn about. The number of that invoice.
+    gst_unpaid_number: Optional[str] = None
 
 
 @dataclass
@@ -286,6 +299,7 @@ class _Book:
                  po_number: Optional[str], bank: Optional[str] = None, note: str = "", copy: bool = False) -> Doc:
         subtotal = sum(Decimal(l["amount"]) for l in lines)
         gst = (subtotal * Decimal("0.18")).quantize(Decimal("0.01"))
+        half = (gst / 2).quantize(Decimal("0.01"))  # same state as Meridian: CGST and SGST
         total = subtotal + gst
         bank = bank or supplier.bank
         due = on + timedelta(days=supplier.net_days)
@@ -306,13 +320,15 @@ class _Book:
             "Currency: INR", "|#|Description|Qty|Rate|Amount",
             *[f"|{i + 1}|{l['description']} (batch {mark.randint(100, 999)}{mark.choice('ABCDEF')})|{l['quantity']}|"
               f"{_r(Decimal(l['unit_price']))}|{_r(Decimal(l['amount']))}" for i, l in enumerate(lines)],
-            f"Taxable value: {_r(subtotal)}", f"IGST 18%: {_r(gst)}", f"Total Amount Due: INR {_r(total)}",
+            f"Taxable value: {_r(subtotal)}", f"CGST 9%: {_r(half)}", f"SGST 9%: {_r(gst - half)}",
+            f"Total Amount Due: INR {_r(total)}",
             f"Amount in words: {_words(total)}",
             f"Payment terms: {supplier.terms}", f"Bank: {bank}", *([note] if note else [])])
         entities = {"document_classification": "Invoice", "vendor_name": supplier.name,
                     "supplier_gstin": supplier.gstin, "bill_to": NAME, "buyer_gstin": GSTIN,
                     "invoice_number": number, "invoice_date": on.isoformat(), "due_date": due.isoformat(),
                     "currency": "INR", "line_items": lines, "subtotal": str(subtotal), "tax_amount": str(gst),
+                    "cgst_amount": str(half), "sgst_amount": str(gst - half), "place_of_supply": "Maharashtra (27)",
                     "total_amount": str(total), "payment_terms": supplier.terms, "vendor_bank_account": bank}
         if po_number:
             entities["po_number"] = po_number
@@ -371,6 +387,10 @@ class _Book:
                 if not supplier.needs_po and total > threshold_po and inv_on <= self.today:
                     self.planted.missing_po_above_threshold += 1
                 paid_on = inv_on + timedelta(days=supplier.pays_after_days)
+                if (supplier.key == "pos" and self.planted.gst_unpaid_number is None
+                        and 152 <= (self.today - inv_on).days <= 178):
+                    self.planted.gst_unpaid_number = number  # never paid: the 180-day rule is near
+                    paid_on = self.today + timedelta(days=3650)
                 if markup:
                     overcharge = sum((Decimal(il["unit_price"]) - Decimal(pl["unit_price"])) * pl["quantity"]
                                      for il, pl in zip(invoice_lines, lines))
@@ -415,10 +435,15 @@ class _Book:
         text = "\n".join(["CREDIT NOTE", supplier.name, f"GSTIN: {supplier.gstin}", f"Credit Note No: {number}",
                           f"Date: {_d(on)}", f"Against Invoice: {invoice_number}", f"To: {NAME}",
                           "Reason: rate charged above the agreed purchase order price", f"Credit amount: INR {_r(amount)}"])
+        taxable = (amount / Decimal("1.18")).quantize(Decimal("0.01"))
+        tax = amount - taxable
+        half = (tax / 2).quantize(Decimal("0.01"))
         return Doc("CREDIT_NOTE", f"{number}.pdf", on, text,
                    {"document_classification": "Credit Note", "vendor_name": supplier.name,
                     "credit_note_number": number, "invoice_reference": invoice_number, "date": on.isoformat(),
-                    "total_amount": str(amount), "currency": "INR"},
+                    "supplier_gstin": supplier.gstin, "buyer_gstin": GSTIN, "note_type": "credit",
+                    "subtotal": str(taxable), "tax_amount": str(tax), "cgst_amount": str(half),
+                    "sgst_amount": str(tax - half), "total_amount": str(amount), "currency": "INR"},
                    number=number, total=amount, vendor=supplier.name, vendor_tax=supplier.gstin, received=on)
 
     # -- sales ------------------------------------------------------------------------------
@@ -830,6 +855,9 @@ def build(db: Session, *, organization_id: uuid.UUID, actor_user_id: Optional[uu
     settings.briefing_enabled = False
     db.flush()
     ledger_store.rebuild_workspace(db, workspace_id=ws.id, as_of=today)
+    from app.services.gst import sample as gst_sample
+
+    gst_sample.build_returns(db, ws, today=today, user_id=actor_user_id)
     counterparties.sync(db, book, as_of=today)
     for supplier in SUPPLIERS:
         _set_contact(db, book, supplier.name, supplier.email)

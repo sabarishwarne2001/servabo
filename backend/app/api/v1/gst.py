@@ -131,6 +131,12 @@ def get_summary(workspace_id: uuid.UUID, gstin: Optional[str] = Query(default=No
     """The six figures for a GSTIN and period (or all). On every plan; the lists are the paid part."""
     workspace = _workspace(db, context, workspace_id)
     wanted, month = _gstin(gstin), _period(period)
+    if workspace.is_sample and not engine.active_gstins(db, workspace.id):
+        # A sample company built before GST Credit existed gets its GSTR-2B the first time someone opens the page.
+        from app.services.gst import sample as gst_sample
+
+        gst_sample.build_returns(db, workspace, user_id=None)
+        db.commit()
     full = gate.full_access(db, workspace)
     return {
         **summary.figures(db, workspace_ids=[workspace.id], gstin=wanted, period=month),
