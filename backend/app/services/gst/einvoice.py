@@ -4,9 +4,11 @@ An Indian e-invoice carries a QR code whose content is a signed token (a JWT, `h
 base64url). The payload's `data` holds the supplier and buyer GSTIN, the document number, type and date, the invoice
 value, the item count, the main HSN code and the **IRN**. An IRN read from the code matches GSTR-2B exactly.
 
-* **Reading.** The code is found in the page images with OpenCV: the WeChat detector (contrib; no model file needed,
-  and the one that reads the dense codes an e-invoice has), then the Aruco-based and the standard detectors. PDFs are
-  rendered with PDFium (the first few pages); images are read as they are.
+* **Reading.** The code is found in the page images with OpenCV (`einvoice_scan.py`): the WeChat detector (contrib; no
+  model file needed, and the one that reads the dense codes an e-invoice has), then the Aruco-based and the standard
+  detectors. That runs in the **OCR worker** (`document.extract`), the only image that carries OpenCV, and keeps the
+  decoded token texts in `extraction_metadata["qr_codes"]`. Reading the token (this module: base64, JSON, RSA) is plain
+  Python and happens in the enrich worker.
 * **Trust.** The signature is **verified only when a public key is configured** (`EINVOICE_QR_PUBLIC_KEY_PEM`, NIC's
   published key; none is shipped). Otherwise the values are marked "signature not verified" and are used as a person
   would use a scribble that agrees: they fill what the model left empty and never replace what it read; a difference
@@ -28,7 +30,7 @@ import re
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any, Iterable, Mapping, Optional
+from typing import Any, Optional
 
 from app.services.gst import fields as f
 
@@ -137,85 +139,6 @@ def verify_signature(token: str, public_key_pem: str) -> bool:
         return False
 
 
-# --------------------------------------------------------------------------------------------- the images
-
-
-def decode_images(images: Iterable[Any]) -> list[str]:
-    """The texts of every QR code found in the images (numpy arrays: grey or BGR). Never raises."""
-    import cv2
-
-    found: list[str] = []
-    detectors = []
-    if hasattr(cv2, "wechat_qrcode_WeChatQRCode"):
-        detectors.append(("wechat", cv2.wechat_qrcode_WeChatQRCode()))
-    if hasattr(cv2, "QRCodeDetectorAruco"):
-        detectors.append(("aruco", cv2.QRCodeDetectorAruco()))
-    detectors.append(("standard", cv2.QRCodeDetector()))
-    for image in images:
-        for name, detector in detectors:
-            try:
-                if name == "wechat":
-                    texts, _points = detector.detectAndDecode(image)
-                    texts = [t for t in texts if t]
-                else:
-                    ok, texts, _points, _straight = detector.detectAndDecodeMulti(image)
-                    texts = [t for t in texts if ok and t]
-            except Exception:  # noqa: BLE001 - one detector failing must not hide what another reads
-                logger.debug("einvoice.detector_failed", extra={"detector": name}, exc_info=True)
-                continue
-            for text in texts:
-                if text not in found:
-                    found.append(text)
-            if found:
-                break
-    return found
-
-
-def render_pdf(pdf_bytes: bytes, *, max_pages: int = MAX_PAGES, scale: float = RENDER_SCALE) -> list[Any]:
-    """The first pages of a PDF as grey numpy arrays."""
-    import numpy as np
-    import pypdfium2 as pdfium
-
-    from app.core.pdfium_lock import PDFIUM_LOCK, pdfium_page
-
-    images: list[Any] = []
-    with PDFIUM_LOCK:
-        document = pdfium.PdfDocument(pdf_bytes)
-        try:
-            for index in range(min(len(document), max_pages)):
-                with pdfium_page(document, index) as page:
-                    bitmap = page.render(scale=scale, grayscale=True)
-                    images.append(np.array(bitmap.to_numpy(), copy=True))
-        finally:
-            document.close()
-    return images
-
-
-def read_images_of(data: bytes, mime: str) -> list[Any]:
-    mime = (mime or "").split(";")[0].strip().lower()
-    if mime == "application/pdf":
-        return render_pdf(data)
-    if mime.startswith("image/"):
-        import cv2
-        import numpy as np
-
-        image = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_GRAYSCALE)
-        return [] if image is None else [image]
-    return []
-
-
-def read_bytes(data: bytes, mime: str, *, public_key_pem: Optional[str] = None) -> Optional[EInvoiceQr]:
-    """The e-invoice QR code of a document (the first one that parses), or None. Never raises."""
-    try:
-        for text in decode_images(read_images_of(data, mime)):
-            parsed = parse_token(text, public_key_pem=public_key_pem)
-            if parsed is not None:
-                return parsed
-    except Exception:  # noqa: BLE001 - a document the reader cannot open simply has no QR code for us
-        logger.warning("einvoice.read_failed", exc_info=True)
-    return None
-
-
 # --------------------------------------------------------------------------------------------- the entities
 
 
@@ -281,30 +204,19 @@ def apply(entities: dict[str, Any], qr: EInvoiceQr) -> dict[str, Any]:
 
 
 def enrich_work_item(entities: dict[str, Any], work_item: Any) -> Optional[dict[str, Any]]:
-    """The processing step: only for invoices and credit notes, from the stored file. Never raises."""
-    kind = str((entities.get("classification_details") or {}).get("document_classification") or "").lower()
+    """The enrich step: the QR token texts the OCR worker found (`extraction_metadata["qr_codes"]`) merged into the
+    entities; the provenance record, or None. Never raises."""
     try:
         from app.core.config import settings
-        from app.core.storage import get_storage_driver
 
-        mime = (getattr(work_item, "file_type", None) or "").split(";")[0].strip().lower()
-        if not getattr(work_item, "stored_filename", None) or not (mime == "application/pdf" or mime.startswith("image/")):
-            return None
-        data = get_storage_driver().get(work_item.stored_filename)
-        return enrich(entities, data, mime, public_key_pem=settings.EINVOICE_QR_PUBLIC_KEY_PEM)
+        texts = (getattr(work_item, "extraction_metadata", None) or {}).get("qr_codes") or []
+        for text in texts if isinstance(texts, list) else []:
+            qr = parse_token(str(text), public_key_pem=settings.EINVOICE_QR_PUBLIC_KEY_PEM)
+            if qr is not None:
+                return apply(entities, qr)
     except Exception:  # noqa: BLE001 - a QR code is a bonus: the document must go on without it
-        logger.warning("einvoice.enrich_failed", extra={"kind": kind}, exc_info=True)
-        return None
+        logger.warning("einvoice.enrich_failed", exc_info=True)
+    return None
 
 
-def enrich(entities: dict[str, Any], data: Optional[bytes], mime: str, *,
-           public_key_pem: Optional[str] = None) -> Optional[dict[str, Any]]:
-    """Read the document's e-invoice QR code and merge it into `entities`; the provenance record, or None."""
-    if not data:
-        return None
-    qr = read_bytes(data, mime, public_key_pem=public_key_pem)
-    return apply(entities, qr) if qr is not None else None
-
-
-__all__ = ["EInvoiceQr", "SOURCE", "apply", "decode_images", "enrich", "enrich_work_item", "fields_of", "parse_token", "read_bytes",
-           "render_pdf", "verify_signature"]
+__all__ = ["EInvoiceQr", "SOURCE", "apply", "enrich_work_item", "fields_of", "parse_token", "verify_signature"]

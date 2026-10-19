@@ -14,7 +14,7 @@ in the containers unless you add it to the service's `environment:` in `docker-c
 is not read by any code, is missing from this page, or is one production cannot run without and
 is missing from `.env.production.template` (or does not stop the app from starting when unset).
 
-295 settings. Columns: name, type, default, where it appears (`example` =
+296 settings. Columns: name, type, default, where it appears (`example` =
 `.env.example`, `production` = `.env.production.template`, `guard` = checked by the production
 guard), and the comment written above it in the code.
 
@@ -126,6 +126,7 @@ guard), and the comment written above it in the code.
 | `SPEND_DEFAULT_MONTHLY_LLM_INPUT_TOKENS` | `Optional[int]` | `2000000` | — |  |
 | `SPEND_DEFAULT_MONTHLY_LLM_OUTPUT_TOKENS` | `Optional[int]` | `500000` | — |  |
 | `SPEND_DEFAULT_MONTHLY_EMBEDDING_TOKENS` | `Optional[int]` | `5000000` | — |  |
+| `EINVOICE_QR_PUBLIC_KEY_PEM` | `Optional[str]` | `None` | — | NIC's published public key (PEM) for the e-invoice QR code's signature. None ships: without it the QR code's values are read but marked "signature not verified" (app/services/gst/einvoice.py). |
 | `S3_BUCKET` | `Optional[str]` | `None` | example, production, guard |  |
 | `S3_REGION` | `Optional[str]` | `'auto'` | production |  |
 | `S3_ENDPOINT_URL` | `Optional[str]` | `None` | example, production |  |

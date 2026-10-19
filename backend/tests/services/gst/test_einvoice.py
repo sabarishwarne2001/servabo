@@ -21,7 +21,7 @@ from cryptography.hazmat.primitives import hashes, serialization  # noqa: E402
 from cryptography.hazmat.primitives.asymmetric import padding, rsa  # noqa: E402
 from PIL import Image  # noqa: E402
 
-from app.services.gst import books, einvoice  # noqa: E402
+from app.services.gst import books, einvoice, einvoice_scan  # noqa: E402
 from app.services.gst import builder as b  # noqa: E402
 from app.services.gst.matching import reconcile  # noqa: E402
 from tests.services.gst.helpers import RECIPIENT, SUPPLIER_A, parsed_return, rec_views  # noqa: E402
@@ -104,13 +104,13 @@ def test_a_dense_qr_code_is_found_in_a_png_and_in_a_pdf(box):
     private = key()
     text = token(private)
     assert len(text) > 700   # a real e-invoice token is this dense (QR version 20 and up)
-    png = qr_png(text, box)
-    from_png = einvoice.read_bytes(png, "image/png")
-    assert from_png is not None and from_png.irn == IRN
-    from_pdf = einvoice.read_bytes(pdf_with(qr_png(text, 5)), "application/pdf", public_key_pem=pem(private))
-    assert from_pdf is not None and from_pdf.irn == IRN and from_pdf.signature_verified is True
-    assert einvoice.read_bytes(b"not an image", "image/png") is None
-    assert einvoice.read_bytes(pdf_with(qr_png("just some text", 5)), "application/pdf") is None
+    from_png = einvoice_scan.token_texts(qr_png(text, box), "image/png")
+    assert from_png == [text] and einvoice.parse_token(from_png[0]).irn == IRN
+    from_pdf = einvoice_scan.token_texts(pdf_with(qr_png(text, 5)), "application/pdf")
+    assert from_pdf == [text]
+    assert einvoice.parse_token(from_pdf[0], public_key_pem=pem(private)).signature_verified is True
+    assert einvoice_scan.token_texts(b"not an image", "image/png") == []
+    assert einvoice_scan.token_texts(pdf_with(qr_png("just some text", 5)), "application/pdf") == []   # not a token
 
 
 def test_values_fill_what_the_model_left_empty_and_never_replace_what_it_read_unless_verified():
@@ -158,16 +158,20 @@ def test_the_irn_then_matches_gstr_2b_exactly_even_when_the_model_misread_the_nu
     assert len(matched) == 1 and matched[0].status == "MATCHED" and matched[0].method == "IRN"
 
 
-def test_the_processing_step_reads_the_stored_file_and_never_breaks_a_document(monkeypatch):
+def test_the_ocr_worker_keeps_the_token_and_the_enrich_worker_merges_it(monkeypatch):
     from types import SimpleNamespace
 
     private = key()
     pdf = pdf_with(qr_png(token(private), 5))
     storage = SimpleNamespace(get=lambda name: pdf if name == "stored.pdf" else (_ for _ in ()).throw(OSError("gone")))
     monkeypatch.setattr("app.core.storage.get_storage_driver", lambda: storage)
-    entities = {"classification_details": {"document_classification": "Invoice"}, "invoice_number": "INV/25-26/0042"}
-    record = einvoice.enrich_work_item(entities, SimpleNamespace(file_type="application/pdf", stored_filename="stored.pdf"))
+    scanned = einvoice_scan.scan_work_item(SimpleNamespace(file_type="application/pdf", stored_filename="stored.pdf"))
+    assert len(scanned) == 1
+    entities = {"invoice_number": "INV/25-26/0042"}
+    record = einvoice.enrich_work_item(entities, SimpleNamespace(extraction_metadata={"qr_codes": scanned}))
     assert record is not None and entities["irn"] == IRN and record["signature_verified"] is False
-    # a missing file, or a type with no picture in it, is just "no QR code"
-    assert einvoice.enrich_work_item({}, SimpleNamespace(file_type="application/pdf", stored_filename="missing.pdf")) is None
-    assert einvoice.enrich_work_item({}, SimpleNamespace(file_type="text/plain", stored_filename="stored.pdf")) is None
+    # no token kept, a junk entry, a missing file or a type with no picture in it: just "no QR code"
+    assert einvoice.enrich_work_item({}, SimpleNamespace(extraction_metadata={})) is None
+    assert einvoice.enrich_work_item({}, SimpleNamespace(extraction_metadata={"qr_codes": ["a.b.c", 7]})) is None
+    assert einvoice_scan.scan_work_item(SimpleNamespace(file_type="application/pdf", stored_filename="missing.pdf")) == []
+    assert einvoice_scan.scan_work_item(SimpleNamespace(file_type="text/plain", stored_filename="stored.pdf")) == []

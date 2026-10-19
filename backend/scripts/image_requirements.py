@@ -98,6 +98,9 @@ def _closure(graph: dict[str, set[str]], start: set[str]) -> set[str]:
 
 # Historical scripts are not read (CLAUDE.md); the images do not run them.
 _NOT_SCANNED = re.compile(r"^(apply_|verify_|arch07_|arch08_)")
+# Code only the OCR worker runs (imports of cv2, numpy and PDFium inside its functions): what it imports belongs in the
+# OCR image, not the web image. `einvoice_scan` reads the QR code of an e-invoice at extraction (`document.extract`).
+_OCR_ONLY_FILES = frozenset({"einvoice_scan.py"})
 
 
 def _imported_distributions(pins: dict[str, str]) -> set[str]:
@@ -106,7 +109,7 @@ def _imported_distributions(pins: dict[str, str]) -> set[str]:
     found: set[str] = set()
     for folder in ("app", "alembic", "scripts"):
         for path in sorted((BACKEND / folder).rglob("*.py")):
-            if _NOT_SCANNED.match(path.name):
+            if _NOT_SCANNED.match(path.name) or path.name in _OCR_ONLY_FILES:
                 continue
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", SyntaxWarning)

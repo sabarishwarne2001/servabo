@@ -138,8 +138,10 @@ purchases.
 ## The e-invoice QR code (stretch)
 
 An Indian e-invoice carries a signed QR code (a JWT) holding the supplier and buyer GSTIN, the document number, type
-and date, the invoice value, the item count, the main HSN code and the **IRN**. `services/gst/einvoice.py` reads it
-during document processing (`document.enrich`, for invoices and notes; never raises):
+and date, the invoice value, the item count, the main HSN code and the **IRN**. It is read in two steps, because
+OpenCV lives only in the OCR image (the web image must not carry it): `einvoice_scan.py` finds the code in the pictures
+at extraction (`document.extract`, the OCR worker) and keeps the token text in `extraction_metadata["qr_codes"]`;
+`einvoice.py` reads and trusts the token at enrichment (`document.enrich`, for invoices and notes; never raises):
 
 - **Finding it:** OpenCV decodes the code from the first three pages of a PDF (rendered with PDFium) or from an image:
   the WeChat detector first (contrib, no model file; the one that reads the dense codes an e-invoice has), then the
