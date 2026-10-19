@@ -1752,6 +1752,10 @@ against a moving target. The seven development-only advisories stay accepted (no
 to a browser; `npm audit --omit=dev` is 0). **Do it after launch**, with screenshots of every page in
 light and dark taken before and after.
 
+*Session H adds:* a new advisory (GHSA-vfj7-8cjw-p6xm) covers every version of `braces`, which Tailwind 3 reaches through
+`chokidar` / `micromatch` / `fast-glob`, and no fixed version exists. That makes Tailwind 4 more worthwhile after launch:
+it removes the whole chain and ends the "report only" audit step (N-143).
+
 ## N-120 — Least-privilege database roles (N-074) are deferred until the production server exists (DECIDED (Session B))
 
 An app role that cannot change tables, and a separate role for the nightly sweeps, need a server to
@@ -2021,3 +2025,33 @@ organization's figures only; without figures the email is exactly what it was).
   still sits inside the trial, the test stand-in can also move that organization's usage events back
   (`e2e_stand_in.py trial-ends --backdate-days N`, which lifts the append-only trigger for that one statement on the
   throwaway test database). Production never does this.
+
+## N-142 — GST matching is faster on a shared CI machine; the budget did not move (DECIDED (Session H); F-528)
+
+`main`'s CI went red after the last two merges because the GST speed test (matching 10,000 records against 10,000
+invoices, budget 5 s times 2 for a shared machine) took 11.48 s there. It passed in the build sandbox, which is faster.
+**The budget and the multiplier were not changed**; the code was. The slowest part was not the comparing but storing
+the 11,457 result rows (now one bulk `COPY`, proven to store exactly what the old insert stored), plus a lookup by
+supplier and day instead of scanning every invoice of the supplier. On the sandbox, matching went from 4.0 to 4.3 s to
+2.3 to 3.2 s, and the import from 2.7 to 3.2 s to 1.5 to 2.0 s. Figures and method: `PERFORMANCE.md`.
+
+## N-143 — The frontend audit blocks on what ships, and only reports the build tools (DECIDED (Session H))
+
+`npm audit` lists two kinds of finding: those in what is **shipped** to customers, and those in tools used only to
+**build** the site. The Frontend CI job now fails on a high or critical advisory in the shipped part
+(`npm audit --omit=dev --audit-level=high`, the same check the Website job already ran) and prints the full list,
+build tools included, in a separate step that is not allowed to fail. Reason: the new `braces` advisory
+(GHSA-vfj7-8cjw-p6xm) reaches us only through Tailwind 3's build tools, has no fixed version, and nothing in the
+customer bundle is affected (`--omit=dev` finds 0). Before this change the whole audit step was already
+`continue-on-error`, so a real customer-facing advisory would have gone unnoticed; that was the larger risk, and it is
+closed. A test (`tests/infra/test_ci_workflow_contract.py`) fails if the blocking check is removed or made soft.
+Tailwind 4 (N-119) removes the cause.
+
+## N-144 — CI runs on a pinned Ubuntu 24.04 and on the current action versions (DECIDED (Session H); revisit after launch)
+
+GitHub moves `ubuntu-latest` to Ubuntu 26 from 2026-10-19. A new image can lack the prebuilt Python 3.12 that
+`setup-python` downloads, and that would break every backend job without any change of ours. Every job now says
+`ubuntu-24.04`. `actions/checkout`, `actions/setup-node` and `actions/setup-python` moved to v7 (their `action.yml`
+says `node24`; v4 and v5 run on the Node.js 20 that GitHub is retiring; we use none of the inputs the v6 and v7 notes
+say changed). **Revisit after launch**: move to the next Ubuntu on purpose, in its own pull request, when the backend jobs
+can be tried on it.

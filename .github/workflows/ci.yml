@@ -47,12 +47,12 @@ jobs:
   # ---------------------------------------------------------------------
   encoding:
     name: Encoding & line endings
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -69,7 +69,7 @@ jobs:
   # full suite then ran them again, ~1 h 40 min in one job.
   backend-tests:
     name: pytest (shard ${{ matrix.shard }}/4)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: encoding
     strategy:
       fail-fast: false
@@ -100,10 +100,10 @@ jobs:
           --health-retries 20
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -181,7 +181,7 @@ jobs:
   # ---------------------------------------------------------------------
   migrations:
     name: Migration head & drift
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: encoding
 
     services:
@@ -199,10 +199,10 @@ jobs:
           --health-retries 20
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -277,13 +277,13 @@ jobs:
   # ---------------------------------------------------------------------
   frontend:
     name: Frontend
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: encoding
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -321,9 +321,16 @@ jobs:
         working-directory: frontend
         run: node scripts/check-no-sourcemaps.mjs --dist
 
-      # F-039. Blocking at "high": the lockfile had 6 high advisories until the
-      # non-breaking `npm audit fix` in Phase 2. Keep it at zero.
-      - name: npm audit (high and critical)
+      # F-039. Blocking at "high" for what ships to customers, the same check the Website job runs. The lockfile
+      # had 6 high advisories until the non-breaking `npm audit fix` in Phase 2. Keep it at zero.
+      - name: npm audit (shipped dependencies)
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
+
+      # Session H. The development tools (Tailwind 3 -> chokidar / micromatch / fast-glob -> braces, advisory
+      # GHSA-vfj7-8cjw-p6xm) never reach a customer and have no fixed version; Tailwind 4 removes the chain (N-119).
+      # They are printed here so they stay visible, and may not block.
+      - name: npm audit (build tools, report only)
         continue-on-error: true
         working-directory: frontend
         run: npm audit --audit-level=high
@@ -337,11 +344,11 @@ jobs:
   # ---------------------------------------------------------------------
   dependency-audit:
     name: pip-audit (advisory)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: pip-audit
@@ -361,7 +368,7 @@ jobs:
   # ---------------------------------------------------------------------
   e2e:
     name: Browser tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     needs: encoding
     timeout-minutes: 90
@@ -424,10 +431,10 @@ jobs:
       E2E_CSP: "1"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -440,7 +447,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -497,17 +504,17 @@ jobs:
   # ---------------------------------------------------------------------
   website:
     name: Website
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: encoding
     timeout-minutes: 30
     defaults:
       run:
         working-directory: website
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -546,7 +553,7 @@ jobs:
   # ---------------------------------------------------------------------
   ci:
     name: CI
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: always()
     needs: [encoding, backend-tests, migrations, frontend, e2e, website]
     steps:

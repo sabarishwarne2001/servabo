@@ -301,3 +301,42 @@ four (`--workers=4`) on COSTS.md's server (4 vCPU, 16 GB). Re-run this before a 
   set it to 1 to hold the sandbox to the brief's figure). A change of one document re-reconciles the whole GSTIN
   for the workspace, debounced to one job every ten seconds.
 - **Decision:** N-136.
+
+## GST Credit: the matching step on a shared CI machine (Session H, 2026-10-19)
+
+- **Question:** after Session F and Session G merged, the CI run on `main` failed `test_import_and_matching_stay_inside_their_budgets`
+  with "matching took 11.48s" (the budget is 5 s times `PERF_BUDGET_MULTIPLIER` 2 = 10 s). It had passed in the
+  session sandbox, which is faster than a CI runner. The budget and the multiplier were **not** changed: the code was.
+- **Where the time went** (measured on the sandbox with the multiplier at 1, `cProfile` and wall-clock timers around
+  each step; matching was 4.0 to 4.3 s before, in three runs):
+
+  | Step of `engine.recompute` at 10,000 / 10,000 | before | after |
+  |---|---|---|
+  | Writing the 11,457 result rows (`INSERT` through SQLAlchemy, then `COPY`) | about 2.0 s | about 0.7 s |
+  | Reading the books (`load_books`, one Python view per document) | about 0.95 s | about 0.8 s |
+  | Reconciling in memory (`reconcile`) | about 0.9 s | about 0.3 to 0.5 s |
+  | Reading the records, building rows, IMS | about 0.4 s | about 0.4 s |
+  | **Matching, whole** | **4.0 to 4.3 s** | **2.3 to 3.2 s (median about 2.9 s)** |
+  | **Import** (parse, store 10,000 records) | 2.7 to 3.2 s | 1.5 to 2.0 s |
+
+- **What the brief guessed, and what the measurement said:** the suggestion loop (every free record against every
+  remaining book of its supplier) was a smaller cost than assumed (under 0.2 s of `reconcile`), and the duplicate-notes
+  loop does nothing when no document is entered twice. The biggest single cost was storing the rows: each value was
+  adapted one at a time in Python and sent in a multi-row `INSERT`.
+- **The changes:**
+  1. `app/services/gst/bulk.py`: the matches and the imported records are written with one `COPY` per 5,000 rows.
+     `tests/services/gst/test_bulk.py` proves it stores exactly what the old insert stored, including quotes,
+     commas, new lines, a backslash, the two characters `\N`, an empty string, non-ASCII text, nested JSON and NULLs.
+  2. Suggestion candidates are looked up by supplier, kind and day (the seven days a record can match) instead of
+     scanning every book of the supplier; the "entered twice in your books" notes use an index by document.
+  3. The plain-key check in `books._flat` is remembered (a bounded cache) and uses `collections.abc.Mapping` (the
+     `typing.Mapping` check was 0.2 s of the profile by itself).
+  `tests/services/gst/test_matching_equivalence.py` keeps the earlier `reconcile` as a frozen reference
+  (`reference_matching.py`) and holds the new one to it, row for row, on five seeded random workloads of 400
+  documents that reach exact, number-format, suggested, amount-off, duplicate, amended, credit-note, name-only
+  supplier, entered-twice and decided cases. It was checked to fail when the new day window is narrowed by one day.
+- **Not done on purpose:** switching the cyclic garbage collector off during a recompute would save about 0.5 s more,
+  but it is a process-wide switch in a web server, so it stays on.
+- **Why not a stricter test:** a second, tighter budget would flake on the same shared machines this fix is for.
+  The existing budget stays as it was.
+- **Decision:** N-142.

@@ -3533,3 +3533,13 @@ Findings start at F-527.
 | ID | Severity | Area | Finding | Evidence | Status |
 |---|---|---|---|---|---|
 | F-527 | Low | Accessibility | **The plan-locked rows of the organization sidebar failed the light-theme colour-contrast check.** A row for a feature the plan does not include (Transactional email, Service levels, Branding & custom domains on Free) was drawn in the muted text colour at 80% opacity, which falls below the 4.5:1 ratio. The lock icon already says the row is locked, so the dimming added nothing. Found by the first axe scan of the plan page for a Free customer (no earlier spec scanned the organization console as a Free customer). | Spec 107's light-theme axe test failed first (`serious color-contrast` on three `span[title]` rows); with `opacity-80` removed from the locked row it passes, 3 repeats, light and dark. | Fixed (`OrganizationSidebarNavigation.tsx`) |
+
+## Session H: main's red CI and the GST Credit add-on (2026-10-19)
+
+Findings start at F-528.
+
+| ID | Severity | Area | Finding | Evidence | Status |
+|---|---|---|---|---|---|
+| F-528 | Medium | CI / GST performance | **`main` was red after PR #31 and PR #32 because the GST speed test failed on the CI machine** (matching took 11.48 s against a 10 s budget; it passed in the sandbox). The pull requests passed because their CI machine was less loaded. Profiling showed storing the 11,457 result rows through multi-row `INSERT`s was the largest cost (about 2.0 s of 4.2 s on the sandbox), then reading the books (0.95 s) and reconciling (0.9 s); the suggestion loop the brief suspected was under 0.2 s. **Correction to the brief:** in runs #387 and #394 the Frontend job was green (its `npm audit` step is `continue-on-error`); the only red job in both was `pytest (shard 2/4)`, and the Browser tests job was skipped because of it. | Run #394 job list (`RESULTS: success,failure,success,success,skipped,success`); `PERF_BUDGET_MULTIPLIER=1` on the sandbox: matching 4.0, 4.2, 4.3 s before; 2.3 to 3.2 s after (`PERFORMANCE.md`); `test_bulk.py` and `test_matching_equivalence.py` prove the rows are unchanged. | Fixed (budget unchanged); CI on this branch is the final proof |
+| F-529 | Low | CI | **The frontend `npm audit` could not fail the build at all** (`continue-on-error: true` on the step), so a high-severity advisory in what ships would have gone unseen; and, separately, the full audit now reports the `braces` advisory (GHSA-vfj7-8cjw-p6xm) in build tools that no fixed version resolves. | `tests/infra/test_ci_workflow_contract.py` failed first on `test_shipped_dependencies_are_audited_and_the_audit_blocks[frontend]`; `npm audit --omit=dev` is 0, the full audit is not. | Fixed (N-143) |
+
