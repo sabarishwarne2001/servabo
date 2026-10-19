@@ -155,6 +155,7 @@ const AssertionReviewPage = lazy(
 const RedactionStudio = lazy(
   () => import("@/pages/redaction/RedactionStudio"),
 );
+const GstCredit = lazy(() => import("@/pages/gst/GstCredit"));
 const ProcurementCaseQueue = lazy(
   () => import("@/pages/procurement/CaseQueue"),
 );
@@ -587,6 +588,7 @@ function AppRoutes() {
                   path={ROUTE_PATTERNS.workspaceProcurement}
                   element={<ProcurementCaseQueue />}
                 />
+                <Route path={ROUTE_PATTERNS.workspaceGst} element={<GstCredit />} />
                 <Route
                   path={ROUTE_PATTERNS.workspaceProcurementPolicies}
                   element={<TolerancePolicyEditor />}

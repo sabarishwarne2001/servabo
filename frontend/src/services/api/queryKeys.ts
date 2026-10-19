@@ -522,6 +522,16 @@ export const procurementKeys = {
     [...procurementKeys.all(workspaceId), "policies"] as const,
 };
 
+export const gstKeys = {
+  all: (workspaceId: string) => [...workspaceScope(workspaceId), "gst"] as const,
+  summary: (workspaceId: string, gstin: string | null, period: string | null) =>
+    [...gstKeys.all(workspaceId), "summary", gstin, period] as const,
+  suppliers: (workspaceId: string, gstin: string | null, period: string | null) =>
+    [...gstKeys.all(workspaceId), "suppliers", gstin, period] as const,
+  lines: (workspaceId: string, filters: unknown) => [...gstKeys.all(workspaceId), "lines", filters] as const,
+  line: (workspaceId: string, lineId: string) => [...gstKeys.all(workspaceId), "line", lineId] as const,
+};
+
 export const invalidatePartner = async (
   queryClient: QueryClient,
   partnerId: string,

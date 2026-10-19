@@ -58,6 +58,9 @@ export const PLAN_FEATURE_LABELS: Record<PlanFeatureKey, string> = {
   [CAPABILITY.helmApprovalChains]: "Helm approval chains (a second approver above an amount you set)",
   [CAPABILITY.helmAllWorkspaces]: "Helm planning across every workspace",
   [CAPABILITY.helmApi]: "Helm API and webhooks",
+  // Session F: GST Credit
+  [CAPABILITY.gstCredit]: "GST credit (match purchase invoices with GSTR-2B: supplier and invoice lists, recommendations for the GST portal's Invoice Management System, Excel export, supplier reminders; the GSTR-2B import and the headline figures are on every plan)",
+  [CAPABILITY.gstCreditAllWorkspaces]: "GST credit across every workspace (one reconciliation per GSTIN)",
   // N-021:plan-feature-label
   [CAPABILITY.byok]: "Bring your own AI key (your OpenAI, Anthropic, Groq, Azure OpenAI, Mistral or Gemini account, routed per task)",
 };

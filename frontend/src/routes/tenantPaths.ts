@@ -161,6 +161,8 @@ export const ROUTE_PATTERNS = {
   workspaceProcurement: "procurement",
   workspaceProcurementCase: "procurement/:caseId",
   workspaceProcurementPolicies: "procurement/policies",
+  // Session F: GST Credit. A child of the workspace shell like procurement, so no reserved segment is needed.
+  workspaceGst: "gst",
   workspaceRedaction: "redactions/:jobId",
   // ARCH34-S3:radar-path. The audit radar is workspace-scoped because a
   // finding names two work items and work items are workspace-scoped; an
@@ -332,6 +334,11 @@ export const procurementPath = (
   orgSlug: string,
   workspaceSlug: string,
 ): string => `${workspacePath(orgSlug, workspaceSlug)}/procurement`;
+
+export const gstPath = (
+  orgSlug: string,
+  workspaceSlug: string,
+): string => `${workspacePath(orgSlug, workspaceSlug)}/gst`;
 
 export const procurementCasePath = (
   orgSlug: string,

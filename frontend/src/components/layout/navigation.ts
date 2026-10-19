@@ -16,6 +16,7 @@ import {
   CreditCard,
   FileText,
   GitCompareArrows,
+  ReceiptIndianRupee,
   GitCompare,
   Handshake,
   History,
@@ -88,6 +89,7 @@ import {
   platformJobsPath,
   organizationEgressPath,
   procurementPath,
+  gstPath,
   procurementPoliciesPath,
   radarPath,
   verificationPath,
@@ -334,6 +336,17 @@ export const buildWorkspaceNavigationGroups = (
         description: "Invoice, purchase order and receipt reconciliation cases",
         capability: CAPABILITY.reconciliation,
         keywords: ["procurement", "invoice matching", "po", "grn", "accounts payable"],
+      },
+      // Session F: GST Credit. No `capability` here on purpose: importing a GSTR-2B and the headline figures are
+      // the preview, open on every plan; the page itself locks the lists and opens the upgrade dialog.
+      {
+        id: "gst",
+        name: "GST credit",
+        route: "workspaceGst",
+        path: gstPath(orgSlug, workspaceSlug),
+        icon: ReceiptIndianRupee,
+        description: "Match your purchase invoices with GSTR-2B: credit you can claim, suppliers who have not reported, and what to do in IMS",
+        keywords: ["gst", "gstr-2b", "gstr2b", "input tax credit", "itc", "ims", "reconciliation", "supplier", "180 days", "india"],
       },
       // ARCH47-S2:nav-erp
       {

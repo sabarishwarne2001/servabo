@@ -3515,3 +3515,11 @@ New findings start at F-518.
 - *Spec 94 leaves an INR price book in force*: global state that cannot be undone from the console (N-134).
   The rule for specs is written in `frontend/e2e/README.md`.
 
+## Session F: finance-grade invoice reading and GST Credit (2026-10-19)
+
+Findings start at F-524.
+
+| ID | Severity | Area | Finding | Evidence | Status |
+|---|---|---|---|---|---|
+| F-524 | High | Extraction | **The real model was never asked for the fields Helm reads.** The production extraction prompt asked an invoice, receipt or purchase order for six fields (vendor name, total, currency, tax, line items, date). Helm's ledger, three-way matching, duplicate and bank-account checks, ERP posting and the corroborator read invoice number, due date, payment terms, PO number, GSTINs, the bank account, Udyam number and more. The browser suite's model stand-in (`frontend/e2e/support/llm-mock.mjs`) returned those fields although the prompt never asked for them, so every test passed while a real model would most likely have left Helm half-blind (no due dates from the invoice, no GSTIN to tell a purchase from a sale, no bank account to check). | `tests/services/test_extraction_prompt_contract.py`: 38 of 47 checks failed on the old prompt (for example the stand-in returned `invoice_number`, `due_date`, `po_number`, `vendor_address`, `vendor_bank_account`, `payment_terms`, `customer_name` that the prompt never asked for), all 47 pass on the new one; 478 reader tests (Helm, batches, corroboration, ERP posting, extraction memory) still pass. **Unverified with a real model**: HANDOFF asks Session D to run a real GST invoice through the new schema. | Fixed (unverified with a real model) |
+
