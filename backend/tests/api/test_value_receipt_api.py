@@ -103,3 +103,61 @@ def test_another_organizations_owner_cannot_read_ours(client, world):
     tenant, _billing = world
     other_url = f"{API}/organizations/{tenant.organization.id}/value-receipt"
     assert client.get(other_url, headers=tenant.other_org_member.headers).status_code in (403, 404)
+
+
+# --- The one-page PDF ------------------------------------------------------------------------------
+
+
+def pdf_text(content: bytes) -> str:
+    import io
+
+    from pypdf import PdfReader
+
+    reader = PdfReader(io.BytesIO(content))
+    return "\n".join(page.extract_text() for page in reader.pages)
+
+
+def pdf_url(tenant, query: str = "") -> str:
+    return f"{API}/organizations/{tenant.organization.id}/value-receipt.pdf{query}"
+
+
+def test_the_pdf_has_the_same_roles_as_the_receipt(client, world):
+    tenant, billing = world
+    for who in (tenant.owner, tenant.org_admin, billing):
+        response = client.get(pdf_url(tenant), headers=who.headers)
+        assert response.status_code == 200, who.user.email
+        assert response.headers["content-type"] == "application/pdf" and response.content.startswith(b"%PDF")
+    for who in (tenant.contributor, tenant.viewer, tenant.ws_admin):
+        assert client.get(pdf_url(tenant), headers=who.headers).status_code == 403, who.user.email
+    assert client.get(pdf_url(tenant, "?period=year"), headers=tenant.owner.headers).status_code == 422
+
+
+def test_the_pdf_carries_the_figures_the_meaning_and_the_disclaimer(client, world):
+    tenant, _billing = world
+    response = client.get(pdf_url(tenant), headers=tenant.owner.headers)
+    text = pdf_text(response.content)
+    assert tenant.organization.name in text and "VALUE RECEIPT" in text
+    assert "In your trial Servabo read 3 documents and found INR 180 of GST credit waiting on 1 supplier." in text.replace("\n", " ")
+    assert "GST credit waiting on 1 supplier" in text and "INR 180" in text
+    assert "no imported GSTR-2B shows" in text.replace("\n", " ")           # its plain meaning
+    assert f"/{tenant.organization.slug}/{tenant.workspace.slug}/gst" in text.replace("\n", "")   # its evidence
+    assert "Business also checks" in text and "Payment risks" in text
+    assert "Figures come from your own documents in Servabo. Not financial or tax advice." in text.replace("\n", " ")
+    assert 'attachment; filename="servabo-value-receipt-' in response.headers["content-disposition"]
+
+
+def test_an_empty_period_still_gives_a_pdf_that_says_so(client, world):
+    tenant, _billing = world
+    empty = f"{API}/organizations/{tenant.foreign_workspace.organization_id}/value-receipt.pdf"
+    response = client.get(empty, headers=tenant.other_org_member.headers)       # another organization with nothing
+    assert response.status_code == 200
+    assert "Nothing to report for this period." in pdf_text(response.content)
+
+
+def test_the_pdf_is_one_page_for_a_normal_receipt(client, world):
+    import io
+
+    from pypdf import PdfReader
+
+    tenant, _billing = world
+    assert len(PdfReader(io.BytesIO(client.get(pdf_url(tenant), headers=tenant.owner.headers).content)).pages) == 1
