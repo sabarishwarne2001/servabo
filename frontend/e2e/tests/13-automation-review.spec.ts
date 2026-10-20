@@ -5,9 +5,9 @@
 import fs from "node:fs";
 
 import { test, expect, expectHealthyPage, settle } from "../support/fixtures";
-import { runId, ws } from "../support/env";
+import { TENANTS, runId, ws } from "../support/env";
 import { DISPUTED_INVOICE_PAGE, buildPdf } from "../support/sample-docs";
-import { listWorkItems, loginAs, resolveWorkspaceId, uploadFile } from "../support/api";
+import { api, listWorkItems, loginAs, resolveWorkspaceId, uploadFile } from "../support/api";
 
 test.use({ user: "C.owner" });
 
@@ -68,7 +68,21 @@ test.describe("Workflows — builder", () => {
 test.describe("Workflows — run history", () => {
   test.setTimeout(240_000);
 
-  test("an upload fires the 'Document uploaded' rule and the run shows in history with its steps", async ({ page }, testInfo) => {
+  /**
+   * Uploads one generated invoice through the upload tray and returns the run that the 'Document
+   * uploaded' rule made of it, read from the API: its document and the chain it belongs to.
+   *
+   * It waits for the two things the page cannot show yet. First the server's answer to the upload:
+   * navigating away straight after "Start Ingestion" cancels the request still on its way, and
+   * the file is then never uploaded (Session I, F-531). Then the run of THIS document, so a slow
+   * worker, a lost upload and a page that does not show a run each fail with their own message
+   * instead of one empty timeline after two minutes.
+   */
+  async function uploadAndFindItsRun(
+    page: import("@playwright/test").Page,
+    testInfo: import("@playwright/test").TestInfo,
+    options: { uploadDelayMs?: number } = {},
+  ): Promise<{ documentId: string; correlationId: string }> {
     // Make sure a rule on "Document uploaded" exists.
     await page.goto(ws("C", "automation"));
     if (!(await page.locator("main").innerText()).includes("E2E rule")) {
@@ -81,24 +95,78 @@ test.describe("Workflows — run history", () => {
     }
     const file = testInfo.outputPath(`trigger-${Date.now()}.pdf`);
     fs.writeFileSync(file, buildPdf([["INVOICE", `Invoice Number: INV-E2E-RUN-${Date.now()}`, "Total Amount Due: 10.00 USD"]]));
+    const isUpload = (request: import("@playwright/test").Request) =>
+      request.method() === "POST" && /\/workspaces\/[0-9a-f-]+\/work-items$/.test(new URL(request.url()).pathname);
+    if (options.uploadDelayMs) {
+      // A slow network or a busy machine: the request leaves the browser late.
+      await page.route(
+        (url) => /\/workspaces\/[0-9a-f-]+\/work-items$/.test(url.pathname),
+        async (route) => {
+          if (isUpload(route.request())) await new Promise((resolve) => setTimeout(resolve, options.uploadDelayMs));
+          await route.continue().catch(() => undefined);
+        },
+      );
+    }
     await page.goto(ws("C"));
     await expect(page.locator("main")).toContainText("Recent Activity");
     await page.locator('main input[type="file"]').first().setInputFiles(file);
     await expect(page.getByText(/Selected files/i)).toBeVisible();
+    const answered = page.waitForResponse((response) => isUpload(response.request()));
     await page.getByRole("button", { name: "Start Ingestion" }).click();
+    const accepted = await answered;
+    expect(accepted.status(), `the upload was refused: ${await accepted.text()}`).toBe(201);
+    const documentId = String(((await accepted.json()) as { id: string }).id);
+
+    // The run of this document. (Waiting for "No automation has run yet" to be absent also passed
+    // while the page was still loading, and then found nothing to open.)
+    const owner = await loginAs("C.owner");
+    const { workspaceId } = await resolveWorkspaceId(owner, TENANTS.C.org, TENANTS.C.ws);
+    let correlationId = "";
+    await expect
+      .poll(
+        async () => {
+          const runs = await api<{ items?: Array<{ correlation_id: string }> }>(
+            owner,
+            "GET",
+            `/workspaces/${workspaceId}/automation/executions?work_item_id=${documentId}`,
+          );
+          correlationId = runs.body.items?.[0]?.correlation_id ?? "";
+          return correlationId;
+        },
+        {
+          message: `document ${documentId} was accepted, but no automation run followed it`,
+          timeout: 120_000,
+          intervals: [1_000, 2_000, 3_000],
+        },
+      )
+      .not.toBe("");
+    return { documentId, correlationId };
+  }
+
+  async function openItsChain(page: import("@playwright/test").Page, correlationId: string): Promise<void> {
     await page.goto(ws("C", "automation/timeline"));
-    // Wait for a run to be listed. (Waiting for "No automation has run yet" to be absent also
-    // passed while the page was still loading, and then found nothing to open.)
-    const firstChain = page.locator("main").getByRole("button").filter({ hasNotText: "Blocked only" }).first();
-    await expect(async () => {
-      await page.reload();
-      await expect(firstChain).toBeVisible({ timeout: 5_000 });
-    }).toPass({ timeout: 120_000, intervals: [3_000] });
-    // Open the first chain and its steps.
-    await firstChain.click();
+    // The row of this document's chain says "chain" and the first eight characters of its id.
+    const chain = page.locator("main").getByRole("button", { name: new RegExp(`chain ${correlationId.slice(0, 8)}`) });
+    await expect(chain).toBeVisible({ timeout: 30_000 });
+    // Open the chain and its steps.
+    await chain.click();
+    await expect(chain).toHaveAttribute("aria-expanded", "true");
     await settle(page);
     await page.getByRole("button", { name: "Blocked only" }).click();
     await expectHealthyPage(page);
+  }
+
+  test("an upload fires the 'Document uploaded' rule and the run shows in history with its steps", async ({ page }, testInfo) => {
+    const { correlationId } = await uploadAndFindItsRun(page, testInfo);
+    await openItsChain(page, correlationId);
+  });
+
+  // Session I (F-531). The same journey with the upload request held back for a second, as a busy
+  // machine does. It failed with the original steps (the page left before the request was sent,
+  // so no run ever appeared); it keeps them from coming back.
+  test("an upload that leaves the browser late still fires the rule and shows its run", async ({ page }, testInfo) => {
+    const { correlationId } = await uploadAndFindItsRun(page, testInfo, { uploadDelayMs: 1_000 });
+    await openItsChain(page, correlationId);
   });
 });
 
