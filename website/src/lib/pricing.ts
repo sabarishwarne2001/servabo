@@ -97,6 +97,23 @@ export const FEATURE_LABELS: Record<string, string> = {
   "capability.priority_slo": "Priority 99.9% service objective",
 };
 
+interface RawAddon {
+  key: string;
+  name: string;
+  monthly_price: { currency: string; unit_amount: number };
+  per: string;
+  included_in: string[];
+  sold_on: string[];
+}
+
+/** What each add-on does, in one plain sentence. The price, the plans and the name come from the data. */
+export const ADDON_WORDS: Record<string, string> = {
+  "addon.custom_domain": "Serve Servabo on your own hostname, with the certificate looked after for you.",
+  "addon.warehouse_sync": "Scheduled exports of usage, documents and activity into Snowflake, BigQuery or S3.",
+  "addon.gst_credit":
+    "The full GST Credit list on Developer: every supplier and invoice beside GSTR-2B, IMS recommendations, your decisions, the Excel export and supplier reminders.",
+};
+
 /** Order on plan cards and in the comparison table: the order the plans add them. */
 export const FEATURE_ORDER: readonly string[] = Object.keys(FEATURE_LABELS);
 
@@ -106,7 +123,12 @@ function fail(message: string): never {
   throw new Error(`website/src/data/pricing.json: ${message}. Add its words in website/src/lib/pricing.ts.`);
 }
 
-const raw = data as unknown as { trial: { days: number }; billing: { usage_billing: boolean }; plans: RawPlan[] };
+const raw = data as unknown as {
+  trial: { days: number };
+  billing: { usage_billing: boolean };
+  plans: RawPlan[];
+  addons: RawAddon[];
+};
 
 for (const plan of raw.plans) {
   if (!PLAN_LABELS[plan.key]) fail(`plan "${plan.key}" has no label`);
@@ -147,6 +169,34 @@ export const PLANS: Plan[] = raw.plans
     };
   })
   .sort((a, b) => a.rank - b.rank);
+
+for (const a of raw.addons) if (!ADDON_WORDS[a.key]) fail(`add-on "${a.key}" has no words`);
+
+export interface Addon {
+  key: string;
+  name: string;
+  words: string;
+  /** Cents a month, for the whole organization. */
+  monthly: number;
+  includedIn: Plan[];
+  soldOn: Plan[];
+}
+
+const plansByKey = (keys: string[]): Plan[] =>
+  keys.map((k) => PLANS.find((p) => p.key === k) ?? fail(`add-on names the unknown plan "${k}"`));
+
+export const ADDONS: Addon[] = raw.addons.map((a) => ({
+  key: a.key,
+  name: a.name,
+  words: ADDON_WORDS[a.key]!,
+  monthly: a.monthly_price.unit_amount,
+  includedIn: plansByKey(a.included_in),
+  soldOn: plansByKey(a.sold_on),
+}));
+
+export function addon(key: string): Addon {
+  return ADDONS.find((a) => a.key === key) ?? fail(`no add-on "${key}"`);
+}
 
 export const TRIAL_DAYS = raw.trial.days;
 /** False on Dodo Payments today: a "bill overage" limit is published as a hard monthly limit. */

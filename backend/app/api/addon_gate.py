@@ -46,6 +46,7 @@ ADDON_REQUIRED_CODE = "ADDON_REQUIRED"
 _RESOURCE_TYPES = {
     entitlements.CUSTOM_DOMAIN_ADDON: AuditResourceType.CUSTOM_DOMAIN,
     entitlements.WAREHOUSE_SYNC_ADDON: AuditResourceType.WAREHOUSE_DESTINATION,
+    entitlements.GST_CREDIT_ADDON: AuditResourceType.GST_RETURN,
 }
 
 

@@ -92,6 +92,8 @@ BATCH_ENGINE_JOB_TYPES: frozenset[str] = frozenset(
 TRUTHMESH_JOB_TYPES: frozenset[str] = frozenset({"truthmesh.index_document", "truthmesh.rebuild_workspace"})
 #: Campaign session 2 (N-052): the free-trial emails.
 TRIAL_JOB_TYPES: frozenset[str] = frozenset({"trial.reminders"})
+#: Session H (N-146): last month's value receipt, to the owners of a paying organization, on the 1st.
+MONTHLY_RECEIPT_JOB_TYPES: frozenset[str] = frozenset({"receipt.monthly"})
 #: Campaign session 3 (N-062): owners are told at 80% and 100% of a monthly plan limit.
 USAGE_ALERT_JOB_TYPES: frozenset[str] = frozenset({"usage.limit_alerts"})
 #: Campaign session 4 (§C.4): the deployment's owner is emailed about dead jobs and error bursts.
@@ -144,6 +146,7 @@ ALL_PHASE_JOB_TYPES: frozenset[str] = (
     | TRUTHMESH_JOB_TYPES
     | TRIAL_JOB_TYPES
     | USAGE_ALERT_JOB_TYPES
+    | MONTHLY_RECEIPT_JOB_TYPES
     | OPS_ALERT_JOB_TYPES
     | HELM_JOB_TYPES
     | GST_JOB_TYPES
@@ -453,6 +456,11 @@ def _trial_reminders(payload: dict[str, Any]) -> dict[str, Any]:
     return handle_reminders(payload)
 
 
+def _monthly_receipt(payload: dict[str, Any]) -> dict[str, Any]:
+    from app.services.monthly_receipt_email import handle_monthly
+    return handle_monthly(payload)
+
+
 def _usage_limit_alerts(payload: dict[str, Any]) -> dict[str, Any]:
     from app.workers.handlers.usage_alerts import handle_limit_alerts
     return handle_limit_alerts(payload)
@@ -592,6 +600,8 @@ _HANDLERS = {
     # Campaign session 2 (N-052). On the LIGHT profile; hourly in DEFAULT_SCHEDULE.
     "trial.reminders": _trial_reminders,
     "usage.limit_alerts": _usage_limit_alerts,
+    # Session H (N-146). On the LIGHT profile; hourly in DEFAULT_SCHEDULE (it sends on the 1st, from 09:00 local).
+    "receipt.monthly": _monthly_receipt,
     # Campaign session 4 (§C.4). On the LIGHT profile; every five minutes in DEFAULT_SCHEDULE.
     "ops.alerts": _operator_alerts,
     # Flagship session: Helm. On the LIGHT profile (app/workers/profiles.py).

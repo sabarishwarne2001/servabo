@@ -237,5 +237,5 @@ class NotificationPreferenceUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # Flagship session: Helm's notices and its Monday briefing (opt-out, brief §10.3).
-    category: Literal["security", "billing", "usage", "workflow", "helm", "helm_briefing"]
+    category: Literal["security", "billing", "usage", "workflow", "monthly_summary", "helm", "helm_briefing"]
     email: bool

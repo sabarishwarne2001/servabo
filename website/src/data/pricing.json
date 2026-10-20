@@ -380,5 +380,54 @@
         "api_and_webhooks": true
       }
     }
+  ],
+  "addons": [
+    {
+      "key": "addon.custom_domain",
+      "name": "Custom domains",
+      "monthly_price": {
+        "currency": "USD",
+        "unit_amount": 19900
+      },
+      "per": "organization",
+      "included_in": [
+        "developer",
+        "business",
+        "enterprise"
+      ],
+      "sold_on": []
+    },
+    {
+      "key": "addon.warehouse_sync",
+      "name": "Warehouse sync",
+      "monthly_price": {
+        "currency": "USD",
+        "unit_amount": 30000
+      },
+      "per": "organization",
+      "included_in": [
+        "business",
+        "enterprise"
+      ],
+      "sold_on": [
+        "developer"
+      ]
+    },
+    {
+      "key": "addon.gst_credit",
+      "name": "GST Credit",
+      "monthly_price": {
+        "currency": "USD",
+        "unit_amount": 4900
+      },
+      "per": "organization",
+      "included_in": [
+        "business",
+        "enterprise"
+      ],
+      "sold_on": [
+        "developer"
+      ]
+    }
   ]
 }

@@ -1752,6 +1752,10 @@ against a moving target. The seven development-only advisories stay accepted (no
 to a browser; `npm audit --omit=dev` is 0). **Do it after launch**, with screenshots of every page in
 light and dark taken before and after.
 
+*Session H adds:* a new advisory (GHSA-vfj7-8cjw-p6xm) covers every version of `braces`, which Tailwind 3 reaches through
+`chokidar` / `micromatch` / `fast-glob`, and no fixed version exists. That makes Tailwind 4 more worthwhile after launch:
+it removes the whole chain and ends the "report only" audit step (N-143).
+
 ## N-120 — Least-privilege database roles (N-074) are deferred until the production server exists (DECIDED (Session B))
 
 An app role that cannot change tables, and a separate role for the nightly sweeps, need a server to
@@ -2021,3 +2025,86 @@ organization's figures only; without figures the email is exactly what it was).
   still sits inside the trial, the test stand-in can also move that organization's usage events back
   (`e2e_stand_in.py trial-ends --backdate-days N`, which lifts the append-only trigger for that one statement on the
   throwaway test database). Production never does this.
+
+## N-142 — GST matching is faster on a shared CI machine; the budget did not move (DECIDED (Session H); F-528)
+
+`main`'s CI went red after the last two merges because the GST speed test (matching 10,000 records against 10,000
+invoices, budget 5 s times 2 for a shared machine) took 11.48 s there. It passed in the build sandbox, which is faster.
+**The budget and the multiplier were not changed**; the code was. The slowest part was not the comparing but storing
+the 11,457 result rows (now one bulk `COPY`, proven to store exactly what the old insert stored), plus a lookup by
+supplier and day instead of scanning every invoice of the supplier. On the sandbox, matching went from 4.0 to 4.3 s to
+2.0 to 2.4 s, and the import from 2.7 to 3.2 s to 1.3 to 1.7 s. The first attempt (bulk write only) still took 10.37 s on CI, so the
+collector is also paused while a recompute or an import builds its objects (`gcpause.py`; a process-wide switch, counted and
+always undone). Figures and method: `PERFORMANCE.md`.
+
+## N-143 — The frontend audit blocks on what ships, and only reports the build tools (DECIDED (Session H))
+
+`npm audit` lists two kinds of finding: those in what is **shipped** to customers, and those in tools used only to
+**build** the site. The Frontend CI job now fails on a high or critical advisory in the shipped part
+(`npm audit --omit=dev --audit-level=high`, the same check the Website job already ran) and prints the full list,
+build tools included, in a separate step that is not allowed to fail. Reason: the new `braces` advisory
+(GHSA-vfj7-8cjw-p6xm) reaches us only through Tailwind 3's build tools, has no fixed version, and nothing in the
+customer bundle is affected (`--omit=dev` finds 0). Before this change the whole audit step was already
+`continue-on-error`, so a real customer-facing advisory would have gone unnoticed; that was the larger risk, and it is
+closed. A test (`tests/infra/test_ci_workflow_contract.py`) fails if the blocking check is removed or made soft.
+Tailwind 4 (N-119) removes the cause.
+
+## N-144 — CI runs on a pinned Ubuntu 24.04 and on the current action versions (DECIDED (Session H); revisit after launch)
+
+GitHub moves `ubuntu-latest` to Ubuntu 26 from 2026-10-19. A new image can lack the prebuilt Python 3.12 that
+`setup-python` downloads, and that would break every backend job without any change of ours. Every job now says
+`ubuntu-24.04`. `actions/checkout`, `actions/setup-node` and `actions/setup-python` moved to v7 (and `actions/upload-artifact` to v6, the first major on Node.js 24) (their `action.yml`
+says `node24`; v4 and v5 run on the Node.js 20 that GitHub is retiring; we use none of the inputs the v6 and v7 notes
+say changed). **Revisit after launch**: move to the next Ubuntu on purpose, in its own pull request, when the backend jobs
+can be tried on it.
+
+## N-145 — GST Credit is the third add-on: $49 a month, Developer only (DECIDED (Session H))
+
+**What it is.** `addon.gst_credit`, shown as "GST Credit". A Developer organization that will not pay for Business
+($299 a seat) can buy the GST Credit lists by themselves: the supplier list, the invoice list with the Invoice Management
+System (IMS) recommendations, decisions, the Excel export and supplier reminders. Exactly what Business and Enterprise get
+through their plan; nothing more.
+
+**Price and who can buy it.** $49 a month for the **whole organization** (not per seat), in US dollars like the other two
+add-ons, as its own Dodo subscription (the eighth Dodo product). **Sold to Developer only.** Business and Enterprise
+include it through their plan, so the checkout is refused there ("already included"). The free trial is offered two ways,
+"Developer with the GST Credit add-on, or Business", and "Choose a plan"; it cannot buy an add-on before it has a plan.
+Only an organization **owner** can start the checkout (the same rule as the other add-ons); everyone else sees whom to ask.
+
+**What stays on Business.** Helm itself and its GST mandates and Guard check (Helm is a Business engine), and Enterprise's
+GST view across every workspace. The add-on does not touch them.
+
+**When it ends** (the customer cancels, or a payment is never recovered): the 14-day grace the other add-ons have (the lists
+stay open, Billing says "Ends on …"), then **GST Credit goes back to the preview** (the headline figures and the sample
+company). Nothing is deleted: the imports, the matches and the decisions stay, and everything returns at once when the
+add-on is bought again. An organization that never bought it gets no grace and no notice (importing is part of the
+preview, so having statements on file does not count as having had the lists).
+
+**Judgement calls made without asking you** (tell me to change any):
+- A 402 for the lists on Developer says "add the GST Credit add-on, or upgrade" (code `ADDON_REQUIRED`); on the trial it
+  stays "included on higher plans" (`CAPABILITY_REQUIRED`).
+- The add-on's checkout returns the customer to the organization's **Billing** page, which re-reads the add-on list every
+  few seconds for a minute; before this, the add-on's checkout returned to an empty address unless the operator had set
+  `BILLING_CHECKOUT_SUCCESS_URL` (F-530).
+- The pricing page lists the three add-ons (name, price, which plans include them, which can buy them), from the same data
+  as the app. The comparison table does not get a second GST row for the add-on key.
+- **Not done:** an annual price for the add-on; selling it to Business or Enterprise (they include it); a different
+  price in rupees (the Dodo product is in dollars like the other two).
+
+## N-146 — The monthly summary email (DECIDED (Session H))
+
+On the **1st of each month, from 09:00 in the organization's time zone** (the zone of its oldest workspace, the same rule as
+Helm's Monday briefing), the **owners of a paying organization** get last month's value receipt: the headline and up to
+three findings, each with a link to its evidence, and a button to the Overview. Rules:
+- **Paying** means a live Dodo subscription that is active, trialing or past due and not held for an overdue payment. The
+  free trial has its own two emails; an organization on an invoiced contract (no gateway subscription) is not included yet.
+- **Only when there is something to say**: at least one finding in last month's receipt. An email that says "nothing found"
+  is never written.
+- **Once per organization per month**, recorded in `monthly_receipt_sends` before anything is sent. A month with nothing to
+  say is recorded too and not looked at again that day. If the mail relay accepts no email at all, the record is removed
+  and the next hourly run (still the 1st) tries again.
+- **"Monthly summary"** is a new notification category, on by default, shown to owners, switched off per person. It is not
+  an essential category (unlike Billing and Security).
+- The receipt's figures are the ones the app shows (stored figures only, currencies never added); the GST figures are
+  as of the last day of that month.
+

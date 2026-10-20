@@ -84,8 +84,10 @@ def get_entitlements(
                 halt_effect=offer.halt_effect,
                 monthly_price_micros=offer.monthly_price_micros,
                 currency=offer.currency,
-                purchasable=entitlement_service.purchasable(key),
+                purchasable=entitlement_service.purchasable(key)
+                and entitlement_service.offered_on_plan(db, organization_id=organization_id, addon_key=key),
                 included_in=entitlement_service.tiers_including(db, key),
+                sold_on=entitlement_service.sold_on(db, key),
             )
         )
 
@@ -123,7 +125,8 @@ def create_addon_checkout_session(
         session = addon_service.create_addon_checkout(
             db, organization_id=organization_id, addon_key=addon_key
         )
-    except (CheckoutConfigurationError, addon_service.AddonAlreadyGrantedError) as exc:
+    except (CheckoutConfigurationError, addon_service.AddonAlreadyGrantedError,
+            addon_service.AddonNotOfferedError) as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     audit_service.record(

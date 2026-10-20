@@ -69,6 +69,15 @@ ADDON_WAREHOUSE_SYNC = {
     "overage_policy": "REFUSE",
 }
 
+# Session H (N-145). Business and Enterprise include GST Credit through their plan, so they also carry its add-on key
+# (`entitlement_service.tier_grants` reads it: the add-on reads as "Included in your plan", and a purchase is refused).
+# Developer does NOT carry it: a Developer organization buys the add-on ($49 a month) as a gateway subscription.
+ADDON_GST_CREDIT = {
+    "limit_key": "addon.gst_credit",
+    "max_cost_micros": 0,
+    "overage_policy": "REFUSE",
+}
+
 # HARDENING-T1:D29 / HARDENING-MASTER HM-S1. The premium packaging.
 #
 # Four tiers, each a strict superset of the one below it. Presence of a
@@ -129,7 +138,7 @@ BUSINESS_CAPABILITIES = [
     _capability("capability.helm"),  # flagship session: Helm (N-082)
     _capability("capability.gst_credit"),  # Session F: GST Credit (N-135)
 ]
-BUSINESS_FEATURES = [*DEVELOPER_FEATURES, *BUSINESS_CAPABILITIES, ADDON_WAREHOUSE_SYNC]
+BUSINESS_FEATURES = [*DEVELOPER_FEATURES, *BUSINESS_CAPABILITIES, ADDON_WAREHOUSE_SYNC, ADDON_GST_CREDIT]
 ENTERPRISE_CAPABILITIES = [
     _capability("capability.reconciliation"),
     _capability("capability.anomaly_radar"),
@@ -161,7 +170,7 @@ ENTERPRISE_CAPABILITIES = [
     _capability("capability.gst_credit"),  # Session F: GST Credit (N-135)
     _capability("capability.gst_credit_all_workspaces"),
 ]
-ENTERPRISE_FEATURES = [*DEVELOPER_FEATURES, *ENTERPRISE_CAPABILITIES, ADDON_WAREHOUSE_SYNC]
+ENTERPRISE_FEATURES = [*DEVELOPER_FEATURES, *ENTERPRISE_CAPABILITIES, ADDON_WAREHOUSE_SYNC, ADDON_GST_CREDIT]
 
 # ARCH-29 Tranche 2 / HM-S1. Commercial terms.
 #

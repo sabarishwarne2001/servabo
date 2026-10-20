@@ -398,10 +398,10 @@ def _phrase(finding: dict[str, Any]) -> str:
     return f"held {amount} with evidence"
 
 
-def headline(period: str, work: dict[str, int], found: list[dict[str, Any]]) -> Optional[str]:
+def headline(period: str, work: dict[str, int], found: list[dict[str, Any]], *, previous: bool = False) -> Optional[str]:
     """One sentence from the work counts and the first finding that is confirmed or has no honesty class."""
     lead = next((f for f in found if f["honesty"] in (None, helm_v.HONESTY_CONFIRMED)), None)
-    opening = "In your trial" if period == TRIAL else "This month"
+    opening = "In your trial" if period == TRIAL else ("Last month" if previous else "This month")
     docs = work["documents"]
     if docs and lead:
         return f"{opening} Servabo read {_plural(docs, 'document')} and {_phrase(lead)}."
@@ -413,7 +413,9 @@ def headline(period: str, work: dict[str, int], found: list[dict[str, Any]]) -> 
 
 
 def _also_on_business(db: Session, organization_id: uuid.UUID, now: datetime) -> list[str]:
-    """The names of the checks Business adds that this organization does not have. Names only, never numbers."""
+    """The names of the checks Business adds that this organization does not have. Names only, never numbers.
+
+    On Developer the GST supplier list is named by `_gst_add_on_line` instead (it is also a $49 add-on there)."""
     from app.api import capability_gate
     from app.services import quota_service
 
@@ -424,16 +426,37 @@ def _also_on_business(db: Session, organization_id: uuid.UUID, now: datetime) ->
     if business is None:
         return []
     granted = {entry.limit_key for entry in business.entries}
+    skip = {entitlements.GST_CREDIT_CAPABILITY} if tier.key == "developer" else set()
     return [name for key, name in BUSINESS_ADDS
-            if key in granted and not capability_gate.has_capability(db, organization_id=organization_id,
-                                                                     capability_key=key)]
+            if key in granted and key not in skip
+            and not capability_gate.has_capability(db, organization_id=organization_id, capability_key=key)]
+
+
+def _gst_add_on_line(db: Session, organization_id: uuid.UUID) -> Optional[str]:
+    """For a Developer organization without GST Credit: the add-on or Business, in one sentence. Else None."""
+    from app.services import quota_service
+    from app.services.billing import entitlement_service
+
+    tier = quota_service.resolve_tier(db, organization_id=organization_id)
+    if tier is None or tier.key not in entitlement_service.offer_for(entitlements.GST_CREDIT_ADDON).sold_on_tiers:
+        return None
+    if entitlement_service.addon_access(db, organization_id=organization_id,
+                                        addon_key=entitlements.GST_CREDIT_ADDON).can_maintain:
+        return None
+    offer = entitlement_service.offer_for(entitlements.GST_CREDIT_ADDON)
+    return (f"{offer.display_name} add-on ({_SYMBOLS.get(offer.currency, '')}{offer.monthly_price_micros // 1_000_000}"
+            f"/month) or Business: GST's supplier list")
 
 
 # ------------------------------------------------------------------------------------------------ the receipt
 
 
-def receipt(db: Session, organization_id: uuid.UUID, period: str, *, now: Optional[datetime] = None) -> dict[str, Any]:
-    """The whole receipt for one organization and period. Reads only."""
+def receipt(db: Session, organization_id: uuid.UUID, period: str, *, now: Optional[datetime] = None,
+            previous: bool = False) -> dict[str, Any]:
+    """The whole receipt for one organization and period. Reads only.
+
+    `previous` (period "month" only): the calendar month BEFORE the one `now` falls in, in the organization's zone, as
+    the monthly summary email reports it; the GST figures then stand as of that month's last day."""
     from app.api import capability_gate
     from app.services.helm import gate as helm_gate
 
@@ -444,7 +467,13 @@ def receipt(db: Session, organization_id: uuid.UUID, period: str, *, now: Option
         raise ReceiptError("organization not found")
     moment = now or datetime.now(timezone.utc)
     workspaces = _workspaces(db, organization_id)
-    start, end, zone_name = window(organization, workspaces, period, moment)
+    if previous and period != MONTH:
+        raise ReceiptError("only a month has a previous one")
+    as_of = moment
+    if previous:
+        zone_now = moment.astimezone(_zone(workspaces[0].timezone if workspaces else "UTC"))
+        as_of = zone_now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(seconds=1)
+    start, end, zone_name = window(organization, workspaces, period, as_of)
     zone = _zone(zone_name)
     sample_ids = _sample_ids(db, organization_id)
     work = _work(db, organization_id, sample_ids, start, end)
@@ -454,7 +483,7 @@ def receipt(db: Session, organization_id: uuid.UUID, period: str, *, now: Option
         ids = [w.id for w in workspaces]
         page, time_machine_path, helm_path = _paths(organization, workspaces)
         has = lambda key: capability_gate.has_capability(db, organization_id=organization_id, capability_key=key)  # noqa: E731
-        found += _gst(db, workspaces, page, moment.astimezone(zone).date())
+        found += _gst(db, workspaces, page, as_of.astimezone(zone).date())
         found += _time_machine(db, organization_id, start, end, time_machine_path)
         radar = has(entitlements.ANOMALY_RADAR_CAPABILITY)
         if radar:
@@ -468,8 +497,9 @@ def receipt(db: Session, organization_id: uuid.UUID, period: str, *, now: Option
     return {
         "organization_id": str(organization_id), "period": period,
         "period_start": start.isoformat(), "period_end": end.isoformat(), "timezone": zone_name,
-        "work": work, "found": found, "headline": headline(period, work, found),
+        "work": work, "found": found, "headline": headline(period, work, found, previous=previous),
         "also_on_business": _also_on_business(db, organization_id, moment),
+        "gst_add_on_line": _gst_add_on_line(db, organization_id),
         "organization_name": organization.name,
         "note": "Figures come from your own documents in Servabo. Not financial or tax advice.",
     }

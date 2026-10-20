@@ -168,6 +168,7 @@ Free is a **trial of 7 days per owner account** (owner decision N-052). The acco
 | Add-on | Free | Developer | Business | Enterprise |
 |---|---|---|---|---|
 | Custom domains (`addon.custom_domain`) | — | included | included | included |
+| GST Credit (`addon.gst_credit`) | — | $49/month | included | included |
 | Warehouse sync (`addon.warehouse_sync`) | — | $300/month | included | included |
 
 ### 4.7 Helm

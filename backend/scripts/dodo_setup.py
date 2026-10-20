@@ -4,7 +4,7 @@
     python scripts/dodo_setup.py --create-test-products   # create what is missing, print the env lines
 
 Servabo sells five plan products (Developer, Business and Enterprise monthly, per seat; Developer
-and Business yearly, per seat) and two add-ons (custom domains, warehouse sync; one per
+and Business yearly, per seat) and three add-ons (custom domains, warehouse sync, GST Credit; one per
 organization). Each is a Dodo product whose id goes into an environment variable
 (GATEWAY_PRICE_ID_*, DODO_ADDON_PRODUCT_*). The expected price, interval and currency come from
 the same tables the app sells from (`scripts/seed_quota_tiers.py`, the add-on catalogue), so this

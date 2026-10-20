@@ -7,7 +7,7 @@
  * be enabled over an endpoint that answers 402.
  */
 
-export type AddonKey = "addon.custom_domain" | "addon.warehouse_sync";
+export type AddonKey = "addon.custom_domain" | "addon.warehouse_sync" | "addon.gst_credit";
 
 export type AddonState = "ACTIVE" | "GRACE" | "LAPSED" | "NOT_GRANTED";
 
@@ -26,6 +26,8 @@ export interface AddonAccess {
   readonly currency: string;
   readonly purchasable: boolean;
   readonly included_in: readonly string[];
+  /** Session H: plans that may buy it when it is sold on particular plans only (GST Credit: Developer). */
+  readonly sold_on: readonly string[];
 }
 
 export interface OrganizationEntitlements {

@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import re
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any, Mapping, Optional, Sequence
+from functools import lru_cache
+from typing import Any, Optional, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -72,13 +74,19 @@ def our_identities(db: Session, workspace_id: uuid.UUID, gstin: str) -> ident.Id
 _SIMPLE_KEY = re.compile(r"^[a-z0-9_]+$")
 
 
+@lru_cache(maxsize=1024)
+def _is_simple_key(key: Any) -> bool:
+    """The same few dozen key names repeat on every document: match each name once."""
+    return isinstance(key, str) and _SIMPLE_KEY.match(key) is not None
+
+
 def _flat(entities: Mapping[str, Any]) -> Mapping[str, Any]:
     """`corroboration.fields.flatten`, with a fast path for what the extraction prompt produces: top-level
     snake_case keys holding plain values (a `{"value": ...}` wrapper is unwrapped). Anything nested goes through the
     full reader."""
     out: dict[str, Any] = {}
     for key, value in entities.items():
-        if not isinstance(key, str) or not _SIMPLE_KEY.match(key):
+        if not _is_simple_key(key):
             return corroboration_fields.flatten(entities)
         if isinstance(value, Mapping):
             return corroboration_fields.flatten(entities)

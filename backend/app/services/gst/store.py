@@ -11,14 +11,15 @@ import uuid
 from dataclasses import asdict
 from typing import Any, Optional
 
-from sqlalchemy import insert, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.audit_log import AuditAction, AuditResourceType
 from app.models.gst import GstReturn, GstReturnRecord
 from app.models.workspace import Workspace
 from app.services import audit_service
-from app.services.gst import engine, parse
+from app.services.gst import bulk, engine, parse
+from app.services.gst.gcpause import collector_paused
 from app.services.gst import vocabulary as v
 
 IMPORTED = "IMPORTED"
@@ -68,8 +69,7 @@ def import_parsed(db: Session, *, workspace: Workspace, parsed: parse.ParsedRetu
     db.flush()
     rows = [_record_row(r, workspace=workspace, return_id=created.id, gstin=parsed.gstin, period=parsed.period)
             for r in parsed.records]
-    for start in range(0, len(rows), 2000):
-        db.execute(insert(GstReturnRecord), rows[start:start + 2000])
+    bulk.insert_rows(db, GstReturnRecord, rows)
     audit_service.record(
         db, organization_id=workspace.organization_id, workspace_id=workspace.id, actor_id=user_id,
         resource_type=AuditResourceType.GST_RETURN, resource_id=created.id, action=AuditAction.CREATED,
@@ -83,8 +83,9 @@ def import_parsed(db: Session, *, workspace: Workspace, parsed: parse.ParsedRetu
 def import_file(db: Session, *, workspace: Workspace, user_id: Optional[uuid.UUID], file_name: str,
                 data: bytes) -> list[dict[str, Any]]:
     """Import an uploaded `.json` or `.zip`. Raises `parse.ReturnFileError` (a sentence a person can act on)."""
-    return [import_parsed(db, workspace=workspace, parsed=parsed, user_id=user_id)
-            for parsed in parse.parse_file(file_name, data)]
+    with collector_paused():  # a return is tens of thousands of small objects and no cycles: see gcpause.py
+        return [import_parsed(db, workspace=workspace, parsed=parsed, user_id=user_id)
+                for parsed in parse.parse_file(file_name, data)]
 
 
 __all__ = ["IMPORTED", "REPLACED", "UNCHANGED", "import_file", "import_parsed"]

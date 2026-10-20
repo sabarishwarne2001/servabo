@@ -75,6 +75,7 @@ GRACE_ENDING_NOTICE = timedelta(days=3)
 _RESOURCE_TYPES = {
     entitlements.CUSTOM_DOMAIN_ADDON: AuditResourceType.CUSTOM_DOMAIN,
     entitlements.WAREHOUSE_SYNC_ADDON: AuditResourceType.WAREHOUSE_DESTINATION,
+    entitlements.GST_CREDIT_ADDON: AuditResourceType.GST_RETURN,
 }
 
 
@@ -84,6 +85,10 @@ class AddonError(Exception):
 
 class AddonAlreadyGrantedError(AddonError):
     """The organization already has this add-on; a checkout would double-bill."""
+
+
+class AddonNotOfferedError(AddonError):
+    """The add-on is not sold on this organization's plan (GST Credit is sold to Developer only)."""
 
 
 class AddonPurchaseConflictError(AddonError):
@@ -422,6 +427,11 @@ def halt_resources(
         )
         return {"schedules_paused": paused}
 
+    if addon_key == entitlements.GST_CREDIT_ADDON:
+        # Nothing is switched off and nothing is deleted: the page returns to the preview and the imports, matches
+        # and decisions stay where they are, ready for the day the add-on is bought again.
+        return {"returned_to_preview": True}
+
     raise entitlement_service.UnknownAddonError(f"{addon_key!r} is not a known add-on.")
 
 
@@ -480,6 +490,20 @@ def sweep(
 # ============================================================================
 
 
+def _return_addresses(db: Session, organization_id: uuid.UUID) -> tuple[str, str]:
+    """Where the payment page sends the customer back: the deployment's configured addresses, else the
+    organization's billing page (Billing -> Add-ons shows the add-on as soon as the payment is confirmed).
+
+    Never taken from the client: a caller-supplied return address on a payment flow is an open redirect."""
+    from app.models.organization import Organization
+
+    slug = db.execute(select(Organization.slug).where(Organization.id == organization_id)).scalar_one_or_none()
+    billing = f"{str(settings.FRONTEND_URL).rstrip('/')}/organizations/{slug}/billing" if slug else ""
+    success = str(settings.BILLING_CHECKOUT_SUCCESS_URL or (f"{billing}?addon=success" if billing else ""))
+    cancel = str(settings.BILLING_CHECKOUT_CANCEL_URL or billing)
+    return success, cancel
+
+
 def create_addon_checkout(
     db: Session,
     *,
@@ -504,12 +528,20 @@ def create_addon_checkout(
             "Starting a checkout would bill for something already provided."
         )
 
+    if not entitlement_service.offered_on_plan(db, organization_id=organization_id, addon_key=addon_key):
+        plans = " or ".join(entitlement_service.sold_on(db, addon_key)) or "a plan that sells it"
+        raise AddonNotOfferedError(
+            f"{offer.display_name} is an add-on for the {plans} plan. Choose {plans} first and add it there, "
+            "or choose a plan that includes it."
+        )
+
     if not entitlement_service.purchasable(addon_key):
         raise portal_service.CheckoutConfigurationError(
             f"{offer.display_name} is not available for self-serve purchase on "
             "this deployment. Contact sales, or upgrade to a plan that includes it."
         )
 
+    success_url, cancel_url = _return_addresses(db, organization_id)
     gateway_name = active_gateway_name()
     product_id = str(getattr(settings, offer.product_setting))
     account = account_service.get_for_organization(db, organization_id=organization_id)
@@ -529,8 +561,8 @@ def create_addon_checkout(
         customer_email=customer_email,
         price_id=product_id,
         quantity=1,
-        success_url=str(settings.BILLING_CHECKOUT_SUCCESS_URL or ""),
-        cancel_url=str(settings.BILLING_CHECKOUT_CANCEL_URL or ""),
+        success_url=success_url,
+        cancel_url=cancel_url,
         client_reference_id=str(organization_id),
         metadata={"organization_id": str(organization_id), "addon_key": addon_key},
     )
@@ -555,6 +587,7 @@ def create_addon_checkout(
 __all__ = [
     "AddonAlreadyGrantedError",
     "AddonError",
+    "AddonNotOfferedError",
     "AddonPurchaseConflictError",
     "GRACE_ENDING_NOTICE",
     "create_addon_checkout",

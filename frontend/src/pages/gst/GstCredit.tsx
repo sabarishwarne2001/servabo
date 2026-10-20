@@ -249,6 +249,9 @@ export const GstCredit: React.FC = () => {
                       : "IMS actions recommend Accept, Pending or Reject for each record, with the reason.",
                 )}
                 onUpgrade={() => upgrade.prompt(CAPABILITY.gstCredit, "GST credit: supplier and invoice lists, IMS recommendations and export")}
+                organizationId={organizationId}
+                organizationSlug={orgSlug}
+                isOwner={orgRole.toUpperCase() === "OWNER"}
               />
             ) : tab === "suppliers" ? (
               <SuppliersTab workspaceId={workspaceId} gstin={gstin} period={period} canDecide={canDecide && !summary.is_sample} />

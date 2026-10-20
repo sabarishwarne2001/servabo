@@ -156,6 +156,8 @@ LIGHT = WorkerProfile(
             "trial.reminders",
             # Campaign session 3 (N-062): plan-limit alerts. Queries and the notification outbox.
             "usage.limit_alerts",
+            # Session H (N-146): the monthly summary email. Queries, the value receipt's queries and SMTP only.
+            "receipt.monthly",
             # Campaign session 4 (§C.4): alerts for the deployment's owner. Queries and SMTP only.
             "ops.alerts",
             # ARCH42-S1:entity-light-profile. Entity resolution: string

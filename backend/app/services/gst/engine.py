@@ -20,6 +20,8 @@ from sqlalchemy.orm import Session
 from app.models.gst import GstDecision, GstMatch, GstReturn, GstReturnRecord, GstSettings
 from app.models.workspace import Workspace
 from app.services.gst import books as books_module
+from app.services.gst import bulk
+from app.services.gst.gcpause import collector_paused
 from app.services.gst import ims
 from app.services.gst import vocabulary as v
 from app.services.gst.matching import DecisionView, MatchOut, RecView, period_window, reconcile
@@ -125,26 +127,26 @@ def recompute(db: Session, workspace: Workspace, gstin: Optional[str] = None, *,
     summary: dict[str, int] = {}
     db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": f"gst:{workspace.id}"})
     targets = [gstin] if gstin else active_gstins(db, workspace.id)
-    for target in targets:
-        periods = active_periods(db, workspace.id, target)
-        if not periods:
+    with collector_paused():  # tens of thousands of small objects, no cycles: see gcpause.py
+        for target in targets:
+            periods = active_periods(db, workspace.id, target)
+            if not periods:
+                db.execute(delete(GstMatch).where(GstMatch.workspace_id == workspace.id, GstMatch.gstin == target))
+                summary[target] = 0
+                continue
+            records = record_views(db, workspace.id, target)
+            books = books_module.load_books(db, workspace, target)
+            outputs = reconcile(records, books, tolerance_micros=tolerance_micros(db, workspace.id),
+                                decisions=decision_views(db, workspace.id, target), window=period_window(periods))
+            for out in outputs:
+                out.ims_action, out.ims_reason = ims.recommend(out)
+                if out.book is not None:
+                    out.risk = ims.exposure(out.book, today)
+            now = datetime.now(timezone.utc)
             db.execute(delete(GstMatch).where(GstMatch.workspace_id == workspace.id, GstMatch.gstin == target))
-            summary[target] = 0
-            continue
-        records = record_views(db, workspace.id, target)
-        books = books_module.load_books(db, workspace, target)
-        outputs = reconcile(records, books, tolerance_micros=tolerance_micros(db, workspace.id),
-                            decisions=decision_views(db, workspace.id, target), window=period_window(periods))
-        for out in outputs:
-            out.ims_action, out.ims_reason = ims.recommend(out)
-            if out.book is not None:
-                out.risk = ims.exposure(out.book, today)
-        now = datetime.now(timezone.utc)
-        db.execute(delete(GstMatch).where(GstMatch.workspace_id == workspace.id, GstMatch.gstin == target))
-        rows = [_row(workspace, target, out, now) for out in outputs]
-        for start in range(0, len(rows), 2000):
-            db.execute(GstMatch.__table__.insert(), rows[start:start + 2000])
-        summary[target] = len(rows)
+            rows = [_row(workspace, target, out, now) for out in outputs]
+            bulk.insert_rows(db, GstMatch, rows)
+            summary[target] = len(rows)
     db.flush()
     from app.services.gst import hooks
 

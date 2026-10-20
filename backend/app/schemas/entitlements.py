@@ -37,6 +37,13 @@ class AddonAccessResponse(BaseModel):
         default_factory=list,
         description="Published plans that include this add-on.",
     )
+    sold_on: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Plans that may buy this add-on, when it is sold on particular plans only (GST Credit: Developer). "
+            "Empty: any plan that does not already include it."
+        ),
+    )
 
 
 class OrganizationEntitlementsResponse(BaseModel):

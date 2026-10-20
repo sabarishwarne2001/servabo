@@ -121,11 +121,13 @@ risky migration for no customer benefit. They hold Dodo data too:
 
 ```
 cd backend
-python scripts/dodo_setup.py --create-test-products   # creates the 5 plan products and 2 add-ons, prints env lines
+python scripts/dodo_setup.py --create-test-products   # creates the 5 plan products and 3 add-ons, prints env lines
 python scripts/dodo_setup.py                          # checks every configured id
 ```
 
 It refuses to run with `DODO_LIVEMODE=true` or the live host. The check reports each product as OK,
 NOT SET or WRONG (missing, one-time price, wrong price, currency or interval, tax included in the
 price, another tax category). Plan products are priced per seat (the checkout quantity is the number
-of seats); add-ons are one per organization.
+of seats); add-ons (custom domains, warehouse sync and GST Credit, $49 a month) are one per organization.
+The eighth product, **GST Credit** (`DODO_ADDON_PRODUCT_GST_CREDIT`), is the add-on a Developer organization buys
+to get the GST Credit lists; Business and Enterprise include them through the plan, so a checkout there is refused.

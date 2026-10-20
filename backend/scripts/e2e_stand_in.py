@@ -73,6 +73,8 @@ if __name__ == "__main__" and _gateway_from_argv(sys.argv[1:]) == "dodo":
     os.environ.update(BILLING_GATEWAY="DODO", DODO_API_BASE=DODO_URL, DODO_LIVEMODE="false",
                       DODO_API_KEY=os.environ.get("E2E_DODO_API_KEY", "e2e_dodo_test_key"),
                       DODO_WEBHOOK_SECRET=_DODO_SECRET)
+    # Session H: the GST Credit add-on is for sale in the browser journeys (start-stack.sh gives the API the same id).
+    os.environ.setdefault("DODO_ADDON_PRODUCT_GST_CREDIT", "pdt_e2e_gst_credit")
 
 from app.core.config import settings  # noqa: E402
 
@@ -265,8 +267,9 @@ def _dodo_call(method: str, path: str, body: Optional[dict[str, Any]] = None) ->
 
 
 def _dodo_catalogue(db) -> list[str]:
-    """Every priced plan as a product at the stand-in Dodo, under its configured product id."""
+    """Every priced plan, and every add-on that has a product id, as a product at the stand-in Dodo."""
     from app.services import quota_service
+    from app.services.billing.entitlement_service import ADDON_CATALOG
 
     quota_service.clear_cache()
     added = []
@@ -278,6 +281,13 @@ def _dodo_catalogue(db) -> list[str]:
             "product_id": tier.gateway_price_id, "name": tier.display_name, "interval": interval,
             "price": int(tier.unit_amount_micros) // 10_000, "currency": tier.currency or "USD"})
         added.append(tier.gateway_price_id)
+    for offer in ADDON_CATALOG.values():  # Session H: an add-on is one product per organization
+        product_id = getattr(settings, offer.product_setting, None)
+        if product_id:
+            _dodo_call("POST", "/_fake/product", {
+                "product_id": product_id, "name": offer.display_name, "interval": "Month",
+                "price": int(offer.monthly_price_micros) // 10_000, "currency": offer.currency})
+            added.append(product_id)
     return added
 
 
@@ -326,7 +336,8 @@ def _move_hold_clock(subscription: Subscription, grace_ends_at: datetime) -> Non
 
 
 DODO_STEPS = ("subscribe", "seats", "change-plan", "cancel", "cancel-at-period-end", "renewal-fails",
-              "payment-fails-again", "mark-unpaid", "card-fixed", "refund", "dodo-catalogue")
+              "payment-fails-again", "mark-unpaid", "card-fixed", "refund", "dodo-catalogue",
+              "cancel-addon", "addon-grace-ends")
 
 
 def _dodo(args: argparse.Namespace) -> int:
@@ -342,7 +353,29 @@ def _dodo(args: argparse.Namespace) -> int:
                 print(json.dumps({"products": _dodo_catalogue(db)}))
                 return 0
             organization = _organization(db, args.org)
-            if args.command == "subscribe":
+            if args.command in ("cancel-addon", "addon-grace-ends"):
+                # Session H: an add-on bought at the gateway. `cancel-addon`: Dodo cancels its subscription now (the
+                # worker reconciles the webhook). `addon-grace-ends`: the fourteen days pass (the clock is played here,
+                # as `trial-ends` does) and the add-on is reconciled, which lapses it.
+                from app.services.billing import addon_service, entitlement_service
+
+                row = entitlement_service.ledger_row(db, organization_id=organization.id, addon_key=args.addon)
+                if row is None or not row.gateway_subscription_id:
+                    raise SystemExit(f"this organization has not bought {args.addon}")
+                if args.command == "cancel-addon":
+                    _dodo_call("POST", "/_fake/cancel", {"subscription_id": row.gateway_subscription_id,
+                                                          "at_period_end": False})
+                else:
+                    row.grace_started_at = NOW - timedelta(days=15)
+                    row.grace_ends_at = NOW - timedelta(days=1)
+                    db.flush([row])
+                    out["reconciled"] = addon_service.reconcile_organization(
+                        db, organization_id=organization.id, only=args.addon)
+                    out["reconciled"] = [{k: v for k, v in r.items() if k in ("addon_key", "status")}
+                                         for r in out["reconciled"]]
+                    print(json.dumps(out, default=str))
+                    return 0
+            elif args.command == "subscribe":
                 # The owner picks the plan in Servabo (its own checkout code opens Dodo's checkout)
                 # and pays on Dodo's page.
                 _dodo_catalogue(db)
@@ -395,6 +428,8 @@ def _dodo(args: argparse.Namespace) -> int:
             refund = _dodo_call("POST", "/_fake/refund", {"payment_id": payments[-1]["payment_id"],
                                                          "amount": args.amount})
             out["refund"] = {"refund_id": refund["refund_id"], "amount": refund["amount"]}
+        elif args.command == "cancel-addon":
+            pass  # done above, inside the transaction that read the ledger
         else:
             raise SystemExit(f"{args.command} is not a Dodo step")
     out["applied"] = _settle(since)
@@ -530,7 +565,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="The browser journeys' clock and gateway stand-ins.")
     parser.add_argument("command", choices=[
         "subscribe", "seats", "change-plan", "cancel", "cancel-at-period-end", "renewal-fails", "payment-fails-again", "mark-unpaid",
-        "card-fixed", "refund", "dodo-catalogue", "trial-ending", "trial-ends", "run-job", "dns-publish", "saml-idp",
+        "card-fixed", "refund", "dodo-catalogue", "cancel-addon", "addon-grace-ends", "trial-ending", "trial-ends", "run-job", "dns-publish", "saml-idp",
         "saml-response", "truthmesh-fill", "truthmesh-stick", "fail-document", "calibration-history"])
     parser.add_argument("--gateway", choices=["dodo", "stripe"], type=str.lower,
                         default=_gateway_from_argv([]), help="whose side to play (default: E2E_GATEWAY, else dodo)")
@@ -539,6 +574,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--plan", default="developer")
     parser.add_argument("--seats", type=int, default=1)
     parser.add_argument("--job", help="job type for run-job")
+    parser.add_argument("--addon", default="addon.gst_credit", help="cancel-addon, addon-grace-ends: the add-on key")
     parser.add_argument("--backdate-days", type=int, default=0,
                         help="trial-ends: also move this organization's usage events that many days back, so the "
                              "work it did sits inside the trial that has now 'ended' (the clock is played here, so "

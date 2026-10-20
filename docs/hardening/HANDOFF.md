@@ -626,8 +626,8 @@ N-130; findings F-500 to F-517._
 **Session D: what to run, exactly** (needs the owner's PC, a Dodo *test-mode* account and its keys; never a
 live key). Follow `docs/billing/DODO-LOCAL-TEST.md` from the top:
 1. Test mode on; put the test API key and webhook key in `backend/.env` (§1–2).
-2. `cd backend; .\.venv\Scripts\python.exe scripts\dodo_setup.py --create-test-products`, paste the seven
-   `GATEWAY_PRICE_ID_…` lines into `.env`, then `scripts\dodo_setup.py` until every line says `OK` (§3).
+2. `cd backend; .\.venv\Scripts\python.exe scripts\dodo_setup.py --create-test-products`, paste the eight
+   `GATEWAY_PRICE_ID_…` / `DODO_ADDON_PRODUCT_…` lines into `.env`, then `scripts\dodo_setup.py` until every line says `OK` (§3).
 3. `.\start_dev.ps1 -Stop; .\start_dev.ps1` (§4), then `.\start_dev.ps1 -Stop; .\start_dev.ps1 -DodoWebhooks` (§5).
 4. Walk journeys A to E in the browser (§6).
 5. `scripts\dodo_probe.py`, then with `--subscription-id sub_… --after-plan-change --payment-id pay_…`, once
@@ -692,8 +692,8 @@ template (secrets generated with the commands shown; Postmark, Groq, R2 from ste
 migrations and the start. *Done when:* `https://app.servabo.app/api/v1/health/ready` says ready.
 
 **Step 8 — Create the plans in Dodo (test mode) and publish them.**
-RUNBOOK §9.2 step 8: `dodo_setup.py --create-test-products` creates the five plan products and two
-add-ons and prints seven lines for `.env.production`; then `dodo_setup.py` must say OK for all seven;
+RUNBOOK §9.2 step 8: `dodo_setup.py --create-test-products` creates the five plan products and three
+add-ons (Session H added GST Credit) and prints eight lines for `.env.production`; then `dodo_setup.py` must say OK for all eight;
 then the two seed commands and the first administrator. *Done when:* signed in as a new user, the
 Billing page shows Developer $49, Business $299 and Enterprise $799 per seat.
 
@@ -716,9 +716,9 @@ prints its restore time and every Healthchecks.io check is green.
 
 **Step 11 — Go live with Dodo.**
 Only after step 4 says verified and step 9 worked. In Dodo, switch off Test Mode, create the same
-seven products in live mode (same prices: plan products per seat, recurring, tax not included), a
+eight products in live mode (same prices: plan products per seat, recurring, tax not included), a
 live webhook endpoint (same URL) and a live API key. In `.env.production`: the live key, the live
-webhook secret, the seven live product ids, `DODO_LIVEMODE=true`; restart, and run the seed commands
+webhook secret, the eight live product ids, `DODO_LIVEMODE=true`; restart, and run the seed commands
 again (step 8). Buy one seat of Developer with your own card, then refund it from Dodo's dashboard.
 *Done when:* your own live payment shows in Billing and the refund shows as "Refunded".
 
@@ -773,3 +773,37 @@ zone, duplicates coming from the radar rather than payment-risk flags, the unaud
 - Test tooling: `e2e_stand_in.py trial-ends --backdate-days N` moves the organization's usage events back by lifting the append-only
   trigger for one statement on the throwaway test database. Never used outside the browser tests.
 - `ConfirmDialog` gained optional `children` and `wide`, and now scrolls inside a short window; other dialogs are unchanged.
+
+## Session H → next sessions
+
+_2026-10-19. Branch `claude/new-session-rtxwwe`, PR #33. Decisions N-142 to N-146; findings F-528 to F-530. Two migrations (one Alembic head)._
+
+**What changed.** (1) **`main`'s red CI.** Both red runs had one failing job: the GST speed test on a slower CI machine
+(matching took 11.48 s against a 10 s budget). The budget did not move; matching is now faster (a bulk `COPY` for the results,
+lookups by supplier and day), and a test proves the rows are exactly the earlier ones. The frontend `npm audit` now blocks on what
+ships and only reports build tools (`braces` under Tailwind 3, no fix exists, Tailwind 4 removes it, N-119); CI runs on
+`ubuntu-24.04` and on Node 24 actions. (2) **GST Credit is the third add-on**: $49 a month per organization, Developer only;
+Business and Enterprise include it; on lapse the page returns to the preview and the data is kept (N-145). (3) **The monthly
+summary email** to owners of paying organizations on the 1st (N-146).
+
+**For Session D / the owner.**
+- **Create the eighth Dodo product.** `scripts/dodo_setup.py --create-test-products` now creates five plan products and **three**
+  add-ons and prints **eight** lines (the new one: `DODO_ADDON_PRODUCT_GST_CREDIT`, $49, monthly, one per organization, tax not
+  included). Paste it into `backend/.env`, run `dodo_setup.py` until all eight say OK, and later do the same in live mode and
+  in `.env.production`. The launch checklist above says eight everywhere it said seven.
+- **Buy the add-on once in test mode** (DODO-LOCAL-TEST.md, journey H): on a Developer organization open GST credit, import a
+  GSTR-2B, press "Add GST Credit — $49 a month for your organization" (an owner), pay with the test card, see the lists open and
+  Billing → Add-ons say "Active"; then cancel it from Dodo's customer portal and see "Ends on …" for 14 days, then the preview
+  with every import still there.
+- Set `BILLING_CHECKOUT_SUCCESS_URL` / `_CANCEL_URL` only if you want a different return page; unset, an add-on's checkout now
+  returns to the organization's Billing page (F-530).
+- **The monthly email** needs the platform mail relay (the same one the trial emails use). Look at one on the 1st with a real
+  paying organization that has a finding; the selection rules are tested with a controlled clock, the rendering in a mail-client
+  checklist (not a real mail client).
+- After the merge, confirm the CI run on `main` is green (the point of Part 1). If the GST speed test is red again on CI,
+  `PERFORMANCE.md` ("the matching step on a shared CI machine") says where the time goes; the next step would be reading the
+  books faster (about 0.8 s) and the insert (about 0.7 s, indexes and foreign keys).
+- Possible follow-ups, none started: an annual price for the add-on; the monthly summary for organizations on an invoiced
+  contract; a rupee price for the add-on; moving CI to the next Ubuntu image on purpose (N-144); `upload-artifact` has a newer major (v7, twelve
+  days old when chosen) than the v6 CI uses.
+
