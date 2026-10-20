@@ -2,7 +2,36 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-19 (Session H)_
+_Last updated: 2026-10-20 (Session I)_
+
+## Current phase — Session I: make CI green again after PR #33 (2026-10-20)
+Branch `claude/new-session-ko5jbm` (the session's assigned branch), based on `main` at `068afea` (PR #33 merged), draft PR #34.
+Founder authority: decisions in NEEDS-OWNER.md as `DECIDED (Session I)` (N-147 decided, N-148 open; next free N-149); findings
+F-531 to F-534 (next free F-535). No migration; one Alembic head. **If cut off, type `continue`: carry on from the first unticked box. Never restart.**
+Local stack this session: Postgres 16 (apt) on :5433 with pgvector 0.8.0 (the apt package is 0.6.0, below the 0.8 the migrations
+require; GitHub and PGDG are blocked here, so the extension files came from the PyPI wheel `pixeltable-pgserver==0.3.0`, PG 16.4
+build, copied into `/usr/lib/postgresql/16` and `/usr/share/postgresql/16`), Redis, backend venv Python 3.12 with the full
+`requirements.txt` + dev, `npm ci`, system Chromium via `E2E_CHROMIUM_PATH`. The two environment blocks (browser stack, backend
+tests) are in the session scratchpad, outside the repo. **The CI report of run #400 could not be downloaded (network policy), so
+what the server and worker logged is unread: N-148.**
+
+- [x] 0. Start-up: STATE read; evidence from the public CI pages and job logs; stack built; draft PR #34
+- [x] 1. (P0) `aiohttp` 3.14.4 (+ `yarl` 1.25.1, which it needs): pip-audit fails before, clean after, both files; full install
+  on 3.12; `test_image_requirements.py` and the AI-provider client tests (73) pass (F-533)
+- [x] 2. (P0) The failing browser test: not reproduced by repetition (30 idle runs of the original test with the history emptied each time, a replay of the specs
+  before 13 in CI's order; the upload steps alone: 0 lost in 60, 20 idle and 40 under load), reproduced by delay (CI's exact error); fixed by waiting on the real signals; spec 13 x10 beside
+  105/107/108 passed (F-531)
+- [x] 3. (P1) The slowdown found on the way: the QR search on every PDF (F-532, N-147): tests failed first, 12 documents
+  113.0 s to 103.2 s, `PERFORMANCE.md`
+- [x] 4. `main` run #401: all four pytest shards passed; only the advisory pip-audit was red (task 4)
+- [x] Finish: records (F-531 to F-534, N-147, N-148, COVERAGE, CHANGELOG, STATE, HANDOFF, PERFORMANCE); PR marked ready; CI (below)
+- **Verified (local).** See HANDOFF "Session I". Spec 13 x10 (110 tests) beside specs 105/107/108: all passed. Replay of specs
+  00 to 03, 10 to 13 in CI's order with 2 workers: 307 passed; the one failure was spec 108's checkout page asking for a
+  favicon the stand-in does not serve (sandbox Chromium; CI's Chromium passes it; not from this work).
+- **Not run locally, on purpose** (the brief says CI runs the full suites): the full backend and browser suites.
+- **Unverified.** That the reproduced mechanism is what happened in run #400 (N-148); that a real e-invoice with a printed QR
+  code is still read (nothing about the reading changed, but no real invoice has ever been tried, N-140); F-534.
+- **Next action:** CI on PR #34 (below), then the owner merges and confirms the run on `main` is green. Then Session D.
 
 ## Current phase — Session H: a green main, the GST Credit add-on, the monthly summary (2026-10-19)
 Branch `claude/new-session-rtxwwe` (the session's assigned branch), based on `main` at `25bf99b` (PR #32 merged), draft PR #33.

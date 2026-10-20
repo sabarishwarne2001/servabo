@@ -51,8 +51,24 @@ def decode_images(images: Iterable[Any]) -> list[str]:
     return found
 
 
+def page_may_hold_a_code(page: Any) -> bool:
+    """False for a page of nothing but text, which cannot hold a QR code (Session I, F-532).
+
+    A code is a picture, shapes drawn on the page, or a form that holds either: any object that is not text. A page
+    with none of them is not rendered or read; the WeChat detector takes about 1.6 s on a page with no code, and the
+    worker runs one job at a time. A scan is a picture and a web page printed to PDF has its code as shapes, so both
+    are still read. (A code set in a font of squares would not be; none is known.)"""
+    import pypdfium2.raw as raw
+
+    count = raw.FPDFPage_CountObjects(page.raw)
+    return any(
+        raw.FPDFPageObj_GetType(raw.FPDFPage_GetObject(page.raw, index)) != raw.FPDF_PAGEOBJ_TEXT
+        for index in range(max(count, 0))
+    )
+
+
 def render_pdf(pdf_bytes: bytes, *, max_pages: int = MAX_PAGES, scale: float = RENDER_SCALE) -> list[Any]:
-    """The first pages of a PDF as grey numpy arrays."""
+    """The first pages of a PDF that can hold a code, as grey numpy arrays."""
     import numpy as np
     import pypdfium2 as pdfium
 
@@ -64,6 +80,8 @@ def render_pdf(pdf_bytes: bytes, *, max_pages: int = MAX_PAGES, scale: float = R
         try:
             for index in range(min(len(document), max_pages)):
                 with pdfium_page(document, index) as page:
+                    if not page_may_hold_a_code(page):
+                        continue
                     bitmap = page.render(scale=scale, grayscale=True)
                     images.append(np.array(bitmap.to_numpy(), copy=True))
         finally:
@@ -109,4 +127,4 @@ def scan_work_item(work_item: Any) -> list[str]:
         return []
 
 
-__all__ = ["decode_images", "render_pdf", "scan_work_item", "token_texts"]
+__all__ = ["decode_images", "page_may_hold_a_code", "render_pdf", "scan_work_item", "token_texts"]

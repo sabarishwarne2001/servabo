@@ -349,3 +349,36 @@ four (`--workers=4`) on COSTS.md's server (4 vCPU, 16 GB). Re-run this before a 
 - **Why not a stricter test:** a second, tighter budget would flake on the same shared machines this fix is for.
   The existing budget stays as it was.
 - **Decision:** N-142.
+
+## The e-invoice QR search on documents that cannot hold a code (Session I, 2026-10-20; F-532)
+
+Session F's e-invoice reading (PR #31) renders up to three pages of every PDF in the OCR worker and runs OpenCV over each.
+The worker runs one job at a time, so every second spent there is a second every queued job waits.
+
+- **Where the time goes** (one A4 page at the render scale in use, 2.5; idle build machine, best of 3): the WeChat detector
+  1,557 ms, the standard detector 86 ms, the Aruco detector 15 ms; rendering 2 to 38 ms. At scale 2.0, 1.5 and 1.0 the
+  WeChat detector takes 513, 291 and 95 ms. The WeChat detector is the only one that reads dense signed codes: on codes as dense as
+  a real token (868 characters) it read every one tried, Aruco read 5 of 8 and the standard detector none. It is fast when a
+  code is present (13 to 147 ms); the cost is the search of a page that has none.
+- **What was tried and rejected:** a smaller render scale (a printed code is small: a 3 cm code of about 110 modules is
+  about 1.9 px a module at scale 2.5 and about 1.2 px at 1.5, below what decoders usually read) and the quick detectors first (they miss codes the slow one reads). Neither was
+  worth a risk that cannot be checked here without a real e-invoice (still unverified, N-140).
+- **The change:** a page whose objects are all text is not rendered or read (`page_may_hold_a_code`). Pictures, drawings and
+  forms are read as before (N-147).
+- **Figures** (idle build machine; `PERF_BUDGET_MULTIPLIER=1` where a budget applies):
+
+| Measure | Before | After |
+|---|---|---|
+| `token_texts` on 3 pages of text (`tests/performance/test_einvoice_scan_budget.py`, budget 250 ms) | 2,888 ms | 1 ms |
+| The 7 browser-suite sample PDFs, all together | 12,105 ms (1.2 to 1.5 s each; the 3-page packet 4.0 s) | 6 ms |
+| 12 one-page invoices, upload to every job finished | 113.0 s (111.4, 114.8, 112.7) | 103.2 s (103.6, 103.5, 102.6) |
+| The same, with the scan removed altogether | 102.3 s (103.1, 101.5) | |
+
+  Per document that is 9.4 s before, 8.6 s after (8.5 s with no scan at all): about 0.9 s, 10%, and the fix gives back 92% of
+  what the scan took. The rest of the 8.5 s is the pipeline itself (about eight jobs one after another, each waiting for the
+  worker's next pass). Method: a script uploads 12 unique one-page invoices to the browser tests' workspace and waits for
+  the job queue to be empty; the worker was restarted between variants, with the scan call replaced by "find nothing" for the
+  "removed" row.
+- **Not covered by these figures:** a document with a picture on every page still pays 1.6 s a page (3 pages at most). That
+  is the cost of looking for a code that is not there, and the next step if it matters would be reading only the region of
+  the page where the picture is.
