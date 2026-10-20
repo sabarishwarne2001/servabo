@@ -6,6 +6,16 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Fixed — CI after PR #33 (Session I, 2026-10-20)
+
+- **A browser test could lose its own upload.** The run-history test (spec 13) clicked "Start Ingestion" and left the page at
+  once, which cancels a request still on its way; when the server lost that race no automation run ever existed and the test
+  waited two minutes for an empty timeline (F-531). It now waits for the server to accept the upload, finds that document's
+  run, and opens that run's chain; a second test holds the upload back a second to keep the race from returning.
+- **Documents of plain text are processed faster.** The e-invoice QR search no longer renders pages that are only text, which
+  cost the worker about 0.9 s per document (F-532, N-147); pages with a picture, a drawing or a form are searched as before.
+- **`aiohttp` 3.14.4** (three security advisories) and `yarl` 1.25.1, which it needs (F-533).
+
 ### Added — A green main, the GST Credit add-on, the monthly summary (Session H, 2026-10-19)
 
 - **GST Credit add-on**: a Developer organization can buy the GST Credit lists (suppliers, invoices with IMS recommendations,

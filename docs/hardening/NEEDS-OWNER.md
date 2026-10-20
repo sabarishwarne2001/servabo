@@ -2108,3 +2108,28 @@ three findings, each with a link to its evidence, and a button to the Overview. 
 - The receipt's figures are the ones the app shows (stored figures only, currencies never added); the GST figures are
   as of the last day of that month.
 
+
+## N-147 — The e-invoice QR search skips pages that are only text (DECIDED (Session I); F-532)
+
+When a PDF is processed, Servabo looks for an e-invoice QR code on its first three pages. **A page that is nothing but text
+is now skipped**, because a code cannot hide in it. A page with a picture on it (a scan, or a QR code printed beside the
+text), with shapes drawn on it (a code from a web page printed to PDF), or with an embedded form is searched exactly as
+before: the same detectors at the same picture size. What changes for you: documents of plain text (contracts, policies,
+simple invoices made by software that writes only text) no longer cost the worker 1.6 s a page.
+- **The one case this would miss:** a QR code typed with a font of squares, as if it were letters. No such invoice is known;
+  if one turns up, the page check is `einvoice_scan.page_may_hold_a_code`.
+- **Tried and not done:** a smaller picture (fewer seconds, but a printed code is small and could stop being read), and the
+  quick detectors first (they read only some of the dense codes; the slow detector reads all of them).
+
+## N-148 — Open the CI report for run #400, once, so the browser-test cause can be marked proven (OPEN; F-531)
+
+The report of the failed browser run (run #400, called `e2e-report`) holds the server's and the worker's own log for the
+minutes the test failed. The sandbox this session ran in cannot download it: its network rules refuse the host GitHub keeps
+artifacts on (`productionresultssa8.blob.core.windows.net`, answered 403). The test is fixed on the mechanism that was
+reproduced (F-531), but whether that mechanism is what happened in run #400 stays **unverified** until someone reads the log.
+Either:
+- download `e2e-report` from run #400 (GitHub > Actions > CI > run 400 > Artifacts; it is kept until 2026-11-02) and look
+  in `e2e-logs/api.log` for a `POST .../work-items` at about 17:21 UTC from the failed test: **present** means the upload
+  arrived and something else was slow (tell the next session); **absent** means the upload was lost, as reproduced; or
+- allow that host in the session's network settings so the next session can read it itself.
+Nothing is blocked on this. If the report is gone by the time anyone looks, F-531 stays "fixed on the reproduced mechanism".

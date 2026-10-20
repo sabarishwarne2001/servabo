@@ -807,3 +807,38 @@ summary email** to owners of paying organizations on the 1st (N-146).
   contract; a rupee price for the add-on; moving CI to the next Ubuntu image on purpose (N-144); `upload-artifact` has a newer major (v7, twelve
   days old when chosen) than the v6 CI uses.
 
+
+## Session I → next sessions
+
+_2026-10-20. Branch `claude/new-session-ko5jbm`, PR #34. Decisions N-147 (decided) and N-148 (open); findings F-531 to F-534. No migration; one Alembic head._
+
+**What changed.** PR #33 was merged while its last CI run (#400) was red. (1) **The browser test** that failed
+(`13-automation-review.spec.ts`, "an upload fires the 'Document uploaded' rule…") clicked "Start Ingestion" and went to the
+next page at once; leaving a page cancels a request still on its way, so the file reaches the server only if the server wins
+the race. Held back by one second, the *original* test fails here with CI's exact error. It now waits for the server's answer
+to the upload, finds that document's run through the API and opens that run's chain, and a second test keeps the race from
+returning (F-531). (2) **Plain-text PDFs are no longer searched for a QR code** (about 0.9 s a document, 10% of the browser
+suite's pipeline; F-532, N-147). (3) **`aiohttp` 3.14.4 and `yarl` 1.25.1** (F-533). `main`'s run #401 was green except the
+advisory pip-audit this fixes.
+
+**What is proven and what is not.**
+- Proven: the mechanism (the exact CI error reproduced with the original code and a 1 s delay; the upload cancelled by the
+  browser in 20 of 20 idle runs and 17 of 40 loaded runs), the fix (spec 13 x10 beside specs 105/107/108; the delayed test), the
+  QR change (tests failed first; 12 documents 113.0 s to 103.2 s), the advisory (pip-audit before and after).
+- **Unverified: that this mechanism is what happened in run #400.** The run's report holds the API and worker logs and could
+  not be downloaded (the sandbox refuses GitHub's artifact host). On the build machine the original test passed 30 of 30 runs and the upload was never actually lost in
+  60 chances without an injected delay, and the worst job wait in a replay of the specs before 13 was 8 s, so a CI-only slowness
+  is not ruled out either. **N-148 says how to read the report (kept until 2026-11-02).**
+- Unverified: that CI's own run is now green on the first try. It is the proof; look at it first.
+
+**For the next session / the owner.**
+- Read N-148 once. If the log shows no `POST .../work-items` from the failed test at about 17:21 UTC, F-531 is proven; if it
+  shows one, the upload arrived and something else was slow: look at `jobs` (the `automation.execute` wait) in the same log.
+- The brief called `e8509ac` "before the QR reading"; it is PR #31's merge and has it. The commit before is `7185674`.
+- If a browser test again waits two minutes for something that "should" appear, ask first whether the page left before a
+  request finished; `page.waitForResponse` for the request, then the API for the result, is the pattern now in spec 13.
+- F-534 (one pytest shard took 2 h 25 min in run #400) is not explained; if it happens again look at the shard's Postgres
+  checkpoint line first (283 s, 704,952 files synced).
+- Possible follow-ups, none started: read only the picture's region of a page instead of the whole page (a document with a
+  picture on every page still pays 1.6 s a page); a CI step that installs the pinned requirements (a bump such as `aiohttp`
+  needs its partner pinned too, and `pip-audit --no-deps` cannot see that).
