@@ -37,7 +37,7 @@ import {
   type CardKey,
   type FlowDraft,
 } from "@/components/automation/flow/flowModel";
-import { PreviewPanel } from "@/components/automation/flow/PreviewPanel";
+import { TestPreviewDialog } from "@/components/automation/flow/TestPreviewDialog";
 import { IssueText } from "@/components/automation/flow/StepCard";
 import { SummaryRail } from "@/components/automation/flow/SummaryRail";
 import { useActiveWorkspaceId } from "@/hooks/useActiveWorkspace";
@@ -54,6 +54,8 @@ interface FlowBuilderProps {
   readonly existingRules?: readonly AutomationRule[];
   /** A recipe the person chose: the builder opens with it filled in. */
   readonly initialDraft?: FlowDraft | null;
+  /** Opens the upgrade dialog for a locked trigger. */
+  readonly onUpgrade?: ((capability: string, feature: string) => void) | undefined;
 }
 
 export const FlowBuilder: React.FC<FlowBuilderProps> = ({
@@ -64,6 +66,7 @@ export const FlowBuilder: React.FC<FlowBuilderProps> = ({
   ruleToDuplicate = null,
   existingRules = [],
   initialDraft = null,
+  onUpgrade,
 }) => {
   const workspaceId = useActiveWorkspaceId();
   const queryClient = useQueryClient();
@@ -333,6 +336,7 @@ export const FlowBuilder: React.FC<FlowBuilderProps> = ({
             isEdit={isEdit}
             onOpenHistory={ruleToEdit ? () => setHistoryOpen(true) : undefined}
             defaultRunsPerHour={catalog.limits.default_runs_per_hour ?? 0}
+            onUpgrade={onUpgrade}
           />
         </div>
       )}
@@ -360,9 +364,13 @@ export const FlowBuilder: React.FC<FlowBuilderProps> = ({
       </footer>
 
       {workspaceId && (
-        <PreviewPanel
+        <TestPreviewDialog
           open={previewOpen}
-          load={() => (catalog ? automationApi.previewDraft(workspaceId, payloadFromDraft(draft, catalog)) : Promise.reject(new Error("The catalog is not loaded.")))}
+          workspaceId={workspaceId}
+          loadPreview={() => (catalog ? automationApi.previewDraft(workspaceId, payloadFromDraft(draft, catalog)) : Promise.reject(new Error("The catalog is not loaded.")))}
+          tryOnDocument={(workItemId) =>
+            catalog ? automationApi.testDraft(workspaceId, payloadFromDraft(draft, catalog), workItemId) : Promise.reject(new Error("The catalog is not loaded."))
+          }
           onClose={() => setPreviewOpen(false)}
         />
       )}

@@ -33,14 +33,16 @@ import { automationApi } from "@/services/api/automation";
 import { FlowBuilder } from "@/pages/Automation/FlowBuilder";
 import {
   actionLabel,
+  summarize,
   draftFromPayload,
+  draftFromRule,
   fieldLabel,
   triggerLabel,
   triggerLabelsForEvents,
   valueText,
   type FlowDraft,
 } from "@/components/automation/flow/flowModel";
-import { PreviewPanel } from "@/components/automation/flow/PreviewPanel";
+import { TestPreviewDialog } from "@/components/automation/flow/TestPreviewDialog";
 import { retryExecution } from "@/services/api/executions";
 import { RecipeGallery } from "@/components/automation/RecipeGallery";
 import { VersionHistoryDialog } from "@/components/automation/VersionHistoryDialog";
@@ -48,12 +50,15 @@ import { RuleTestDialog } from "@/pages/Automation/RuleTestDialog";
 import { formatDateTime } from "@/utils/formatters";
 import { ApiError } from "@/services/api/client";
 import type { AutomationRule, AutomationLog, AutomationErrorPolicy } from "@/types/automation";
+import type { RuleHealth } from "@/types/automationVolume";
 import { formatCostMicros, formatDurationMs } from "@/types/automation";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useActiveWorkspace, useActiveWorkspaceId } from "@/hooks/useActiveWorkspace";
 import { canManageAutomation } from "@/permissions/workspacePermissions";
 import type { WorkspaceRole } from "@/types/tenancy";
 import { useCapabilityAccess } from "@/hooks/useCapabilityAccess";
+import { useTenant } from "@/hooks/useTenant";
+import { useUpgradePrompt } from "@/hooks/useUpgradePrompt";
 import { CAPABILITY } from "@/constants/capabilities";
 import { PlanLockBanner } from "@/components/billing/PlanLockBanner";
 import { automationKeys, keepPreviousWithinWorkspace } from "@/services/api/queryKeys";
@@ -86,6 +91,28 @@ const OPERATOR_DISPLAY_MAP: Record<string, string> = {
   IS_NOT_EMPTY: "Is Not Empty",
   ARRAY_CONTAINS_ANY: "Contains Any",
   ARRAY_CONTAINS_ALL: "Contains All",
+};
+
+/** How a rule has been doing in the last 7 days, in one line. */
+const RuleHealthLine: React.FC<{ readonly stat: RuleHealth | undefined }> = ({ stat }) => {
+  if (!stat || (stat.runs_7d === 0 && stat.throttled_7d === 0 && stat.paused_7d === 0)) {
+    return (
+      <p className="text-[11px] text-muted-foreground" data-testid="rule-health">
+        {stat?.last_run_at ? `Last run ${formatDateTime(stat.last_run_at)}. No runs in the last 7 days.` : "Has not run yet."}
+      </p>
+    );
+  }
+  return (
+    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground" data-testid="rule-health">
+      {stat.last_run_at && <span>Last run {formatDateTime(stat.last_run_at)}</span>}
+      <span>{stat.runs_7d} run{stat.runs_7d === 1 ? "" : "s"} in 7 days</span>
+      <span className={stat.failed_7d > 0 ? "font-semibold text-destructive" : ""}>
+        {stat.failed_7d > 0 ? `${stat.failure_rate}% failed (${stat.failed_7d})` : "none failed"}
+      </span>
+      {stat.throttled_7d > 0 && <span className="font-semibold text-amber-700 dark:text-amber-400">{stat.throttled_7d} held back by the limit</span>}
+      {stat.paused_7d > 0 && <span className="font-semibold text-amber-700 dark:text-amber-400">{stat.paused_7d} skipped while paused</span>}
+    </p>
+  );
 };
 
 /**
@@ -128,6 +155,12 @@ export const Automation: React.FC = () => {
   const canManage = canManageAutomation((useActiveWorkspace()?.role ?? "VIEWER") as WorkspaceRole);
   const automations = useCapabilityAccess(organizationId, CAPABILITY.automations);
   const planLocked = !automations.isLoading && !automations.isError && !automations.granted;
+  const { state: tenantState } = useTenant();
+  const upgrade = useUpgradePrompt(
+    organizationId,
+    tenantState.status === "ready" ? tenantState.organization.organization_slug : "",
+    tenantState.status === "ready" ? String(tenantState.organizationRole) : "MEMBER",
+  );
 
   // Dialog overlay controller states
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
@@ -153,6 +186,8 @@ export const Automation: React.FC = () => {
     staleTime: 60_000,
   });
   const [eventFilter, setEventFilter] = useState<string>("ALL");
+  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
+  const [healthFilter, setHealthFilter] = useState<"ALL" | "FAILING" | "HELD_BACK" | "QUIET">("ALL");
   const [sortBy, setSortBy] = useState<string>("PRIORITY_ASC");
 
   // Advanced Audit Log Filter states (Log list)
@@ -205,6 +240,14 @@ export const Automation: React.FC = () => {
     staleTime: 15_000,
   });
   const paused = pauseQuery.data?.paused === true;
+  const healthQuery = useQuery({
+    queryKey: automationKeys.health(workspaceId ?? ""),
+    queryFn: () => automationApi.getHealth(workspaceId ?? ""),
+    enabled: Boolean(workspaceId),
+    staleTime: 20_000,
+    refetchInterval: pollUnlessRefused(30_000),
+  });
+  const health = healthQuery.data?.rules ?? {};
   const setPausedMutation = useMutation({
     mutationFn: (next: boolean) => automationApi.setPaused(workspaceId ?? "", next),
     onSuccess: async (state) => {
@@ -407,9 +450,23 @@ export const Automation: React.FC = () => {
         eventFilter === "ALL"
           ? true
           : (rule.triggers ?? []).includes(eventFilter) || rule.event === eventFilter;
-      return matchesSearch && matchesStatus && matchesEvent;
+      const keys = rule.triggers ?? [];
+      const matchesCategory =
+        categoryFilter === "ALL"
+          ? true
+          : keys.some((key) => catalog?.triggers.find((t) => t.key === key)?.category === categoryFilter);
+      const stat = health[rule.id];
+      const matchesHealth =
+        healthFilter === "ALL"
+          ? true
+          : healthFilter === "FAILING"
+            ? (stat?.failed_7d ?? 0) > 0
+            : healthFilter === "HELD_BACK"
+              ? (stat?.throttled_7d ?? 0) + (stat?.paused_7d ?? 0) > 0
+              : (stat?.runs_7d ?? 0) === 0;
+      return matchesSearch && matchesStatus && matchesEvent && matchesCategory && matchesHealth;
     });
-  }, [rules, searchQuery, statusFilter, eventFilter]);
+  }, [rules, searchQuery, statusFilter, eventFilter, categoryFilter, healthFilter, catalog, health]);
 
   const sortedRules = useMemo(() => {
     const sorted = [...filteredRules];
@@ -842,6 +899,40 @@ export const Automation: React.FC = () => {
 
           <div className="flex items-center space-x-2">
             <span className="text-[10px] text-muted-foreground uppercase font-semibold">
+              About:
+            </span>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[170px] h-9 text-xs" aria-label="Filter workflows by category">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All categories</SelectItem>
+                {Array.from(new Set((catalog?.triggers ?? []).map((t) => t.category))).map((category) => (
+                  <SelectItem key={category} value={category}>{category}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <span className="text-[10px] text-muted-foreground uppercase font-semibold">
+              Health:
+            </span>
+            <Select value={healthFilter} onValueChange={(value) => setHealthFilter(value as "ALL" | "FAILING" | "HELD_BACK" | "QUIET")}>
+              <SelectTrigger className="w-[190px] h-9 text-xs" aria-label="Filter workflows by health">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Any health</SelectItem>
+                <SelectItem value="FAILING">Failed in the last 7 days</SelectItem>
+                <SelectItem value="HELD_BACK">Held back in the last 7 days</SelectItem>
+                <SelectItem value="QUIET">No runs in 7 days</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <span className="text-[10px] text-muted-foreground uppercase font-semibold">
               Sort:
             </span>
 
@@ -931,6 +1022,8 @@ export const Automation: React.FC = () => {
                   setSearchQuery("");
                   setStatusFilter("ALL");
                   setEventFilter("ALL");
+                  setCategoryFilter("ALL");
+                  setHealthFilter("ALL");
                   setSortBy("PRIORITY_ASC");
                 }}
                 className="px-3.5 py-1.5 border border-border rounded-lg text-xs font-semibold bg-background hover:bg-muted hover:text-foreground text-muted-foreground transition-all focus:outline-none select-none"
@@ -955,6 +1048,11 @@ export const Automation: React.FC = () => {
                       <h4 className="font-semibold text-base leading-snug truncate text-foreground">
                         {rule.name}
                       </h4>
+                      {catalog && (rule.triggers ?? []).length > 0 && rule.actions.length > 0 && (
+                        <p className="text-xs leading-relaxed text-muted-foreground" data-testid="rule-sentence">
+                          {summarize(draftFromRule(rule, catalog, "edit"), catalog)}
+                        </p>
+                      )}
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-md font-semibold select-none whitespace-nowrap">
                           Priority #{rule.priority}
@@ -1045,6 +1143,8 @@ export const Automation: React.FC = () => {
                     </button>
                   </div>
 
+                  <RuleHealthLine stat={health[rule.id]} />
+
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-muted/30 dark:bg-muted/10 border border-border/40 rounded-xl p-3.5 select-none">
                     <div className="sm:col-span-7 flex flex-col justify-center space-y-2.5 border-b sm:border-b-0 pb-2.5 sm:pb-0">
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
@@ -1128,6 +1228,7 @@ export const Automation: React.FC = () => {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-border/10">
                     <div className="text-[10px] text-muted-foreground font-medium flex flex-wrap items-center gap-x-3 gap-y-1 select-none">
                       {rule.version ? <span>Version {rule.version}</span> : null}
+                      {rule.owner_name ? <span>Owner: {rule.owner_name}</span> : null}
                       <span>Created: {formatDateTime(rule.created_at)}</span>
                       {rule.updated_at && (
                         <span>Updated: {formatDateTime(rule.updated_at)}</span>
@@ -1602,6 +1703,7 @@ export const Automation: React.FC = () => {
         workspaceId={workspaceId ?? ""}
         catalog={catalog}
         onClose={() => setRecipesOpen(false)}
+        onUpgrade={upgrade.prompt}
         onUse={(rule) => {
           if (!catalog) {return;}
           setRecipesOpen(false);
@@ -1619,10 +1721,11 @@ export const Automation: React.FC = () => {
         onClose={() => setHistoryRule(null)}
       />
       {workspaceId && (
-        <PreviewPanel
+        <TestPreviewDialog
           open={previewTarget !== null}
+          workspaceId={workspaceId}
           title={previewTarget ? `“${previewTarget.name}” on the last 30 days` : undefined}
-          load={() => (previewTarget ? automationApi.previewRule(workspaceId, previewTarget.id) : Promise.reject(new Error("No rule chosen.")))}
+          loadPreview={() => (previewTarget ? automationApi.previewRule(workspaceId, previewTarget.id) : Promise.reject(new Error("No rule chosen.")))}
           onClose={() => setPreviewTarget(null)}
         />
       )}
@@ -1649,8 +1752,10 @@ export const Automation: React.FC = () => {
         onConfirm={() => retryAsk && retryMutation.mutate({ executionId: retryAsk.executionId, acknowledge: true, name: retryAsk.name })}
         onCancel={() => setRetryAsk(null)}
       />
+      {upgrade.dialog}
       <FlowBuilder
         isOpen={isFormOpen}
+        onUpgrade={upgrade.prompt}
         initialDraft={recipeDraft}
         onClose={handleFormClose}
         onSaveSuccess={handleSaveSuccessCallback}

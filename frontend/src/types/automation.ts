@@ -81,6 +81,8 @@ export interface AutomationRule {
   /** True when the workspace's automations are paused, so this rule will not run although it is on. */
   readonly paused?: boolean;
   readonly version?: number;
+  /** Who built it (display name, else email). */
+  readonly owner_name?: string | null;
 }
 
 /** ARCH-37 flow shape. The server still accepts the ARCH-13 shape. */

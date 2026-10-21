@@ -50,6 +50,7 @@ interface BuilderInspectorProps {
   readonly isEdit: boolean;
   readonly onOpenHistory?: (() => void) | undefined;
   readonly defaultRunsPerHour: number;
+  readonly onUpgrade?: ((capability: string, feature: string) => void) | undefined;
 }
 
 const Field: React.FC<{
@@ -68,7 +69,7 @@ const Field: React.FC<{
 );
 
 export const BuilderInspector: React.FC<BuilderInspectorProps> = ({
-  catalog, draft, update, selection, issues, disabled, isEdit, onOpenHistory, defaultRunsPerHour,
+  catalog, draft, update, selection, issues, disabled, isEdit, onOpenHistory, defaultRunsPerHour, onUpgrade,
 }) => {
   const [tab, setTab] = useState<Tab>("configuration");
   const panel = useRef<HTMLDivElement | null>(null);
@@ -97,6 +98,7 @@ export const BuilderInspector: React.FC<BuilderInspectorProps> = ({
             onChange={(triggers) => update({ triggers })}
             issues={issuesFor(issues, "trigger")}
             disabled={disabled}
+            onUpgrade={onUpgrade}
           />
         );
       case "conditions":

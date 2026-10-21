@@ -11,6 +11,8 @@ import type { FlowCatalog } from "@/types/automationFlow";
 import type {
   AutomationPauseState,
   DocumentExplanation,
+  DraftTestResult,
+  HealthReport,
   PreviewResult,
   RecipeList,
   RuleVersionPage,
@@ -173,7 +175,20 @@ export const explainDocument = async (workspaceId: string, workItemId: string): 
 export const getRecipes = async (workspaceId: string): Promise<RecipeList> =>
   (await apiClient.get<RecipeList>(AUTOMATION_ENDPOINTS.recipes(workspaceId))).data;
 
+/** Which way a rule that may not be saved yet goes for one document, with each step's message filled in. Read-only. */
+export const testDraft = async (
+  workspaceId: string,
+  data: AutomationRuleCreateRequest,
+  workItemId: string,
+): Promise<DraftTestResult> =>
+  (await apiClient.post<DraftTestResult>(AUTOMATION_ENDPOINTS.testDraft(workspaceId), { ...data, work_item_id: workItemId })).data;
+
+export const getHealth = async (workspaceId: string): Promise<HealthReport> =>
+  (await apiClient.get<HealthReport>(AUTOMATION_ENDPOINTS.health(workspaceId))).data;
+
 export const automationApi = {
+  testDraft,
+  getHealth,
   getPauseState,
   setPaused,
   getRuleVersions,

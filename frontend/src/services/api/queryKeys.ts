@@ -78,6 +78,7 @@ export const automationKeys = {
   versions: (workspaceId: string, ruleId: string) =>
     [...automationKeys.all(workspaceId), "versions", ruleId] as const,
   recipes: (workspaceId: string) => [...automationKeys.all(workspaceId), "recipes"] as const,
+  health: (workspaceId: string) => [...automationKeys.all(workspaceId), "health"] as const,
   explain: (workspaceId: string, workItemId: string) =>
     [...automationKeys.all(workspaceId), "explain", workItemId] as const,
 };

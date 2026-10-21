@@ -13,6 +13,7 @@ import { ArrowDown, ArrowUp, GitBranch, Lock, Play, Plus, Trash2 } from "lucide-
 
 import type { FlowAction, FlowCatalog } from "@/types/automationFlow";
 import { ActionConfigForm } from "./ActionConfigForm";
+import { ActionIcon } from "./ActionIcon";
 import {
   defaultConfig,
   excludedActions,
@@ -110,6 +111,7 @@ export const ActionsCard: React.FC<ActionsCardProps> = ({
                 <div className="min-w-0">
                   <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
                     <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">#{index + 1}</span>
+                    <span className="text-primary"><ActionIcon actionType={entry.action_type} word={action?.icon} className="h-4 w-4" /></span>
                     {action?.label ?? entry.action_type}
                     {action && <span className="text-[10px] font-semibold uppercase text-muted-foreground">{action.category}</span>}
                     {action && !action.available && (

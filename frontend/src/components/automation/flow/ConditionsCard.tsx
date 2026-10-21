@@ -5,8 +5,8 @@
  * Operators are filtered by the field's type.
  */
 
-import React from "react";
-import { Filter, Plus, Trash2 } from "lucide-react";
+import React, { useState } from "react";
+import { Filter, Plus, Search, Trash2 } from "lucide-react";
 
 import type { AutomationLogicOperator } from "@/types/automation";
 import type { FlowCatalog, FlowConditionValue } from "@/types/automationFlow";
@@ -84,9 +84,17 @@ const Keyword: React.FC<{ readonly word: "IF" | "AND" | "OR"; readonly className
 export const ConditionsCard: React.FC<ConditionsCardProps> = ({
   catalog, triggers, groups, groupsOperator, onChange, issues, disabled, bare = false,
 }) => {
-  const eventFields = commonEventFields(catalog, triggers);
-  const documentFields = availableFields(catalog, triggers).filter((f) => f.source === "document");
-  const derivedFields = availableFields(catalog, triggers).filter((f) => f.source === "derived");
+  const [fieldQuery, setFieldQuery] = useState("");
+  const chosenFields = new Set(groups.flatMap((group) => group.conditions.map((condition) => condition.field)));
+  // A field is found by its name, its group or any other name a model may give it; the ones already used stay listed.
+  const fieldMatches = (f: { key: string; label: string; group?: string | undefined; aliases?: readonly string[] | undefined }): boolean => {
+    const needle = fieldQuery.trim().toLowerCase();
+    if (!needle || chosenFields.has(f.key)) {return true;}
+    return [f.label, f.key, f.group ?? "", ...(f.aliases ?? [])].some((text) => text.toLowerCase().includes(needle));
+  };
+  const eventFields = commonEventFields(catalog, triggers).filter(fieldMatches);
+  const documentFields = availableFields(catalog, triggers).filter((f) => f.source === "document").filter(fieldMatches);
+  const derivedFields = availableFields(catalog, triggers).filter((f) => f.source === "derived").filter(fieldMatches);
   const documentGroups = Array.from(
     documentFields.reduce((groups, f) => {
       const key = f.group ?? "From the document";
@@ -172,6 +180,20 @@ export const ConditionsCard: React.FC<ConditionsCardProps> = ({
       }
     >
       <div className="space-y-3">
+        {groups.length > 0 && (
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <input
+              type="search"
+              aria-label="Search fields"
+              value={fieldQuery}
+              disabled={disabled}
+              placeholder="Search fields: total, GSTIN, due date…"
+              onChange={(e) => setFieldQuery(e.target.value)}
+              className={`${inputClass(false)} py-1.5 pl-8 text-xs`}
+            />
+          </div>
+        )}
         {groups.map((group, g) => (
           <React.Fragment key={group.uid}>
             {g > 0 && (

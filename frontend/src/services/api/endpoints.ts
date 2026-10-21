@@ -290,6 +290,8 @@ export const AUTOMATION_ENDPOINTS = {
   explain: (workspaceId: string, workItemId: string): string =>
     `${scoped(workspaceId)}/automation/documents/${seg(workItemId)}/explain`,
   recipes: (workspaceId: string): string => `${scoped(workspaceId)}/automation/recipes`,
+  testDraft: (workspaceId: string): string => `${scoped(workspaceId)}/automation/test-draft`,
+  health: (workspaceId: string): string => `${scoped(workspaceId)}/automation/health`,
 } as const;
 
 export const NOTIFICATION_ENDPOINTS = {

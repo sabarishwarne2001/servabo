@@ -10,8 +10,10 @@ import React from "react";
 import { AlertTriangle, Check, CirclePlus, Filter, GitBranch, Play, Zap } from "lucide-react";
 
 import type { FlowCatalog } from "@/types/automationFlow";
+import { ActionIcon } from "./ActionIcon";
 import {
   actionLabel,
+  findAction,
   conditionText,
   issuesFor,
   triggerLabel,
@@ -113,6 +115,9 @@ const StepRows: React.FC<{
           >
             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-[10px] text-muted-foreground">
               {index + 1}
+            </span>
+            <span className="shrink-0 text-muted-foreground">
+              <ActionIcon actionType={step.action_type} word={findAction(catalog, step.action_type)?.icon} />
             </span>
             <span className="min-w-0 flex-1 truncate">{actionLabel(catalog, step.action_type)}</span>
             {own > 0 && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-destructive" aria-hidden="true" />}

@@ -99,10 +99,48 @@ export interface Recipe {
   readonly rule: AutomationRuleCreateRequest;
   readonly available: boolean;
   readonly unavailable_reason: string | null;
+  /** What the upgrade dialog names when a locked recipe is chosen. */
+  readonly locked_capability?: string | null;
+  readonly locked_feature?: string | null;
   readonly trigger_labels: readonly string[];
 }
 
 export interface RecipeList {
   readonly categories: readonly string[];
   readonly recipes: readonly Recipe[];
+}
+
+export interface DraftTestStep {
+  readonly index: number;
+  readonly label: string;
+  readonly action_type?: string;
+  readonly ok: boolean;
+  readonly problem: string | null;
+  readonly idempotent?: boolean;
+  /** The text this step would send, with the variables filled in from the document (title, message, subject, body). */
+  readonly rendered: Readonly<Record<string, string>>;
+}
+
+export interface DraftTestResult {
+  readonly matched: boolean;
+  readonly branch: "then" | "otherwise" | "none";
+  readonly conditions: readonly ConditionTrace[];
+  readonly steps: readonly DraftTestStep[];
+  readonly document: string | null;
+  readonly event: { readonly type: string; readonly occurred_at: string } | null;
+  readonly has_otherwise: boolean;
+}
+
+export interface RuleHealth {
+  readonly last_run_at: string | null;
+  readonly runs_7d: number;
+  readonly failed_7d: number;
+  readonly throttled_7d: number;
+  readonly paused_7d: number;
+  readonly failure_rate: number;
+}
+
+export interface HealthReport {
+  readonly days: number;
+  readonly rules: Readonly<Record<string, RuleHealth>>;
 }

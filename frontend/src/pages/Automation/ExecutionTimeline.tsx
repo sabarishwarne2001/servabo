@@ -1,5 +1,6 @@
 import { formatTimestamp } from "@/utils/displayTime";
 import React, { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -16,6 +17,8 @@ import {
 
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
+import { useTenant } from "@/hooks/useTenant";
+import { workItemDetailsPath } from "@/routes/tenantPaths";
 import { canManageAutomation } from "@/permissions/workspacePermissions";
 import { ApiError } from "@/services/api/errors";
 import type { WorkspaceRole } from "@/types/tenancy";
@@ -312,6 +315,8 @@ export const ExecutionTimeline: React.FC = () => {
 
   const [suppressedOnly, setSuppressedOnly] = useState(false);
   const [outcomeFilter, setOutcomeFilter] = useState<"ALL" | "FAILED" | "SKIPPED">("ALL");
+  const [ruleFilter, setRuleFilter] = useState("ALL");
+  const [dateFilter, setDateFilter] = useState<"ALL" | "TODAY" | "7_DAYS" | "30_DAYS">("ALL");
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useQuery({
@@ -334,7 +339,15 @@ export const ExecutionTimeline: React.FC = () => {
   const chains = useMemo(() => {
     const grouped = new Map<string, AutomationExecution[]>();
 
-    (data?.items ?? []).filter((execution) =>
+    (data?.items ?? []).filter((execution) => {
+      if (ruleFilter !== "ALL" && execution.rule_id !== ruleFilter) {return false;}
+      if (dateFilter !== "ALL") {
+        const at = Date.parse(execution.created_at);
+        const age = Date.now() - at;
+        if (dateFilter === "TODAY" ? at < new Date().setHours(0, 0, 0, 0) : age > (dateFilter === "7_DAYS" ? 7 : 30) * 86_400_000) {return false;}
+      }
+      return true;
+    }).filter((execution) =>
       outcomeFilter === "ALL"
         ? true
         : outcomeFilter === "SKIPPED"
@@ -374,7 +387,13 @@ export const ExecutionTimeline: React.FC = () => {
         durationMs: chainSpanMs(ordered),
       };
     });
-  }, [data, outcomeFilter]);
+  }, [data, outcomeFilter, ruleFilter, dateFilter]);
+
+  const ruleChoices = useMemo(() => {
+    const names = new Map<string, string>();
+    (data?.items ?? []).forEach((execution) => names.set(execution.rule_id, execution.rule_name ?? `Rule ${execution.rule_id.slice(0, 8)}`));
+    return Array.from(names.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [data]);
 
   const summary = useMemo(() => summarise(data?.items ?? [], chains.length), [data, chains.length]);
 
@@ -446,6 +465,37 @@ export const ExecutionTimeline: React.FC = () => {
           Blocked only
         </button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        <label className="flex items-center gap-2">
+          <span className="font-semibold uppercase tracking-wider text-muted-foreground">Rule</span>
+          <select
+            aria-label="Filter runs by rule"
+            value={ruleFilter}
+            onChange={(e) => setRuleFilter(e.target.value)}
+            className="rounded-md border border-border bg-background px-2 py-1.5"
+          >
+            <option value="ALL">All rules</option>
+            {ruleChoices.map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2">
+          <span className="font-semibold uppercase tracking-wider text-muted-foreground">When</span>
+          <select
+            aria-label="Filter runs by date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value as "ALL" | "TODAY" | "7_DAYS" | "30_DAYS")}
+            className="rounded-md border border-border bg-background px-2 py-1.5"
+          >
+            <option value="ALL">Any time</option>
+            <option value="TODAY">Today</option>
+            <option value="7_DAYS">Last 7 days</option>
+            <option value="30_DAYS">Last 30 days</option>
+          </select>
+        </label>
       </div>
 
       {summary.runs > 0 ? (
@@ -576,6 +626,11 @@ const ExecutionStep: React.FC<ExecutionStepProps> = ({
   const workspace = useActiveWorkspace();
   const workspaceId = workspace?.workspaceId ?? "";
   const queryClient = useQueryClient();
+  const { state: tenantState } = useTenant();
+  const documentPath =
+    execution.work_item_id && tenantState.status === "ready"
+      ? workItemDetailsPath(tenantState.organization.organization_slug, tenantState.workspace.slug, execution.work_item_id)
+      : null;
   const canManage = canManageAutomation((workspace?.role ?? "VIEWER") as WorkspaceRole);
   const [repeatWarning, setRepeatWarning] = useState<string | null>(null);
   const retry = useMutation({
@@ -669,6 +724,12 @@ const ExecutionStep: React.FC<ExecutionStepProps> = ({
             }`}
           >
             {execution.error}
+          </p>
+        )}
+
+        {documentPath && (
+          <p className="mt-1.5 text-[11px]">
+            <Link to={documentPath} className="font-semibold text-primary hover:underline">Open the document</Link>
           </p>
         )}
 

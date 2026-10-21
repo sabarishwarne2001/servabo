@@ -23,6 +23,8 @@ interface RecipeGalleryProps {
   readonly catalog: FlowCatalog | undefined;
   readonly onClose: () => void;
   readonly onUse: (rule: AutomationRuleCreateRequest) => void;
+  /** A locked recipe opens the upgrade dialog, which names the capability it needs. */
+  readonly onUpgrade: (capability: string, feature: string) => void;
 }
 
 export const matchesRecipe = (recipe: Recipe, query: string, category: string): boolean => {
@@ -68,7 +70,7 @@ const FillInField: React.FC<{
   );
 };
 
-export const RecipeGallery: React.FC<RecipeGalleryProps> = ({ open, workspaceId, catalog, onClose, onUse }) => {
+export const RecipeGallery: React.FC<RecipeGalleryProps> = ({ open, workspaceId, catalog, onClose, onUse, onUpgrade }) => {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [chosen, setChosen] = useState<Recipe | null>(null);
@@ -226,9 +228,21 @@ export const RecipeGallery: React.FC<RecipeGalleryProps> = ({ open, workspaceId,
                           Use this recipe
                         </button>
                       ) : (
-                        <p className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground">
-                          <Lock className="h-3.5 w-3.5" aria-hidden="true" /> {recipe.unavailable_reason ?? "Not in your plan"}
-                        </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1.5 text-xs font-semibold text-muted-foreground">
+                            <Lock className="h-3.5 w-3.5" aria-hidden="true" /> {recipe.unavailable_reason ?? "Not in your plan"}
+                          </span>
+                          {recipe.locked_capability && (
+                            <button
+                              type="button"
+                              onClick={() => onUpgrade(recipe.locked_capability ?? "", recipe.locked_feature ?? recipe.title)}
+                              aria-label={`Upgrade to use the recipe: ${recipe.title}`}
+                              className="rounded-lg border border-primary px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
+                            >
+                              Upgrade
+                            </button>
+                          )}
+                        </div>
                       )}
                     </li>
                   ))}

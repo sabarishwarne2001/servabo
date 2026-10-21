@@ -19,6 +19,8 @@ interface TriggerCardProps {
   readonly disabled: boolean;
   /** The builder shows the card inside its inspector, which already has a heading. */
   readonly bare?: boolean;
+  /** A locked trigger offers "Upgrade", which opens the upgrade dialog naming what it needs. */
+  readonly onUpgrade?: ((capability: string, feature: string) => void) | undefined;
 }
 
 export const matchesTrigger = (trigger: FlowTrigger, query: string): boolean => {
@@ -28,7 +30,7 @@ export const matchesTrigger = (trigger: FlowTrigger, query: string): boolean => 
     .some((text) => text.toLowerCase().includes(needle));
 };
 
-export const TriggerCard: React.FC<TriggerCardProps> = ({ catalog, selected, onChange, issues, disabled, bare = false }) => {
+export const TriggerCard: React.FC<TriggerCardProps> = ({ catalog, selected, onChange, issues, disabled, bare = false, onUpgrade }) => {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
 
@@ -125,6 +127,18 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({ catalog, selected, onC
                       <IssueText issues={own} />
                     </span>
                   </label>
+                  {locked && onUpgrade && (trigger.capability || trigger.addon) && (
+                    <div className="border-t border-border/60 px-3 py-1.5">
+                      <button
+                        type="button"
+                        onClick={() => onUpgrade(trigger.capability ?? trigger.addon ?? "", trigger.label)}
+                        aria-label={`Upgrade to use the trigger: ${trigger.label}`}
+                        className="text-[11px] font-semibold text-primary hover:underline"
+                      >
+                        Upgrade{trigger.unavailable_reason ? `: ${trigger.unavailable_reason}` : ""}
+                      </button>
+                    </div>
+                  )}
                   {trigger.description && trigger.description !== line && (
                     <div className="border-t border-border/60 px-3 py-1.5">
                       <button
