@@ -250,7 +250,7 @@ def history(db: Session, *, rule_id: uuid.UUID, limit: int = 50, offset: int = 0
         db.execute(
             select(AutomationRuleVersion)
             .where(AutomationRuleVersion.rule_id == rule_id)
-            .order_by(AutomationRuleVersion.version.desc())
+            .order_by(AutomationRuleVersion.version.desc(), AutomationRuleVersion.id.desc())
             .limit(min(limit, MAX_VERSIONS_LISTED))
             .offset(offset)
         ).scalars()

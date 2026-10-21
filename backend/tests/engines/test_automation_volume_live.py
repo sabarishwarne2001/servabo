@@ -479,3 +479,42 @@ def test_rule_health_counts_runs_failures_and_held_back_runs_in_seven_days(engin
     assert health["rules"][quiet["id"]]["runs_7d"] == 3, "a run that only looked is still a run; it just did nothing"
     listed = {r["id"]: r for r in engines.get("/automation/rules").json()}
     assert listed[rule["id"]]["owner_name"], "the rule says who built it"
+
+
+# ----------------------------------------------------------------------------------------------- isolation
+
+
+def test_every_new_route_refuses_another_workspaces_rule_run_and_document(engines: Engines) -> None:
+    """The new Phase 4 and 5 routes, addressed through a second workspace of the same organization (a person who
+    administers both): each answers 404 for A's ids, lists show nothing of A, and the pause switch is per workspace."""
+    from tests.engines.isolation import _second_workspace
+
+    rule = _rule(engines, "Mine in A", [{"action_type": "document.tag", "config": {"add": ["x"]}}])
+    document = _invoice(engines, "INV-ISO-1", "9,00,000.00")
+    run = _runs(engines, rule["id"])[0]
+    other = _second_workspace(engines)
+    base = f"/api/v1/workspaces/{other}/automation"
+    owner = engines.tenant.owner.headers
+
+    def call(method: str, path: str, body: Any = None):
+        return engines.client.request(method, f"{base}{path}", json=body, headers=owner)
+
+    assert call("GET", f"/rules/{rule['id']}/versions").status_code == 404
+    assert call("POST", f"/rules/{rule['id']}/versions/1/restore", {}).status_code == 404
+    assert call("POST", f"/rules/{rule['id']}/preview", {}).status_code == 404
+    assert call("POST", f"/executions/{run['id']}/retry", {}).status_code == 404
+    assert call("GET", f"/documents/{document}/explain").status_code == 404
+    assert call("POST", "/test-draft", {**_draft(), "work_item_id": str(document)}).status_code == 404
+
+    rules_in_b = call("GET", "/rules").json()
+    assert rules_in_b == [] or all(r["id"] != rule["id"] for r in rules_in_b)
+    assert rule["id"] not in call("GET", "/health").json()["rules"]
+    assert all(r["rule_id"] != rule["id"] for r in call("GET", f"/executions", None).json()["items"])
+    assert call("GET", "/recipes").status_code == 200
+
+    # The pause switch belongs to one workspace.
+    assert call("PUT", "/pause", {"paused": True}).json()["paused"] is True
+    assert engines.get("/automation/pause").json()["paused"] is False
+    _invoice(engines, "INV-ISO-2")
+    assert _by_status(engines, rule["id"]).get("SKIPPED_PAUSED") is None
+    assert call("PUT", "/pause", {"paused": False}).json()["paused"] is False
