@@ -13,6 +13,7 @@
     "lint": "eslint . --report-unused-disable-directives --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "check:self": "node scripts/run-self-checks.mjs",
+    "test:unit": "vitest run",
     "codegen:types": "openapi-typescript http://localhost:8000/api/v1/openapi.json -o src/types/api.generated.d.ts",
     "verify:contracts": "node scripts/verify-api-contracts.mjs",
     "verify:contracts:ci": "node scripts/verify-api-contracts.mjs --schema ../openapi.json",
@@ -51,6 +52,8 @@
   "devDependencies": {
     "@axe-core/playwright": "4.10.2",
     "@playwright/test": "1.56.1",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/react": "^16.3.0",
     "@types/dompurify": "^3.0.5",
     "@types/node": "^22.15.3",
     "@types/qrcode": "1.5.6",
@@ -64,6 +67,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "husky": "^9.1.7",
+    "jsdom": "^26.1.0",
     "lint-staged": "^16.1.2",
     "openapi-typescript": "^7.13.0",
     "postcss": "^8.5.6",
@@ -71,7 +75,8 @@
     "rimraf": "^6.0.1",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
-    "vite": "^7.0.2"
+    "vite": "^7.0.2",
+    "vitest": "^3.2.4"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [
