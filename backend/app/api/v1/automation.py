@@ -148,11 +148,13 @@ def _view(db: Session, rule: AutomationRule) -> dict[str, Any]:
     from app.services.automation import flow_service, rule_triggers
 
     events = rule_triggers.event_types_of(db, rule_ids=[rule.id]).get(rule.id, [])
-    return flow_service.rule_view(
+    view = flow_service.rule_view(
         rule, events,
         paused=_workspace_paused(db, rule.workspace_id),
         version=_latest_versions(db, [rule.id]).get(rule.id, 0),
     )
+    view["owner_name"] = _user_names(db, {rule.created_by_user_id} if rule.created_by_user_id else set()).get(rule.created_by_user_id)
+    return view
 
 
 @router.get(
@@ -508,9 +510,13 @@ def list_rules(
     events = rule_triggers.event_types_of(db, rule_ids=[r.id for r in rules])
     paused = _workspace_paused(db, context.workspace_id)
     versions = _latest_versions(db, [r.id for r in rules])
-    return [
-        flow_service.rule_view(r, events.get(r.id, []), paused=paused, version=versions.get(r.id, 0)) for r in rules
-    ]
+    owners = _user_names(db, {r.created_by_user_id for r in rules if r.created_by_user_id})
+    out = []
+    for r in rules:
+        view = flow_service.rule_view(r, events.get(r.id, []), paused=paused, version=versions.get(r.id, 0))
+        view["owner_name"] = owners.get(r.created_by_user_id) if r.created_by_user_id else None
+        out.append(view)
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -1182,3 +1188,52 @@ def list_recipes(
 
     authoring = catalog_service.authoring_for(db, context=context)
     return {"categories": list(recipes.CATEGORIES), "recipes": recipes.build(authoring)}
+
+
+class DraftTestRequest(AutomationRuleCreate):
+    """A rule that may not be saved yet, and the document to try it on."""
+
+    work_item_id: uuid.UUID
+
+
+@router.post(
+    "/test-draft",
+    summary="Try a rule that is not saved yet on one document, step by step (nothing is performed)",
+)
+def test_draft(
+    body: DraftTestRequest,
+    db: Session = Depends(deps.get_db),
+    context: deps.TenantContext = Depends(deps.RequireWorkspaceAdmin),
+) -> dict[str, Any]:
+    """Which way the conditions go for this document, what each step would do, and the message each would send with the
+    variables filled in from the document. Read-only: no run, notification or outbox row is written."""
+    from app.services.automation import catalog_service, flow_service, preview
+
+    _require_automations(db, context, "automation.rule.test")
+    work_item = crud.get_work_item(db, workspace_id=context.workspace_id, work_item_id=body.work_item_id)
+    if work_item is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Work item not found or you do not have permission to access it.")
+    try:
+        normalised = flow_service.normalise(
+            body.model_dump(mode="json", exclude={"work_item_id"}), catalog_service.authoring_for(db, context=context)
+        )
+    except flow_service.FlowValidationError as exc:
+        raise _flow_issues(exc) from exc
+    draft = preview.draft_rule(normalised, max_runs_per_hour=body.max_runs_per_hour)
+    draft.name = body.name
+    return preview.try_draft(
+        db, rule=draft, event_types=list(normalised.event_types), work_item=work_item, workspace_id=context.workspace_id
+    )
+
+
+@router.get(
+    "/health",
+    summary="How each rule has been doing: last run, runs in 7 days, failure rate, held back",
+)
+def rules_health(
+    db: Session = Depends(deps.get_db),
+    context: deps.TenantContext = Depends(deps.RequireWorkspaceContributor),
+) -> dict[str, Any]:
+    from app.services.automation import preview
+
+    return {"days": 7, "rules": preview.rule_health(db, workspace_id=context.workspace_id)}

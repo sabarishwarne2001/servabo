@@ -25,7 +25,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.models.automation import AutomationRule
-from app.models.automation_execution import AutomationExecution
+from app.models.automation_execution import AutomationExecution, AutomationExecutionStatus
 from app.models.outbox_event import OutboxEvent
 from app.models.work_item import WorkItem
 from app.models.workspace import Workspace
@@ -339,4 +339,125 @@ def explain_document(db: Session, *, workspace_id: uuid.UUID, work_item: WorkIte
     return out
 
 
-__all__ = ["draft_rule", "explain_document", "preview", "rule_conditions_config"]
+# ------------------------------------------------------------------------------------- try a draft on a document
+
+
+def try_draft(db: Session, *, rule: Any, event_types: list[str], work_item: WorkItem, workspace_id: uuid.UUID) -> dict[str, Any]:
+    """Read-only: run a rule that may not be saved yet against one document and say, step by step, what it would do.
+
+    The conditions are decided by the engine's own evaluator (with the document's latest matching event, when there is
+    one, for the trigger's own fields); each step names itself and shows the text it would send with the variables filled
+    in from this document. Nothing is performed, sent or written."""
+    from pydantic import ValidationError
+
+    from app.services.automation.actions import base as action_base
+    from app.services.automation.contracts import ActionNodeConfig
+
+    _read_only(db)
+    workspace = db.get(Workspace, workspace_id)
+    ctx = evaluator.EvalContext.for_workspace(workspace) if workspace is not None else evaluator.EvalContext()
+    event = None
+    if event_types:
+        event = db.execute(
+            select(OutboxEvent)
+            .where(
+                OutboxEvent.workspace_id == workspace_id,
+                OutboxEvent.visibility == "INTERNAL",
+                OutboxEvent.resource_id == work_item.id,
+                OutboxEvent.event_type.in_(event_types),
+            )
+            .order_by(OutboxEvent.created_at.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+    payload = dict(event.payload or {}) if event is not None else None
+    matched, traced = conditions.trace_node_config(
+        rule_conditions_config(rule), work_item=work_item, event_payload=payload,
+        event_type=event.event_type if event is not None else None, context=ctx,
+    )
+    spec = rule.flow_spec if isinstance(getattr(rule, "flow_spec", None), dict) else None
+    planned = _planned_actions(rule, matched)
+    branch = "then" if matched else ("otherwise" if planned else "none")
+
+    state = SimpleNamespace(
+        db=db, work_item=work_item, trigger_event=event, rule=SimpleNamespace(name=getattr(rule, "name", "") or "This rule"),
+        execution=SimpleNamespace(workspace_id=workspace_id),
+    )
+    values = action_base.plain_variables_for(state)
+    steps: list[dict[str, Any]] = []
+    for index, entry in enumerate(planned):
+        node = ActionNodeConfig.from_node_config(entry)
+        definition = action_registry.get(node.action_type)
+        if definition is None:
+            steps.append({"index": index + 1, "label": node.action_type, "ok": False, "problem": "This step no longer exists.", "rendered": {}})
+            continue
+        problem = None
+        config: dict[str, Any] = dict(node.authored_parameters())
+        try:
+            definition.parse(config)
+        except ValidationError as exc:
+            first = exc.errors()[0] if exc.errors() else {}
+            problem = f"{first.get('msg', 'This step is not set up correctly.')}"
+        rendered = {
+            key: action_base.render(str(config[key]), values)
+            for key in definition.template_fields
+            if isinstance(config.get(key), str) and config.get(key)
+        }
+        steps.append({
+            "index": index + 1, "label": definition.label, "action_type": definition.action_type, "ok": problem is None,
+            "problem": problem, "idempotent": definition.idempotent, "rendered": rendered,
+        })
+    db.rollback()
+    return {
+        "matched": bool(matched),
+        "branch": branch,
+        "conditions": traced,
+        "steps": steps,
+        "document": getattr(work_item, "original_filename", None),
+        "event": {"type": event.event_type, "occurred_at": event.created_at} if event is not None else None,
+        "has_otherwise": bool((spec or {}).get("else_actions")),
+    }
+
+
+# ------------------------------------------------------------------------------------------- health of each rule
+
+FAILED_STATUSES = ("FAILED", "TIMED_OUT", "BUDGET_EXHAUSTED")
+
+
+def rule_health(db: Session, *, workspace_id: uuid.UUID, days: int = 7, now: Optional[datetime] = None) -> dict[str, dict[str, Any]]:
+    """Per rule: the last real run, runs in the last 7 days, how many failed, and how many were held back by a limit."""
+    from sqlalchemy import case, func
+
+    since = (now or datetime.now(timezone.utc)) - timedelta(days=days)
+    skipped = AutomationExecution.status.in_(
+        [s for s in AutomationExecutionStatus if s.value.startswith("SKIPPED")]
+    )
+    failed = AutomationExecution.status.in_([s for s in AutomationExecutionStatus if s.value in FAILED_STATUSES])
+    rows = db.execute(
+        select(
+            AutomationExecution.rule_id,
+            func.count().filter(~skipped).label("runs"),
+            func.count().filter(failed).label("failed"),
+            func.count().filter(AutomationExecution.status == AutomationExecutionStatus.SKIPPED_THROTTLED).label("throttled"),
+            func.count().filter(AutomationExecution.status == AutomationExecutionStatus.SKIPPED_PAUSED).label("paused"),
+        )
+        .where(AutomationExecution.workspace_id == workspace_id, AutomationExecution.created_at >= since)
+        .group_by(AutomationExecution.rule_id)
+    ).all()
+    last = dict(
+        db.execute(
+            select(AutomationExecution.rule_id, func.max(AutomationExecution.created_at))
+            .where(AutomationExecution.workspace_id == workspace_id, ~skipped)
+            .group_by(AutomationExecution.rule_id)
+        ).all()
+    )
+    out: dict[str, dict[str, Any]] = {}
+    for rule_id, at in last.items():
+        out[str(rule_id)] = {"last_run_at": at, "runs_7d": 0, "failed_7d": 0, "throttled_7d": 0, "paused_7d": 0, "failure_rate": 0}
+    for rule_id, runs, bad, throttled, paused in rows:
+        entry = out.setdefault(str(rule_id), {"last_run_at": None, "runs_7d": 0, "failed_7d": 0, "throttled_7d": 0, "paused_7d": 0, "failure_rate": 0})
+        entry.update(runs_7d=int(runs), failed_7d=int(bad), throttled_7d=int(throttled), paused_7d=int(paused),
+                     failure_rate=round(100 * int(bad) / int(runs)) if runs else 0)
+    return out
+
+
+__all__ = ["draft_rule", "explain_document", "preview", "rule_conditions_config", "rule_health", "try_draft"]

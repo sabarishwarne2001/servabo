@@ -200,6 +200,8 @@ class AutomationRuleResponse(BaseModel):
     #: True when the workspace's automations are paused, so this rule will not run even though it is on.
     paused: bool = False
     version: int = 0
+    #: Who built it (their display name, else their email).
+    owner_name: Optional[str] = None
 
     graph_version: int = Field(
         default=0,

@@ -107,6 +107,19 @@ RECIPES: tuple[dict[str, Any], ...] = (
         ]),
     },
     {
+        "id": "bank-account-changed",
+        "title": "Tell finance when a supplier\u2019s bank account changes",
+        "summary": "A changed bank account on a supplier\u2019s invoice is the classic payment fraud. Finance is told before anything is paid.",
+        "category": "Compliance",
+        "icon": "alert",
+        "fill_ins": [],
+        "rule": _rule("Supplier bank account changed: tell finance", ["payment_risk.flagged"], [
+            _step("notify.role", roles=["ADMIN", "BILLING"], title="Bank account changed: {{document.filename}}",
+                  message="The supplier\u2019s bank account differs from before. Check it with the supplier before paying.",
+                  priority="ERROR"),
+        ], groups=[[{"field": "event.kind", "operator": "EQUALS", "value": "BANK_ACCOUNT_CHANGED"}]]),
+    },
+    {
         "id": "payment-risk-chat",
         "title": "Post payment-risk flags to Slack or Teams",
         "summary": "A changed bank account or a suspicious supplier is posted to your finance channel the moment it is flagged.",
@@ -226,16 +239,22 @@ RECIPES: tuple[dict[str, Any], ...] = (
 )
 
 
-def _unavailable_reason(recipe: dict[str, Any], authoring: Any) -> Optional[str]:
+def _locked(recipe: dict[str, Any], authoring: Any) -> Optional[dict[str, Optional[str]]]:
+    """Why a recipe is not open to this tenant: the words, and the capability the upgrade dialog should name."""
     for key in recipe["rule"]["triggers"]:
         spec = TRIGGERS_BY_KEY[key]
         if not available_for(spec, capabilities=authoring.granted_capabilities, addons=authoring.addons):
-            return "Needs the GST Credit add-on or a plan that includes GST Credit." if spec.addon else "Not included in your plan."
+            return {
+                "reason": "Needs the GST Credit add-on or a plan that includes GST Credit." if spec.addon else "Not included in your plan.",
+                "capability": spec.capability or spec.addon,
+                "feature": spec.label,
+            }
     for step in [*recipe["rule"]["actions"], *recipe["rule"]["else_actions"]]:
         definition = action_registry.get(step["action_type"])
         if definition is not None and not flow_service.action_available(
                 definition, capabilities=authoring.granted_capabilities, addons=authoring.addons):
-            return "Not included in your plan."
+            return {"reason": "Not included in your plan.", "capability": definition.capability or definition.addon,
+                    "feature": definition.label}
     return None
 
 
@@ -243,9 +262,17 @@ def build(authoring: Any) -> list[dict[str, Any]]:
     """The recipes, each marked available (or not, with the reason) for this tenant."""
     out: list[dict[str, Any]] = []
     for recipe in RECIPES:
-        reason = _unavailable_reason(recipe, authoring)
+        locked = _locked(recipe, authoring)
         triggers = [TRIGGERS_BY_KEY[k].label for k in recipe["rule"]["triggers"]]
-        out.append({**recipe, "available": reason is None, "unavailable_reason": reason, "trigger_labels": triggers})
+        out.append({
+            **recipe,
+            "available": locked is None,
+            "unavailable_reason": locked["reason"] if locked else None,
+            # What the upgrade dialog names when a locked recipe is chosen.
+            "locked_capability": locked["capability"] if locked else None,
+            "locked_feature": locked["feature"] if locked else None,
+            "trigger_labels": triggers,
+        })
     return out
 
 

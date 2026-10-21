@@ -432,3 +432,50 @@ def test_the_explainer_is_read_only_and_workspace_scoped(engines: Engines) -> No
     assert engines.get(f"/automation/documents/{document}/explain", as_user=engines.tenant.contributor).status_code == 200
     assert _row_counts(engines) == before
     assert engines.get(f"/automation/documents/{uuid.uuid4()}/explain").status_code == 404
+
+
+# ------------------------------------------------------------------------------------------- try a draft, health
+
+
+def test_a_draft_is_tried_on_a_document_with_the_messages_filled_in_and_nothing_written(engines: Engines) -> None:
+    big = _invoice(engines, "INV-TD-1", "9,00,000.00")
+    small = _invoice(engines, "INV-TD-2", "1,180.00")
+    before = _row_counts(engines)
+    draft = _draft([{"action_type": "notify.role", "config": {
+        "roles": ["ADMIN"], "title": "Big: {{document.filename}}", "message": "Total {{field.total_amount}} from {{field.vendor_name}}"}}],
+        else_actions=[{"action_type": "document.tag", "config": {"add": ["small"]}}])
+
+    yes = engines.post("/automation/test-draft", {**draft, "work_item_id": str(big)})
+    assert yes.status_code == 200, yes.text
+    body = yes.json()
+    assert body["matched"] is True and body["branch"] == "then" and body["document"] == "INV-TD-1.pdf"
+    step = body["steps"][0]
+    assert step["ok"] is True and step["rendered"]["title"] == "Big: INV-TD-1.pdf"
+    assert step["rendered"]["message"] == "Total 9,00,000.00 from Acme Supplies Ltd"
+    assert body["conditions"][0]["matched"] is True
+
+    no = engines.post("/automation/test-draft", {**draft, "work_item_id": str(small)}).json()
+    assert no["matched"] is False and no["branch"] == "otherwise" and no["steps"][0]["label"]
+    assert "1,180.00" in no["conditions"][0]["actual"]
+    assert _row_counts(engines) == before, "trying a draft writes nothing"
+
+    bad = engines.post("/automation/test-draft", {**draft, "actions": [{"action_type": "document.tag", "config": {"add": ["no way!"]}}],
+                                                 "work_item_id": str(big)})
+    assert bad.status_code == 422 and "is not a valid tag" in bad.text
+    assert engines.post("/automation/test-draft", {**draft, "work_item_id": str(uuid.uuid4())}).status_code == 404
+    assert engines.post("/automation/test-draft", {**draft, "work_item_id": str(big)}, as_user=engines.tenant.contributor).status_code == 403
+
+
+def test_rule_health_counts_runs_failures_and_held_back_runs_in_seven_days(engines: Engines) -> None:
+    rule = _rule(engines, "Tag every upload", max_runs_per_hour=1)
+    quiet = _rule(engines, "Never runs", condition_groups=[BIG])
+    for number in ("INV-HE-1", "INV-HE-2", "INV-HE-3"):
+        _invoice(engines, number)
+    health = engines.get("/automation/health").json()
+    assert health["days"] == 7
+    mine = health["rules"][rule["id"]]
+    assert mine["runs_7d"] == 1 and mine["throttled_7d"] == 2 and mine["failed_7d"] == 0 and mine["failure_rate"] == 0
+    assert mine["last_run_at"]
+    assert health["rules"][quiet["id"]]["runs_7d"] == 3, "a run that only looked is still a run; it just did nothing"
+    listed = {r["id"]: r for r in engines.get("/automation/rules").json()}
+    assert listed[rule["id"]]["owner_name"], "the rule says who built it"
