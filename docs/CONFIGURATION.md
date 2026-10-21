@@ -14,7 +14,7 @@ in the containers unless you add it to the service's `environment:` in `docker-c
 is not read by any code, is missing from this page, or is one production cannot run without and
 is missing from `.env.production.template` (or does not stop the app from starting when unset).
 
-297 settings. Columns: name, type, default, where it appears (`example` =
+299 settings. Columns: name, type, default, where it appears (`example` =
 `.env.example`, `production` = `.env.production.template`, `guard` = checked by the production
 guard), and the comment written above it in the code.
 
@@ -267,6 +267,8 @@ guard), and the comment written above it in the code.
 | `AUTOMATION_MAX_ACTIONS_PER_EXECUTION` | `int` | `20` | — |  |
 | `AUTOMATION_DEFAULT_BUDGET_MICROS` | `int` | `50000` | — |  |
 | `AUTOMATION_ENGINE_ENABLED` | `bool` | `True` | example |  |
+| `AUTOMATION_DEFAULT_RUNS_PER_HOUR` | `int` | `200` | — | The default "at most N runs per hour" for a rule that sets none (N-151). 0 turns the default off. |
+| `CHAT_WEBHOOK_EXTRA_HOSTS` | `str` | `''` | — | Extra hosts a Slack or Teams incoming-webhook URL may name, comma separated (the stand-in receiver of the test suites). The real hosts (hooks.slack.com, *.webhook.office.com, *.logic.azure.com) are always allowed. |
 | `AUTOMATION_VERIFICATION_AGENTS` | `int` | `2` | example |  |
 | `AUTOMATION_AUTO_APPROVE_THRESHOLD` | `float` | `0.85` | example |  |
 | `ARGON2_MEMORY_COST` | `int` | `19456` | example |  |

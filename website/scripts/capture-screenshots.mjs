@@ -80,6 +80,19 @@ const SHOTS = {
       }
     },
   },
+  // Automation: the builder with the recipe "Hold invoices above ₹10 lakh for review" filled in, the amount check open
+  // (a ₹ field with its currency, never millionths), the rule drawn as a flow with its Yes and No paths.
+  "automation-builder": {
+    path: ws("automation"),
+    prepare: async (page) => {
+      await page.getByRole("button", { name: "Start from a recipe" }).click();
+      await page.getByRole("button", { name: "Use the recipe: Hold invoices above ₹10 lakh for review" }).click();
+      const builder = page.getByRole("dialog", { name: /New automation/ });
+      await builder.waitFor({ timeout: 15_000 });
+      await builder.getByTestId("flow-node-conditions").click();
+      await settle(page);
+    },
+  },
   identity: { path: org("identity") },
   egress: { path: org("egress") },
   // GST credit (the sample company's GSTR-2B, which has planted cases of every status).
