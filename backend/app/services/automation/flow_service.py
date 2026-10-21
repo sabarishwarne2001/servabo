@@ -391,7 +391,7 @@ def payload_from_rule(rule: Any, event_types: list[str]) -> dict[str, Any]:
     }
 
 
-def rule_view(rule: Any, event_types: list[str]) -> dict[str, Any]:
+def rule_view(rule: Any, event_types: list[str], *, paused: bool = False, version: int = 0) -> dict[str, Any]:
     spec = rule.flow_spec if isinstance(rule.flow_spec, dict) else None
     if spec is not None:
         groups = list(spec.get("condition_groups") or [])
@@ -426,7 +426,18 @@ def rule_view(rule: Any, event_types: list[str]) -> dict[str, Any]:
         "is_flow": spec is not None,
         "graph_version": int(rule.graph_version or 0),
         "on_error": rule.on_error,
+        "max_runs_per_hour": getattr(rule, "max_runs_per_hour", None),
+        "cooldown_hours": getattr(rule, "cooldown_hours", None),
+        "effective_runs_per_hour": _effective_runs_per_hour(rule),
+        "paused": bool(paused and rule.is_active),
+        "version": version,
     }
+
+
+def _effective_runs_per_hour(rule: Any) -> int:
+    from app.services.automation import volume
+
+    return volume.effective_runs_per_hour(rule)
 
 
 def dry_run(db: Any, *, rule: Any, work_item: Any) -> dict[str, Any]:

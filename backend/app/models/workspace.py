@@ -171,6 +171,11 @@ class Workspace(Base, UUIDMixin, TimestampMixin):
         default="YYYY-MM-DD",
         nullable=False,
     )
+    #: Session J. When a workspace admin paused every automation here (NULL = running), and who.
+    automations_paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    automations_paused_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     logo_file_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("uploaded_files.id", ondelete="SET NULL"),

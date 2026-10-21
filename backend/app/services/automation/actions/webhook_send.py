@@ -125,6 +125,8 @@ def build_payload(state: Any, config: WebhookSendConfig) -> dict[str, Any]:
     return {
         "rule": {"id": str(state.rule.id), "name": state.rule.name},
         "execution_id": str(state.execution.id),
+        # Session J: the same on a retry of this run, so a receiver that de-duplicates on it sees one delivery.
+        "idempotency_key": f"{_root_execution_id(state)}:{int(getattr(state, 'actions_executed', 0) or 0)}",
         "workspace_id": str(state.execution.workspace_id),
         "trigger": {
             "key": spec.key if spec else None,
@@ -151,6 +153,12 @@ def build_payload(state: Any, config: WebhookSendConfig) -> dict[str, Any]:
         },
         "fields": fields,
     }
+
+
+def _root_execution_id(state: Any) -> str:
+    from app.services.automation import volume
+
+    return str(volume.root_execution_id(state.db, state.execution))
 
 
 def perform(state: Any, spec: Any) -> ActionOutcome:
@@ -196,4 +204,6 @@ DEFINITION = ActionDefinition(
     minimum_role=ROLE_ORGANIZATION_ADMIN,
     aliases=("webhook",),
     validate_resources=_validate,
+    # The payload carries an idempotency key that a retry repeats, so a receiver that de-duplicates sees one delivery.
+    idempotent=True,
 )

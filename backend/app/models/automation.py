@@ -18,6 +18,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import ENUM as PGEnum, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -52,6 +53,14 @@ class AutomationRule(Base, UUIDMixin, TimestampMixin):
         CheckConstraint(
             "budget_cost_micros IS NULL OR budget_cost_micros >= 0",
             name="ck_automation_rules_budget_non_negative",
+        ),
+        CheckConstraint(
+            "max_runs_per_hour IS NULL OR (max_runs_per_hour >= 1 AND max_runs_per_hour <= 100000)",
+            name="ck_automation_rules_max_runs_per_hour_bounded",
+        ),
+        CheckConstraint(
+            "cooldown_hours IS NULL OR (cooldown_hours >= 1 AND cooldown_hours <= 8760)",
+            name="ck_automation_rules_cooldown_hours_bounded",
         ),
         # ARCH37-S1:flow-spec
         CheckConstraint(
@@ -140,6 +149,14 @@ class AutomationRule(Base, UUIDMixin, TimestampMixin):
     budget_cost_micros: Mapped[Union[int, None]] = mapped_column(
         BigInteger, nullable=True
     )
+
+    # ---- Session J: safe at volume ------------------------------------
+    #: "At most N runs per hour". NULL means the workspace default (`AUTOMATION_DEFAULT_RUNS_PER_HOUR`).
+    max_runs_per_hour: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    #: "At most once per document every X hours". NULL means off.
+    cooldown_hours: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    #: When the owner was last told this rule was throttled (at most one notice a day).
+    throttle_notified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # ---- ARCH-37 ------------------------------------------------------
     #: The step builder's document: condition groups, the operator between
@@ -236,3 +253,33 @@ class AutomationLog(Base, UUIDMixin, TimestampMixin):
         back_populates="automation_logs",
         passive_deletes=True,
     )
+
+
+class AutomationRuleVersion(Base, UUIDMixin, TimestampMixin):
+    """Session J. A snapshot of a rule written at every save, for the history, a plain diff and Restore."""
+
+    __tablename__ = "automation_rule_versions"
+
+    __table_args__ = (
+        UniqueConstraint("rule_id", "version", name="uq_automation_rule_versions_rule_version"),
+        CheckConstraint("version >= 1", name="ck_automation_rule_versions_version_positive"),
+        CheckConstraint("jsonb_typeof(snapshot) = 'object'", name="ck_automation_rule_versions_snapshot_is_object"),
+        Index("ix_automation_rule_versions_workspace", "workspace_id"),
+    )
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
+    )
+    rule_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("automation_rules.id", ondelete="CASCADE"), nullable=False
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    note: Mapped[str] = mapped_column(String(200), nullable=False, default="", server_default="")
+    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    restored_from_version: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

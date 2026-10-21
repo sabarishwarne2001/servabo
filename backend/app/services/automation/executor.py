@@ -86,15 +86,21 @@ def create_execution(
     outbox_event_id: Optional[uuid.UUID] = None,
     causation_id: Optional[uuid.UUID] = None,
     node_count: int = 0,
+    hold: Optional[Any] = None,
+    retry_of_id: Optional[uuid.UUID] = None,
 ) -> tuple[AutomationExecution, bool]:
+    """`hold` (Session J) is a `volume.Hold`: the run is recorded as skipped (paused, throttled, cooldown) and never runs.
+    A paused workspace comes before the cycle check, because a paused run must not be explained as a loop."""
     actual_correlation_id = correlation_id or uuid.uuid4()
-    suppression = cycle_detector.check(
-        db,
-        rule_id=rule.id,
-        correlation_id=actual_correlation_id,
-        depth=depth,
-        causation_id=causation_id,
-    )
+    suppression = None
+    if hold is None:
+        suppression = cycle_detector.check(
+            db,
+            rule_id=rule.id,
+            correlation_id=actual_correlation_id,
+            depth=depth,
+            causation_id=causation_id,
+        )
 
     execution = AutomationExecution(
         organization_id=organization_id,
@@ -105,13 +111,18 @@ def create_execution(
         correlation_id=actual_correlation_id,
         depth=depth,
         status=(
-            suppression.status if suppression else AutomationExecutionStatus.QUEUED
+            hold.status if hold is not None
+            else suppression.status if suppression else AutomationExecutionStatus.QUEUED
         ),
+        retry_of_id=retry_of_id,
         budget_cost_micros=budget_service.resolve_budget_micros(rule),
         node_count=node_count,
-        details=suppression.as_details() if suppression else {},
-        error=suppression.reason if suppression else None,
-        completed_at=_now() if suppression else None,
+        details=(
+            {"held_back": hold.details} if hold is not None
+            else suppression.as_details() if suppression else {}
+        ),
+        error=hold.reason if hold is not None else suppression.reason if suppression else None,
+        completed_at=_now() if (suppression or hold is not None) else None,
     )
     
     execution, created = insert_or_get(

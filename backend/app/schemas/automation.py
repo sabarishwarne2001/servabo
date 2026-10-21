@@ -132,6 +132,11 @@ class AutomationRuleCreate(AutomationRuleBase):
     groups_operator: Literal["AND", "OR"] = Field(default="AND")
     else_actions: list[AutomationAction] = Field(default_factory=list, max_length=10)
     on_error: Literal["HALT", "CONTINUE"] = Field(default="HALT")
+    # Session J, Phase 4: safe at volume. NULL means the default / off.
+    max_runs_per_hour: Optional[int] = Field(default=None, ge=1, le=100000)
+    cooldown_hours: Optional[int] = Field(default=None, ge=1, le=8760)
+    #: A note kept with the version this save writes ("Raised the limit for month end").
+    note: Optional[str] = Field(default=None, max_length=200)
 
     @model_validator(mode="after")
     def validate_conditions_presence(self) -> "AutomationRuleCreate":  # type: ignore[override]
@@ -160,6 +165,9 @@ class AutomationRuleUpdate(BaseModel):
     groups_operator: Literal["AND", "OR"] | None = None
     else_actions: list[AutomationAction] | None = Field(None, max_length=10)
     on_error: Literal["HALT", "CONTINUE"] | None = None
+    max_runs_per_hour: int | None = Field(None, ge=1, le=100000)
+    cooldown_hours: int | None = Field(None, ge=1, le=8760)
+    note: str | None = Field(None, max_length=200)
 
 
 class AutomationRuleResponse(BaseModel):
@@ -185,6 +193,13 @@ class AutomationRuleResponse(BaseModel):
     groups_operator: Literal["AND", "OR"] = "AND"
     else_actions: list[dict[str, Any]] = Field(default_factory=list)
     is_flow: bool = False
+    max_runs_per_hour: Optional[int] = None
+    cooldown_hours: Optional[int] = None
+    #: The limit that applies: the rule's own, else the workspace default (0 = none).
+    effective_runs_per_hour: int = 0
+    #: True when the workspace's automations are paused, so this rule will not run even though it is on.
+    paused: bool = False
+    version: int = 0
 
     graph_version: int = Field(
         default=0,
