@@ -14,16 +14,16 @@ Builder direction: the owner's sample UI (full-page editor, step cards joined by
 look for the new builder, in Lumen colours (N-149 when decided).
 
 - [x] 0. Start-up: docs and code read; `docs/automation/AUDIT.md` written (inventory, 13 native dialogs); this checklist
-- [ ] 0b. Emitter test (every catalog trigger's event has an emitter in `app/`), failing first
-- [ ] 1. (P0) Phase 1: conditions always right (money, dates, options, lists, finance schema + aliases, derived fields, trace)
-- [ ] 2. (P0/P1) Phase 2: engines become triggers (GST, payment risk, schedule, manual, TruthMesh, legal hold; then Helm, request link)
-- [ ] 3. (P0/P1) Phase 3: new actions (document.tag, review.assign, legal_hold.place, chat.post, gst.remind_supplier; then obligation.create, supplier.request_document)
-- [ ] 4. (P0/P1) Phase 4: throttle and cooldown, pause switch, retry, preview, versions, "why didn't my rule run?" (Wait step only if all green)
-- [ ] 5A. (P0) Phase 5A: no browser pop-ups (ConfirmDialog Esc fix, `useConfirmDialog`, 13 replacements, three guards, specs updated)
-- [ ] 5. (P0) Phase 5: Automation home, recipe gallery (12 to 16), the new builder, run history, document page panel
-- [ ] 6. Tests: Vitest + `test:unit` in CI, browser specs 109+ (x3 repeats, axe), backend suites
-- [ ] 7. Records: README, NEEDS-OWNER, FINDINGS, COVERAGE, CHANGELOG, CONFIGURATION, HANDOFF, website screenshot and paragraph
-- [ ] Finish: full suites once, one Alembic head (up/down/up), lint/typecheck/check:self clean, PR ready, CI green on every job
+- [x] 0b. Emitter test (every catalog trigger's event has an emitter in `app/`), failing first
+- [x] 1. (P0) Phase 1: conditions always right (money, dates, options, lists, finance schema + aliases, derived fields, trace) (F-535 to F-539)
+- [x] 2. (P0/P1) Phase 2: engines become triggers: 14 new, 37 in all (GST, payment risk, schedule, manual, TruthMesh, legal hold, Helm, request link)
+- [x] 3. (P0/P1) Phase 3: seven new actions (tag, assign review, legal hold, chat post, GST reminder, obligation, supplier request)
+- [x] 4. (P0/P1) Phase 4: throttle and cooldown, pause switch, retry, preview, versions, "why didn't my rule run?". **The optional Wait step was not built (N-154)**
+- [x] 5A. (P0) Phase 5A: no browser pop-ups (ConfirmDialog Esc fix, `useConfirmDialog`, 13 replacements, three guards, specs updated) (F-540, F-541)
+- [x] 5. (P0) Phase 5: Automation home (cards with sentence, health, owner; filters), recipe gallery (16), the full-page builder, run history, document panel
+- [x] 6. Tests: Vitest (+ `test:unit` in CI and its contract test), browser specs 109 to 117, backend suites
+- [x] 7. Records: README, NEEDS-OWNER (N-149 to N-159), FINDINGS (F-535 to F-544), COVERAGE, CHANGELOG, CONFIGURATION, HANDOFF, website screenshot and paragraph
+- [ ] Finish: full suites once, one Alembic head (up/down/up), lint/typecheck/check:self clean, PR ready, CI green on every job (below)
 
 ## Current phase — Session I: make CI green again after PR #33 (2026-10-20)
 Branch `claude/new-session-ko5jbm` (the session's assigned branch), based on `main` at `068afea` (PR #33 merged), draft PR #34.

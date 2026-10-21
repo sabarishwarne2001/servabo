@@ -113,5 +113,5 @@ steps, and for each check the reason in words. **Retry this run**, and **Open th
 
 - `AUTOMATION_DEFAULT_RUNS_PER_HOUR` (default 200; 0 = no default limit) and `CHAT_WEBHOOK_EXTRA_HOSTS`: see `docs/CONFIGURATION.md`.
 - The hourly job `automation.sweep` announces the schedules and the GST clocks; the worker's light profile runs it.
-- Decisions behind all this: `docs/hardening/NEEDS-OWNER.md`, N-149 to N-159. Defects found: F-535 to F-544. The starting
+- Decisions behind all this: `docs/hardening/NEEDS-OWNER.md`, N-149 to N-159. Defects found: F-535 to F-545. The starting
   inventory: `docs/automation/AUDIT.md`.
