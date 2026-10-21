@@ -216,7 +216,7 @@ def _members(db: Session, *, workspace_id: uuid.UUID, organization_id: uuid.UUID
     """People a rule may assign a review or a follow-up to: those who can work review items here."""
     from app.services.automation.actions import review_assign
 
-    return [{"email": user.email, "name": (getattr(user, "full_name", None) or user.email)}
+    return [{"email": user.email, "name": (getattr(user, "display_name", None) or user.email)}
             for user, _role in review_assign._holders(db, workspace_id=workspace_id, organization_id=organization_id)]  # noqa: SLF001
 
 
@@ -256,6 +256,7 @@ def _workspace_settings(db: Session, workspace_id: uuid.UUID) -> dict[str, Any]:
 
 
 def build(db: Session, *, context: Any) -> dict[str, Any]:
+    from app.core.config import settings
     from app.models.warehouse_sync import EXPORT_DATASET_VALUES
     from app.services.automation.actions.notify_role import ROLE_VALUES
     from app.services.automation.actions.work_item_mutate import MUTABLE_COLUMNS
@@ -351,7 +352,11 @@ def build(db: Session, *, context: Any) -> dict[str, Any]:
         "template_variables": list(STATIC_VARIABLES),
         "document_fields": observed_fields(db, workspace_id=authoring.workspace_id),
         "resources": resources,
-        "limits": {"triggers": 4, "groups": 10, "conditions_per_group": 20, "actions_per_branch": 10},
+        "limits": {
+            "triggers": 4, "groups": 10, "conditions_per_group": 20, "actions_per_branch": 10,
+            # Session J: what a rule with no limit of its own is held to, per hour (0 = no default limit).
+            "default_runs_per_hour": max(0, int(settings.AUTOMATION_DEFAULT_RUNS_PER_HOUR)),
+        },
     }
 
 
