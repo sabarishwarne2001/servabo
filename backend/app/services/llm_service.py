@@ -16,7 +16,7 @@ from typing import Any
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core import byok_providers
+from app.core import byok_providers, finance_schema
 from app.core.config import settings
 from app.models.ai_settings import AISettings
 from app.prompts.intents import PromptIntent
@@ -55,7 +55,10 @@ Document:
 {text}
 """
 
-ENTITY_EXTRACTION_PROMPT_TEMPLATE = """
+# Session J: the field lists are rendered from `app/core/finance_schema.py`, the one table the automation
+# builder's field picker is built from too. `tests/services/test_finance_schema.py` pins the text.
+ENTITY_EXTRACTION_PROMPT_TEMPLATE = (
+    """
 You are an expert information extraction engine.
 
 Document Type:
@@ -74,68 +77,21 @@ Invoice / Receipt / Purchase Order
 
 (Credit notes and debit notes are read with these rules as well.)
 
-- invoice_number: the number printed on an invoice, bill or credit/debit note
-- invoice_date: the date printed on an invoice, bill or credit/debit note
-- po_date: the date of a purchase order
-- receipt_date: the date goods were received, on a goods receipt
-- delivery_date: the delivery date a purchase order asks for
-- due_date
-- payment_terms: as printed, for example "Net 45"
-- po_number: the purchase order the document refers to, or its own number on a purchase order
-- receipt_number: the number of a goods receipt or delivery note
-- vendor_name: the seller
-- vendor_gstin: the seller's 15-character GSTIN
-- vendor_pan
-- vendor_address
-- vendor_email
-- vendor_bank_account: the seller's bank account number, as printed
-- vendor_ifsc
-- udyam_number: the seller's Udyam registration number
-- customer_name: the buyer (bill to)
-- buyer_gstin: the buyer's 15-character GSTIN
-- place_of_supply
-- currency: ISO code such as INR
-- subtotal: the taxable value before tax
-- cgst_amount
-- sgst_amount
-- igst_amount
-- cess_amount
-- tax_amount: total tax
-- total_amount: the amount payable
-- reverse_charge: true or false, as the document states
-- irn: the e-invoice Invoice Reference Number
-- note_type: "credit" or "debit", for a credit or debit note only
-- credit_note_number: the note's own number, for a credit or debit note only
-- original_invoice_number: the invoice a credit or debit note refers to
-- original_invoice_date
-- line_items: a list; each entry has
-  - description
-  - hsn_sac: the HSN or SAC code
-  - quantity
-  - unit
-  - unit_price
-  - taxable_value
-  - tax_rate: percent
-  - amount
-  - received_quantity: on a goods receipt, the quantity received
+"""
+    + finance_schema.prompt_block(finance_schema.GROUP_COMMERCIAL)
+    + """
 
 Resume
 
-- candidate_name
-- email
-- phone_number
-- core_skills
-- degree_education
-- years_of_experience
+"""
+    + finance_schema.prompt_block(finance_schema.GROUP_RESUME)
+    + """
 
 Contract
 
-- agreement_number
-- agreement_date
-- termination_date
-- party_names
-- governing_law
-- value_amount
+"""
+    + finance_schema.prompt_block(finance_schema.GROUP_CONTRACT)
+    + """
 
 Other
 
@@ -148,6 +104,7 @@ Document:
 
 {text}
 """
+)
 
 SUMMARIZATION_PROMPT_TEMPLATE = """
 You are an expert document summarization system.

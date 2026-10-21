@@ -250,6 +250,7 @@ def _reconcile(db: Session, *, organization_id: uuid.UUID, workspace_id: uuid.UU
     now = _now()
     new = 0
     seen: set[str] = set()
+    opened: list[MeshConflict] = []
     for draft in detected:
         fingerprint = draft.fingerprint
         seen.add(fingerprint)
@@ -258,13 +259,15 @@ def _reconcile(db: Session, *, organization_id: uuid.UUID, workspace_id: uuid.UU
             row = db.execute(select(MeshConflict).where(MeshConflict.workspace_id == workspace_id,
                                                         MeshConflict.fingerprint == fingerprint)).scalar_one_or_none()
         if row is None:
-            db.add(MeshConflict(
+            fresh = MeshConflict(
                 id=uuid.uuid4(), organization_id=organization_id, workspace_id=workspace_id, fingerprint=fingerprint,
                 kind=draft.kind, concept=draft.concept, severity=draft.severity, status="OPEN",
                 title=draft.title[:300], summary=draft.summary, relation=draft.relation,
                 work_item_ids=sorted(set(draft.work_item_ids), key=str), document_values=draft.document_values,
                 details=draft.details, exposure_micros=draft.exposure_micros, currency=draft.currency,
-                first_seen_at=now, last_seen_at=now))
+                first_seen_at=now, last_seen_at=now)
+            db.add(fresh)
+            opened.append(fresh)
             new += 1
             continue
         row.title, row.summary, row.severity = draft.title[:300], draft.summary, draft.severity
@@ -274,8 +277,10 @@ def _reconcile(db: Session, *, organization_id: uuid.UUID, workspace_id: uuid.UU
         row.updated_at = now
         if row.status == "RESOLVED" and row.auto_resolved:
             row.status, row.resolved_at, row.auto_resolved, row.resolution_note = "OPEN", None, False, None
+            opened.append(row)
             new += 1
     resolved = 0
+    auto_resolved: list[MeshConflict] = []
     for fingerprint, row in existing.items():
         if fingerprint in seen or row.status not in OPEN:
             continue
@@ -284,8 +289,16 @@ def _reconcile(db: Session, *, organization_id: uuid.UUID, workspace_id: uuid.UU
         row.status, row.auto_resolved, row.resolved_at = "RESOLVED", True, now
         row.resolution_note = "No longer detected: the documents or the links between them changed."
         row.updated_at = now
+        auto_resolved.append(row)
         resolved += 1
     db.flush()
+    # Session J: a conflict opening (or reopening itself) and a conflict ending by itself are triggers.
+    from app.services.automation import emitters
+
+    for row in opened:
+        emitters.truthmesh_conflict(db, conflict=row, opened=True, when=now)
+    for row in auto_resolved:
+        emitters.truthmesh_conflict(db, conflict=row, opened=False, how="AUTO", when=now)
     return new, resolved
 
 
@@ -434,6 +447,7 @@ def decide_conflict(db: Session, *, conflict: MeshConflict, status: str, note: O
     if status in ("RESOLVED", "DISMISSED") and len(text) < 3:
         raise MeshError("REASON_REQUIRED", "Say how it was resolved, or why it is not a conflict (a few words).")
     now = _now()
+    previous_status = conflict.status
     conflict.status = status
     conflict.auto_resolved = False
     if status in ("RESOLVED", "DISMISSED"):
@@ -445,6 +459,12 @@ def decide_conflict(db: Session, *, conflict: MeshConflict, status: str, note: O
         conflict.resolution_note = text[:2000] or conflict.resolution_note
     conflict.updated_at = now
     db.flush()
+    from app.services.automation import emitters
+
+    if status in ("RESOLVED", "DISMISSED") and previous_status not in ("RESOLVED", "DISMISSED"):
+        emitters.truthmesh_conflict(db, conflict=conflict, opened=False, how=status, when=now)
+    elif status == "OPEN" and previous_status in ("RESOLVED", "DISMISSED"):
+        emitters.truthmesh_conflict(db, conflict=conflict, opened=True, when=now)
     _refresh_risk(db, conflict.workspace_id, set(conflict.work_item_ids))
     _refresh_state(db, workspace_id=conflict.workspace_id, organization_id=conflict.organization_id, ms=None)
     return conflict

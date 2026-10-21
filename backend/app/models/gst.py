@@ -251,11 +251,14 @@ class GstSettings(Base):
     __table_args__ = (
         _workspace_fk("gst_settings"),
         CheckConstraint("tolerance_micros >= 0 AND tolerance_micros <= 1000000000", name="ck_gst_settings_tolerance"),
+        CheckConstraint("waiting_notice_days >= 1 AND waiting_notice_days <= 365", name="ck_gst_settings_waiting_notice_days"),
         Index("ix_gst_settings_organization", "organization_id"),
     )
 
     workspace_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True)
     organization_id: Mapped[uuid.UUID] = _org()
     tolerance_micros: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default=text("1000000"))
+    #: Session J: a purchase invoice still missing from every GSTR-2B after this many days is announced to the rules.
+    waiting_notice_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("30"))
     updated_by_user_id: Mapped[Optional[uuid.UUID]] = _user()
     updated_at: Mapped[datetime] = _ts()

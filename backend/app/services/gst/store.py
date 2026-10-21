@@ -76,6 +76,10 @@ def import_parsed(db: Session, *, workspace: Workspace, parsed: parse.ParsedRetu
         details={"gstin": parsed.gstin, "period": parsed.period, "records": len(rows), "file_sha256": parsed.sha256,
                  "replaced": supersedes is not None, "problems": len(parsed.problems)})
     engine.recompute(db, workspace, parsed.gstin)
+    from app.services.automation import emitters
+
+    emitters.gst_return_imported(db, workspace=workspace, gstin=parsed.gstin, period=parsed.period,
+                                 return_id=created.id, records=len(rows), replaced=supersedes is not None)
     return {**result, "status": status, "return_id": str(created.id),
             "message": ("Replaced the earlier import of this period." if status == REPLACED else "Imported.")}
 

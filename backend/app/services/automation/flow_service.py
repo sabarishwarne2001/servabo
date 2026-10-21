@@ -41,7 +41,9 @@ from app.services.automation.actions.base import (
 
 MAX_ACTIONS = 10
 DOCUMENT_ACTIONS = frozenset(
-    {"redaction.start", "review.escalate", "autonomy.decide", "work_item.mutate"}
+    {"redaction.start", "review.escalate", "autonomy.decide", "work_item.mutate",
+     # Session J: these act on the document the run is about.
+     "document.tag", "review.assign", "legal_hold.place"}
 )
 ALL_OPERATORS = frozenset(op for ops in catalog.OPERATORS_BY_TYPE.values() for op in ops)
 
@@ -85,24 +87,59 @@ def _dump(model: Any) -> Any:
     return model.model_dump(mode="json") if hasattr(model, "model_dump") else model
 
 
+def action_available(definition: Any, *, capabilities: frozenset[str], addons: frozenset[str]) -> bool:
+    """Whether a tenant may use an action: its capability AND its add-on, or (for `either`) one of them."""
+    has_cap = definition.capability is None or definition.capability in capabilities
+    has_addon = definition.addon is None or definition.addon in addons
+    if getattr(definition, "either", False):
+        return (definition.capability in capabilities) or (definition.addon in addons)
+    return has_cap and has_addon
+
+
 def _role_ok(minimum: str, organization_role: str) -> bool:
     if minimum == ROLE_ORGANIZATION_ADMIN:
         return organization_role in ("OWNER", "ADMIN")
     return True
 
 
+def _value_items(value: Any) -> list[str]:
+    if isinstance(value, (list, tuple)):
+        return [str(v).strip() for v in value if str(v).strip()]
+    text = str(value or "").strip()
+    return [text] if text else []
+
+
+def _option_issue(label: str, values: list[str], options: Sequence[Any]) -> Optional[str]:
+    allowed = {str(o["value"]).lower(): str(o["label"]) for o in options}
+    bad = [v for v in values if v.lower() not in allowed]
+    if not bad:
+        return None
+    shown = ", ".join(f"{l}" for l in allowed.values())
+    return f"{', '.join(repr(b) for b in bad)} {'is' if len(bad) == 1 else 'are'} not among the choices for {label}: {shown}."
+
+
 def _validate_conditions(
-    groups: list[dict[str, Any]], trigger_keys: list[str], issues: list[dict[str, Any]]
+    groups: list[dict[str, Any]], trigger_keys: list[str], issues: list[dict[str, Any]], *, check_options: bool = True
 ) -> None:
+    from app.core import finance_schema as fs
+    from app.services.automation import document_fields as df
+    from app.services.automation import evaluator
+
     event_fields = {f.path: f for f in catalog.fields_for(trigger_keys)}
     specs, _ = catalog.resolve_trigger_keys(trigger_keys)
     documents = all(spec.has_document for spec in specs)
+    derived = {d["key"]: d for d in df.DERIVED_FIELDS}
     for g_index, group in enumerate(groups):
         for c_index, condition in enumerate(group.get("conditions") or []):
             loc = ("condition_groups", g_index, "conditions", c_index)
             path = str(condition.get("field") or "")
             operator = str(condition.get("operator") or "").upper()
-            value = str(condition.get("value") or "")
+            raw_value = condition.get("value")
+            items = _value_items(raw_value)
+            currency = condition.get("currency")
+            field_type: Optional[str] = None
+            options: Sequence[Any] = ()
+            label = path
             if path.startswith(catalog.EVENT_FIELD_PREFIX):
                 spec_field = event_fields.get(path)
                 if spec_field is None:
@@ -111,13 +148,64 @@ def _validate_conditions(
                 allowed = catalog.OPERATORS_BY_TYPE[spec_field.type]
                 if operator not in allowed:
                     issues.append(_issue((*loc, "operator"), f"{operator} does not apply to a {spec_field.type} field."))
+                field_type, label = spec_field.type, spec_field.label
+                options = [{"value": v, "label": l} for v, l in spec_field.options]
             else:
                 if not documents:
                     issues.append(_issue((*loc, "field"), "The selected trigger has no document to read."))
                 if operator not in ALL_OPERATORS:
                     issues.append(_issue((*loc, "operator"), f"Unknown operator {operator!r}."))
-            if operator not in catalog.VALUELESS_OPERATORS and not value.strip():
+                if path in derived:
+                    field_type, label = derived[path]["type"], derived[path]["label"]
+                else:
+                    known = fs.BY_KEY.get(df.canonical_key(path))
+                    if known is not None:
+                        field_type, label, options = known.type, known.label, [{"value": v, "label": l} for v, l in known.options]
+                    elif path == fs.CLASSIFICATION_PATH:
+                        field_type, label = "string", "Document type"
+                        options = [{"value": v, "label": l} for v, l in fs.CLASSIFICATIONS]
+                if operator in catalog.DATE_OPERATORS_NEW and field_type is not None and field_type != "date":
+                    issues.append(_issue((*loc, "operator"), f"{operator} compares dates, and {label} is not a date."))
+            if operator not in catalog.VALUELESS_OPERATORS and not items:
                 issues.append(_issue((*loc, "value"), "A value is required for this operator."))
+                continue
+            if operator in catalog.DAY_COUNT_OPERATORS and items:
+                if not (len(items) == 1 and items[0].isdigit()):
+                    issues.append(_issue((*loc, "value"), "Enter a whole number of days (0 or more)."))
+            if operator == "BETWEEN" and isinstance(raw_value, (list, tuple)) and len(items) != 2:
+                issues.append(_issue((*loc, "value"), "Give a low and a high value."))
+            if check_options and options and operator in ("EQUALS", "NOT_EQUALS", "IN", "NOT_IN") and items:
+                message = _option_issue(label, items, options)
+                if message:
+                    issues.append(_issue((*loc, "value"), message))
+            if currency:
+                if field_type != "money":
+                    issues.append(_issue((*loc, "currency"), "A currency applies only to an amount."))
+                elif evaluator.known_currency(currency) is None:
+                    issues.append(_issue((*loc, "currency"), f"{currency!r} is not a currency this product knows."))
+
+
+def _store_list_values(groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """IN, NOT_IN, BETWEEN and the array operators store a JSON list. A comma string from an older client is split
+    exactly as the evaluator always split it, so the rule means what it meant."""
+    from app.services.automation import evaluator
+
+    out: list[dict[str, Any]] = []
+    for group in groups:
+        conditions = []
+        for condition in group.get("conditions") or []:
+            condition = dict(condition)
+            operator = str(condition.get("operator") or "").upper()
+            value = condition.get("value")
+            if operator in catalog.LIST_VALUE_OPERATORS and isinstance(value, str):
+                parts = evaluator.split_between(value) if operator == "BETWEEN" else evaluator.expected_items(value)
+                if parts:
+                    condition["value"] = parts
+            if not condition.get("currency"):
+                condition.pop("currency", None)
+            conditions.append(condition)
+        out.append({**group, "conditions": conditions})
+    return out
 
 
 def _validate_actions(
@@ -150,12 +238,21 @@ def _validate_actions(
         action_type = definition.action_type
         if action_type in excluded:
             issues.append(_issue((*loc, "action_type"), f"{definition.label} cannot run on the selected trigger."))
+        allowed_here = catalog.allowed_actions_for(trigger_keys)
+        if allowed_here is not None and action_type not in allowed_here:
+            issues.append(_issue(
+                (*loc, "action_type"),
+                f"{definition.label} cannot run on the selected trigger. On Helm, a rule may only notify people, send "
+                "an email, post to chat, call a webhook, open a review or tag; it never approves, pays or schedules a payment."))
         if action_type in DOCUMENT_ACTIONS and not documents:
             issues.append(_issue((*loc, "action_type"), f"{definition.label} needs a document."))
-        if definition.capability and definition.capability not in authoring.granted_capabilities:
-            issues.append(_issue((*loc, "action_type"), f"{definition.label} is not included in your plan.", "plan"))
-        if definition.addon and definition.addon not in authoring.addons:
-            issues.append(_issue((*loc, "action_type"), f"{definition.label} needs an add-on your organization does not have.", "plan"))
+        if not action_available(definition, capabilities=authoring.granted_capabilities, addons=authoring.addons):
+            if definition.either:
+                issues.append(_issue((*loc, "action_type"), f"{definition.label} is not included in your plan. It needs GST Credit, or its add-on.", "plan"))
+            elif definition.capability and definition.capability not in authoring.granted_capabilities:
+                issues.append(_issue((*loc, "action_type"), f"{definition.label} is not included in your plan.", "plan"))
+            else:
+                issues.append(_issue((*loc, "action_type"), f"{definition.label} needs an add-on your organization does not have.", "plan"))
         if not _role_ok(definition.minimum_role, authoring.organization_role):
             issues.append(_issue((*loc, "action_type"), f"Only organization owners and admins can add {definition.label}.", "permission"))
 
@@ -184,8 +281,12 @@ def _validate_actions(
     return stored
 
 
-def normalise(payload: dict[str, Any], authoring: Authoring) -> NormalisedRule:
-    """Validate a complete rule document and return its storage shape."""
+def normalise(payload: dict[str, Any], authoring: Authoring, *, check_options: bool = True) -> NormalisedRule:
+    """Validate a complete rule document and return its storage shape.
+
+    `check_options` is False when a rule is only switched back on, not edited: a value saved before the choices
+    were enforced must not stop someone turning their own rule on again.
+    """
     issues: list[dict[str, Any]] = []
     trigger_keys = payload.get("triggers")
     legacy = trigger_keys is None
@@ -204,7 +305,7 @@ def normalise(payload: dict[str, Any], authoring: Authoring) -> NormalisedRule:
         for key in unknown:
             issues.append(_issue(("triggers", trigger_keys.index(key)), f"Unknown trigger {key!r}."))
         for spec in specs:
-            if spec.capability and spec.capability not in authoring.granted_capabilities:
+            if not catalog.available_for(spec, capabilities=authoring.granted_capabilities, addons=authoring.addons):
                 issues.append(_issue(("triggers", trigger_keys.index(spec.key)), f"{spec.label} is not included in your plan.", "plan"))
 
     on_error = str(payload.get("on_error") or "HALT")
@@ -223,7 +324,9 @@ def normalise(payload: dict[str, Any], authoring: Authoring) -> NormalisedRule:
         groups = [_dump(g) for g in payload.get("condition_groups") or []]
         groups = [g for g in groups if g.get("conditions")]
         groups_operator = str(payload.get("groups_operator") or "AND")
-    _validate_conditions(groups, trigger_keys, issues)
+    _validate_conditions(groups, trigger_keys, issues, check_options=check_options and not legacy)
+    if not legacy:
+        groups = _store_list_values(groups)
 
     has_conditions = any(g.get("conditions") for g in groups)
     if else_actions and not has_conditions:
@@ -333,26 +436,31 @@ def dry_run(db: Any, *, rule: Any, work_item: Any) -> dict[str, Any]:
     customer's endpoint because an administrator clicked "Test" would be a
     production side effect with no trigger behind it.
     """
-    from app.services.automation import conditions
+    from app.models.workspace import Workspace
+    from app.services.automation import conditions, evaluator
     from app.services.automation.contracts import ActionNodeConfig
 
     started = time.perf_counter()
+    workspace = db.get(Workspace, getattr(work_item, "workspace_id", None)) if db is not None else None
+    context = evaluator.EvalContext.for_workspace(workspace) if workspace is not None else evaluator.EvalContext()
     spec = rule.flow_spec if isinstance(rule.flow_spec, dict) else None
     if spec is not None:
         groups = list(spec.get("condition_groups") or [])
-        matched = conditions.evaluate_groups(
+        matched, traced = conditions.trace_groups(
             groups,
             groups_operator=spec.get("groups_operator"),
             work_item=work_item,
             event_payload=None,
+            context=context,
         )
         planned = list(rule.actions or []) if matched else list(spec.get("else_actions") or [])
         branch = "then" if matched else ("otherwise" if planned else "none")
     else:
-        matched = conditions.evaluate_node_config(
+        matched, traced = conditions.trace_node_config(
             {"conditions": list(rule.conditions or []), "logic_operator": rule.logic_operator},
             work_item=work_item,
             event_payload=None,
+            context=context,
         )
         planned = list(rule.actions or []) if matched else []
         branch = "then" if matched else "none"
@@ -384,6 +492,8 @@ def dry_run(db: Any, *, rule: Any, work_item: Any) -> dict[str, Any]:
         "notification_sent": False,
         "message": message[:2000],
         "execution_time_ms": round((time.perf_counter() - started) * 1000.0, 2),
+        # Session J: what each condition read, wanted and decided, in words.
+        "conditions": traced,
     }
 
 

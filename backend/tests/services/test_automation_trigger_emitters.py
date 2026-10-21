@@ -27,7 +27,8 @@ import pytest
 from app.services.automation.triggers import CATALOG_EVENT_TYPES, TRIGGER_PREFIX
 
 APP = pathlib.Path(__file__).resolve().parents[2] / "app"
-EMIT_FUNCTIONS = frozenset({"emit_trigger", "emit_internal", "emit_public_with_twin", "emit"})
+#: `emit_once` is Session J's helper (`automation/emitters.py`): one announcement per occurrence.
+EMIT_FUNCTIONS = frozenset({"emit_trigger", "emit_internal", "emit_public_with_twin", "emit", "emit_once"})
 #: Files that LIST events (the catalog, the vocabulary) are not emitters.
 LISTING_FILES = frozenset({"automation_events.py", "triggers.py"})
 
@@ -162,3 +163,21 @@ def test_the_scan_notices_an_event_nothing_emits() -> None:
     hidden.calls = [call for call in index.calls if "obligations" not in str(call[0])]
     assert missing_emitters(["trigger.obligation.due_soon"], ) == []
     assert emitters_of("trigger.obligation.due_soon", index=hidden) == []
+
+
+@pytest.mark.no_db
+def test_every_session_j_emitter_helper_is_called_from_the_engine_it_belongs_to() -> None:
+    """The catalog's Session J events are sent through helpers in `automation/emitters.py`. A helper nobody calls is a
+    trigger that never fires, so each must have a caller elsewhere in `app/`."""
+    from app.services.automation import emitters
+
+    helpers = {name for name in emitters.__all__ if name not in ("emit_once", "listening")}
+    called: set[str] = set()
+    for path in sorted(APP.rglob("*.py")):
+        if path.name == "emitters.py":
+            continue
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in helpers:
+                if isinstance(node.func.value, ast.Name) and node.func.value.id == "emitters":
+                    called.add(node.func.attr)
+    assert helpers - called == set(), f"never called: {sorted(helpers - called)}"

@@ -11,7 +11,7 @@ from app.models.job import (
 )
 from app.models.automation import AutomationRule, AutomationLog
 # ARCH37-S1:models-registered
-from app.models.automation_trigger import AutomationRuleTrigger
+from app.models.automation_trigger import AutomationEventMark, AutomationRuleTrigger
 from app.models.automation_execution import (
     AutomationExecution,
     AutomationExecutionStatus,

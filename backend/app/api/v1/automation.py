@@ -77,6 +77,9 @@ class AutomationNodeRunResponse(BaseModel):
     external_ref: Optional[str] = None
     duration_ms: Optional[int] = None
     outcome: Optional[str] = None
+    # Session J: what each condition read, wanted and decided, in words (identifiers masked).
+    conditions: list[dict[str, Any]] = Field(default_factory=list)
+    matched: Optional[bool] = None
 
 
 # ==========================================================================
@@ -181,6 +184,8 @@ def list_execution_nodes(
             external_ref=row.external_ref,
             duration_ms=row.duration_ms,
             outcome=(row.details or {}).get("outcome") if isinstance(row.details, dict) else None,
+            conditions=list((row.details or {}).get("conditions") or []) if isinstance(row.details, dict) else [],
+            matched=(row.details or {}).get("matched") if isinstance(row.details, dict) else None,
         )
         for row in rows
     ]
@@ -650,7 +655,7 @@ def update_rule(
                 merged[key] = changes[key]
         try:
             normalised = flow_service.normalise(
-                merged, catalog_service.authoring_for(db, context=context)
+                merged, catalog_service.authoring_for(db, context=context), check_options=bool(structural)
             )
         except flow_service.FlowValidationError as exc:
             raise _flow_issues(exc) from exc
@@ -743,3 +748,52 @@ def test_rule(
     return asyncio.run(
         automation_service.test_rule_for_work_item(db, rule=rule, work_item=work_item)
     )
+
+# ==========================================================================
+# Session J — run a rule by hand on one document
+# ==========================================================================
+
+
+class ManualRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    work_item_id: uuid.UUID
+
+
+@router.post(
+    "/rules/{rule_id}/run",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Run a rule by hand on one document",
+    response_description="The run is queued; it appears in Run history within seconds.",
+)
+def run_rule_by_hand(
+    rule_id: uuid.UUID,
+    payload: ManualRunRequest,
+    db: Session = Depends(deps.get_db),
+    context: deps.TenantContext = Depends(deps.RequireWorkspaceAdmin),
+) -> dict[str, Any]:
+    """The manual trigger. A workspace admin presses "Run a rule on this document"; the rule runs on that document as if
+    its trigger had just fired. The rule must have the "Run by hand" trigger and be switched on. Audited."""
+    from app.models.audit_log import AuditAction
+    from app.models.workspace import Workspace
+    from app.services.automation import emitters, rule_triggers
+
+    _require_automations(db, context, "automation.rule.run")
+    rule = crud.get_rule_by_id(db, workspace_id=context.workspace_id, rule_id=rule_id)
+    if rule is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Automation rule not found or you do not have permission to access it.")
+    if emitters.MANUAL not in rule_triggers.event_types_of(db, rule_ids=[rule.id]).get(rule.id, []):
+        raise HTTPException(status.HTTP_409_CONFLICT, "This rule is not set to run by hand. Give it the 'Run by hand on one document' trigger.")
+    if not rule.is_active:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Switch the rule on before running it.")
+    work_item = crud.get_work_item(db, workspace_id=context.workspace_id, work_item_id=payload.work_item_id)
+    if work_item is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Work item not found or you do not have permission to access it.")
+    workspace = db.get(Workspace, context.workspace_id)
+    event = emitters.manual(db, workspace=workspace, work_item_id=work_item.id, rule_id=rule.id)
+    if event is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "The run could not be queued. Check that the rule is on and try again.")
+    _audit_rule(db, context=context, rule=rule, action=AuditAction.EXECUTED,
+                details={"manual_run": True, "work_item_id": str(work_item.id)})
+    db.commit()
+    return {"queued": True, "event_id": str(event.id), "rule_id": str(rule.id), "work_item_id": str(work_item.id)}

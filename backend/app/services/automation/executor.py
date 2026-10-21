@@ -149,12 +149,28 @@ class _WalkState:
     emitted_event_ids: list[str] = field(default_factory=list)
     skipped: set[str] = field(default_factory=set)
     sequence: int = 0
+    #: Session J: the workspace's date format, time zone and currency (see `_eval_context`).
+    eval_ctx: Any = None
 
 
-def _evaluate_condition_node(state: _WalkState, config: dict[str, Any]) -> bool:
+def _eval_context(state: _WalkState) -> Any:
+    """The workspace's date format, time zone and currency, read once per execution (Session J)."""
+    if state.eval_ctx is not None:
+        return state.eval_ctx
+    from app.models.workspace import Workspace
+    from app.services.automation import evaluator
+
+    workspace = state.db.get(Workspace, state.execution.workspace_id)
+    ctx = evaluator.EvalContext.for_workspace(workspace) if workspace is not None else evaluator.EvalContext()
+    state.eval_ctx = ctx
+    return ctx
+
+
+def _evaluate_condition_node(state: _WalkState, config: dict[str, Any]) -> tuple[bool, list[dict[str, Any]]]:
     # ARCH37-S1:condition-groups. Grouped conditions, and `event.<key>` paths
     # that read the trigger's payload. A flat ARCH-13 config evaluates exactly
     # as before, except that an event field no longer needs a document.
+    # Session J: also returns what each condition read, wanted and decided (masked), for the run's trace.
     from app.services.automation import conditions
 
     payload = getattr(state.trigger_event, "payload", None)
@@ -164,14 +180,16 @@ def _evaluate_condition_node(state: _WalkState, config: dict[str, Any]) -> bool:
             str((c or {}).get("field", "")).startswith("event.") for c in flat
             if isinstance(c, dict)
         ):
-            return False
-    return bool(
-        conditions.evaluate_node_config(
-            config,
-            work_item=state.work_item,
-            event_payload=payload if isinstance(payload, dict) else None,
-        )
+            return False, [{"reason": "This trigger has no document, so a condition on a document field could not match.",
+                            "matched": False}]
+    matched, entries = conditions.trace_node_config(
+        config,
+        work_item=state.work_item,
+        event_payload=payload if isinstance(payload, dict) else None,
+        event_type=getattr(state.trigger_event, "event_type", None),
+        context=_eval_context(state),
     )
+    return bool(matched), entries
 
 
 def _tenant_scope_for(state: _WalkState) -> TenantScope:
@@ -383,13 +401,13 @@ def _execute_node(
         return True
 
     if node.node_type in ("condition", "branch"):
-        matched = _evaluate_condition_node(state, config)
+        matched, trace = _evaluate_condition_node(state, config)
         _record_node(
             state,
             node_key=node.node_key,
             node_type=node.node_type,
             status=AutomationNodeRunStatus.COMPLETED,
-            details={"matched": matched},
+            details={"matched": matched, "conditions": trace},
             input_digest=_digest(config.get("conditions") or []),
         )
         if node.node_type == "branch":

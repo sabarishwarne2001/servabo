@@ -38,6 +38,11 @@ from app.core.automation_events import (
 )
 from app.core.entitlements import (
     ANOMALY_RADAR_CAPABILITY,
+    AUTOMATIONS_CAPABILITY,
+    GST_CREDIT_ADDON,
+    GST_CREDIT_CAPABILITY,
+    HELM_CAPABILITY,
+    TRUTHMESH_CAPABILITY,
     CASE_INTELLIGENCE_CAPABILITY,
     RECONCILIATION_CAPABILITY,
     TABLE_INTELLIGENCE_CAPABILITY,
@@ -49,7 +54,7 @@ from app.core.entitlements import (
     SEMANTIC_ASSERTIONS_CAPABILITY,
 )
 
-FIELD_TYPES: Final[frozenset[str]] = frozenset({"string", "number", "boolean", "array", "date"})
+FIELD_TYPES: Final[frozenset[str]] = frozenset({"string", "number", "money", "boolean", "array", "date"})
 
 #: Operators the condition builder offers per field type. The evaluator in
 #: `automation_service._evaluate_condition` accepts every one of them.
@@ -68,10 +73,29 @@ OPERATORS_BY_TYPE: Final[Mapping[str, tuple[str, ...]]] = {
         "CONTAINS", "NOT_CONTAINS", "ARRAY_CONTAINS_ANY", "ARRAY_CONTAINS_ALL",
         "IN", "NOT_IN", "EXISTS", "IS_EMPTY", "IS_NOT_EMPTY",
     ),
+    # Session J: amounts are entered in currency units (never micros) and may name a currency.
+    "money": (
+        "GREATER_THAN", "LESS_THAN", "GREATER_THAN_OR_EQUAL", "LESS_THAN_OR_EQUAL", "BETWEEN",
+        "EQUALS", "NOT_EQUALS", "EXISTS", "IS_EMPTY", "IS_NOT_EMPTY",
+    ),
+    # Session J: dates compare (before, after, within, older than) as well as match.
     "date": (
         "EQUALS", "NOT_EQUALS", "STARTS_WITH", "EXISTS", "IS_EMPTY", "IS_NOT_EMPTY",
+        "BEFORE", "AFTER", "ON_OR_BEFORE", "ON_OR_AFTER",
+        "WITHIN_NEXT_DAYS", "WITHIN_LAST_DAYS", "OLDER_THAN_DAYS",
     ),
 }
+
+#: The comparisons Session J added for dates; they need a date to read.
+DATE_OPERATORS_NEW: Final[frozenset[str]] = frozenset(
+    {"BEFORE", "AFTER", "ON_OR_BEFORE", "ON_OR_AFTER", "WITHIN_NEXT_DAYS", "WITHIN_LAST_DAYS", "OLDER_THAN_DAYS"}
+)
+#: Operators whose value is a whole number of days.
+DAY_COUNT_OPERATORS: Final[frozenset[str]] = frozenset({"WITHIN_NEXT_DAYS", "WITHIN_LAST_DAYS", "OLDER_THAN_DAYS"})
+#: Operators whose value is stored as a JSON list (Session J). A comma string is still read.
+LIST_VALUE_OPERATORS: Final[frozenset[str]] = frozenset(
+    {"IN", "NOT_IN", "BETWEEN", "ARRAY_CONTAINS_ANY", "ARRAY_CONTAINS_ALL"}
+)
 
 VALUELESS_OPERATORS: Final[frozenset[str]] = frozenset({"EXISTS", "IS_EMPTY", "IS_NOT_EMPTY"})
 
@@ -87,12 +111,24 @@ class TriggerField:
     type: str
     example: str = ""
     description: str = ""
+    #: Session J. The fixed values the field takes, (value, plain label): the builder offers a dropdown, and a rule
+    #: with a value outside them is refused in words.
+    options: tuple[tuple[str, str], ...] = ()
+    #: Session J. A `money` field whose stored value is not in currency units: "micros" (millionths).
+    unit: str = ""
+    #: Session J. The payload key that actually holds the value, when it differs from `key` (`variance` is
+    #: stored as `variance_micros`).
+    source_key: str = ""
+    #: Session J. The payload key that names the amount's currency, when the event carries one.
+    currency_key: str = ""
+    #: Session J. Kept so a rule saved against it still runs; no longer offered for new rules.
+    legacy: bool = False
 
     @property
     def path(self) -> str:
         return f"{EVENT_FIELD_PREFIX}{self.key}"
 
-    def as_dict(self) -> dict[str, str]:
+    def as_dict(self) -> dict[str, object]:
         return {
             "key": self.path,
             "label": self.label,
@@ -100,6 +136,10 @@ class TriggerField:
             "example": self.example,
             "description": self.description,
             "source": "event",
+            "options": [{"value": value, "label": label} for value, label in self.options],
+            "unit": self.unit or None,
+            "currency_key": self.currency_key or None,
+            "legacy": self.legacy,
         }
 
 
@@ -112,11 +152,19 @@ class TriggerSpec:
     event_types: tuple[str, ...]
     fields: tuple[TriggerField, ...] = ()
     capability: Optional[str] = None
+    #: Session J. An add-on that opens the trigger too, when the plan's capability is not held (GST Credit on
+    #: Developer). The trigger is available when EITHER is held.
+    addon: Optional[str] = None
+    #: Session J. A short line for the picker; the long `description` is shown on demand.
+    summary: str = ""
     #: False when the event concerns something other than one document, so
     #: document field conditions have nothing to read.
     has_document: bool = True
     #: Action types this trigger may not run. See the entries for why.
     excluded_actions: tuple[str, ...] = ()
+    #: Session J. When set, ONLY these actions may run on the trigger (Helm's triggers: the automation never
+    #: approves, pays or schedules a payment). `None` means every action the trigger's data allows.
+    allowed_actions: Optional[tuple[str, ...]] = None
     #: True when the trigger announces a held review. The automation handler
     #: otherwise skips every event for a document with an open review, which
     #: would make this trigger unreachable by construction.
@@ -133,10 +181,61 @@ class TriggerSpec:
             "event_types": list(self.event_types),
             "fields": [f.as_dict() for f in self.fields],
             "capability": self.capability,
+            "addon": self.addon,
+            "summary": self.summary or self.description.split(". ")[0].rstrip(".") + ".",
             "has_document": self.has_document,
             "excluded_actions": list(self.excluded_actions),
+            "allowed_actions": list(self.allowed_actions) if self.allowed_actions is not None else None,
             "runs_during_review": self.runs_during_review,
         }
+
+
+#: Session J: the fixed values trigger fields take, with plain labels. This module imports no engine, so the lists are
+#: written here; `tests/services/test_automation_trigger_fields.py` fails when one drifts from its engine's vocabulary.
+OPTIONS_SEVERITY: Final[tuple[tuple[str, str], ...]] = (("LOW", "Low"), ("MEDIUM", "Medium"), ("HIGH", "High"))
+OPTIONS_REVIEW_SEVERITY: Final[tuple[tuple[str, str], ...]] = (
+    ("CRITICAL", "Critical"), ("HIGH", "High"), ("MEDIUM", "Medium"), ("LOW", "Low"),
+)
+OPTIONS_CASE_STATUS: Final[tuple[tuple[str, str], ...]] = (
+    ("OPEN", "Open"), ("MATCHED", "Matched"), ("NEEDS_REVIEW", "Needs review"), ("APPROVED", "Approved"),
+    ("DISPUTED", "Disputed"), ("SUPERSEDED", "Replaced by a newer match"),
+)
+OPTIONS_ANOMALY_KIND: Final[tuple[tuple[str, str], ...]] = (
+    ("DUPLICATE_DOCUMENT", "Duplicate document"), ("PRICE_SURGE", "Price surge"), ("CONTRACT_DRIFT", "Contract drift"),
+)
+OPTIONS_ASSERTION_VERDICT: Final[tuple[tuple[str, str], ...]] = (
+    ("PASS", "Pass"), ("FAIL", "Fail"), ("UNDETERMINED", "Could not be decided"),
+)
+OPTIONS_REVIEW_KIND: Final[tuple[tuple[str, str], ...]] = (
+    ("EXTRACTION", "Extraction check"), ("ASSERTION", "Clause check"), ("ANOMALY", "Anomaly or duplicate"),
+    ("MERGE", "Record merge"), ("SPLIT", "Packet split"), ("TABLE", "Table check"),
+    ("CORROBORATION", "Documents disagree"), ("OBLIGATION", "Obligation"), ("POSTING", "ERP posting"),
+    ("HELM", "Helm"),
+)
+OPTIONS_OBLIGATION_KIND: Final[tuple[tuple[str, str], ...]] = (
+    ("RENEWAL", "Renewal"), ("NOTICE", "Notice deadline"), ("PAYMENT", "Payment"), ("DELIVERY", "Delivery"),
+    ("EXPIRY", "Expiry"), ("REPORTING", "Report or filing"), ("OTHER", "Other"),
+)
+OPTIONS_POSTING_STATE: Final[tuple[tuple[str, str], ...]] = (
+    ("FAILED", "Failed"), ("REJECTED", "Rejected by the target"), ("MISMATCH", "Acknowledged different figures"),
+    ("UNCERTAIN", "Outcome unknown"),
+)
+OPTIONS_POSTING_OBJECT: Final[tuple[tuple[str, str], ...]] = (
+    ("VENDOR_BILL", "Vendor bill"), ("PURCHASE_ORDER", "Purchase order"), ("GOODS_RECEIPT", "Goods receipt"),
+    ("JOURNAL_ENTRY", "Journal entry"), ("PAYMENT_REFERENCE", "Payment reference"),
+)
+OPTIONS_PROCESS_OBJECT: Final[tuple[tuple[str, str], ...]] = (
+    ("DOCUMENT", "Document"), ("CASE", "Case"), ("POSTING", "ERP posting"), ("REVIEW_ITEM", "Review item"),
+    ("FINDING", "Radar finding"), ("EXECUTION", "Flow execution"),
+)
+
+
+def _variance(example: str) -> tuple[TriggerField, TriggerField]:
+    """The variance as an amount in currency units, and the old micros field kept for rules that use it."""
+    return (
+        TriggerField("variance", "Variance", "money", example, unit="micros", source_key="variance_micros"),
+        TriggerField("variance_micros", "Variance (micros, old)", "number", "12500000", legacy=True),
+    )
 
 
 _DOCUMENT_FIELDS: Final[tuple[TriggerField, ...]] = (
@@ -227,9 +326,9 @@ TRIGGERS: Final[tuple[TriggerSpec, ...]] = (
         description="An invoice was matched against its purchase order and receipt.",
         event_types=("trigger.procurement.completed",),
         fields=(
-            TriggerField("status", "Match status", "string", "EXCEPTION"),
+            TriggerField("status", "Match status", "string", "NEEDS_REVIEW", options=OPTIONS_CASE_STATUS),
             TriggerField("exception_count", "Exceptions", "number", "2"),
-            TriggerField("variance_micros", "Variance (micros)", "number", "12500000"),
+            *_variance("12.50"),
             TriggerField("line_count", "Line count", "number", "14"),
         ),
         capability=RECONCILIATION_CAPABILITY,
@@ -242,7 +341,7 @@ TRIGGERS: Final[tuple[TriggerSpec, ...]] = (
         event_types=("trigger.procurement.approved",),
         fields=(
             TriggerField("exception_count", "Exceptions", "number", "0"),
-            TriggerField("variance_micros", "Variance (micros)", "number", "0"),
+            *_variance("0.00"),
         ),
         capability=RECONCILIATION_CAPABILITY,
     ),
@@ -253,7 +352,7 @@ TRIGGERS: Final[tuple[TriggerSpec, ...]] = (
         description="A reviewer disputed a matched invoice with the supplier.",
         event_types=("trigger.procurement.disputed",),
         fields=(
-            TriggerField("variance_micros", "Variance (micros)", "number", "12500000"),
+            *_variance("12.50"),
         ),
         capability=RECONCILIATION_CAPABILITY,
     ),
@@ -264,9 +363,9 @@ TRIGGERS: Final[tuple[TriggerSpec, ...]] = (
         description="The radar raised a finding on a document.",
         event_types=("trigger.anomaly.detected",),
         fields=(
-            TriggerField("kind", "Finding kind", "string", "DUPLICATE"),
+            TriggerField("kind", "Finding kind", "string", "DUPLICATE_DOCUMENT", options=OPTIONS_ANOMALY_KIND),
             TriggerField("layer", "Detection layer", "string", "L2"),
-            TriggerField("severity", "Severity", "string", "HIGH"),
+            TriggerField("severity", "Severity", "string", "HIGH", options=OPTIONS_SEVERITY),
             TriggerField("score", "Score", "number", "0.94"),
         ),
         capability=ANOMALY_RADAR_CAPABILITY,
@@ -279,7 +378,7 @@ TRIGGERS: Final[tuple[TriggerSpec, ...]] = (
         event_types=("trigger.assertion.held",),
         fields=(
             TriggerField("family", "Assertion family", "string", "auto_renewal"),
-            TriggerField("verdict", "Engine verdict", "string", "FAIL"),
+            TriggerField("verdict", "Engine verdict", "string", "FAIL", options=OPTIONS_ASSERTION_VERDICT),
             TriggerField("raw_score", "Raw score", "number", "0.61"),
         ),
         capability=SEMANTIC_ASSERTIONS_CAPABILITY,
@@ -340,8 +439,8 @@ TRIGGERS: Final[tuple[TriggerSpec, ...]] = (
         ),
         event_types=("trigger.review.cleared",),
         fields=(
-            TriggerField("review_kind", "Review type", "string", "EXTRACTION"),
-            TriggerField("severity", "Severity", "string", "HIGH"),
+            TriggerField("review_kind", "Review type", "string", "EXTRACTION", options=OPTIONS_REVIEW_KIND),
+            TriggerField("severity", "Severity", "string", "HIGH", options=OPTIONS_REVIEW_SEVERITY),
             TriggerField("resolution", "Outcome", "string", "REVIEWED"),
             TriggerField("work_item_id", "Document", "string", "a UUID"),
         ),
@@ -449,7 +548,7 @@ TRIGGERS: Final[tuple[TriggerSpec, ...]] = (
         event_types=("trigger.obligation.due_soon",),
         fields=(
             TriggerField("title", "Obligation", "string", "Notice deadline (non-renewal) — Acme Ltd"),
-            TriggerField("kind", "Kind", "string", "NOTICE"),
+            TriggerField("kind", "Kind", "string", "NOTICE", options=OPTIONS_OBLIGATION_KIND),
             TriggerField("due_date", "Due date", "date", "2026-11-13"),
             TriggerField("days_left", "Days left", "number", "14"),
             TriggerField("owner_email", "Owner", "string", "legal@example.com"),
@@ -472,7 +571,7 @@ TRIGGERS: Final[tuple[TriggerSpec, ...]] = (
         event_types=("trigger.obligation.overdue",),
         fields=(
             TriggerField("title", "Obligation", "string", "Payment of INR 2,50,000 — Acme Ltd"),
-            TriggerField("kind", "Kind", "string", "PAYMENT"),
+            TriggerField("kind", "Kind", "string", "PAYMENT", options=OPTIONS_OBLIGATION_KIND),
             TriggerField("due_date", "Due date", "date", "2026-10-05"),
             TriggerField("days_overdue", "Days overdue", "number", "1"),
             TriggerField("owner_email", "Owner", "string", "finance@example.com"),
@@ -495,10 +594,11 @@ TRIGGERS: Final[tuple[TriggerSpec, ...]] = (
         event_types=("trigger.posting.failed",),
         fields=(
             TriggerField("target", "Target", "string", "QuickBooks Online (production)"),
-            TriggerField("object_kind", "Object", "string", "VENDOR_BILL"),
-            TriggerField("state", "State", "string", "REJECTED"),
+            TriggerField("object_kind", "Object", "string", "VENDOR_BILL", options=OPTIONS_POSTING_OBJECT),
+            TriggerField("state", "State", "string", "REJECTED", options=OPTIONS_POSTING_STATE),
             TriggerField("document_number", "Document number", "string", "INV-2026-0042"),
-            TriggerField("amount", "Amount", "string", "118000.00"),
+            TriggerField("amount_value", "Amount", "money", "118000.00", source_key="amount", currency_key="currency"),
+            TriggerField("amount", "Amount (as text, old)", "string", "118000.00", legacy=True),
             TriggerField("currency", "Currency", "string", "INR"),
             TriggerField("reason", "Reason", "string", "the target answered 400: 6000 Business Validation Error"),
             TriggerField("attempts", "Attempts", "number", "3"),
@@ -521,7 +621,7 @@ TRIGGERS: Final[tuple[TriggerSpec, ...]] = (
         ),
         event_types=("trigger.process.sla_at_risk",),
         fields=(
-            TriggerField("object_type", "Object", "string", "POSTING"),
+            TriggerField("object_type", "Object", "string", "POSTING", options=OPTIONS_PROCESS_OBJECT),
             TriggerField("kind", "Kind", "string", "VENDOR_BILL"),
             TriggerField("probability", "Breach probability", "number", "0.83"),
             TriggerField("due_at", "Due", "date", "2026-10-05T14:00:00+00:00"),
@@ -533,6 +633,274 @@ TRIGGERS: Final[tuple[TriggerSpec, ...]] = (
         has_document=False,
     ),
 )
+
+# Session J: the engines become triggers. 37 triggers over 38 events after Session J.
+#: Helm may tell people and open a review; it never moves money (N-150).
+HELM_ALLOWED_ACTIONS: Final[tuple[str, ...]] = (
+    "notify.role", "email.send", "chat.post", "webhook.send", "review.assign", "review.escalate", "document.tag",
+)
+OPTIONS_WEEKDAY: Final[tuple[tuple[str, str], ...]] = (
+    ("MONDAY", "Monday"), ("TUESDAY", "Tuesday"), ("WEDNESDAY", "Wednesday"), ("THURSDAY", "Thursday"),
+    ("FRIDAY", "Friday"), ("SATURDAY", "Saturday"), ("SUNDAY", "Sunday"),
+)
+OPTIONS_PAYMENT_RISK: Final[tuple[tuple[str, str], ...]] = (
+    ("BANK_ACCOUNT_CHANGED", "Bank account changed"), ("ROUND_AMOUNT", "Round amount"),
+)
+OPTIONS_HOLD_SCOPE: Final[tuple[tuple[str, str], ...]] = (("WORKSPACE", "Whole workspace"), ("DOCUMENT", "One document"))
+OPTIONS_CONFLICT_KIND: Final[tuple[tuple[str, str], ...]] = (
+    ("UNAUTHORIZED_COMMITMENT", "Exceeds its authority"), ("CUMULATIVE_OVERRUN", "Cumulative overrun"),
+    ("DUPLICATE_BILLING", "Duplicate billing"), ("AMOUNT_MISMATCH", "Amounts disagree"),
+    ("DATE_CONTRADICTION", "Contradictory dates"), ("OUT_OF_TERM", "Outside the agreement's term"),
+    ("PARTY_MISMATCH", "Party not on the agreement"), ("PAYEE_ACCOUNT_CHANGED", "Payee account changed"),
+    ("CURRENCY_MISMATCH", "Currencies disagree"), ("TERM_CONFLICT", "Conflicting terms"),
+    ("UNSUPPORTED_COMMITMENT", "No authorising document"),
+)
+OPTIONS_CONFLICT_RESOLUTION: Final[tuple[tuple[str, str], ...]] = (
+    ("RESOLVED", "Resolved by a person"), ("DISMISSED", "Dismissed as not a conflict"),
+    ("AUTO", "No longer detected"),
+)
+
+SESSION_J_TRIGGERS: Final[tuple[TriggerSpec, ...]] = (
+    TriggerSpec(
+        key="gst.return_imported", label="GSTR-2B imported", category="GST Credit",
+        summary="A GSTR-2B finished importing and was matched against your books.",
+        description=(
+            "A GSTR-2B return finished importing and was matched against your purchase invoices. Fires once per "
+            "import (importing the same file again changes nothing, so it does not fire again). It carries the "
+            "figures the GST page shows: records, invoices still waiting for their supplier and what they are "
+            "worth, and records that differ from your books."
+        ),
+        event_types=("trigger.gst.return_imported",),
+        fields=(
+            TriggerField("gstin", "Your GSTIN", "string", "27AAAAA0000A1Z5"),
+            TriggerField("period", "Return period", "string", "2026-09"),
+            TriggerField("records", "Records in the return", "number", "412"),
+            TriggerField("waiting_count", "Invoices waiting for a supplier", "number", "9"),
+            TriggerField("waiting", "Value waiting for suppliers", "money", "480000.00", source_key="waiting_micros",
+                         unit="micros", currency_key="currency"),
+            TriggerField("differences", "Records that differ from your books", "number", "4"),
+            TriggerField("replaced", "Replaced an earlier import", "boolean", "false"),
+        ),
+        capability=GST_CREDIT_CAPABILITY, addon=GST_CREDIT_ADDON, has_document=False,
+    ),
+    TriggerSpec(
+        key="gst.waiting_for_supplier", label="Invoice waiting for its supplier", category="GST Credit",
+        summary="A purchase invoice has waited N days for its supplier to report it.",
+        description=(
+            "A purchase invoice in your books has waited N days for its supplier to report it in a GSTR-2B (N is "
+            "set for the workspace on the GST page, 30 by default). Fires once per invoice and threshold. The "
+            "document is the invoice."    ),
+        event_types=("trigger.gst.waiting_for_supplier",),
+        fields=(
+            TriggerField("supplier_name", "Supplier", "string", "Acme Supplies Ltd"),
+            TriggerField("supplier_gstin", "Supplier GSTIN", "string", "27AAAAA0000A1Z5"),
+            TriggerField("invoice_number", "Invoice number", "string", "INV-2231"),
+            TriggerField("amount", "Invoice amount", "money", "118000.00", source_key="amount_micros", unit="micros",
+                         currency_key="currency"),
+            TriggerField("days_waiting", "Days waiting", "number", "32"),
+            TriggerField("threshold_days", "Notice after (days)", "number", "30"),
+            TriggerField("gstin", "Your GSTIN", "string", "29BBBBB1111B1Z6"),
+        ),
+        capability=GST_CREDIT_CAPABILITY, addon=GST_CREDIT_ADDON,
+        # A document waiting for a reviewer must not swallow an announcement the engine makes once.
+        runs_during_review=True,
+    ),
+    TriggerSpec(
+        key="gst.reversal_risk", label="GST credit at risk of reversal", category="GST Credit",
+        summary="An unpaid purchase invoice reached 150 days: the 180-day rule is a month away.",
+        description=(
+            "An unpaid purchase invoice reached 150 days of age, a month before the 180-day rule can reverse the "
+            "input tax credit. Fires once per invoice. The document is the invoice."    ),
+        event_types=("trigger.gst.reversal_risk",),
+        fields=(
+            TriggerField("supplier_name", "Supplier", "string", "Acme Supplies Ltd"),
+            TriggerField("supplier_gstin", "Supplier GSTIN", "string", "27AAAAA0000A1Z5"),
+            TriggerField("invoice_number", "Invoice number", "string", "INV-2231"),
+            TriggerField("amount_at_risk", "Credit at risk", "money", "18000.00", source_key="amount_micros",
+                         unit="micros", currency_key="currency"),
+            TriggerField("age_days", "Invoice age (days)", "number", "150"),
+            TriggerField("days_left", "Days left", "number", "30"),
+            TriggerField("reversal_date", "Reversal date", "date", "2026-11-20"),
+        ),
+        capability=GST_CREDIT_CAPABILITY, addon=GST_CREDIT_ADDON,
+        # A document waiting for a reviewer must not swallow an announcement the engine makes once.
+        runs_during_review=True,
+    ),
+    TriggerSpec(
+        key="payment_risk.flagged", label="Payment-risk flag raised", category="Forensic audit",
+        summary="An invoice was flagged: its supplier's bank account changed, or the total is suspiciously round.",
+        description=(
+            "The radar raised a payment-risk flag on an invoice: the supplier asks to be paid into a different "
+            "bank account than before, or the total is an exact round sum. Fires once per invoice and kind."    ),
+        event_types=("trigger.payment_risk.flagged",),
+        fields=(
+            TriggerField("kind", "Flag", "string", "BANK_ACCOUNT_CHANGED", options=OPTIONS_PAYMENT_RISK),
+            TriggerField("severity", "Severity", "string", "HIGH", options=OPTIONS_SEVERITY),
+            TriggerField("vendor", "Supplier", "string", "acme supplies ltd"),
+            TriggerField("amount", "Invoice total", "money", "118000.00", source_key="amount_micros", unit="micros",
+                         currency_key="currency"),
+        ),
+        capability=ANOMALY_RADAR_CAPABILITY,
+        # A document waiting for a reviewer must not swallow an announcement the engine makes once.
+        runs_during_review=True,
+    ),
+    TriggerSpec(
+        key="legal_hold.placed", label="Legal hold placed", category="Compliance",
+        summary="A hold now stops a document, or the whole workspace, from being deleted.",
+        description=(
+            "A legal hold was placed on one document or on the whole workspace. Nothing it covers can be deleted "
+            "while it stands. Fires once per hold."
+        ),
+        event_types=("trigger.legal_hold.placed",),
+        fields=(
+            TriggerField("scope", "Covers", "string", "DOCUMENT", options=OPTIONS_HOLD_SCOPE),
+            TriggerField("reason", "Reason", "string", "Litigation: Acme v. Bharat"),
+            TriggerField("reference", "Reference", "string", "CASE-2026-14"),
+            TriggerField("placed_by", "Placed by", "string", "A person in your workspace"),
+        ),
+        has_document=False,
+    ),
+    TriggerSpec(
+        key="legal_hold.released", label="Legal hold released", category="Compliance",
+        summary="A legal hold was released.",
+        description="A legal hold was released by a person. Fires once per hold.",
+        event_types=("trigger.legal_hold.released",),
+        fields=(
+            TriggerField("scope", "Covered", "string", "DOCUMENT", options=OPTIONS_HOLD_SCOPE),
+            TriggerField("reason", "Reason it was placed", "string", "Litigation: Acme v. Bharat"),
+            TriggerField("reference", "Reference", "string", "CASE-2026-14"),
+        ),
+        has_document=False,
+    ),
+    TriggerSpec(
+        key="truthmesh.conflict_opened", label="TruthMesh conflict opened", category="TruthMesh",
+        summary="TruthMesh found documents that contradict each other.",
+        description=(
+            "TruthMesh found a discrepancy across documents (a payee, a value, a date or terms that disagree), "
+            "or reopened one that had cleared by itself. Fires once per conflict and opening."
+        ),
+        event_types=("trigger.truthmesh.conflict_opened",),
+        fields=(
+            TriggerField("kind", "Kind of conflict", "string", "PAYEE_ACCOUNT_CHANGED", options=OPTIONS_CONFLICT_KIND),
+            TriggerField("severity", "Severity", "string", "HIGH", options=OPTIONS_REVIEW_SEVERITY),
+            TriggerField("title", "Title", "string", "The payee differs between the PO and the invoice"),
+            TriggerField("documents", "Documents involved", "number", "2"),
+            TriggerField("at_risk", "Money at risk", "money", "250000.00", source_key="exposure_micros", unit="micros",
+                         currency_key="currency"),
+        ),
+        capability=TRUTHMESH_CAPABILITY, has_document=False,
+    ),
+    TriggerSpec(
+        key="truthmesh.conflict_resolved", label="TruthMesh conflict resolved", category="TruthMesh",
+        summary="A TruthMesh conflict was decided, or stopped being a conflict.",
+        description=(
+            "A TruthMesh conflict was resolved or dismissed by a person, or stopped being detected because the "
+            "documents changed. Fires once per conflict and resolution."
+        ),
+        event_types=("trigger.truthmesh.conflict_resolved",),
+        fields=(
+            TriggerField("kind", "Kind of conflict", "string", "PAYEE_ACCOUNT_CHANGED", options=OPTIONS_CONFLICT_KIND),
+            TriggerField("severity", "Severity", "string", "HIGH", options=OPTIONS_REVIEW_SEVERITY),
+            TriggerField("title", "Title", "string", "The payee differs between the PO and the invoice"),
+            TriggerField("documents", "Documents involved", "number", "2"),
+            TriggerField("at_risk", "Money that was at risk", "money", "250000.00", source_key="exposure_micros",
+                         unit="micros", currency_key="currency"),
+            TriggerField("how", "How it ended", "string", "RESOLVED", options=OPTIONS_CONFLICT_RESOLUTION),
+        ),
+        capability=TRUTHMESH_CAPABILITY, has_document=False,
+    ),
+    TriggerSpec(
+        key="schedule.daily", label="Every day", category="Schedule",
+        summary="Once a day at 08:00, in the workspace's time zone.",
+        description=(
+            "Once a day at 08:00 in the workspace's time zone, for digests and reminders. There is no document: "
+            "use it to notify people, send an email or post to chat. To run on one day of the week only, add the "
+            "condition 'Weekday is Friday'."
+        ),
+        event_types=("trigger.schedule.daily",),
+        fields=(
+            TriggerField("local_date", "Today's date", "date", "2026-10-21"),
+            TriggerField("weekday", "Weekday", "string", "FRIDAY", options=OPTIONS_WEEKDAY),
+        ),
+        capability=AUTOMATIONS_CAPABILITY, has_document=False,
+    ),
+    TriggerSpec(
+        key="schedule.weekly", label="Every week", category="Schedule",
+        summary="Every Monday at 08:00, in the workspace's time zone.",
+        description=(
+            "Every Monday at 08:00 in the workspace's time zone, for weekly digests. There is no document."
+        ),
+        event_types=("trigger.schedule.weekly",),
+        fields=(
+            TriggerField("local_date", "Today's date", "date", "2026-10-19"),
+            TriggerField("weekday", "Weekday", "string", "MONDAY", options=OPTIONS_WEEKDAY),
+        ),
+        capability=AUTOMATIONS_CAPABILITY, has_document=False,
+    ),
+    TriggerSpec(
+        key="manual", label="Run by hand on one document", category="Documents",
+        summary="A person presses 'Run a rule on this document'.",
+        description=(
+            "A workspace admin pressed 'Run a rule on this document' on a document's page. The rule runs on that "
+            "one document, as if its trigger had just fired. Every manual run is recorded in the audit log."    ),
+        event_types=("trigger.manual",),
+        fields=(TriggerField("requested_by", "Run by", "string", "A person in your workspace"),),
+        capability=AUTOMATIONS_CAPABILITY,
+        # A document waiting for a reviewer must not swallow an announcement the engine makes once.
+        runs_during_review=True,
+    ),
+    TriggerSpec(
+        key="helm.mandate_breached", label="Helm mandate breached", category="Helm",
+        summary="One of Helm's mandates is breached on the latest plan.",
+        description=(
+            "Helm's latest plan shows a mandate as breached when it was not before (for example, the 180-day "
+            "mandate). Fires once per mandate and plan. Automations on Helm can tell people and open a review; "
+            "they never approve, pay or schedule a payment."
+        ),
+        event_types=("trigger.helm.mandate_breached",),
+        fields=(
+            TriggerField("template", "Mandate", "string", "msme_45_day"),
+            TriggerField("kind", "Kind", "string", "limit"),
+            TriggerField("previous_state", "State before", "string", "OK"),
+            TriggerField("items", "Items affected", "number", "3"),
+        ),
+        capability=HELM_CAPABILITY, has_document=False, allowed_actions=HELM_ALLOWED_ACTIONS,
+    ),
+    TriggerSpec(
+        key="helm.approval_needed", label="Helm action waiting for approval", category="Helm",
+        summary="Helm proposed an action that needs a person's approval.",
+        description=(
+            "Helm proposed an action that needs a person's approval before it runs. Fires once per action. "
+            "Automations on Helm can tell people and open a review; they never approve, pay or schedule a payment."
+        ),
+        event_types=("trigger.helm.approval_needed",),
+        fields=(
+            TriggerField("kind", "Action", "string", "pay_invoice"),
+            TriggerField("amount", "Amount", "money", "118000.00", source_key="amount_micros", unit="micros",
+                         currency_key="currency"),
+            TriggerField("run_date", "Planned for", "date", "2026-10-30"),
+        ),
+        capability=HELM_CAPABILITY, has_document=False, allowed_actions=HELM_ALLOWED_ACTIONS,
+    ),
+    TriggerSpec(
+        key="document.received_by_link", label="Document received through a request link", category="Cases",
+        summary="Someone uploaded a requested document through a link you sent.",
+        description=(
+            "Someone uploaded a file through a document-request link you sent from a case. The document is the "
+            "new file; it has not been read yet, so its extracted fields are empty."    ),
+        event_types=("trigger.document.received_by_link",),
+        fields=(
+            TriggerField("document_type", "Document asked for", "string", "gst_registration"),
+            TriggerField("recipient", "Asked of", "string", "Acme Supplies"),
+            TriggerField("case_title", "Case", "string", "Vendor onboarding: Acme Supplies"),
+        ),
+        capability=CASE_INTELLIGENCE_CAPABILITY,
+        # A document waiting for a reviewer must not swallow an announcement the engine makes once.
+        runs_during_review=True,
+    ),
+)
+
+TRIGGERS: Final[tuple[TriggerSpec, ...]] = TRIGGERS + SESSION_J_TRIGGERS
 
 TRIGGERS_BY_KEY: Final[Mapping[str, TriggerSpec]] = {spec.key: spec for spec in TRIGGERS}
 
@@ -632,6 +1000,28 @@ def fields_for(keys: list[str] | tuple[str, ...]) -> list[TriggerField]:
     return [f for f in specs[0].fields if f.key in common]
 
 
+def allowed_actions_for(keys: list[str] | tuple[str, ...]) -> Optional[set[str]]:
+    """The actions every selected trigger permits, or None when none of them restricts it (Session J)."""
+    specs, _ = resolve_trigger_keys(keys)
+    restricted = [set(spec.allowed_actions) for spec in specs if spec.allowed_actions is not None]
+    if not restricted:
+        return None
+    allowed = restricted[0]
+    for other in restricted[1:]:
+        allowed &= other
+    return allowed
+
+
+def available_for(spec: TriggerSpec, *, capabilities: frozenset[str], addons: frozenset[str]) -> bool:
+    """A trigger is open when the plan holds its capability, or its add-on is active, or it needs neither."""
+    if spec.capability is None and spec.addon is None:
+        return True
+    return bool(
+        (spec.capability is not None and spec.capability in capabilities)
+        or (spec.addon is not None and spec.addon in addons)
+    )
+
+
 def excluded_actions_for(keys: list[str] | tuple[str, ...]) -> set[str]:
     specs, _ = resolve_trigger_keys(keys)
     return {action for spec in specs for action in spec.excluded_actions}
@@ -654,6 +1044,8 @@ __all__ = [
     "TriggerField",
     "TriggerSpec",
     "VALUELESS_OPERATORS",
+    "allowed_actions_for",
+    "available_for",
     "catalog_triggers",
     "event_types_for",
     "excluded_actions_for",

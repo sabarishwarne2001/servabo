@@ -294,6 +294,16 @@ DEFAULT_SCHEDULE: tuple[ScheduledJob, ...] = (
         ),
     ),
     ScheduledJob(
+        job_type="automation.sweep",
+        interval_seconds=3_600,
+        description=(
+            "Announce to automation what the clock makes true: the daily and weekly schedules (08:00 in each "
+            "workspace's time zone) and the two GST clocks (an invoice that waited N days for its supplier, an "
+            "unpaid one at 150 days). Only workspaces with a rule on those triggers are looked at; each "
+            "occurrence is announced once (Session J)."
+        ),
+    ),
+    ScheduledJob(
         job_type="helm.plan",
         interval_seconds=3_600,
         description="Re-plan every Helm book hourly (kept as is when nothing changed).",

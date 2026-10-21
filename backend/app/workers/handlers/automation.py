@@ -23,6 +23,7 @@ from app.models.workspace import Workspace
 logger = logging.getLogger("app.workers.handlers.automation")
 
 JOB_TYPE = "automation.execute"
+SWEEP_JOB_TYPE = "automation.sweep"
 
 
 class Outcome:
@@ -164,6 +165,10 @@ def handle_automation_execute(payload: dict[str, Any]) -> dict[str, Any]:
         rules = _resolve_rules(
             db, workspace_id=workspace_id, event_type=event.event_type
         )
+        if event.event_type == "trigger.manual":
+            # Session J: pressing "Run a rule on this document" runs THAT rule, not every rule on the manual trigger.
+            wanted = str((event.payload or {}).get("rule_id") or "")
+            rules = [r for r in rules if str(r.id) == wanted]
         if not rules:
             return {"outcome": Outcome.SKIPPED, "reason": "no matching rules"}
 
@@ -481,4 +486,15 @@ def _emit_budget_exhausted(db: Session, *, execution: Any, event: OutboxEvent) -
     db.commit()
 
 
-__all__ = ["JOB_TYPE", "Outcome", "handle_automation_execute"]
+def handle_automation_sweep(payload: dict[str, Any]) -> dict[str, Any]:
+    """Session J: the hourly announcements the clock makes true (schedules, the GST clocks)."""
+    from app.db.session import SessionLocal
+    from app.services.automation import sweeps
+
+    with SessionLocal() as db:
+        result = sweeps.run(db)
+        db.commit()
+    return {"outcome": Outcome.COMPLETED, **result}
+
+
+__all__ = ["JOB_TYPE", "SWEEP_JOB_TYPE", "Outcome", "handle_automation_execute", "handle_automation_sweep"]

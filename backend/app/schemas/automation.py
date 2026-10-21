@@ -10,12 +10,34 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 class AutomationCondition(BaseModel):
     field: str = Field(..., min_length=1, max_length=100)
     operator: str = Field(..., min_length=1, max_length=50)
-    value: str = Field(..., max_length=255)
+    #: A string, or (Session J) a list for IN, NOT_IN, BETWEEN and the array operators. A comma string still reads.
+    value: Union[str, list[str]] = Field(..., max_length=255)
+    #: Session J: the currency an amount is compared in ("INR"); an amount in another currency does not match.
+    currency: Optional[str] = Field(default=None, min_length=3, max_length=3)
 
     @field_validator("field", "value", mode="before")
     @classmethod
     def strip_strings(cls, value: Any) -> Any:
+        if isinstance(value, list):
+            return [v.strip() if isinstance(v, str) else v for v in value]
         return value.strip() if isinstance(value, str) else value
+
+    @field_validator("value", mode="after")
+    @classmethod
+    def bound_list_value(cls, value: Union[str, list[str]]) -> Union[str, list[str]]:
+        if isinstance(value, list):
+            if len(value) > 50:
+                raise ValueError("A list value holds at most 50 items.")
+            if any(len(item) > 255 for item in value):
+                raise ValueError("Each item in a list value is at most 255 characters.")
+        return value
+
+    @field_validator("currency", mode="before")
+    @classmethod
+    def normalize_currency(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return value.strip().upper() or None
+        return value
 
     @field_validator("operator", mode="before")
     @classmethod
@@ -32,12 +54,16 @@ class AutomationCondition(BaseModel):
     @model_validator(mode="after")
     def validate_operator_value_dependency(self) -> "AutomationCondition":
         op = self.operator.upper().strip()
-        val = self.value.strip() if self.value else ""
+        if isinstance(self.value, list):
+            val = ",".join(item for item in self.value if item.strip())
+        else:
+            val = self.value.strip() if self.value else ""
 
         value_required = {
             "EQUALS", "NOT_EQUALS", "CONTAINS", "NOT_CONTAINS", "STARTS_WITH",
             "ENDS_WITH", "GREATER_THAN", "LESS_THAN", "GREATER_THAN_OR_EQUAL",
-            "LESS_THAN_OR_EQUAL", "BETWEEN", "IN", "NOT_IN", "ARRAY_CONTAINS_ANY", "ARRAY_CONTAINS_ALL"
+            "LESS_THAN_OR_EQUAL", "BETWEEN", "IN", "NOT_IN", "ARRAY_CONTAINS_ANY", "ARRAY_CONTAINS_ALL",
+            "BEFORE", "AFTER", "ON_OR_BEFORE", "ON_OR_AFTER", "WITHIN_NEXT_DAYS", "WITHIN_LAST_DAYS", "OLDER_THAN_DAYS",
         }
         if op in value_required and not val:
             raise ValueError(f"A target match value is required for operator '{op}'.")
@@ -200,4 +226,6 @@ class AutomationRuleTestResponse(BaseModel):
     notification_sent: bool = Field(default=False)
     message: str = Field(default="")
     execution_time_ms: float = Field(default=0.0)
+    #: Session J: each condition's actual value, expected value and result, in words (identifiers masked).
+    conditions: list[dict[str, Any]] = Field(default_factory=list)
     model_config = ConfigDict(from_attributes=True)
