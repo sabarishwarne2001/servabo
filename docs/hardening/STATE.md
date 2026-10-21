@@ -2,7 +2,28 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-20 (Session I)_
+_Last updated: 2026-10-21 (Session J)_
+
+## Current phase — Session J: Automation, end to end (2026-10-21)
+Branch `claude/new-session-otth8f` (the session's assigned branch; CLAUDE.md says `hardening/<topic>`, the brief says "use the assigned branch", so the
+assigned branch is used), based on `main` at `c872828` (PR #34 merged), draft PR below. Founder authority: decisions in NEEDS-OWNER.md as
+`DECIDED (Session J)` (next free N-149), findings from F-535 (next free F-535). **If cut off, type `continue`: carry on from the first unticked box. Never restart.**
+Local stack this session: Postgres 16 (apt) on :5432 with pgvector 0.8.0 (files from the PyPI wheel `pixeltable-pgserver==0.3.0`), Redis, backend venv Python 3.12 and
+`npm ci` in the session scratchpad. The test environment block is `testenv.sh` in the scratchpad (outside the repo).
+Builder direction: the owner's sample UI (full-page editor, step cards joined by Yes/No branches, an inspector panel, a status bar, Test run and Publish) is the
+look for the new builder, in Lumen colours (N-149 when decided).
+
+- [x] 0. Start-up: docs and code read; `docs/automation/AUDIT.md` written (inventory, 13 native dialogs); this checklist
+- [ ] 0b. Emitter test (every catalog trigger's event has an emitter in `app/`), failing first
+- [ ] 1. (P0) Phase 1: conditions always right (money, dates, options, lists, finance schema + aliases, derived fields, trace)
+- [ ] 2. (P0/P1) Phase 2: engines become triggers (GST, payment risk, schedule, manual, TruthMesh, legal hold; then Helm, request link)
+- [ ] 3. (P0/P1) Phase 3: new actions (document.tag, review.assign, legal_hold.place, chat.post, gst.remind_supplier; then obligation.create, supplier.request_document)
+- [ ] 4. (P0/P1) Phase 4: throttle and cooldown, pause switch, retry, preview, versions, "why didn't my rule run?" (Wait step only if all green)
+- [ ] 5A. (P0) Phase 5A: no browser pop-ups (ConfirmDialog Esc fix, `useConfirmDialog`, 13 replacements, three guards, specs updated)
+- [ ] 5. (P0) Phase 5: Automation home, recipe gallery (12 to 16), the new builder, run history, document page panel
+- [ ] 6. Tests: Vitest + `test:unit` in CI, browser specs 109+ (x3 repeats, axe), backend suites
+- [ ] 7. Records: README, NEEDS-OWNER, FINDINGS, COVERAGE, CHANGELOG, CONFIGURATION, HANDOFF, website screenshot and paragraph
+- [ ] Finish: full suites once, one Alembic head (up/down/up), lint/typecheck/check:self clean, PR ready, CI green on every job
 
 ## Current phase — Session I: make CI green again after PR #33 (2026-10-20)
 Branch `claude/new-session-ko5jbm` (the session's assigned branch), based on `main` at `068afea` (PR #33 merged), draft PR #34.
