@@ -70,10 +70,14 @@ const draftWith = (conditions: ConditionDraft[]): FlowDraft => ({
 
 describe("valueText", () => {
   it("shows an amount with its currency and a list in words", () => {
-    expect(valueText("GREATER_THAN", "1000000", "INR")).toBe("1000000 INR");
+    expect(valueText("GREATER_THAN", "1000000", "INR")).toBe("10,00,000 INR");
+    expect(valueText("GREATER_THAN", "1000000", "USD")).toBe("1,000,000 USD");
+    expect(valueText("GREATER_THAN", "₹10,00,000", "INR")).toBe("₹10,00,000 INR");
+    expect(valueText("GREATER_THAN", "1180.50", "INR")).toBe("1,180.50 INR");
     expect(valueText("IN", ["Acme, Inc", "Beta"])).toBe("Acme, Inc or Beta");
     expect(valueText("IN", ["a", "b", "c"])).toBe("a, b or c");
     expect(valueText("BETWEEN", ["5", "10"], "USD")).toBe("5 and 10 USD");
+    expect(valueText("BETWEEN", ["50000", "200000"], "INR")).toBe("50,000 and 2,00,000 INR");
   });
   it("counts days and says nothing for an empty value", () => {
     expect(valueText("OLDER_THAN_DAYS", "30")).toBe("30 days");
@@ -85,7 +89,7 @@ describe("valueText", () => {
 
 describe("the sentence builder", () => {
   it("reads one condition as a person would say it", () => {
-    expect(conditionText(catalog, condition({}))).toBe("total amount is greater than 1000000 INR");
+    expect(conditionText(catalog, condition({}))).toBe("total amount is greater than 10,00,000 INR");
     expect(conditionText(catalog, condition({ operator: "EXISTS", value: "" }))).toBe("total amount exists");
     expect(conditionText(catalog, condition({ field: "invoice_date", operator: "OLDER_THAN_DAYS", value: "30", currency: "" })))
       .toBe("invoice date is older than 30 days");
@@ -102,7 +106,7 @@ describe("the sentence builder", () => {
       else_actions: [{ uid: "e", action_type: "notify.role", config: { roles: ["OWNER"] } }],
     };
     expect(summarize(draft, catalog)).toBe(
-      "When document processed, if total amount is greater than 1000000 INR: notify a role; otherwise notify a role.",
+      "When document processed, if total amount is greater than 10,00,000 INR: notify a role; otherwise notify a role.",
     );
   });
 });
@@ -173,6 +177,11 @@ describe("recipes", () => {
     expect(draft.is_active).toBe(true);
     expect(draft.on_error).toBe("CONTINUE");
     expect(draft.actions).toHaveLength(1);
+  });
+  it("gets the default priority when the recipe carries none, so the builder can save it", () => {
+    const { priority: _unused, ...withoutPriority } = rule as unknown as Record<string, unknown>;
+    const draft = draftFromPayload(withoutPriority as unknown as Parameters<typeof applyFillIns>[0], catalog);
+    expect(draft.priority).toBe(100);
   });
   it("is found by what it is about", () => {
     const recipe = { title: "Hold invoices above ₹10 lakh", summary: "Waits for a person.", category: "Invoices", trigger_labels: ["Document processed"] } as unknown as Recipe;

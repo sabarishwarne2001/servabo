@@ -238,8 +238,8 @@ export const ConditionsCard: React.FC<ConditionsCardProps> = ({
                         word={c === 0 ? "IF" : group.logic_operator === "AND" ? "AND" : "OR"}
                         className="mt-2 shrink-0"
                       />
-                      <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 md:grid-cols-12">
-                        <div className="md:col-span-4">
+                      <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
+                        <div className="col-span-2">
                           <select
                             aria-label="Field"
                             disabled={disabled}
@@ -285,7 +285,7 @@ export const ConditionsCard: React.FC<ConditionsCardProps> = ({
                           )}
                           <IssueText issues={byField("field")} />
                         </div>
-                        <div className="md:col-span-3">
+                        <div>
                           <select
                             aria-label="Comparison"
                             disabled={disabled}
@@ -299,7 +299,7 @@ export const ConditionsCard: React.FC<ConditionsCardProps> = ({
                           </select>
                           <IssueText issues={byField("operator")} />
                         </div>
-                        <div className="md:col-span-4">
+                        <div>
                           {!isValueless(catalog, condition.operator) && (
                             <ConditionValue
                               catalog={catalog}
@@ -314,18 +314,16 @@ export const ConditionsCard: React.FC<ConditionsCardProps> = ({
                           )}
                           <IssueText issues={[...byField("value"), ...own.filter((i) => i.field === null)]} />
                         </div>
-                        <div className="flex items-start justify-end md:col-span-1">
-                          <button
-                            type="button"
-                            disabled={disabled}
-                            onClick={() => setGroup(g, { ...group, conditions: group.conditions.filter((_, i) => i !== c) })}
-                            className="rounded p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                            aria-label="Remove condition"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
                       </div>
+                      <button
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => setGroup(g, { ...group, conditions: group.conditions.filter((_, i) => i !== c) })}
+                        className="mt-1 shrink-0 rounded p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        aria-label="Remove condition"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   );
                 })}

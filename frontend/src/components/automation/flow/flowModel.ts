@@ -124,7 +124,18 @@ export const valueItems = (value: FlowConditionValue | undefined): string[] =>
 
 export const valueIsEmpty = (value: FlowConditionValue | undefined): boolean => valueItems(value).length === 0;
 
-/** The value as a person reads it: "1,000,000 INR", "Acme, Inc or Beta", "5 and 10". */
+/**
+ * An amount as people write it: rupees in lakh grouping ("10,00,000"), other currencies in thousands. Text that is
+ * not a plain number ("₹10,00,000", "1.5 crore") is shown exactly as typed.
+ */
+export const groupAmount = (text: string, currency: string): string => {
+  if (!/^\d+(\.\d+)?$/.test(text)) {return text;}
+  const [whole = "", fraction] = text.split(".");
+  const grouped = new Intl.NumberFormat(currency.toUpperCase() === "INR" ? "en-IN" : "en-US", { maximumFractionDigits: 0 }).format(Number(whole));
+  return fraction === undefined ? grouped : `${grouped}.${fraction}`;
+};
+
+/** The value as a person reads it: "10,00,000 INR", "Acme, Inc or Beta", "5 and 10". */
 export const valueText = (
   operator: string,
   value: FlowConditionValue | undefined,
@@ -133,13 +144,14 @@ export const valueText = (
   const items = valueItems(value);
   if (items.length === 0) {return "";}
   const unit = currency ? ` ${currency}` : "";
-  if (operator === "BETWEEN" && items.length === 2) {return `${items[0]} and ${items[1]}${unit}`;}
+  const shown = (item: string): string => (currency ? groupAmount(item, currency) : item);
+  if (operator === "BETWEEN" && items.length === 2) {return `${shown(items[0] ?? "")} and ${shown(items[1] ?? "")}${unit}`;}
   if (items.length > 1) {
     const last = items[items.length - 1] ?? "";
     return `${items.slice(0, -1).join(", ")} or ${last}${unit}`;
   }
   const only = items[0] ?? "";
-  return DAY_COUNT_OPERATORS.includes(operator) ? `${only} day${only === "1" ? "" : "s"}` : `${only}${unit}`;
+  return DAY_COUNT_OPERATORS.includes(operator) ? `${only} day${only === "1" ? "" : "s"}` : `${shown(only)}${unit}`;
 };
 
 export const operatorLabel = (operator: string): string =>
@@ -338,8 +350,12 @@ export const draftFromRule = (
   );
 
 /** A recipe's rule as a draft, ready for the builder. A recipe starts switched on: the person decides when they save. */
+/**
+ * A rule document (a recipe) to a draft. A recipe carries no priority of its own (the server fills it in on save), so the
+ * draft gets the default one; without it the builder said "Priority must be a whole number" and refused to save.
+ */
 export const draftFromPayload = (payload: AutomationRuleCreateRequest, catalog: FlowCatalog | undefined): FlowDraft =>
-  draftFromShape(payload, catalog, payload.name, payload.is_active ?? true);
+  draftFromShape({ ...payload, priority: payload.priority ?? emptyDraft().priority }, catalog, payload.name, payload.is_active ?? true);
 
 /** Answers a recipe asked for, written into its rule at the `path` each fill-in names (`actions.0.config.endpoint_id`). */
 export const applyFillIns = (

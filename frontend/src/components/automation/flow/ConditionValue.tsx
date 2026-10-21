@@ -274,14 +274,14 @@ const CurrencyPick: React.FC<{
   readonly disabled: boolean;
   readonly onChange: (currency: string) => void;
 }> = ({ catalog, currency, disabled, onChange }) => (
-  <label className="flex items-center gap-2 text-xs text-muted-foreground">
-    Currency
+  <label className="flex w-full min-w-0 items-center gap-2 text-xs text-muted-foreground">
+    <span className="shrink-0">Currency</span>
     <select
       aria-label="Currency"
       disabled={disabled}
       value={currency}
       onChange={(e) => onChange(e.target.value)}
-      className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground"
+      className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground"
     >
       <option value="">The document&rsquo;s own</option>
       {currencyChoices(catalog.workspace?.currency).map((code) => (
