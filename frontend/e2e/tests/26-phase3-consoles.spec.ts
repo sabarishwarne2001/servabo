@@ -101,12 +101,8 @@ test.describe("Revenue operations: invoiced contracts (F-186)", () => {
     for (const row of contracts.body.filter((c) => c.organization_id === orgId && c.status === "ACTIVE")) {
       expect((await api(session, "POST", `/admin/revops/contracts/${row.id}/end`, { reason: "CANCELLED" })).status).toBe(200);
     }
-    let prompts = 0;
-    page.on("dialog", (dialog) => {
-      prompts += 1;
-      void dialog.dismiss();
-    });
-
+    // The guarantee "this page asks no browser prompt" is now the fixture's: any native alert, confirm or
+    // prompt fails the test (support/fixtures.ts), so this test no longer counts dialogs itself.
     await page.goto("/admin/revops");
     await page.getByRole("tab", { name: "Contracts" }).or(page.getByRole("button", { name: "Contracts", exact: true })).click();
     const number = `ENT-E2E-${runId()}`;
@@ -154,7 +150,6 @@ test.describe("Revenue operations: invoiced contracts (F-186)", () => {
     await confirm.getByRole("button", { name: "Cancel contract" }).click();
     await expect(detail).toContainText("CANCELLED");
 
-    expect(prompts).toBe(0);
     await expectHealthyPage(page);
   });
 

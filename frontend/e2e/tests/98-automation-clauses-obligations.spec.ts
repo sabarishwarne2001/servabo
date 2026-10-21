@@ -756,18 +756,18 @@ test.describe("Obligations: waive with a reason, revoke a calendar feed", () => 
     }).toBeGreaterThan(0);
 
     // 2. Revoke asks first. "No" leaves the feed alone.
-    page.once("dialog", (dialog) => {
-      expect(dialog.message()).toContain(label);
-      void dialog.dismiss();
-    });
+    const question = page.getByRole("alertdialog");
     await row.getByRole("button", { name: "Revoke" }).click();
+    await expect(question).toContainText(label);
+    await question.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(question).toHaveCount(0);
     await expect(row.getByRole("button", { name: "Revoke" })).toBeVisible();
     expect((await fetchOnce(link, {})).status).toBe(200);
 
     // 3. "Yes" revokes it.
-    page.once("dialog", (dialog) => { void dialog.accept(); });
     const revoked = page.waitForResponse((r) => /\/calendar-feeds\/[0-9a-f-]+$/.test(r.url()) && r.request().method() === "DELETE");
     await row.getByRole("button", { name: "Revoke" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Revoke feed", exact: true }).click();
     expect((await revoked).status()).toBe(204);
     await expect(page.getByText("Feed revoked. Calendars subscribed to it stop updating.")).toBeVisible();
     await expect(row).toContainText("Revoked");

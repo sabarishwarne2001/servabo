@@ -42,7 +42,7 @@ interface Entity360 {
 }
 
 const BILL_TO = "Northwind Retail Limited";
-const ERASE_PROMPT = "Erase this record, its identifiers and its links to every document? The documents themselves are kept.";
+const ERASE_PROMPT = "its links to every document are erased. The documents themselves are kept.";
 
 /** Vendor name -> the file names that name it. Every file is a real PDF the worker has to read. */
 const SUPPLIERS: Readonly<Record<string, readonly string[]>> = {
@@ -326,21 +326,23 @@ test.describe("Entity 360 — the record page's buttons", () => {
     await openRecord(page, elm.id);
     const erase = page.getByRole("button", { name: "Erase record" });
 
-    // Dismiss: the confirmation is shown with its warning, and nothing is sent or removed.
-    const dismissed: string[] = [];
-    page.once("dialog", (dialog) => { dismissed.push(`${dialog.type()}: ${dialog.message()}`); void dialog.dismiss(); });
+    // Cancel: the in-app question is shown with its warning, and nothing is sent or removed.
     const sent: string[] = [];
     page.on("request", (request) => { if (request.method() === "DELETE") sent.push(request.url()); });
     await erase.click();
-    await expect.poll(() => dismissed).toEqual([`confirm: ${ERASE_PROMPT}`]);
+    const question = page.getByRole("alertdialog");
+    await expect(question).toBeVisible();
+    await expect(question).toContainText(ERASE_PROMPT);
+    await question.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(question).toHaveCount(0);
     await expect(heading(page, "Elm Hardware Limited")).toBeVisible();
     expect(sent).toEqual([]);
     expect((await detail(session, elm.id)).entity.display_name).toBe("Elm Hardware Limited");
 
     // Accept: the record is erased and the page goes back to the list.
-    page.once("dialog", (dialog) => { void dialog.accept(); });
     const gone = page.waitForResponse((r) => r.request().method() === "DELETE" && r.url().endsWith(`/entities/${elm.id}`));
     await erase.click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Erase record", exact: true }).click();
     expect((await gone).status()).toBe(200);
     await expect(page).toHaveURL(new RegExp(`/${customer.wsSlug}/entities$`));
     await expect(page.getByRole("heading", { name: "Entity graph" })).toBeVisible();

@@ -25,7 +25,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import type { Dialog, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import { test, expect, expectHealthyPage } from "../support/fixtures";
 import { api, listWorkItems, uploadFile, type ApiSession } from "../support/api";
@@ -70,8 +70,9 @@ const PO_NUMBER = `PO-${tag}`;
 const INVOICE_FILE = `invoice-${INVOICE_NUMBER}.pdf`;
 const VENDOR = `Northwind Fasteners ${tag} Ltd`;
 const BUYER = "ERP Posting Ltd";
-const CONFIRM_TEXT = "This posting will not be sent. Continue?";
-const RESTORE_TEXT = "Replace the active mapping with the default for this format?";
+// Session J: these questions are asked in Servabo's own dialog (never a browser confirm).
+const CONFIRM_TEXT = "This posting will not be sent to the target.";
+const RESTORE_TEXT = "The active mapping is replaced by the default for this format, as a new version.";
 
 let customer: Customer;
 let contributor: { email: string; session: ApiSession };
@@ -159,14 +160,18 @@ async function saveMappingVia(targetId: string, spec: Spec, note: string): Promi
   expect(saved.status, saved.text.slice(0, 300)).toBe(200);
 }
 
-/** Answer the next window.confirm: dismiss it or accept it, and return what it asked. */
-function answerNextConfirm(page: Page, accept: boolean): Promise<string> {
-  return new Promise((resolve) => {
-    page.once("dialog", (dialog: Dialog) => {
-      const message = dialog.message();
-      void (accept ? dialog.accept() : dialog.dismiss()).then(() => resolve(message));
-    });
-  });
+/**
+ * Answer the in-app question the last click opened: confirm it with the named button or cancel it.
+ * Returns the dialog's text, so the caller still asserts what was asked. (The browser fixture fails
+ * any test that opens a native dialog, so this is the only way a question can be asked.)
+ */
+async function answerDialog(page: Page, accept: false | string): Promise<string> {
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toBeVisible();
+  const asked = await dialog.innerText();
+  await dialog.getByRole("button", { name: accept === false ? "Cancel" : accept, exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  return asked;
 }
 
 const stateBadge = (page: Page, label: string) => page.getByText(label, { exact: true }).first();
@@ -385,16 +390,14 @@ test.describe("ERP posting — a tenant of its own, a real approved match", () =
 
     // Dismissing the confirmation changes nothing.
     await decide.getByLabel("Note").fill("Entered by hand instead");
-    const dismissed = answerNextConfirm(page, false);
     await decide.getByRole("button", { name: "Do not post" }).click();
-    expect(await dismissed).toBe(CONFIRM_TEXT);
+    expect(await answerDialog(page, false)).toContain(CONFIRM_TEXT);
     await expect(stateBadge(page, "Awaiting acknowledgement")).toBeVisible();
     expect((await detailOf(postingId)).posting.state).toBe("DELIVERED");
 
     // Accepting it cancels the posting.
-    const accepted = answerNextConfirm(page, true);
     await decide.getByRole("button", { name: "Do not post" }).click();
-    expect(await accepted).toBe(CONFIRM_TEXT);
+    expect(await answerDialog(page, "Do not send")).toContain(CONFIRM_TEXT);
     await expect(stateBadge(page, "Cancelled")).toBeVisible();
     await expect(page.getByRole("region", { name: "Decide" })).toHaveCount(0);
     await expect(page.getByText("Reviewer's note: Entered by hand instead")).toBeVisible();
@@ -454,16 +457,14 @@ test.describe("ERP posting — a tenant of its own, a real approved match", () =
     expect(JSON.parse(await page.getByLabel("Mapping for VENDOR_BILL").inputValue())).toEqual(changed);
 
     // Restore default asks first; "no" changes nothing.
-    const declined = answerNextConfirm(page, false);
     await page.getByRole("button", { name: "Restore default" }).click();
-    expect(await declined).toBe(RESTORE_TEXT);
+    expect(await answerDialog(page, false)).toContain(RESTORE_TEXT);
     await expect(page.getByText(/Active: version 2/)).toBeVisible();
     expect((await mappingsOf(target.id)).versions).toHaveLength(2);
 
     // "Yes" makes the shipped mapping version 3 (nothing is overwritten) and shows it in the editor.
-    const confirmed = answerNextConfirm(page, true);
     await page.getByRole("button", { name: "Restore default" }).click();
-    expect(await confirmed).toBe(RESTORE_TEXT);
+    expect(await answerDialog(page, "Restore default")).toContain(RESTORE_TEXT);
     await expect(page.getByText(/Active: version 3/)).toBeVisible();
     await expect(page.getByText("Earlier versions (2)")).toBeVisible();
     expect(JSON.parse(await page.getByLabel("Mapping for VENDOR_BILL").inputValue())).toEqual(first.default_spec);
