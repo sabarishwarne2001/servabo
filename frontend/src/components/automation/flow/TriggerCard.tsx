@@ -96,9 +96,11 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({ catalog, selected, onC
                   key={trigger.key}
                   className={`rounded-lg border transition-colors ${
                     checked ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40"
-                  } ${locked || full || disabled ? "opacity-60" : ""}`}
+                  }`}
                 >
-                  <label className={`flex items-start gap-3 p-3 ${locked || full || disabled ? "cursor-not-allowed" : "cursor-pointer"}`}>
+                  {/* The dimming is on the label alone: its text belongs to a disabled checkbox, which needs no contrast. The
+                      "Upgrade" and "Details" buttons below are live controls and keep their full contrast. */}
+                  <label className={`flex items-start gap-3 p-3 ${locked || full || disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
                     <input
                       type="checkbox"
                       className="mt-0.5 h-4 w-4 accent-primary"

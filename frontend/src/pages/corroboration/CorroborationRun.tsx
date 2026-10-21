@@ -196,7 +196,13 @@ const CorroborationRun: React.FC = () => {
   const remove = useMutation({
     mutationFn: () => deleteRun(workspaceId, runId),
     onSuccess: async () => {
-      await refreshAll();
+      // Refresh the lists and the review queue, but not this comparison's own page data: it is gone, and asking the
+      // server for it again is a 404.
+      const gone = JSON.stringify(corroborationKeys.detail(workspaceId, runId));
+      await Promise.all([
+        client.invalidateQueries({ queryKey: corroborationKeys.all(workspaceId), predicate: (q) => JSON.stringify(q.queryKey) !== gone }),
+        client.invalidateQueries({ queryKey: reviewKeys.all(workspaceId) }),
+      ]);
       navigate(corroborationsPath(orgSlug, workspaceSlug));
     },
   });

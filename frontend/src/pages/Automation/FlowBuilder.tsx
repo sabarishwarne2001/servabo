@@ -316,7 +316,7 @@ export const FlowBuilder: React.FC<FlowBuilderProps> = ({
         </div>
       ) : (
         <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(380px,440px)] lg:overflow-hidden">
-          <div className="min-h-0 overflow-y-auto bg-[radial-gradient(hsl(var(--border))_1px,transparent_1px)] [background-size:18px_18px] lg:min-h-0">
+          <div className="bg-[radial-gradient(hsl(var(--border))_1px,transparent_1px)] [background-size:18px_18px] lg:min-h-0 lg:overflow-y-auto">
             <SummaryRail
               sentence={summarize(draft, catalog)}
               // Every open issue, not only the ones shown on the boxes. Before the first save attempt the boxes stay

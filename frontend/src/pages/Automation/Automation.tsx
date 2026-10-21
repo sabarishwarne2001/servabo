@@ -660,7 +660,7 @@ export const Automation: React.FC = () => {
             and its outcome as it happens.
           </p>
         </div>
-        <div className="flex items-center space-x-2 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={handleManualSync}

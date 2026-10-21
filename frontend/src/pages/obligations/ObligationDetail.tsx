@@ -76,7 +76,12 @@ const ObligationDetail: React.FC = () => {
   const edit = useMutation({ mutationFn: (body: ObligationUpdate) => updateObligation(workspaceId, obligationId, body),
     onSuccess: (d) => { setNewDate(""); done(d); } });
   const remove = useMutation({ mutationFn: () => deleteObligation(workspaceId, obligationId),
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: obligationKeys.all(workspaceId) }); navigate(obligationsPath(orgSlug, workspaceSlug)); } });
+    onSuccess: () => {
+      // Refresh every list, but not this obligation's own page data: it is gone, and asking the server for it again is a 404.
+      const gone = JSON.stringify(obligationKeys.detail(workspaceId, obligationId));
+      void queryClient.invalidateQueries({ queryKey: obligationKeys.all(workspaceId), predicate: (q) => JSON.stringify(q.queryKey) !== gone });
+      navigate(obligationsPath(orgSlug, workspaceSlug));
+    } });
   const busy = complete.isPending || waive.isPending || reopen.isPending || review.isPending || edit.isPending || remove.isPending;
   const failure = [complete, waive, reopen, review, edit, remove].find((m) => m.isError)?.error;
 

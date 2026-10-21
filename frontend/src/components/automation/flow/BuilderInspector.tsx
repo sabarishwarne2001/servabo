@@ -73,6 +73,8 @@ export const BuilderInspector: React.FC<BuilderInspectorProps> = ({
 }) => {
   const [tab, setTab] = useState<Tab>("configuration");
   const panel = useRef<HTMLDivElement | null>(null);
+  const aside = useRef<HTMLElement | null>(null);
+  const first = useRef(true);
   const hasConditions = draft.groups.some((g) => g.conditions.length > 0);
   const general = issuesFor(issues, "general");
 
@@ -80,6 +82,16 @@ export const BuilderInspector: React.FC<BuilderInspectorProps> = ({
   useEffect(() => {
     setTab("configuration");
   }, [selection.card]);
+  // On a phone the inspector sits below the canvas: choosing a box brings its form into view.
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    if (typeof window.matchMedia === "function" && window.matchMedia("(max-width: 1023px)").matches) {
+      aside.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selection]);
   useEffect(() => {
     if (selection.index === null || (selection.card !== "actions" && selection.card !== "else")) {return;}
     document.getElementById(`${selection.card}-step-${selection.index}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -326,7 +338,7 @@ export const BuilderInspector: React.FC<BuilderInspectorProps> = ({
   );
 
   return (
-    <aside className="flex min-h-0 flex-col border-border bg-card lg:border-l" aria-label="Step settings">
+    <aside ref={aside} className="flex min-h-0 flex-col border-border bg-card lg:border-l" aria-label="Step settings">
       <div className="border-b border-border px-4 pt-3">
         <h3 className="text-sm font-semibold">{heading}</h3>
         <div role="tablist" aria-label="Step settings" className="mt-2 flex gap-1">

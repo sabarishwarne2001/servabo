@@ -191,7 +191,9 @@ const ErpTargetDetail: React.FC = () => {
   const remove = useMutation({
     mutationFn: () => deleteTarget(workspaceId, targetId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: erpKeys.all(workspaceId) });
+      // Refresh every list, but not this target's own page data (its settings, its mappings): it is gone, and asking the
+      // server for it again is a 404.
+      void queryClient.invalidateQueries({ queryKey: erpKeys.all(workspaceId), predicate: (q) => !q.queryKey.includes(targetId) });
       navigate(erpPath(orgSlug, workspaceSlug));
     },
   });
