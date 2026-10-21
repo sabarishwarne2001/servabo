@@ -11,7 +11,8 @@
  * the server's so most mistakes show before a round trip.
  *
  * Keyboard: Ctrl/Cmd+S and Ctrl/Cmd+Enter save, Esc closes. Closing with
- * unsaved changes asks first, and so does leaving the page.
+ * unsaved changes asks first, in Servabo's own dialog (never `window.confirm`), and so does
+ * leaving the page (the browser's own `beforeunload` prompt, the one native exception).
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -19,6 +20,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Settings2, X } from "lucide-react";
 import { toast } from "sonner";
 
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ActionsCard } from "@/components/automation/flow/ActionsCard";
 import { ConditionsCard } from "@/components/automation/flow/ConditionsCard";
 import {
@@ -75,6 +77,7 @@ export const FlowBuilder: React.FC<FlowBuilderProps> = ({
   const [initial, setInitial] = useState<FlowDraft>(emptyDraft);
   const [serverIssues, setServerIssues] = useState<readonly CardIssue[]>([]);
   const [attempted, setAttempted] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
   const openedFor = useRef<string | null>(null);
 
   // Load the draft once per opening, after the catalog arrives (legacy action
@@ -156,13 +159,18 @@ export const FlowBuilder: React.FC<FlowBuilderProps> = ({
 
   const requestClose = useCallback((): void => {
     if (save.isPending) {return;}
-    if (dirty && !window.confirm("Discard your unsaved changes to this rule?")) {return;}
+    if (dirty) {
+      setDiscardOpen(true);
+      return;
+    }
     onClose();
   }, [dirty, onClose, save.isPending]);
 
   useEffect(() => {
     if (!isOpen) {return undefined;}
     const onKey = (event: KeyboardEvent): void => {
+      // Behind the discard question nothing else may act: not Esc, not save.
+      if (discardOpen) {return;}
       const mod = event.ctrlKey || event.metaKey;
       if (mod && (event.key === "s" || event.key === "S" || event.key === "Enter")) {
         event.preventDefault();
@@ -184,7 +192,7 @@ export const FlowBuilder: React.FC<FlowBuilderProps> = ({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("beforeunload", onUnload);
     };
-  }, [isOpen, submit, requestClose, dirty]);
+  }, [isOpen, submit, requestClose, dirty, discardOpen]);
 
   if (!isOpen) {return null;}
 
@@ -348,6 +356,17 @@ export const FlowBuilder: React.FC<FlowBuilderProps> = ({
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={discardOpen}
+        title="Discard your changes?"
+        message="The edits you made to this rule will be lost."
+        confirmText="Discard changes"
+        cancelText="Keep editing"
+        tone="danger"
+        initialFocus="cancel"
+        onConfirm={() => { setDiscardOpen(false); onClose(); }}
+        onCancel={() => setDiscardOpen(false)}
+      />
     </div>
   );
 };

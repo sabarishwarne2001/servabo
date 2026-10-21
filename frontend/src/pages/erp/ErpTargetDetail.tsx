@@ -30,11 +30,13 @@ import {
   type AckMode, type AuthMode, type ObjectKind, type SourceKind, type TargetDetail, type TestResult,
 } from "@/types/erp";
 import { formatTimestamp } from "@/utils/displayTime";
+import { useConfirmDialog } from "@/components/common/useConfirmDialog";
 
 const Settings: React.FC<{ readonly workspaceId: string; readonly detail: TargetDetail; readonly ackModes: readonly AckMode[]; readonly authModes: readonly AuthMode[]; readonly isAdmin: boolean }> = ({
   workspaceId, detail, ackModes, authModes, isAdmin,
 }) => {
   const queryClient = useQueryClient();
+  const { ask, confirmDialog } = useConfirmDialog();
   const t = detail.target;
   const [name, setName] = useState(t.name);
   const [ackMode, setAck] = useState<AckMode>(t.ack_mode);
@@ -72,10 +74,18 @@ const Settings: React.FC<{ readonly workspaceId: string; readonly detail: Target
         setLocalError("The configuration is a JSON object.");
         return;
       }
-      if (authMode !== t.auth_mode && t.credential_set && !window.confirm("Changing the sign-in method removes the stored credential. Continue?")) {
+      const body = config as Record<string, unknown>;
+      if (authMode !== t.auth_mode && t.credential_set) {
+        // The save waits for the answer; Cancel saves nothing.
+        void ask({
+          title: "Change the sign-in method?",
+          message: "Changing the sign-in method removes the stored credential. You will need to enter a new one before postings can be sent.",
+          confirmText: "Change and remove credential",
+          tone: "danger",
+        }).then((yes) => { if (yes) { save.mutate(body); } });
         return;
       }
-      save.mutate(config as Record<string, unknown>);
+      save.mutate(body);
     } catch {
       setLocalError("The configuration is not valid JSON.");
     }
@@ -143,6 +153,7 @@ const Settings: React.FC<{ readonly workspaceId: string; readonly detail: Target
           </button>
         ) : null}
       </fieldset>
+      {confirmDialog}
     </form>
   );
 };
@@ -153,6 +164,7 @@ const ErpTargetDetail: React.FC = () => {
   const { orgSlug = "", workspaceSlug = "", targetId = "" } = useParams<{ orgSlug: string; workspaceSlug: string; targetId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { ask, confirmDialog } = useConfirmDialog();
   const capability = useCapabilityAccess(workspace?.organizationId ?? "", CAPABILITY.erpPosting);
   const isAdmin = canAdminister(workspace?.role);
   const enabled = Boolean(workspaceId && targetId && capability.granted);
@@ -214,7 +226,10 @@ const ErpTargetDetail: React.FC = () => {
             </button>
             <button type="button" className={BUTTON_DESTRUCTIVE} disabled={remove.isPending || t.postings > 0}
               title={t.postings > 0 ? "A target with postings is part of the ledger: disable it instead" : undefined}
-              onClick={() => { if (window.confirm(`Delete ${t.name}?`)) { remove.mutate(); } }}>
+              onClick={() => {
+                void ask({ title: `Delete ${t.name}?`, message: "The target and its mappings are removed. This cannot be undone.", confirmText: "Delete target" })
+                  .then((yes) => { if (yes) { remove.mutate(); } });
+              }}>
               <Trash2 className="h-4 w-4" aria-hidden /> Delete
             </button>
           </div>
@@ -280,6 +295,7 @@ const ErpTargetDetail: React.FC = () => {
         {postings.isError ? <p className="text-sm text-destructive">{errorMessage(postings.error, "Could not load postings.")}</p> : null}
         {postings.data ? <PostingTable rows={postings.data.items} showTarget={false} /> : null}
       </section>
+      {confirmDialog}
     </div>
   );
 };

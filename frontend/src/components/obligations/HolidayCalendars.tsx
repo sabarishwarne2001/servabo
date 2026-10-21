@@ -10,6 +10,7 @@ import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, Loader2, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirmDialog } from "@/components/common/useConfirmDialog";
 
 import { BUTTON_DESTRUCTIVE, BUTTON_GHOST, BUTTON_PRIMARY, FIELD_LABEL, HINT, INPUT, SELECT, SURFACE, TEXTAREA } from "@/components/ui/primitives";
 import {
@@ -40,6 +41,7 @@ interface Props {
 
 export const HolidayCalendars: React.FC<Props> = ({ workspaceId, isAdmin }) => {
   const queryClient = useQueryClient();
+  const { ask, confirmDialog } = useConfirmDialog();
   const query = useQuery({ queryKey: obligationKeys.calendars(workspaceId), queryFn: () => listHolidayCalendars(workspaceId),
     enabled: Boolean(workspaceId) });
   const [name, setName] = useState("");
@@ -128,7 +130,10 @@ export const HolidayCalendars: React.FC<Props> = ({ workspaceId, isAdmin }) => {
               ) : null}
               {isAdmin ? (
                 <button type="button" className={BUTTON_DESTRUCTIVE} disabled={remove.isPending}
-                  onClick={() => { if (window.confirm(`Delete ${cal.name}? Its obligations fall back to weekends only.`)) { remove.mutate(cal.id); } }}>
+                  onClick={() => {
+                    void ask({ title: `Delete ${cal.name}?`, message: "Its obligations fall back to weekends only. This cannot be undone.", confirmText: "Delete calendar" })
+                      .then((yes) => { if (yes) { remove.mutate(cal.id); } });
+                  }}>
                   <Trash2 className="h-4 w-4" aria-hidden /> Delete
                 </button>
               ) : null}
@@ -213,6 +218,7 @@ export const HolidayCalendars: React.FC<Props> = ({ workspaceId, isAdmin }) => {
           </button>
         </form>
       ) : null}
+      {confirmDialog}
     </div>
   );
 };

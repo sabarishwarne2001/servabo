@@ -34,6 +34,7 @@ import { RELATION_LABELS } from "@/types/entities";
 // ARCH46-S2:h8-timestamps — instants follow the reader's profile zone and language (ARCH-30 D-5; verify_arch30_tranche3 H8).
 import { formatTimestampDate } from "@/utils/displayTime";
 import { ViewPlansAction } from "@/components/billing/ViewPlansAction";
+import { useConfirmDialog } from "@/components/common/useConfirmDialog";
 
 const DECISION_LABEL: Readonly<Record<string, string>> = {
   AUTO: "linked automatically",
@@ -73,6 +74,7 @@ const Entity360: React.FC = () => {
   const capability = useCapabilityAccess(workspace?.organizationId ?? "", CAPABILITY.entityGraph);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { ask, confirmDialog } = useConfirmDialog();
   const enabled = Boolean(workspaceId && entityId && capability.granted);
   const [depth, setDepth] = useState(2);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -195,9 +197,8 @@ const Entity360: React.FC = () => {
               className={BUTTON_DESTRUCTIVE}
               disabled={erase.isPending}
               onClick={() => {
-                if (window.confirm("Erase this record, its identifiers and its links to every document? The documents themselves are kept.")) {
-                  erase.mutate();
-                }
+                void ask({ title: "Erase this record?", message: "The record, its identifiers and its links to every document are erased. The documents themselves are kept. This cannot be undone.", confirmText: "Erase record" })
+                  .then((yes) => { if (yes) { erase.mutate(); } });
               }}
             >
               <Trash2 className="mr-1 inline h-4 w-4" aria-hidden />
@@ -357,6 +358,7 @@ const Entity360: React.FC = () => {
           <EntityObligations entityId={data.entity.id} orgSlug={orgSlug} workspaceSlug={workspaceSlug} />
         </Section>
       </div>
+      {confirmDialog}
     </div>
   );
 };

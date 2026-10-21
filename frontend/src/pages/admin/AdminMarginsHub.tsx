@@ -16,6 +16,7 @@
 
 import { LoadFailed } from "@/components/common/LoadFailed";
 import React, { useCallback, useMemo, useState } from "react";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import {
   ReconciliationHistory,
   SupplierInvoiceModal,
@@ -415,6 +416,10 @@ export const AdminMarginsHub: React.FC = () => {
   const [days, setDays] = useState(30);
   const [order, setOrder] = useState<MarginOrder>("MARGIN_ASC");
   const [error, setError] = useState<string | null>(null);
+  // Session J: the required note for accepting a variance, asked in the app's own dialog (it was
+  // `window.prompt`, whose Cancel could still let the action run). Cancel does nothing.
+  const [acceptFor, setAcceptFor] = useState<string | null>(null);
+  const [acceptNote, setAcceptNote] = useState("");
   // The invoice whose period has not closed: the refusal (409) names it, and the operator may reconcile anyway.
   const [openPeriodInvoiceId, setOpenPeriodInvoiceId] = useState<string | null>(null);
 
@@ -500,23 +505,38 @@ export const AdminMarginsHub: React.FC = () => {
   const handleAccept = useCallback(
     (reconciliationId: string) => {
       setError(null);
-
-      const note = globalThis.prompt(
-        "Why is this variance acceptable? A note is required — an accepted variance with no stated reason is indistinguishable from a mistake.",
-      );
-      if (!note || !note.trim()) {
-        return;
-      }
-      accept.mutate({ id: reconciliationId, note: note.trim() });
+      setAcceptNote("");
+      setAcceptFor(reconciliationId);
     },
-    [accept],
+    [],
   );
+
+  const confirmAccept = useCallback(() => {
+    const note = acceptNote.trim();
+    if (acceptFor === null || note === "") {
+      return;
+    }
+    accept.mutate({ id: acceptFor, note });
+    setAcceptFor(null);
+    setAcceptNote("");
+  }, [accept, acceptFor, acceptNote]);
 
   const figures = summary.data?.figures;
   const busy = reconcile.isPending || accept.isPending;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
+      <ConfirmDialog
+        open={acceptFor !== null}
+        title="Accept this variance?"
+        message="Why is this variance acceptable? A note is required — an accepted variance with no stated reason is indistinguishable from a mistake."
+        confirmText="Accept variance"
+        tone="primary"
+        input={{ label: "Why is it acceptable?", value: acceptNote, onChange: setAcceptNote, maxLength: 4000 }}
+        confirmDisabled={acceptNote.trim() === ""}
+        onConfirm={confirmAccept}
+        onCancel={() => { setAcceptFor(null); setAcceptNote(""); }}
+      />
       <PageHeader
         icon={Scale}
         eyebrow="Platform"

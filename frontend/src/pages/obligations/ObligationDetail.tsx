@@ -33,6 +33,7 @@ import {
 import { formatDateTime } from "@/utils/formatters";
 import { ViewPlansAction } from "@/components/billing/ViewPlansAction";
 import { CapabilityLoading } from "@/components/common/CapabilityLoading";
+import { useConfirmDialog } from "@/components/common/useConfirmDialog";
 
 const EVENT_LABELS: Readonly<Record<string, string>> = {
   CREATED: "Created", UPDATED: "Edited", DUE_SOON: "Became due soon", OVERDUE: "Became overdue", REOPENED: "Reopened",
@@ -48,6 +49,7 @@ const ObligationDetail: React.FC = () => {
   const role = workspace?.role;
   const canEdit = role === "ADMIN" || role === "OWNER" || role === "CONTRIBUTOR";
   const queryClient = useQueryClient();
+  const { ask, confirmDialog } = useConfirmDialog();
   const navigate = useNavigate();
   const [waiveReason, setWaiveReason] = useState("");
   const [note, setNote] = useState("");
@@ -195,7 +197,10 @@ const ObligationDetail: React.FC = () => {
             </button>
             {o.origin === "MANUAL" ? (
               <button type="button" className={`${BUTTON_DESTRUCTIVE} ml-auto`} disabled={busy}
-                onClick={() => { if (window.confirm("Delete this obligation?")) { remove.mutate(); } }}>
+                onClick={() => {
+                  void ask({ title: "Delete this obligation?", message: "The obligation is removed. This cannot be undone.", confirmText: "Delete obligation" })
+                    .then((yes) => { if (yes) { remove.mutate(); } });
+                }}>
                 <Trash2 className="h-4 w-4" aria-hidden /> Delete
               </button>
             ) : null}
@@ -266,6 +271,7 @@ const ObligationDetail: React.FC = () => {
           ))}
         </ol>
       </section>
+      {confirmDialog}
     </div>
   );
 };

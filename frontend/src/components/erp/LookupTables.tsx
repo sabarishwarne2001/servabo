@@ -14,6 +14,7 @@ import { createLookup, deleteLookup, erpKeys, listLookups, updateLookup } from "
 import { errorMessage } from "@/services/api/errors";
 import type { LookupRow } from "@/types/erp";
 import { formatTimestamp } from "@/utils/displayTime";
+import { useConfirmDialog } from "@/components/common/useConfirmDialog";
 
 export const toLines = (entries: Readonly<Record<string, string>>): string =>
   Object.entries(entries).map(([k, v]) => `${k} = ${v}`).join("\n");
@@ -43,6 +44,7 @@ export const parseLines = (text: string): { entries: Record<string, string>; pro
 
 const LookupEditor: React.FC<{ readonly workspaceId: string; readonly row: LookupRow; readonly isAdmin: boolean }> = ({ workspaceId, row, isAdmin }) => {
   const queryClient = useQueryClient();
+  const { ask, confirmDialog } = useConfirmDialog();
   const [text, setText] = useState(toLines(row.entries));
   const [description, setDescription] = useState(row.description ?? "");
   const parsed = parseLines(text);
@@ -73,11 +75,15 @@ const LookupEditor: React.FC<{ readonly workspaceId: string; readonly row: Looku
           </button>
           <button type="button" className={`${BUTTON_DESTRUCTIVE} ml-auto`} disabled={remove.isPending || row.used_by.length > 0}
             title={row.used_by.length > 0 ? "A mapping still uses this table" : undefined}
-            onClick={() => { if (window.confirm(`Delete ${row.name}?`)) { remove.mutate(); } }}>
+            onClick={() => {
+              void ask({ title: `Delete ${row.name}?`, message: "The lookup table is removed. This cannot be undone.", confirmText: "Delete table" })
+                .then((yes) => { if (yes) { remove.mutate(); } });
+            }}>
             <Trash2 className="h-4 w-4" aria-hidden /> Delete
           </button>
         </div>
       ) : null}
+      {confirmDialog}
     </article>
   );
 };
