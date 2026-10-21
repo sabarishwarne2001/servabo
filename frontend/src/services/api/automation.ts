@@ -8,6 +8,13 @@ import type {
   AutomationRuleTestResponse,
 } from "@/types/automation";
 import type { FlowCatalog } from "@/types/automationFlow";
+import type {
+  AutomationPauseState,
+  DocumentExplanation,
+  PreviewResult,
+  RecipeList,
+  RuleVersionPage,
+} from "@/types/automationVolume";
 
 export const createAutomationRule = async (
   workspaceId: string,
@@ -124,7 +131,58 @@ export const getAutomationCatalog = async (
   return response.data;
 };
 
+export const getPauseState = async (workspaceId: string): Promise<AutomationPauseState> =>
+  (await apiClient.get<AutomationPauseState>(AUTOMATION_ENDPOINTS.pause(workspaceId))).data;
+
+export const setPaused = async (workspaceId: string, paused: boolean): Promise<AutomationPauseState> =>
+  (await apiClient.put<AutomationPauseState>(AUTOMATION_ENDPOINTS.pause(workspaceId), { paused })).data;
+
+export const getRuleVersions = async (workspaceId: string, ruleId: string): Promise<RuleVersionPage> =>
+  (await apiClient.get<RuleVersionPage>(AUTOMATION_ENDPOINTS.versions(workspaceId, ruleId))).data;
+
+export const restoreRuleVersion = async (
+  workspaceId: string,
+  ruleId: string,
+  version: number,
+): Promise<AutomationRule> =>
+  (await apiClient.post<AutomationRule>(AUTOMATION_ENDPOINTS.restore(workspaceId, ruleId, version), {})).data;
+
+/** What a rule that is not saved yet would have done on the last 30 days. Read-only on the server. */
+export const previewDraft = async (
+  workspaceId: string,
+  data: AutomationRuleCreateRequest,
+): Promise<PreviewResult> =>
+  (await apiClient.post<PreviewResult>(AUTOMATION_ENDPOINTS.previewDraft(workspaceId), data)).data;
+
+export const previewRule = async (workspaceId: string, ruleId: string): Promise<PreviewResult> =>
+  (await apiClient.post<PreviewResult>(AUTOMATION_ENDPOINTS.previewRule(workspaceId, ruleId), {})).data;
+
+export const runRuleByHand = async (
+  workspaceId: string,
+  ruleId: string,
+  workItemId: string,
+): Promise<{ readonly queued: boolean; readonly event_id: string }> =>
+  (await apiClient.post<{ queued: boolean; event_id: string }>(
+    AUTOMATION_ENDPOINTS.runByHand(workspaceId, ruleId),
+    { work_item_id: workItemId },
+  )).data;
+
+export const explainDocument = async (workspaceId: string, workItemId: string): Promise<DocumentExplanation> =>
+  (await apiClient.get<DocumentExplanation>(AUTOMATION_ENDPOINTS.explain(workspaceId, workItemId))).data;
+
+export const getRecipes = async (workspaceId: string): Promise<RecipeList> =>
+  (await apiClient.get<RecipeList>(AUTOMATION_ENDPOINTS.recipes(workspaceId))).data;
+
 export const automationApi = {
+  getPauseState,
+  setPaused,
+  getRuleVersions,
+  restoreRuleVersion,
+  previewDraft,
+  previewRule,
+  runRuleByHand,
+  explainDocument,
+  getRecipes,
   createAutomationRule,
   getAutomationRules,
   getAutomationRuleDetails,

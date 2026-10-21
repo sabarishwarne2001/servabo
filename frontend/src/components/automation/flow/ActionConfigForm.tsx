@@ -18,6 +18,7 @@ import {
   schemaProperties,
   type CardIssue,
 } from "./flowModel";
+import { ChipList } from "./ConditionValue";
 import { IssueText, inputClass } from "./StepCard";
 
 export const ACTION_FORMS: Readonly<Record<string, readonly string[]>> = {
@@ -31,6 +32,14 @@ export const ACTION_FORMS: Readonly<Record<string, readonly string[]>> = {
   "work_item.mutate": ["target_field", "target_value"],
   // ARCH47-S2:action-form-erp-post
   "erp.post": ["target_id", "object_kinds"],
+  // Session J
+  "document.tag": ["add", "remove"],
+  "review.assign": ["assignee_email", "assignee_role", "reason", "due_in_hours"],
+  "legal_hold.place": ["reason", "reference"],
+  "chat.post": ["endpoint_id", "title", "message"],
+  "gst.remind_supplier": ["at_most_every_days"],
+  "obligation.create": ["title", "kind", "due_in_days", "owner_email", "description"],
+  "supplier.request_document": ["case_template_id", "document_type"],
 };
 
 const LABELS: Readonly<Record<string, string>> = {
@@ -47,6 +56,17 @@ const LABELS: Readonly<Record<string, string>> = {
   target_value: "New value",
   target_id: "ERP target",
   object_kinds: "What to post",
+  add: "Tags to add",
+  remove: "Tags to take off",
+  assignee_email: "Send the review to",
+  assignee_role: "Or to whoever holds the role",
+  due_in_hours: "Due in (hours)",
+  reference: "Matter or case reference",
+  at_most_every_days: "At most one reminder per supplier every (days)",
+  due_in_days: "Due in (days)",
+  owner_email: "Owner",
+  case_template_id: "Case template",
+  document_type: "Document to ask for",
 };
 
 const HELP: Readonly<Record<string, string>> = {
@@ -57,6 +77,10 @@ const HELP: Readonly<Record<string, string>> = {
   on_hold: "Either way, the actions after this one are skipped.",
   target_id: "Active ERP targets of this workspace. Runs on “procurement approved” and “case completed” only.",
   object_kinds: "One posting per kind, exactly once: a rule that fires again finds it already in the ledger.",
+  add: "Press Enter after each tag. Tags are lower-case words, numbers and dashes.",
+  assignee_email: "Choose a person, or a role below, not both.",
+  owner_email: "Leave empty to give it to the person who built the rule.",
+  case_template_id: "Only published case templates are listed.",
 };
 
 const enumOf = (prop: JsonSchemaProperty | undefined): readonly string[] | undefined =>
@@ -145,6 +169,12 @@ export const ActionConfigForm: React.FC<ActionConfigFormProps> = ({
 
     switch (key) {
       case "endpoint_id":
+        if (action.type === "chat.post") {
+          return select(
+            (resources.chat_endpoints ?? []).map((e) => ({ value: e.id, label: `${e.kind === "SLACK" ? "Slack" : "Microsoft Teams"} · ${e.label}` })),
+            "No Slack or Teams channel yet: add one under Settings › Webhooks",
+          );
+        }
         return select(
           resources.webhook_endpoints.map((e) => ({ value: e.id, label: `${e.label}${e.host && e.host !== e.label ? ` (${e.host})` : ""}` })),
           "No active webhook endpoints — register one under Settings › Webhooks",
@@ -154,6 +184,24 @@ export const ActionConfigForm: React.FC<ActionConfigFormProps> = ({
           resources.warehouse_destinations.map((d) => ({ value: d.id, label: `${d.label} · ${d.kind}` })),
           "No active destinations, or the warehouse add-on is not active",
         );
+      case "assignee_email":
+      case "owner_email":
+        return (
+          <select id={id} disabled={disabled} value={text(key)} onChange={(e) => set(key, e.target.value)} className={inputClass(invalid)}>
+            <option value="">{key === "owner_email" ? "The person who built the rule" : "Choose a person…"}</option>
+            {(resources.members ?? []).map((m) => (
+              <option key={m.email} value={m.email}>{m.name === m.email ? m.email : `${m.name} (${m.email})`}</option>
+            ))}
+          </select>
+        );
+      case "case_template_id":
+        return select(
+          (resources.case_templates ?? []).map((t) => ({ value: t.id, label: t.label })),
+          "No published case templates yet",
+        );
+      case "add":
+      case "remove":
+        return <ChipList items={list(key)} disabled={disabled} invalid={invalid} onChange={(next) => set(key, next)} label={`${LABELS[key] ?? key}`} />;
       case "profile_key":
         return select(resources.redaction_profiles.map((p) => ({ value: p, label: optionLabel(p) })), "No profiles");
       case "roles":
@@ -188,6 +236,9 @@ export const ActionConfigForm: React.FC<ActionConfigFormProps> = ({
 
     if (options) {
       return select(options.map((o) => ({ value: o, label: optionLabel(o) })), "—");
+    }
+    if (prop?.type === "array" && prop.items?.type === "string") {
+      return <ChipList items={list(key)} disabled={disabled} invalid={invalid} onChange={(next) => set(key, next)} label={LABELS[key] ?? humanize(key)} />;
     }
     if (prop?.type === "integer" || prop?.type === "number") {
       return (

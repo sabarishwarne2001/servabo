@@ -13,6 +13,7 @@ import {
   FileText,
   MessageSquare,
   RefreshCw,
+  Zap,
 } from "lucide-react";
 
 import { workItemApi } from "@/services/api/workItem";
@@ -37,6 +38,7 @@ import DocumentComparisons from "@/components/corroboration/DocumentComparisons"
 import DocumentObligations from "@/components/obligations/DocumentObligations";
 // ARCH47-S2:document-postings
 import DocumentPostings from "@/components/erp/DocumentPostings";
+import DocumentAutomation from "@/components/automation/DocumentAutomation";
 import { formatBytes, formatDateTime } from "@/utils/formatters";
 // N-020 items 6/7: the page beside the extracted fields, correctable in place.
 import DocumentPageViewer, { useDocumentEvidence } from "@/components/workItems/DocumentPageViewer";
@@ -49,7 +51,7 @@ import { ApiError } from "@/services/api/client";
 import type { WorkItemStatus } from "@/types/workItem";
 import { formatNumber } from "@/utils/displayTime";
 
-type DetailTab = "document" | "summary" | "entities" | "obligations" | "postings" | "ocr" | "chat";
+type DetailTab = "document" | "summary" | "entities" | "obligations" | "postings" | "automation" | "ocr" | "chat";
 
 const STATUS_BADGE_MAP: Record<WorkItemStatus, string> = {
   QUEUED: "bg-primary/10 text-primary border-primary/20",
@@ -66,6 +68,8 @@ const DETAIL_TABS = [
   { value: "obligations", label: "Obligations", icon: CalendarClock },
   // ARCH47-S2:postings-tab
   { value: "postings", label: "ERP postings", icon: BookUp },
+  // Session J: why each rule did or did not run on this document
+  { value: "automation", label: "Automation", icon: Zap },
   { value: "ocr", label: "OCR", icon: Eye },
   { value: "chat", label: "Chat", icon: MessageSquare },
 ] as const;
@@ -510,6 +514,7 @@ export const WorkItemDetails: React.FC = () => {
 
               {activeTab === "obligations" && <DocumentObligations workItemId={workItem.id} />}
               {activeTab === "postings" && <DocumentPostings workItemId={workItem.id} />}
+              {activeTab === "automation" && <DocumentAutomation workItemId={workItem.id} />}
 
               {activeTab === "ocr" && (
                 <section className="space-y-4">

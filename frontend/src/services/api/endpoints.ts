@@ -276,6 +276,20 @@ export const AUTOMATION_ENDPOINTS = {
   logs: (workspaceId: string): string => `${scoped(workspaceId)}/automation/logs`,
   // ARCH37-S2:catalog-endpoint. The flow builder's catalog.
   catalog: (workspaceId: string): string => `${scoped(workspaceId)}/automation/catalog`,
+  // Session J: safe at volume, preview, "why didn't it run", recipes.
+  pause: (workspaceId: string): string => `${scoped(workspaceId)}/automation/pause`,
+  versions: (workspaceId: string, ruleId: string): string =>
+    `${scoped(workspaceId)}/automation/rules/${seg(ruleId)}/versions`,
+  restore: (workspaceId: string, ruleId: string, version: number): string =>
+    `${scoped(workspaceId)}/automation/rules/${seg(ruleId)}/versions/${version}/restore`,
+  previewDraft: (workspaceId: string): string => `${scoped(workspaceId)}/automation/preview`,
+  previewRule: (workspaceId: string, ruleId: string): string =>
+    `${scoped(workspaceId)}/automation/rules/${seg(ruleId)}/preview`,
+  runByHand: (workspaceId: string, ruleId: string): string =>
+    `${scoped(workspaceId)}/automation/rules/${seg(ruleId)}/run`,
+  explain: (workspaceId: string, workItemId: string): string =>
+    `${scoped(workspaceId)}/automation/documents/${seg(workItemId)}/explain`,
+  recipes: (workspaceId: string): string => `${scoped(workspaceId)}/automation/recipes`,
 } as const;
 
 export const NOTIFICATION_ENDPOINTS = {

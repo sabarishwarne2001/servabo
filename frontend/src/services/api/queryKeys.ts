@@ -73,6 +73,13 @@ export const automationKeys = {
   catalog: (workspaceId: string) => [...automationKeys.all(workspaceId), "catalog"] as const,
   executionNodes: (workspaceId: string, executionId: string) =>
     [...automationKeys.all(workspaceId), "execution-nodes", executionId] as const,
+  // Session J
+  pause: (workspaceId: string) => [...automationKeys.all(workspaceId), "pause"] as const,
+  versions: (workspaceId: string, ruleId: string) =>
+    [...automationKeys.all(workspaceId), "versions", ruleId] as const,
+  recipes: (workspaceId: string) => [...automationKeys.all(workspaceId), "recipes"] as const,
+  explain: (workspaceId: string, workItemId: string) =>
+    [...automationKeys.all(workspaceId), "explain", workItemId] as const,
 };
 
 export const notificationKeys = {

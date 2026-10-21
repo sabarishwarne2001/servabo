@@ -21,11 +21,29 @@ import {
   PieChart,
   ChevronDown,
   ChevronUp,
+  Eye,
+  History,
+  RotateCcw,
+  PauseCircle,
+  PlayCircle,
+  Sparkles,
 } from "lucide-react";
 import { automationApi } from "@/services/api/automation";
 // ARCH37-S2:flow-builder-wired. The step builder replaces RuleForm; labels come from the catalog.
 import { FlowBuilder } from "@/pages/Automation/FlowBuilder";
-import { actionLabel, fieldLabel, triggerLabel, triggerLabelsForEvents } from "@/components/automation/flow/flowModel";
+import {
+  actionLabel,
+  draftFromPayload,
+  fieldLabel,
+  triggerLabel,
+  triggerLabelsForEvents,
+  valueText,
+  type FlowDraft,
+} from "@/components/automation/flow/flowModel";
+import { PreviewPanel } from "@/components/automation/flow/PreviewPanel";
+import { retryExecution } from "@/services/api/executions";
+import { RecipeGallery } from "@/components/automation/RecipeGallery";
+import { VersionHistoryDialog } from "@/components/automation/VersionHistoryDialog";
 import { RuleTestDialog } from "@/pages/Automation/RuleTestDialog";
 import { formatDateTime } from "@/utils/formatters";
 import { ApiError } from "@/services/api/client";
@@ -118,6 +136,12 @@ export const Automation: React.FC = () => {
   const [ruleToTest, setRuleToTest] = useState<AutomationRule | null>(null);
   const [ruleToDelete, setRuleToDelete] = useState<AutomationRule | null>(null);
   const [togglingRuleId, setTogglingRuleId] = useState<string | null>(null);
+  // Session J: recipes, history, preview and the pause switch.
+  const [recipesOpen, setRecipesOpen] = useState<boolean>(false);
+  const [recipeDraft, setRecipeDraft] = useState<FlowDraft | null>(null);
+  const [historyRule, setHistoryRule] = useState<AutomationRule | null>(null);
+  const [previewTarget, setPreviewTarget] = useState<AutomationRule | null>(null);
+  const [pauseAsk, setPauseAsk] = useState<boolean>(false);
 
   // Search & Filters Panel states (Rule list)
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -133,7 +157,7 @@ export const Automation: React.FC = () => {
 
   // Advanced Audit Log Filter states (Log list)
   const [logSearchQuery, setLogSearchQuery] = useState<string>("");
-  const [logStatusFilter, setLogStatusFilter] = useState<"ALL" | "SUCCESS" | "FAILED">("ALL");
+  const [logStatusFilter, setLogStatusFilter] = useState<"ALL" | "SUCCESS" | "FAILED" | "SKIPPED">("ALL");
   const [logRuleFilter, setLogRuleFilter] = useState<string>("ALL");
   const [logDateRangeFilter, setLogDateRangeFilter] = useState<"ALL" | "TODAY" | "7_DAYS" | "30_DAYS">("ALL");
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
@@ -147,7 +171,57 @@ export const Automation: React.FC = () => {
     setRuleToDelete(null);
     setTogglingRuleId(null);
     setExpandedLogId(null);
+    setRecipesOpen(false);
+    setRecipeDraft(null);
+    setHistoryRule(null);
+    setPreviewTarget(null);
+    setPauseAsk(false);
   }, [workspaceId]);
+
+  const [retryAsk, setRetryAsk] = useState<{ executionId: string; name: string; message: string } | null>(null);
+  const retryMutation = useMutation({
+    mutationFn: ({ executionId, acknowledge }: { executionId: string; acknowledge: boolean; name: string }) =>
+      retryExecution(workspaceId ?? "", executionId, acknowledge),
+    onSuccess: async (_result, variables) => {
+      setRetryAsk(null);
+      toast.success(`Retrying “${variables.name}”. The new run appears in Run history in a moment.`);
+      if (workspaceId) {await queryClient.invalidateQueries({ queryKey: automationKeys.logs(workspaceId) });}
+    },
+    onError: (error: unknown, variables) => {
+      // The server names the steps that could send a message twice and waits for a yes.
+      if (error instanceof ApiError && error.code === "may_repeat") {
+        setRetryAsk({ executionId: variables.executionId, name: variables.name, message: error.message });
+        return;
+      }
+      setRetryAsk(null);
+      toast.error(error instanceof ApiError ? error.message : "The run could not be retried.");
+    },
+  });
+
+  const pauseQuery = useQuery({
+    queryKey: automationKeys.pause(workspaceId ?? ""),
+    queryFn: () => automationApi.getPauseState(workspaceId ?? ""),
+    enabled: Boolean(workspaceId),
+    staleTime: 15_000,
+  });
+  const paused = pauseQuery.data?.paused === true;
+  const setPausedMutation = useMutation({
+    mutationFn: (next: boolean) => automationApi.setPaused(workspaceId ?? "", next),
+    onSuccess: async (state) => {
+      setPauseAsk(false);
+      toast.success(state.paused ? "Automations are paused. Nothing will run until you resume them." : "Automations resumed.");
+      if (workspaceId) {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: automationKeys.pause(workspaceId) }),
+          queryClient.invalidateQueries({ queryKey: automationKeys.rules(workspaceId) }),
+        ]);
+      }
+    },
+    onError: (error: unknown) => {
+      setPauseAsk(false);
+      toast.error(error instanceof ApiError ? error.message : "The pause switch could not be changed.");
+    },
+  });
 
   // 1. Query user-configured Rules lists
   const {
@@ -403,9 +477,11 @@ export const Automation: React.FC = () => {
     const successful = filteredLogs.filter(
       (l: AutomationLog) => l.status === "SUCCESS"
     ).length;
-    const failed = total - successful;
-    const successPct = total > 0 ? Math.round((successful / total) * 100) : 0;
-    const failurePct = total > 0 ? 100 - successPct : 0;
+    // Session J: a run that was held back (paused, over its limit, cooldown) is neither a success nor a failure.
+    const failed = filteredLogs.filter((l: AutomationLog) => l.status === "FAILED").length;
+    const decided = successful + failed;
+    const successPct = decided > 0 ? Math.round((successful / decided) * 100) : 0;
+    const failurePct = decided > 0 ? 100 - successPct : 0;
 
     return {
       total,
@@ -419,6 +495,7 @@ export const Automation: React.FC = () => {
   const handleOpenCreateForm = useCallback((): void => {
     setRuleToEdit(null);
     setRuleToDuplicate(null);
+    setRecipeDraft(null);
     setIsFormOpen(true);
   }, []);
 
@@ -438,6 +515,7 @@ export const Automation: React.FC = () => {
     setIsFormOpen(false);
     setRuleToEdit(null);
     setRuleToDuplicate(null);
+    setRecipeDraft(null);
   }, []);
 
   const handleOpenTestDialog = useCallback((rule: AutomationRule): void => {
@@ -540,6 +618,29 @@ export const Automation: React.FC = () => {
             />
           </button>
           {canManage && (
+            <button
+              type="button"
+              onClick={() => (paused ? setPausedMutation.mutate(false) : setPauseAsk(true))}
+              disabled={setPausedMutation.isPending || pauseQuery.isLoading}
+              className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-all disabled:opacity-50 ${
+                paused ? "border-amber-500/50 bg-amber-500/10 text-amber-800 dark:text-amber-300" : "border-border bg-background text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {paused ? <PlayCircle className="h-4 w-4" aria-hidden="true" /> : <PauseCircle className="h-4 w-4" aria-hidden="true" />}
+              {paused ? "Resume automations" : "Pause all automations"}
+            </button>
+          )}
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => setRecipesOpen(true)}
+              disabled={planLocked}
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
+            >
+              <Sparkles className="h-4 w-4" aria-hidden="true" /> Start from a recipe
+            </button>
+          )}
+          {canManage && (
           <button
             type="button"
             onClick={handleOpenCreateForm}
@@ -552,6 +653,25 @@ export const Automation: React.FC = () => {
           )}
         </div>
       </header>
+
+      {paused && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+          <p className="flex items-center gap-2 font-semibold">
+            <PauseCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+            Automations are paused. No rule runs; runs that arrive are listed in Run history as Skipped.
+          </p>
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => setPausedMutation.mutate(false)}
+              disabled={setPausedMutation.isPending}
+              className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
+            >
+              Resume now
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 select-none">
         {/* Total Rules */}
@@ -780,6 +900,16 @@ export const Automation: React.FC = () => {
                 Create your first rule
               </button>
               )}
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => setRecipesOpen(true)}
+                  disabled={planLocked}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+                >
+                  <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> or start from a ready-made recipe
+                </button>
+              )}
             </div>
           ) : sortedRules.length === 0 ? (
             <div className="text-center py-14 px-6 bg-card border border-dashed border-border/60 rounded-2xl select-none flex flex-col items-center justify-center space-y-3">
@@ -842,6 +972,21 @@ export const Automation: React.FC = () => {
                             Has otherwise
                           </span>
                         )}
+                        {rule.paused && (
+                          <span className="text-[10px] bg-amber-500/15 text-amber-800 dark:text-amber-300 px-2.5 py-0.5 rounded-full font-semibold select-none whitespace-nowrap">
+                            Paused
+                          </span>
+                        )}
+                        {rule.max_runs_per_hour ? (
+                          <span className="text-[10px] bg-secondary text-secondary-foreground border border-border/40 px-2 py-0.5 rounded-md font-semibold select-none whitespace-nowrap">
+                            Up to {rule.max_runs_per_hour} runs an hour
+                          </span>
+                        ) : null}
+                        {rule.cooldown_hours ? (
+                          <span className="text-[10px] bg-secondary text-secondary-foreground border border-border/40 px-2 py-0.5 rounded-md font-semibold select-none whitespace-nowrap">
+                            Once per document every {rule.cooldown_hours} h
+                          </span>
+                        ) : null}
                         {rule.is_active ? (
                           <span className="text-[10px] bg-emerald-500/10 text-emerald-500 px-2.5 py-0.5 rounded-full font-semibold select-none whitespace-nowrap">
                             Active
@@ -932,7 +1077,7 @@ export const Automation: React.FC = () => {
                                   cond.operator.replace("_", " ")}
                               </span>
                               <span className="px-2 py-1 rounded-md bg-primary/10 text-primary border border-primary/20 font-semibold truncate max-w-[150px]">
-                                {cond.value}
+                                {valueText(cond.operator, cond.value, cond.currency ?? "")}
                               </span>
                             </div>
                           </React.Fragment>
@@ -982,6 +1127,7 @@ export const Automation: React.FC = () => {
 
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-border/10">
                     <div className="text-[10px] text-muted-foreground font-medium flex flex-wrap items-center gap-x-3 gap-y-1 select-none">
+                      {rule.version ? <span>Version {rule.version}</span> : null}
                       <span>Created: {formatDateTime(rule.created_at)}</span>
                       {rule.updated_at && (
                         <span>Updated: {formatDateTime(rule.updated_at)}</span>
@@ -990,6 +1136,25 @@ export const Automation: React.FC = () => {
 
                     {canManage && (
                     <div className="flex items-center space-x-1 self-end sm:self-auto">
+                      <button
+                        type="button"
+                        disabled={isDeletingRule || isUpdatingRule || planLocked}
+                        onClick={() => setPreviewTarget(rule)}
+                        className="p-2 rounded-lg bg-background border border-border/40 hover:bg-muted/80 hover:border-border text-muted-foreground hover:text-foreground transition-all focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="See what this rule would have done on the last 30 days"
+                        aria-label={`Preview rule ${rule.name}`}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHistoryRule(rule)}
+                        className="p-2 rounded-lg bg-background border border-border/40 hover:bg-muted/80 hover:border-border text-muted-foreground hover:text-foreground transition-all focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        title="Every change to this rule, in plain words"
+                        aria-label={`History of rule ${rule.name}`}
+                      >
+                        <History className="h-3.5 w-3.5" />
+                      </button>
                       <button
                         type="button"
                         disabled={isDeletingRule || isUpdatingRule || planLocked}
@@ -1114,7 +1279,7 @@ export const Automation: React.FC = () => {
                 <Select
                   value={logStatusFilter}
                   onValueChange={(value) =>
-                    setLogStatusFilter(value as "ALL" | "SUCCESS" | "FAILED")
+                    setLogStatusFilter(value as "ALL" | "SUCCESS" | "FAILED" | "SKIPPED")
                   }
                 >
                   <SelectTrigger className="h-9 text-xs w-full" aria-label="Filter by status">
@@ -1125,6 +1290,7 @@ export const Automation: React.FC = () => {
                     <SelectItem value="ALL">All Statuses</SelectItem>
                     <SelectItem value="SUCCESS">Succeeded Runs</SelectItem>
                     <SelectItem value="FAILED">Failed Runs</SelectItem>
+                    <SelectItem value="SKIPPED">Skipped Runs</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -1247,6 +1413,10 @@ export const Automation: React.FC = () => {
                 filteredLogs.map((log: AutomationLog) => {
                   const isExpanded = expandedLogId === log.id;
                   const isFailed = log.status === "FAILED";
+                  const isSkipped = log.status === "SKIPPED";
+                  const canRetry =
+                    isFailed &&
+                    ["FAILED", "TIMED_OUT", "BUDGET_EXHAUSTED"].includes(log.execution_status ?? "");
 
                   return (
                     <div
@@ -1279,10 +1449,12 @@ export const Automation: React.FC = () => {
                             className={`rounded-md px-2 py-0.5 font-semibold ${
                               isFailed
                                 ? "bg-destructive/10 text-destructive"
-                                : "bg-emerald-500/10 text-emerald-500"
+                                : isSkipped
+                                  ? "bg-amber-500/15 text-amber-800 dark:text-amber-300"
+                                  : "bg-emerald-500/10 text-emerald-500"
                             }`}
                           >
-                            {isFailed ? "FAILED" : " Successfully Executed"}
+                            {isFailed ? "FAILED" : isSkipped ? "SKIPPED" : " Successfully Executed"}
                           </span>
                         </div>
 
@@ -1384,13 +1556,17 @@ export const Automation: React.FC = () => {
 
                       {isFailed && (
                         <div className="flex justify-end space-x-2 border-t border-border/10 pt-2 select-none">
-                          <button
-                            type="button"
-                            disabled
-                            className="rounded-md border border-border px-3 py-1 text-xs bg-muted/50 text-muted-foreground cursor-not-allowed"
-                          >
-                            Retry (Coming Soon)
-                          </button>
+                          {canRetry && canManage && (
+                            <button
+                              type="button"
+                              disabled={retryMutation.isPending}
+                              onClick={() => retryMutation.mutate({ executionId: log.id, acknowledge: false, name: log.rule_name })}
+                              aria-label={`Retry the failed run of ${log.rule_name}`}
+                              className="inline-flex items-center gap-1 rounded-md border border-primary px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
+                            >
+                              <RotateCcw className="h-3 w-3" aria-hidden="true" /> Retry
+                            </button>
+                          )}
                           {log.log_message && (
                             <button
                               type="button"
@@ -1421,8 +1597,61 @@ export const Automation: React.FC = () => {
         </div>
       </section>
 
+      <RecipeGallery
+        open={recipesOpen}
+        workspaceId={workspaceId ?? ""}
+        catalog={catalog}
+        onClose={() => setRecipesOpen(false)}
+        onUse={(rule) => {
+          if (!catalog) {return;}
+          setRecipesOpen(false);
+          setRuleToEdit(null);
+          setRuleToDuplicate(null);
+          setRecipeDraft(draftFromPayload(rule, catalog));
+          setIsFormOpen(true);
+        }}
+      />
+      <VersionHistoryDialog
+        open={historyRule !== null}
+        workspaceId={workspaceId ?? ""}
+        rule={historyRule}
+        canRestore={canManage && !planLocked}
+        onClose={() => setHistoryRule(null)}
+      />
+      {workspaceId && (
+        <PreviewPanel
+          open={previewTarget !== null}
+          title={previewTarget ? `“${previewTarget.name}” on the last 30 days` : undefined}
+          load={() => (previewTarget ? automationApi.previewRule(workspaceId, previewTarget.id) : Promise.reject(new Error("No rule chosen.")))}
+          onClose={() => setPreviewTarget(null)}
+        />
+      )}
+      <ConfirmDialog
+        open={pauseAsk}
+        tone="primary"
+        title="Pause all automations?"
+        message="No rule in this workspace will run until you resume them. Documents keep arriving, and each run that is held back is listed in Run history as Skipped. Nothing is lost."
+        confirmText="Pause automations"
+        cancelText="Keep them running"
+        loading={setPausedMutation.isPending}
+        onConfirm={() => setPausedMutation.mutate(true)}
+        onCancel={() => setPauseAsk(false)}
+      />
+      <ConfirmDialog
+        open={retryAsk !== null}
+        tone="primary"
+        title="Retry this run?"
+        message={retryAsk?.message ?? ""}
+        confirmText="Retry anyway"
+        cancelText="Do not retry"
+        initialFocus="cancel"
+        loading={retryMutation.isPending}
+        onConfirm={() => retryAsk && retryMutation.mutate({ executionId: retryAsk.executionId, acknowledge: true, name: retryAsk.name })}
+        onCancel={() => setRetryAsk(null)}
+      />
       <FlowBuilder
         isOpen={isFormOpen}
+        initialDraft={recipeDraft}
         onClose={handleFormClose}
         onSaveSuccess={handleSaveSuccessCallback}
         ruleToEdit={ruleToEdit}

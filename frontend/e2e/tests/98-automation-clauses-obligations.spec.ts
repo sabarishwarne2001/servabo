@@ -252,6 +252,8 @@ test.describe("Automation rules: switch, test, edit, duplicate, delete", () => {
     await expect(builder).toBeVisible();
     await expect(builder.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(original);
     await builder.getByRole("textbox", { name: "Name", exact: true }).fill(renamed);
+    // Priority and the failure policy live under the inspector's Advanced tab (Session J).
+    await builder.getByRole("tab", { name: "Advanced" }).click();
     await builder.getByRole("spinbutton", { name: "Priority" }).fill("7");
     await builder.getByLabel("On failure").selectOption("CONTINUE");
     await builder.getByRole("button", { name: "Save changes" }).click();
