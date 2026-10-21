@@ -1162,3 +1162,23 @@ def explain_document(
         "work_item_id": work_item_id,
         "rules": preview.explain_document(db, workspace_id=context.workspace_id, work_item=work_item),
     }
+
+
+# ==========================================================================
+# Session J, Phase 5 — recipes
+# ==========================================================================
+
+
+@router.get(
+    "/recipes",
+    summary="Ready-made rules to start from",
+    response_description="Complete rule documents with plain-words titles; each says what the person must fill in.",
+)
+def list_recipes(
+    db: Session = Depends(deps.get_db),
+    context: deps.TenantContext = Depends(deps.RequireWorkspaceContributor),
+) -> dict[str, Any]:
+    from app.services.automation import catalog_service, recipes
+
+    authoring = catalog_service.authoring_for(db, context=context)
+    return {"categories": list(recipes.CATEGORIES), "recipes": recipes.build(authoring)}
