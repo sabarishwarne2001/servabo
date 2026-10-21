@@ -60,8 +60,10 @@ def load_endpoint(
     endpoint_id: uuid.UUID,
     organization_id: uuid.UUID,
     workspace_id: uuid.UUID,
+    chat: bool = False,
 ) -> tuple[Optional[Any], Optional[str]]:
-    """The endpoint if this workspace may target it, else a refusal reason."""
+    """The endpoint if this workspace may target it, else a refusal reason. `chat` asks for a Slack or Teams endpoint
+    (`chat.post`); the default asks for an ordinary signed-JSON endpoint (`webhook.send`)."""
     from sqlalchemy import select
 
     from app.models.webhook_endpoint import WebhookEndpoint, WebhookEndpointStatus
@@ -77,6 +79,10 @@ def load_endpoint(
         return None, "This webhook endpoint is scoped to a different workspace."
     if endpoint.status is not WebhookEndpointStatus.ACTIVE:
         return None, "This webhook endpoint is disabled."
+    if chat and not endpoint.is_chat:
+        return None, "Choose a Slack or Microsoft Teams channel. This endpoint is an ordinary webhook."
+    if not chat and endpoint.is_chat:
+        return None, "This endpoint posts to Slack or Teams. Use 'Post a message to chat' for it."
     return endpoint, None
 
 
@@ -139,7 +145,9 @@ def build_payload(state: Any, config: WebhookSendConfig) -> dict[str, Any]:
         "event": {
             f.key: _scalar(event_payload.get(f.key))
             for f in (spec.fields if spec else ())
-            if f.key not in ("failure_reason",)
+            # Session J: a money field is the same value as a payload key already listed (`variance_micros`,
+            # `amount`), shown in currency units to people; the webhook keeps the keys it always had.
+            if f.key not in ("failure_reason",) and not f.source_key
         },
         "fields": fields,
     }

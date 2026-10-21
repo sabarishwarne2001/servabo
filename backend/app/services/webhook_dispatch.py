@@ -202,8 +202,15 @@ def attempt_delivery(
     http = client or egress.http_client(egress.WEBHOOK, organization_id=getattr(endpoint, "organization_id", None))
 
     envelope = build_envelope(delivery)
-    body = serialise_body(envelope)
+    chat_message = (getattr(delivery, "payload", None) or {}).get("chat") if getattr(endpoint, "is_chat", False) else None
+    if isinstance(chat_message, dict):
+        # Session J: Slack and Teams take their own message shape, not Servabo's envelope. Same signing, retries,
+        # egress gate and delivery log as every other webhook.
+        body = json.dumps(chat_message, separators=(",", ":"), sort_keys=True, default=str).encode("utf-8")
+    else:
+        body = serialise_body(envelope)
     signature = build_signature_header(endpoint, raw_body=body, timestamp=timestamp)
+    target_url = endpoint.delivery_url
 
     try:
         del_id_str = str(delivery.id)
@@ -239,7 +246,7 @@ def attempt_delivery(
         )
 
     try:
-        response = http.request("POST", endpoint.url, headers=headers, body=body)
+        response = http.request("POST", target_url, headers=headers, body=body)
     except (ForbiddenAddressError, InvalidURLError) as exc:
         logger.warning(
             "webhook.delivery.ssrf_refused",

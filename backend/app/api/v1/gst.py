@@ -32,7 +32,7 @@ from datetime import date
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy.orm import Session
 
 from app.api import capability_gate
@@ -303,15 +303,25 @@ def send_reminder(workspace_id: uuid.UUID, supplier_gstin: str, gstin: str = Que
 class SettingsIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    tolerance_rupees: float = Field(..., ge=0, le=1000)
+    tolerance_rupees: Optional[float] = Field(default=None, ge=0, le=1000)
+    #: Session J: after how many days a purchase invoice still missing from every GSTR-2B is announced to automation.
+    waiting_notice_days: Optional[int] = Field(default=None, ge=1, le=365)
+
+    @model_validator(mode="after")
+    def _something_to_change(self) -> "SettingsIn":
+        if self.tolerance_rupees is None and self.waiting_notice_days is None:
+            raise ValueError("Send tolerance_rupees, waiting_notice_days or both.")
+        return self
 
 
 @router.get(P + "/settings")
 def get_settings(workspace_id: uuid.UUID, db: Session = Depends(get_db),
                  context: TenantContext = Depends(RequireViewer)) -> dict[str, Any]:
     workspace = _workspace(db, context, workspace_id)
+    row = db.get(GstSettings, workspace.id)
     return {"tolerance_micros": engine.tolerance_micros(db, workspace.id),
-            "default_tolerance_micros": v.DEFAULT_TOLERANCE_MICROS}
+            "default_tolerance_micros": v.DEFAULT_TOLERANCE_MICROS,
+            "waiting_notice_days": row.waiting_notice_days if row is not None else 30, "default_waiting_notice_days": 30}
 
 
 @router.patch(P + "/settings")
@@ -324,15 +334,20 @@ def patch_settings(workspace_id: uuid.UUID, body: SettingsIn, db: Session = Depe
     if row is None:
         row = GstSettings(workspace_id=workspace.id, organization_id=workspace.organization_id)
         db.add(row)
-    row.tolerance_micros = int(round(body.tolerance_rupees * 1_000_000))
+    if body.tolerance_rupees is not None:
+        row.tolerance_micros = int(round(body.tolerance_rupees * 1_000_000))
+    if body.waiting_notice_days is not None:
+        row.waiting_notice_days = body.waiting_notice_days
     row.updated_by_user_id = context.user_id
     db.flush()
     audit_service.record(db, organization_id=workspace.organization_id, workspace_id=workspace.id,
                          actor_id=context.user_id, resource_type=AuditResourceType.GST_MATCH, resource_id=None,
-                         action=AuditAction.UPDATED, details={"tolerance_micros": row.tolerance_micros})
-    engine.recompute(db, workspace)
+                         action=AuditAction.UPDATED,
+                         details={"tolerance_micros": row.tolerance_micros, "waiting_notice_days": row.waiting_notice_days})
+    if body.tolerance_rupees is not None:
+        engine.recompute(db, workspace)
     db.commit()
-    return {"tolerance_micros": row.tolerance_micros}
+    return {"tolerance_micros": row.tolerance_micros, "waiting_notice_days": row.waiting_notice_days}
 
 
 # --------------------------------------------------------------------------------------------- every workspace

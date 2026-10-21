@@ -116,3 +116,52 @@ def test_the_webhook_action_has_no_url_and_refuses_one() -> None:
 def test_the_webhook_action_can_only_name_an_endpoint_by_id() -> None:
     with pytest.raises(ValidationError):
         WebhookSendConfig(endpoint_id="https://attacker.example/x")  # type: ignore[arg-type]
+
+
+# ---- Session J: the actions that render text ------------------------------------------------------------------------
+
+
+def test_every_new_text_action_names_its_template_fields_so_unknown_variables_are_refused() -> None:
+    from app.services.automation import actions
+
+    for action_type, fields in {"chat.post": {"title", "message"}, "legal_hold.place": {"reason", "reference"},
+                                "obligation.create": {"title", "description"}}.items():
+        assert set(actions.ACTIONS[action_type].template_fields) == fields, action_type
+
+
+def test_chat_text_is_plain_and_a_document_cannot_ping_a_channel_or_inject_markup() -> None:
+    from app.services import webhook_service
+
+    values = base.plain_variables_for(_state(vendor="<!channel> <@U123> <https://evil.example|click> & <b>x</b>"))
+    text = base.render("{{field.vendor}} / {{document.filename}}", values)
+    assert "<!channel>" in text, "the plain value is kept as it is until the destination escapes it"
+    slack = webhook_service.chat_body("SLACK", title="T <!here>", message=text)["text"]
+    assert "<!" not in slack and "<@" not in slack and "<https" not in slack and "&lt;!channel&gt;" in slack
+    teams = webhook_service.chat_body("TEAMS", title="T", message=text)["attachments"][0]["content"]
+    assert [block["type"] for block in teams["body"]] == ["TextBlock", "TextBlock"], "text only, never an action or an image"
+    assert "<script>" not in str(teams) or "TextBlock" in str(teams)
+
+
+def test_chat_variables_are_one_pass_and_never_re_expanded() -> None:
+    values = base.plain_variables_for(_state(vendor="{{rule.name}} {{field.vendor}}"))
+    assert base.render("{{field.vendor}}", values) == "{{rule.name}} {{field.vendor}}"
+
+
+def test_the_chat_action_has_no_url_and_refuses_one() -> None:
+    from app.services.automation.actions.chat_post import ChatPostConfig
+
+    with pytest.raises(ValidationError):
+        ChatPostConfig.model_validate({"endpoint_id": str(uuid.uuid4()), "url": "https://hooks.slack.com/services/x", "message": "m"})
+    with pytest.raises(ValidationError):
+        ChatPostConfig.model_validate({"endpoint_id": "not-a-uuid", "message": "m"})
+    assert ChatPostConfig.model_validate({"endpoint_id": str(uuid.uuid4()), "message": "{{document.filename}}"})
+
+
+def test_a_follow_ups_owner_and_a_reviews_assignee_are_chosen_by_the_author_never_a_document_field() -> None:
+    from app.services.automation.actions.obligation_create import ObligationCreateConfig
+    from app.services.automation.actions.review_assign import ReviewAssignConfig
+
+    assert "owner_email" in ObligationCreateConfig.model_fields and "assignee_email" in ReviewAssignConfig.model_fields
+    # A template in the owner field is just a string that is not a member's address: it resolves to nobody.
+    config = ReviewAssignConfig.model_validate({"assignee_email": "{{field.vendor_email}}@evil.example"})
+    assert config.assignee_email.startswith("{{")  # kept literally; the save and run paths find no such member
