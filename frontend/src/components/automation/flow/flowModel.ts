@@ -131,7 +131,15 @@ export const valueIsEmpty = (value: FlowConditionValue | undefined): boolean => 
 export const groupAmount = (text: string, currency: string): string => {
   if (!/^\d+(\.\d+)?$/.test(text)) {return text;}
   const [whole = "", fraction] = text.split(".");
-  const grouped = new Intl.NumberFormat(currency.toUpperCase() === "INR" ? "en-IN" : "en-US", { maximumFractionDigits: 0 }).format(Number(whole));
+  const digits = whole.replace(/^0+(?=\d)/, "");
+  let grouped: string;
+  if (currency.toUpperCase() === "INR" && digits.length > 3) {
+    // Lakh grouping: the last three digits, then pairs (10,00,000).
+    const head = digits.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ",");
+    grouped = `${head},${digits.slice(-3)}`;
+  } else {
+    grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
   return fraction === undefined ? grouped : `${grouped}.${fraction}`;
 };
 
