@@ -16,6 +16,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, Loader2, Save, X } from "lucide-react";
 import { toast } from "sonner";
@@ -227,7 +228,8 @@ export const FlowBuilder: React.FC<FlowBuilderProps> = ({
   const stepCount = draft.actions.length + draft.else_actions.length;
   const previewable = Boolean(catalog) && draft.triggers.length > 0 && draft.actions.length > 0 && issues.every((i) => i.card === "general" && i.field === "name");
 
-  return (
+  // In the document body, so no ancestor's stacking context or overflow can put the app's own header over it.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex flex-col bg-background"
       role="dialog"
@@ -394,7 +396,8 @@ export const FlowBuilder: React.FC<FlowBuilderProps> = ({
         onConfirm={() => { setDiscardOpen(false); onClose(); }}
         onCancel={() => setDiscardOpen(false)}
       />
-    </div>
+    </div>,
+    document.body,
   );
 };
 

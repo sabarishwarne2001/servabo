@@ -3,6 +3,7 @@
  */
 
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { History, Loader2, RotateCcw, X } from "lucide-react";
 import { toast } from "sonner";
@@ -51,7 +52,7 @@ export const VersionHistoryDialog: React.FC<VersionHistoryDialogProps> = ({ open
 
   if (!open || !rule) {return null;}
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
       role="dialog"
@@ -127,6 +128,7 @@ export const VersionHistoryDialog: React.FC<VersionHistoryDialogProps> = ({ open
         onConfirm={() => restoring && restore.mutate(restoring.version)}
         onCancel={() => setRestoring(null)}
       />
-    </div>
+    </div>,
+    document.body,
   );
 };

@@ -6,6 +6,7 @@
  */
 
 import React, { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, Lock, Search, Sparkles, X } from "lucide-react";
 
@@ -103,7 +104,7 @@ export const RecipeGallery: React.FC<RecipeGalleryProps> = ({ open, workspaceId,
   };
   const missing = chosen ? chosen.fill_ins.filter((fill) => !(answers[fill.path] ?? "").trim()) : [];
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[60] flex items-stretch justify-center bg-black/40 p-0 backdrop-blur-sm sm:p-6"
       role="dialog"
@@ -252,6 +253,7 @@ export const RecipeGallery: React.FC<RecipeGalleryProps> = ({ open, workspaceId,
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
