@@ -469,3 +469,56 @@ def test_the_new_actions_have_a_role_a_capability_and_a_selector(engines: Engine
     catalog = {a["type"]: a for a in engines.get("/automation/catalog").json()["actions"]}
     assert catalog["document.tag"]["needs_document"] and catalog["legal_hold.place"]["needs_document"]
     assert catalog["chat.post"]["idempotent"] is False and catalog["document.tag"]["idempotent"] is True
+
+
+def test_a_contact_helm_derived_from_documents_is_known_by_its_gstin_key(engines: Engines) -> None:
+    """Helm's sync stores a supplier under the key `gstin:<GSTIN>` and never fills `tax_id`; the reminder's lookup used to
+    read only `tax_id`, so no supplier Helm had derived from a document ever had a known contact (found by browser spec 115)."""
+    from app.models.helm import HelmCounterparty
+    from app.models.workspace import Workspace
+    from app.services.gst import reminder
+    from tests.services.gst.helpers import SUPPLIER_A, SUPPLIER_B
+
+    engines.plan("business")
+    book = engines.client.post(f"/api/v1/organizations/{engines.org}/helm/books", json={"workspace_id": str(engines.ws)},
+                               headers=engines.tenant.owner.headers).json()
+    for key, email in ((f"gstin:{SUPPLIER_A}", "accounts@sahyadri.example.com"), (f"gstin:{SUPPLIER_B}", None)):
+        engines.db.add(HelmCounterparty(organization_id=engines.org, book_id=uuid.UUID(book["id"]), key=key, role="SUPPLIER",
+                                        display_name="Derived by sync", tax_id=None, contact_email=email))
+    engines.db.commit()
+    workspace = engines.db.get(Workspace, engines.ws)
+    assert reminder.known_contact(engines.db, workspace, SUPPLIER_A) == "accounts@sahyadri.example.com"
+    assert reminder.known_contact(engines.db, workspace, SUPPLIER_B) is None, "a supplier with no contact stays unknown"
+    assert reminder.known_contact(engines.db, workspace, "29ZZZZZ9999Z9Z9") is None
+
+
+def test_helms_own_sync_records_the_suppliers_gstin_so_its_contact_is_found(engines: Engines) -> None:
+    """The whole path, with nothing written by hand: an invoice naming a supplier, its GSTIN and its email is read; Helm
+    derives the supplier; the reminder then finds its contact (F-545)."""
+    from app.models.helm import HelmCounterparty
+    from app.models.workspace import Workspace
+    from app.services.gst import reminder
+    from tests.services.gst.helpers import SUPPLIER_A
+
+    engines.plan("business")
+    engines.process("SAH-1.pdf", [["TAX INVOICE", "Invoice Number: SAH-1"]], marker="SAH-1", classification="Invoice", entities={
+        "invoice_number": "SAH-1", "invoice_date": "2026-09-01", "due_date": "2026-10-01", "total_amount": "11800.00",
+        "currency": "INR", "vendor_name": "Sahyadri Packaging", "vendor_gstin": SUPPLIER_A,
+        "vendor_email": "accounts@sahyadri.example.com"})
+    created = engines.client.post(f"/api/v1/organizations/{engines.org}/helm/books", json={"workspace_id": str(engines.ws)},
+                                  headers=engines.tenant.owner.headers)
+    assert created.status_code in (200, 201), created.text
+    book = created.json()["id"]
+    from app.models.helm import HelmBook
+    from app.services.helm import counterparties, ledger_store
+
+    engines.refresh()
+    ledger_store.rebuild_workspace(engines.db, workspace_id=engines.ws)
+    counterparties.sync(engines.db, engines.db.get(HelmBook, uuid.UUID(book)))
+    engines.db.commit()
+    engines.refresh()
+    rows = list(engines.db.execute(select(HelmCounterparty).where(HelmCounterparty.organization_id == engines.org)).scalars())
+    assert rows, "Helm derived no supplier from the invoice"
+    assert [r.contact_email for r in rows] == ["accounts@sahyadri.example.com"]
+    workspace = engines.db.get(Workspace, engines.ws)
+    assert reminder.known_contact(engines.db, workspace, SUPPLIER_A) == "accounts@sahyadri.example.com"

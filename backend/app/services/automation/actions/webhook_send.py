@@ -158,7 +158,8 @@ def build_payload(state: Any, config: WebhookSendConfig) -> dict[str, Any]:
 def _root_execution_id(state: Any) -> str:
     from app.services.automation import volume
 
-    return str(volume.root_execution_id(state.db, state.execution))
+    db = getattr(state, "db", None)
+    return str(volume.root_execution_id(db, state.execution) if db is not None else state.execution.id)
 
 
 def perform(state: Any, spec: Any) -> ActionOutcome:

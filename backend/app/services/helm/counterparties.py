@@ -115,16 +115,26 @@ def derive(db: Session, book: HelmBook, *, as_of: Optional[date] = None) -> dict
         if entry["terms_days"]:
             info["terms_days"] = sorted(entry["terms_days"])[len(entry["terms_days"]) // 2]
         contact = None
+        tax_id = None
         for wid in entry["work_items"]:
             entities = entities_by_item.get(wid) or {}
-            contact = _email(entities, CUSTOMER_EMAIL_KEYS if role == v.ROLE_CUSTOMER else EMAIL_KEYS)
-            if contact:
+            contact = contact or _email(entities, CUSTOMER_EMAIL_KEYS if role == v.ROLE_CUSTOMER else EMAIL_KEYS)
+            # The party's own tax id (a supplier's GSTIN), so a lookup by GSTIN, such as the GST reminder's, finds it.
+            party = ident.buyer(entities) if role == v.ROLE_CUSTOMER else ident.seller(entities)
+            tax_id = tax_id or _tax_id(party)
+            if contact and tax_id:
                 break
         cert = certificates.get(key)
         out[key] = {"name": entry["name"] or key.split(":", 1)[-1], "role": role,
                     "udyam": cert[0] if cert else entry["udyam"], "certificate_category": cert[1] if cert else None,
-                    "contact": contact, "behaviour": json_safe(info)}
+                    "contact": contact, "tax_id": tax_id, "behaviour": json_safe(info)}
     return out
+
+
+def _tax_id(party: Any) -> Optional[str]:
+    """The party's tax id as the canonical text ("27AAAAA0000A1Z5"), or None when it has none that normalises."""
+    key = ident.tax_key(party.tax_id)
+    return key.split(":", 1)[1][:64] if key else None
 
 
 def json_safe(value: Any) -> Any:
@@ -148,12 +158,14 @@ def sync(db: Session, book: HelmBook, *, as_of: Optional[date] = None) -> int:
                 role=facts["role"], display_name=(facts["name"] or key)[:300], udyam_number=facts["udyam"],
                 msme_category=category, msme_source=(v.MSME_SOURCE_CERTIFICATE if category else
                                                      v.MSME_SOURCE_DOCUMENT if facts["udyam"] else None),
-                contact_email=facts["contact"], behaviour=facts["behaviour"],
+                contact_email=facts["contact"], tax_id=facts["tax_id"], behaviour=facts["behaviour"],
             ).on_conflict_do_nothing(constraint="uq_helm_counterparties_book_key"))
             continue
         row.role = facts["role"]
         row.display_name = (facts["name"] or row.display_name)[:300]
         row.behaviour = facts["behaviour"]
+        if facts["tax_id"] and not row.tax_id:
+            row.tax_id = facts["tax_id"]
         if facts["udyam"] and not row.udyam_number:
             row.udyam_number = facts["udyam"]
         if row.msme_source != v.MSME_SOURCE_PERSON:
