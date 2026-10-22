@@ -137,10 +137,12 @@ def claim_domain(organization_id: str, payload: dict = Body(...),
                  membership=Depends(deps.RequireOrgOwner),
                  db=Depends(deps.get_db), user=Depends(deps.get_current_active_user)):
     _cap_gate.require_capability(db, context=membership, capability_key=_ent.ENTERPRISE_IDENTITY_CAPABILITY, operation="identity.domain.claim")
+    # A list or a number used to be turned into text ("['a.com']") and claimed (F-595).
+    raw_domain = _required_text(payload, "domain")
     try:
         row = domain_service.claim_domain(
             db, organization_id=organization_id,
-            raw_domain=str(payload.get("domain", "")), principal=_principal(user))
+            raw_domain=raw_domain, principal=_principal(user))
     except IdentityError as exc:
         raise HTTPException(exc.status_code, exc.message) from exc
     return {

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import secrets
 from dataclasses import dataclass
 from datetime import timedelta
@@ -20,6 +21,13 @@ from app.services.identity.errors import (
 )
 
 logger = logging.getLogger(__name__)
+
+_LABEL_RE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
+
+#: Endings that are never on the public internet (RFC 2606, RFC 6761, RFC 6762 and the usual private-network ones).
+_RESERVED_TOP_LEVEL = frozenset({
+    "invalid", "local", "localhost", "internal", "test", "example", "lan", "home", "corp", "intranet", "private", "arpa",
+})
 
 _PUBLIC_SUFFIX_FLOOR = frozenset({
     "com", "net", "org", "io", "co", "ai", "dev", "app", "cloud", "info", "biz",
@@ -87,6 +95,15 @@ def assert_claimable(domain: str) -> None:
         raise DomainPolicyRefused(f"{domain!r} is not a fully qualified domain.")
     if any(len(lbl) > 63 for lbl in labels) or len(domain) > 253:
         raise DomainPolicyRefused("Domain exceeds DNS length limits.")
+    # F-595. Each label is letters, digits and hyphens, not starting or ending with a hyphen; an IP address and a name under
+    # a reserved ending (.local, .internal, .invalid, ...) are not domains an organization can ever prove it owns, so they
+    # were saved as claims that could never verify.
+    if any(not _LABEL_RE.match(lbl) for lbl in labels):
+        raise DomainPolicyRefused(f"{domain!r} is not a valid domain name.")
+    if all(lbl.isdigit() for lbl in labels):
+        raise DomainPolicyRefused("An IP address is not a domain. Enter the domain name your organization owns.")
+    if labels[-1] in _RESERVED_TOP_LEVEL:
+        raise DomainPolicyRefused(f".{labels[-1]} names are not on the public internet, so ownership of {domain} cannot be proved.")
 
     if domain in _CONSUMER_MAIL_DOMAINS:
         raise DomainPolicyRefused(
