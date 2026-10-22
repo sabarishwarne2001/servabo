@@ -222,8 +222,9 @@ export const DomainManager: React.FC = () => {
 
       {claim.isError && (
         <p role="alert" className="text-sm text-destructive">
-          That domain couldn&apos;t be claimed. It may already be registered to
-          another organization.
+          {/* The server says why (an IP address, a name that is not a domain, one already registered to another
+              organization); the page used to say "may already be registered" for every refusal (F-599). */}
+          {errorMessage(claim.error, "That domain couldn't be claimed. Please try again.")}
         </p>
       )}
 
