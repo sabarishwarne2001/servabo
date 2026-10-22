@@ -2378,3 +2378,68 @@ key configured, today), "signature checked" (the key verifies it) or "signature 
 page's reading and the code differ both values are shown. **Which one is used follows Session F's rule, which was in the code but never written down:** the
 code's value wins only when its signature was checked; otherwise the page's reading stays and the difference is shown for a person to decide. A wrong key in
 `EINVOICE_QR_PUBLIC_KEY_PEM` makes every code read "does not match", so set it from NIC's published key (not shipped).
+
+## N-176 — The new Servabo logo is a vector recreation (DECIDED (Final 1); OWNER: drop in the original files if exact pixels matter)
+
+The new logo (a glossy cyan-to-violet ribbon "S" on a navy tile with an orbit ring and a glowing dot, and the lowercase "servabo" wordmark with its leaf) was
+given as a picture only, and the picture file was not in the session. The logo everywhere in the product, the website, the emails, the app icons and the
+social cards is a **vector recreation drawn from the picture**. It is close, not pixel-exact. If you have the original files (SVG, or a large PNG), copy them
+into `brand/assets/`, run `python brand/scripts/build_brand_assets.py` (it needs `fonttools`, `brotli`, `cairosvg`, `pillow`, `shapely`, `svgpathtools`) and
+commit; every place that shows the mark is generated from there. A workspace with no logo of its own, or whose logo will not load, now shows the Servabo mark
+(it used to show initials), so no workspace is ever blank.
+
+## N-177 — Sidebars can be resized (DECIDED (Final 1))
+
+Every sidebar has a draggable divider (mouse, finger, pen; arrows on the keyboard; double click resets). Widths: the workspace, organization and Helm
+sidebars share one width, 220 to 420 px (starts at 260); the assistant's conversation list 240 to 560 (340); the settings section list 220 to 420 (280). On a
+phone the drawer never exceeds 85% of the screen, on a computer no sidebar exceeds half the window. The width is remembered **in the browser** (not on the
+account), so another computer starts at the default.
+
+## N-178 — Organization console rules found by the test pass (DECIDED (Final 1))
+
+Found by testing every tab of the organization console (F-581 to F-600), each fixed with a test: names are one line of real text; a retention period is a whole
+number of days up to 36,500 (100 years) and a typo is explained, never saved as "keep forever"; moving a data region needs the written acknowledgement; a
+webhook address has no user name or password and a valid port; a domain claim must be a real domain that can be proved; an API key has a real name, each
+scope once and an expiry still ahead. **Administrators read Enterprise identity** (webhooks and the audit log too), as N-006 decided; every write there stays
+the owner's, on the server and on the page. Nothing here changes a price or a plan.
+
+## N-179 — Public webhook events for the engines (DECIDED (Final 1))
+
+Five events a customer's systems can subscribe to (any plan with webhooks): `gst.return.imported`, `gst.invoice.at_risk` (150 days unpaid, 30 left of the
+180), `gst.supplier.not_reported` (waited longer than the workspace's notice, 30 days unless changed), `automation.run.failed` (a run ended failed, timed out
+or ran out of budget) and `automation.run.held` (a run was held back: paused, throttled, cooldown). Once per occurrence, only when an endpoint listens; ids,
+GSTINs, micros, dates, counts and states only (no names, invoice numbers or error text). `automation.` stays a reserved internal prefix: only these two run
+events are public, listed one by one. Payloads are documented in `docs/product/WEBHOOK-EVENTS.md`. **OPEN:** whether the failed-run event should also say
+*why* (the error text can hold document content, so it does not today).
+
+## N-180 — Warehouse datasets for Enterprise (DECIDED (Final 1)); OPEN: should Business get them?
+
+`GST_MATCHES` (how each supplier record matched your invoices, with the credit) and `HELM_LEDGER` (every promise Helm found and whether it was kept), across
+every workspace; identifiers, states and figures only, no supplier or counterparty names, the sample company left out. They need the capabilities that sell
+"across every workspace" (GST credit across every workspace, Helm across every workspace: Enterprise). Creating a schedule or starting a sync without them is
+a 402 in words; a schedule made on Enterprise that later falls to a lower plan keeps running without them (and logs it) instead of breaking. **OPEN:** if
+Business should have them (alone, or with the GST Credit add-on), that is a plan decision for you; nothing was changed.
+
+## N-181 — Document packs propose their checks (DECIDED (Final 1)); OPEN: the cost of AI-read checks
+
+Enabling a pack proposes its suggested checks under Clause assertions (Enterprise); an administrator adds each with one click or turns it down; nothing is added
+by itself. A pack's severity sets the confidence the check is saved with (high 0.97, medium 0.95, low 0.90; higher sends more documents to a person). **Twelve
+of the fourteen checks the shipped packs suggest are read by an AI model** (the engine cannot make them a typed check), so each such check is billed as assistant
+usage on every document, and its button says so ("Add, read by an AI model"). If you would rather ship only typed checks in the packs, that is an edit of the
+packs' sentences, not of the code. The Redact menu offers the matching pack's profile first on a document the pack recognises.
+
+## N-182 — Money is shown one way (DECIDED (Final 1))
+
+Rupees are grouped the Indian way with the rupee sign (₹12,34,567.50) on every screen whatever the person's language; every other currency uses the person's
+language and its own symbol. One formatter, and `check:self` refuses a screen that builds its own money text.
+
+## N-183 — Global search finds GST suppliers, GST invoices and workflows (DECIDED (Final 1))
+
+Ctrl+K also finds a GST supplier (by name or GSTIN), a GST invoice (by number) and an automation rule (by name). A person sees only what they could open
+anyway: suppliers and invoices need a plan that opens the GST lists (or the add-on, or the sample company) and membership of the workspace; a workflow needs
+the contributor role or higher. Text is matched literally (a `%` finds nothing).
+
+## N-184 — What an error says to a person (DECIDED (Final 1))
+
+A refusal (a 4xx) shows the server's own sentence; a fault (a 5xx) shows a plain fallback line (the details go to error tracking, not the screen); a validation
+failure becomes one sentence naming the field in words. No screen shows `error.message` raw; `check:self` fails a new one.

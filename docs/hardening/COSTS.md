@@ -144,3 +144,20 @@ replays, no breadcrumbs) a healthy product sends a handful a day; 5,000 a month 
 Sentry's own service (EU region): nothing to run, a good screen, free up to the limit above, a US company holding data in the EU. GlitchTip, self-hosted:
 free whatever the volume and the data never leaves your server, but it is another thing to run, update and back up, and it has a plainer screen. Start with
 Sentry's free plan; move to GlitchTip only if you hit the limit or a customer's contract forbids a third party seeing even scrubbed errors.
+
+## 8. What Final session 1 added to the bill (2026-10-22)
+
+None of these was measured against the real service; each says where the number would come from.
+
+| Item | Adds to the monthly bill | Notes |
+|---|---|---|
+| **Email-in** | **About $0 extra** | Postmark's inbound is part of the account that already sends the platform's mail; check that your Postmark plan's monthly message count covers inbound too (inbound messages count towards it on some plans; look at the plan page on the day you set it up). Each forwarded attachment costs what an upload costs (OCR and reading on your own server, plus the model call). |
+| **The GST Monday email** | **A few cents** | One message per organization per week, only when there is something to say, through the same relay. |
+| **Error tracking** | **$0** | Section 7. |
+| **Zoho Books Connect** | **$0** | A free developer application in Zoho's API console; the customer's own Zoho Books pays for itself. |
+| **Tally file** | **$0** | A file the customer imports. |
+| **Public webhook events** | **A little compute** | One small signed request per occurrence to the customer's address, only when they subscribed. |
+| **Warehouse datasets** | **Storage and egress, small** | Two more Parquet files per scheduled sync for an Enterprise customer (identifiers and figures only, so small); the customer's bucket pays for what it stores. |
+| **Document packs: added checks** | **Model tokens, per document** | Twelve of the fourteen shipped checks are read by an AI model (N-181). Each one a customer adds costs one short model call per document processed, billed to the customer as assistant usage at the usual markup. A customer who adds five has five calls on every document. |
+| **The new logo, resizable sidebars, search, screens** | **$0** | Nothing runs on a server for them. |
+| **WhatsApp-in** (not built) | A monthly line from Meta (and possibly a solution provider) | PRODUCT-NEXT 2.2 says what it takes; read Meta's price list before deciding. |

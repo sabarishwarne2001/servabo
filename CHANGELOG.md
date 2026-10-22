@@ -6,6 +6,37 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Added — Final session 1: bring every part up to date, build what earns money (2026-10-22)
+
+Findings F-546 to F-605, decisions N-161 to N-184. The study is `docs/hardening/UPGRADE-AUDIT.md`; the hand-over to Final session 2 is in `docs/hardening/HANDOFF.md`.
+
+- **A customer's data is accounted for** (F-546 to F-551). One registry (`data_map.py`) says, for every table, what erasure, the retention sweep, deleting a workspace or an
+  organization and the data export do with it, and a test fails for a table with no decision. Deleting a workspace or organization now really purges its data
+  (30 days after archiving; the money records and the audit trail stay; N-162, N-163), and the export carries what a customer owns (GST books, Helm, automation, entities).
+- **Zip upload and email-in** (F-558, F-559). One zip becomes its documents; a workspace has its own address and forwarded invoices become documents (Postmark inbound;
+  listed senders at once, anyone else held for an administrator). **Getting started** leads to the first money found (F-556).
+- **GST credit tells you** (F-554): in-app notices and a Monday email, once, only when there is something to say, with rupees in lakh grouping. **Upgrade moments** (F-552, F-553, F-576 to F-579):
+  every lock names the plan that includes it, only an owner is sent to buy, the 80% usage and seat warnings go to the fix.
+- **Zoho Books Connect and a guided Tally Prime file** (F-561), **the e-invoice QR badge** (F-562), **error tracking** with Sentry or GlitchTip, scrubbed and off by default (F-560),
+  and **`scripts/preflight.py`**: one command that says whether a setup is ready, with `--send-test-email` and `--send-test-error` (F-563).
+- **Models and libraries** (F-564 to F-569): current model lists and a plain sentence for a retired model, Pillow 13, pypdf, certifi, SQLAlchemy, Alembic, pydantic; `google-generativeai` removed.
+- **Public webhook events** `gst.return.imported`, `gst.invoice.at_risk`, `gst.supplier.not_reported`, `automation.run.failed`, `automation.run.held` (F-557; migration k1a6; `docs/product/WEBHOOK-EVENTS.md`),
+  **warehouse datasets** `GST_MATCHES` and `HELM_LEDGER` for Enterprise, and **document packs that do what they promise** (F-408; migration k1a7): enabling a pack proposes its checks under
+  Clause assertions, one click each, and the Redact menu offers the pack's profile first.
+- **Screens** (F-573 to F-575, F-601 to F-604): every page is walked in light and dark and at phone width (specs 72, 74, 132 and a guard that fails when a page is in none); money
+  is shown one way (rupees in lakh and crore, with a guard); no raw error text reaches a person (with a guard); global search finds GST suppliers, GST invoices and workflows.
+- **The organization console, tab by tab** (F-581 to F-600). All 17 tabs have backend tests and browser specs 127 to 131; 19 real defects were fixed (a huge number crashed a save, a
+  typo became "keep forever", a webhook address kept its password, administrators were refused Enterprise identity, and more).
+- **Resizable sidebars** on every screen that has one (mouse, finger, keyboard; spec 126) and **the new Servabo logo** everywhere, as the default for any workspace without its own (F-605; a vector
+  recreation, N-176).
+- **The website** says what zip upload, email-in, the GST Monday email and the Zoho and Tally connections do, with all screenshots retaken.
+
+### Changed — Final session 1
+
+- **Rupees are grouped the Indian way everywhere** (₹12,34,567.50), whatever the person's language (N-182). A tool of yours that read the old grouping needs to expect the new one.
+- **Administrators can read Enterprise identity** (webhooks and the audit log too); writes stay the owner's (N-006, N-178).
+- **Database:** migrations `k1a1` to `k1a7` (see below; one head, `k1a7_pack_check_dismissals`). `k1a6` widens the webhook-event CHECKs; `k1a7` adds `workspace_schema_presets.dismissed_checks`.
+
 ### Docs — The two final sessions (2026-10-22)
 
 - **Sessions D and E are replaced by two final sessions** (N-160). `docs/FINAL-SESSIONS.md` explains them for the owner;

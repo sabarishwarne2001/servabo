@@ -5,6 +5,7 @@
     python scripts/preflight.py --online               # also makes READ-ONLY calls: database, Redis, storage bucket, SMTP login (no
                                                        #   mail sent), Groq's model list, Dodo's product list, Postmark's server record
     python scripts/preflight.py --send-test-email you@example.com   # sends exactly one message
+    python scripts/preflight.py --send-test-error      # sends exactly one test error to the error tracker (needs SENTRY_DSN)
     python scripts/preflight.py --json                 # machine-readable
     python scripts/preflight.py --online --i-mean-live # needed before --online will talk to a LIVE Dodo account (it still only reads)
 
@@ -409,6 +410,21 @@ def check_operations(report: Report, s: Any, strict: bool) -> None:
 
 # ---------------------------------------------------------------------------------------------- running and printing
 
+def send_test_error() -> tuple[bool, str]:
+    """Send ONE deliberately raised error through the app's own error tracking (the same DSN, scrubber and tags), then flush.
+
+    Returns (sent, a short sentence). Nothing is sent when SENTRY_DSN is empty. The message carries no data: it is safe to ignore in the tracker."""
+    from app.core import error_tracking
+
+    if not error_tracking.init("preflight"):
+        return False, "SENTRY_DSN is empty, so error tracking is off"
+    try:
+        error_tracking.capture(RuntimeError("Servabo preflight test error (safe to ignore)"), area="preflight")
+    finally:
+        error_tracking.shutdown()  # flushes
+    return True, "one test error sent: look for it in the project (tag area=preflight)"
+
+
 def load_settings() -> tuple[Optional[Any], Optional[list[str]]]:
     """The settings as the app reads them; when the app itself would refuse to start, the reasons (variable names and sentences, no values)."""
     try:
@@ -455,6 +471,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     mode.add_argument("--offline", action="store_true", help="configuration only; contacts nothing (the default)")
     mode.add_argument("--online", action="store_true", help="also make read-only calls to the services")
     parser.add_argument("--send-test-email", metavar="ADDRESS", help="send exactly one message to this address")
+    parser.add_argument("--send-test-error", action="store_true",
+                        help="send exactly one test error to the error tracker (SENTRY_DSN), tagged area=preflight, through the same scrubber")
     parser.add_argument("--i-mean-live", action="store_true", help="allow --online to read a LIVE Dodo account")
     parser.add_argument("--json", action="store_true", help="machine-readable output")
     args = parser.parse_args(argv)
@@ -474,6 +492,10 @@ def main(argv: Optional[list[str]] = None) -> int:
                            "" if delivered else "Check the relay's credentials and the sender address.")
             except Exception as exc:  # noqa: BLE001
                 report.add("mail relay", "test email", WRONG, type(exc).__name__, "The message could not be sent.")
+        if args.send_test_error:
+            delivered, detail = send_test_error()
+            report.add("error tracking", "test error", OK if delivered else WRONG, detail,
+                       "" if delivered else "Set SENTRY_DSN (RUNBOOK 9.13) and run this again.")
     if args.json:
         print(json.dumps({"ready": report.ready, "items": [asdict(i) for i in report.items]}, indent=2))
     else:

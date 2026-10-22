@@ -931,3 +931,24 @@ Dodo's product list, Postmark's server record); against a **live** Dodo account 
 `--send-test-email you@example.com` sends exactly one message. It checks: the environment and URLs, the production guard, database, Redis, storage (and R2's EU
 endpoint), the mail relay, the Groq, Gemini and encryption keys, Dodo (test or live agree, the webhook secret, all eight product ids), email-in, Zoho,
 error tracking, the NIC key, the backup key and folder, `ALERT_WEBHOOK`, `OPERATOR_ALERT_EMAILS` and the CPU-only image.
+
+### 9.15 Webhook events for GST and workflow runs, warehouse datasets, pack checks, and the logo (Final session 1)
+
+**Five more webhook events** (`gst.return.imported`, `gst.invoice.at_risk`, `gst.supplier.not_reported`, `automation.run.failed`, `automation.run.held`). A customer ticks them on an
+endpoint under Organization → Webhooks; payloads and behaviour are in `docs/product/WEBHOOK-EVENTS.md`. Nothing to configure. If a customer says "my endpoint got nothing": the endpoint
+must be Active and subscribed to that event; the GST clock events come from the hourly `automation.sweep` and need a workspace whose plan opens the GST lists; a held or failed run
+is announced when it is recorded. `webhook_deliveries` shows every attempt, as for every other event. Migration `k1a6_engine_webhook_events` widens the two database checks that pin the
+event names; downgrading it deletes the deliveries of these events and removes them from endpoints' subscriptions.
+
+**Two warehouse datasets for Enterprise** (`GST_MATCHES`, `HELM_LEDGER`). They appear on Organization → Analytics next to the others, tagged Enterprise, and need the same warehouse
+add-on every export needs plus the plan capabilities for GST credit and Helm "across every workspace". Their column lists are served by `GET …/analytics/datasets`. A schedule that
+was made on Enterprise keeps running after a downgrade without them (a warning `analytics.sync.datasets_not_included` is logged); a manual sync or a new schedule without the plan is
+refused with a 402 in plain words.
+
+**Document packs propose their checks.** Enabling a pack lists its suggested checks under Clause assertions (Enterprise) for an administrator to add with one click or turn down; a turned-down
+check is remembered per workspace (`workspace_schema_presets.dismissed_checks`, migration `k1a7`). Twelve of the fourteen shipped checks are read by an AI model and are billed as
+assistant usage on every document once added (N-181): if a customer is surprised by that usage line, this is the place to look (Clause assertions → Clause checks).
+
+**The logo.** Every brand file is generated from one place: `brand/scripts/build_brand_assets.py` writes `brand/assets/*`, `brand/mark.ts` and the app and website copies. To change the logo,
+edit the mark's drawing in that script (its geometry is described in `brand/README.md`) and run it (it needs `fonttools`, `brotli`, `cairosvg`, `pillow`, `shapely`, `svgpathtools`). The current artwork is a
+recreation of the supplied picture (N-176). A workspace with no logo of its own shows the Servabo mark.

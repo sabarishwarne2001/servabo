@@ -2,7 +2,14 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-22 (Final session 1, Phase 1 done)_
+_Last updated: 2026-10-22 (Final session 1 finished; next: Final session 2 on the owner's PC)_
+
+## Current phase — Final session 2 on the owner's PC (next)
+**Next action: Final session 2 on the owner's PC** (`docs/sessions/FINAL-2-LIVE.md`; the owner's guide `docs/FINAL-SESSIONS.md`). It trusts the hand-over in `docs/hardening/HANDOFF.md`
+"Final session 1 → Final session 2" (a table of every outside connection to try for real, the commands, what was not reached, what is unverified). Before it starts: the owner merges
+PR #37 once CI is green, and prepares what `docs/FINAL-SESSIONS.md` §4 lists. Findings continue from **F-606**, decisions from **N-185**, browser specs from **135**.
+- [ ] Final session 2 (the owner's PC): everything for real; results in `docs/hardening/LIVE-VERIFICATION.md`
+- [ ] The owner launch checklist (HANDOFF), from step 1
 
 ## Current phase — Final session 1 (2026-10-22)
 Branch `claude/focused-planck-g9363e` (the session's assigned branch; CLAUDE.md says `hardening/<topic>`, the brief says "use the assigned branch", so the assigned
@@ -26,10 +33,11 @@ backend venv Python 3.12 and `npm ci` in the session scratchpad. The test enviro
 - [x] 3D. E-invoice QR badge and signature line
 - [x] 4A. Error tracking (Sentry / GlitchTip)
 - [x] 4B. `scripts/preflight.py`
-- [ ] 5. Screens: accessibility sweep, phone pass, money formatter guard, states, global search, website
-- [ ] 6. Public webhook events, warehouse datasets, document packs that do everything they promise
-- [ ] 7. `PRODUCT-NEXT.md` rewritten; HANDOFF "Final session 1 → Final session 2"; records
-- [ ] Finish: suites, `campaign_slices.py --check all`, one Alembic head (up/down/up), PR ready, CI green
+- [x] 5. Screens: accessibility sweep (specs 72, 74, 132 and a guard that every router page is walked), phone pass, money formatter guard, states (no raw error text), global search, website
+- [x] 6. Public webhook events (migration k1a6), warehouse datasets (GST matches, Helm ledger), document packs that do everything they promise (migration k1a7)
+- [x] 7. `PRODUCT-NEXT.md` rewritten; HANDOFF "Final session 1 → Final session 2"; records (UPGRADE-AUDIT, FINDINGS F-546 to F-605, COVERAGE, NEEDS-OWNER N-176 to N-184, CHANGELOG, RUNBOOK, CONFIGURATION)
+- [x] 8. Added mid-session by the owner: Organization console tabs tested end to end (17 tabs, backend tests and specs 127 to 131, 19 defects fixed), resizable sidebars everywhere (spec 126), the new Servabo logo and a default workspace logo (spec 125)
+- [ ] Finish: all suites on the ready PR's CI, `campaign_slices.py --check all` (0 open rows: run locally), one Alembic head `k1a7_pack_check_dismissals` (up, down, up run locally for k1a6; CI runs all), PR ready, CI green (see the last line of this section)
 
 ## Current phase — Plan change: the two final sessions (2026-10-22)
 Branch `hardening/final-two-sessions`, based on `main` at `3b2a7e2` (PR #35 merged; `main` run #417 green, only the advisory

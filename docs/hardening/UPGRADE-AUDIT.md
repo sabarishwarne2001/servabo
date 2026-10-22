@@ -99,3 +99,66 @@ Bugs the walk-through tests found. Each has the failing test that proved it and 
 | F-578 | P2 | **The server's plan refusal did not name the plans.** `CAPABILITY_REQUIRED` said "is included on higher plans"; the body now carries `included_in` and the message names them ("the Business and Enterprise plans"). | `backend/tests/api/test_upgrade_moments.py::test_the_refusal_for_a_capability_names_the_plans_that_carry_it` (32 capabilities; `KeyError: 'included_in'` before) | 3B |
 | F-579 | P2 | **The 80% usage email led to the top of the Billing page, the 80% banner had no way out (only the 100% banner had "Upgrade"), and nobody was warned that seats were nearly used.** Now: the email goes to the plan picker; the banner has "Upgrade"; owners and administrators are told at four of five seats and when every seat is taken, with "Add seats" (or "Choose a plan" where seats come with the plan). | `backend/tests/services/test_usage_limit_alerts.py` (5 new), `upgradeMoments.test.tsx` (80% banner) | 3B |
 | F-580 | P1 | **Settings added in this session (and the earlier e-invoice key) never reached the production containers.** `docker-compose.prod.yml` passed only the variables it listed, so `ZIP_UPLOAD_MAX_MB`, the email-in settings, the archived-data purge settings and `EINVOICE_QR_PUBLIC_KEY_PEM` set in `.env` were silently ignored. Now passed with the settings' own defaults (and Zoho and error tracking). | script comparing `.env.production.template` names with the compose file: 17 missing before | 4A |
+
+| # | Sev | Finding | Proof | Fixed in |
+| --- | --- | --- | --- | --- |
+| F-581 | P2 | **Organization names could be blank or padded with spaces.** | `test_org_console_general.py` | `7b54de2` |
+| F-582 | P1 | **A retention period of billions of days crashed the save** (a database "integer out of range"), so the owner saw a server error. At most 100 years now. | `test_org_console_email_slo_compliance.py` (a DataError before) | `2834b00` |
+| F-583 | P2 | **Transactional email accepted a server, user name or sender name made of spaces.** | `test_org_console_email_slo_compliance.py` | `c0bb141` |
+| F-584 | P1 | **Moving a data region without the acknowledgement was accepted** when the field was simply left out, so the owner's "I understand existing files stay in the old region" was never recorded. | 200 before, 422 after | `05b4952` |
+| F-585 | P2 | **A service-level target of billions crashed the save.** | `test_org_console_email_slo_compliance.py` | `86036b2` |
+| F-586 | P1 | **A typo in a retention field (such as "9o") was saved as "keep forever"**, and a save gave no feedback. | spec 128 | `922495d` |
+| F-587 | P2 | **A refused service-level target said only "failed".** | spec 128 | `0d36727` |
+| F-588 | P2 | **An API key could be named with spaces only.** | `test_org_console_credentials.py` | `cc05d9e` |
+| F-589 | P2 | **An API key accepted the same scope twice and an expiry in the past.** | `test_org_console_credentials.py` | `cc05d9e` |
+| F-590 | P1 | **A webhook address with a user name and password in it was stored whole**, so the password would show in the console and in logs; a port of 99999 was accepted and could never work. | 201 before, 422 after | `99253c2` |
+| F-591 | P2 | **Brand names could hold line breaks and control characters** (they reach emails and the browser tab). | `test_org_console_platform.py` | `7a70881` |
+| F-592 | P2 | **An egress rule of digits and dots that is not an IP address was accepted.** | `test_org_console_platform.py` | `2c9c770` |
+| F-593 | P2 | **The API keys page printed a generic failure and let a past date be picked for the expiry.** | spec 130 | `e1d7a8f` |
+| F-594 | P2 | **Deleting a webhook endpoint left its delivery log open and asking for a page that no longer existed.** | spec 130 | `ab9e0f3` |
+| F-595 | P2 | **A domain claim accepted an IP address, `.local`, a name starting with a hyphen, and a list (saved as the text "['a.com']").** None could ever be verified. | nine cases, 201 before | `ad77b96` |
+| F-596 | — | Not used (the number was skipped while merging two findings into F-595). | | |
+| F-597 | P2 | **Below the plan, the Developer platform page printed "The request log could not be loaded." after three refused requests** and never said the feature was not included. | spec 131 | `57458f6` |
+| F-598 | P1 | **Administrators were told "Access restricted" on Enterprise identity although decision N-006 says they read it** and the sidebar offered it. Every write stays the owner's, on the server and in each panel. | spec 131; specs 89 and 100 now say what is true | `bbc68c9` |
+| F-599 | P2 | **A refused domain claim showed a generic line instead of the server's reason.** | spec 131 | `f1fe4d8` |
+| F-600 | P2 | **An audit-log end date before the start date was sent and returned nothing, with no explanation.** | spec 131 | `5f66b07` |
+| F-601 | P2 | **The new-workspace and new-organization forms had no `main` landmark**, so a screen-reader user could not jump to the content. | spec 132 (axe) | `7a5a365` |
+| F-602 | P2 | **The jobs console's tabs pointed at panels that did not exist, and its scrolling tables could not be reached with the keyboard.** | spec 132 (axe: critical `aria-valid-attr-value`, serious `scrollable-region-focusable`) | `7a5a365` |
+| F-603 | P1 | **Raw server text reached people.** Eight screens put `error.message` into a toast, and a validation failure read like `body.name: String should have at least 1 character`. Now a server sentence for a refusal (4xx), a plain fallback for a fault (5xx), and a validation list turned into one sentence; `check:self` fails a new case. | `errors.validation.test.ts`; "no raw error text" guard | `66137c7`, `1443236` |
+| F-604 | P2 | **Rupees were grouped in thousands on billing and revenue screens** (₹150,000.00) beside lakh grouping in Helm and GST (₹1,50,000.00), depending on the browser's language; nothing stopped a screen building its own money text. One formatter, and a guard. | `formatMoney.test.ts`; "money, one way" guard | `61397b5` |
+| F-605 | P1 | **A new workspace had an empty initials badge where a logo should be**, and the logo itself was the old one. The new Servabo logo replaces it everywhere and is the default for any workspace without its own (or whose own will not load). **The artwork was supplied as a picture only: this is a vector recreation (see NEEDS-OWNER N-176).** | `defaultLogo.test.tsx`, spec 125 | `93ca674` |
+
+## Status at the end of Final session 1
+
+Every finding above F-581 came from the study; each is now **done** (the commit is in `git log` under its number, the proof is in the tests named in
+FINDINGS.md), with these notes:
+
+- **F-546 to F-551** (data lifecycle): done (1A). One registry, `data_map.py`, and a test that fails for a table without a decision.
+- **F-552, F-553, F-577 to F-579** (plans and upgrade moments): done (1D, 3B).
+- **F-554, F-556** (GST notices and the digest, Getting started): done (3A, 2C). The digest in a real inbox is unverified (HANDOFF).
+- **F-555** (global search): done in Phase 5 (suppliers, invoices, workflows; spec 133 and the backend tests).
+- **F-557** (webhook events, warehouse datasets): done in Phase 6 (migration k1a6, docs/product/WEBHOOK-EVENTS.md, `GST_MATCHES` and `HELM_LEDGER`).
+- **F-558, F-559** (zip, email-in), **F-560, F-563** (error tracking, `preflight.py`), **F-561, F-562** (Zoho and Tally, the QR badge): done; each outside
+  connection is unverified against the real service (HANDOFF "Final session 1 → Final session 2").
+- **F-564 to F-569** (models, libraries): done. **F-570 to F-572**: done.
+- **F-573** (axe in few specs): done. Specs 72 and 74 walk the page catalogue in light, dark and four widths; spec 132 walks the pages the catalogue
+  predates; `routeSweepCoverage.test.ts` fails when a router page is in neither. **F-574** (money guard): done. **F-575** (PRODUCT-NEXT): done.
+- **F-580** (settings that never reached the containers): done.
+
+## Phase 5 results
+
+- **Accessibility, light and dark, every page.** Specs 72 and 74 (the catalogue: 23 workspace pages, 18 organization pages, 3 platform pages, the public pages)
+  and spec 132 (GST Credit in a workspace and an organization, Helm's ten pages, the new-workspace form, the jobs console) run axe in the light and the dark
+  theme (Helm's dark theme is its Night Bridge). The sweep found F-601 and F-602; both fixed; all pass. Moderate and minor axe findings are recorded as
+  annotations on the tests, not failures.
+- **Phone, 390 px.** Spec 74 (375 px) and spec 132 (390 px): no page scrolls sideways; wide tables scroll inside their own box. Three dialogs (the command
+  palette, the recipe gallery, the mobile drawer through spec 126) fit the screen. Spec 132 opens every page the sweeps named.
+- **Not walked, and why.** Pages that need an id in the address (a case, a certificate, an ERP posting) are opened by the specs for those features; the
+  partner portal has its own sign-in (spec 100); the payment return page needs the provider's answer.
+- **Money, one way** (F-604), **no raw error text** (F-603), **shared load-failed block**: the nine organization console pages each repeat the same
+  "couldn't be loaded / Try again" block (80 files in the app do). It is consistent in words and behaviour and tested per page, so it was **left as it is**;
+  a shared component is a refactor with no user-visible change (PRODUCT-NEXT, "polish").
+- **Global search** finds GST suppliers (by name or GSTIN), GST invoices (by number) and automation rules (by name), each opening its page narrowed to the
+  match; scoped to the person's workspaces and grants; a plan that does not open the GST lists shows no GST result.
+- **The website** says in one honest line each what zip upload, email-in, the GST Monday email and the Zoho Books and Tally connections do; all 44
+  screenshots were retaken from the demo company (41 look different: new logo, resizable sidebar, rupee grouping).

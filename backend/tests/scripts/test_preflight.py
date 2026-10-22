@@ -211,3 +211,29 @@ def test_when_the_app_would_refuse_to_start_the_reasons_are_reported_without_val
     assert preflight.main([]) == 1
     out = capsys.readouterr().out
     assert "JWT_SECRET_KEY" in out and "REDIS_URL" in out and "NOT READY" in out
+
+
+def test_send_test_error_sends_one_error_through_the_apps_own_tracking_and_nothing_secret(boot, monkeypatch, capsys):
+    from app.core import error_tracking
+
+    sent: list[tuple[str, str]] = []
+    monkeypatch.setattr(error_tracking, "init", lambda service: sent.append(("init", service)) or True)
+    monkeypatch.setattr(error_tracking, "capture", lambda exc, *, area, **tags: sent.append((area, str(exc))))
+    monkeypatch.setattr(error_tracking, "shutdown", lambda: sent.append(("shutdown", "")))
+    settings = boot()
+    monkeypatch.setattr(preflight, "load_settings", lambda: (settings, None))
+    preflight.main(["--send-test-error"])
+    out = capsys.readouterr().out
+    assert sent == [("init", "preflight"), ("preflight", "Servabo preflight test error (safe to ignore)"), ("shutdown", "")]
+    assert "one test error sent" in out and "publickey" not in out, "the DSN's key never prints"
+
+
+def test_send_test_error_says_so_when_error_tracking_is_off(boot, monkeypatch, capsys):
+    from app.core import error_tracking
+
+    monkeypatch.setattr(error_tracking, "init", lambda service: False)
+    monkeypatch.setattr(error_tracking, "capture", lambda *a, **k: pytest.fail("nothing may be sent when tracking is off"))
+    settings = boot()
+    monkeypatch.setattr(preflight, "load_settings", lambda: (settings, None))
+    assert preflight.main(["--send-test-error"]) == 1
+    assert "SENTRY_DSN is empty" in capsys.readouterr().out
