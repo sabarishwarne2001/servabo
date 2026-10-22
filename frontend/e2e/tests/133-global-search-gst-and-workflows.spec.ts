@@ -44,10 +44,10 @@ test("a supplier, an invoice and a workflow are found, each opens narrowed, and 
   const branch = created.body;
   await importStatement(customer, customer.wsId);
   await importStatement(customer, branch.id);
-  await createRuleViaApi(customer, { name: "Chase Sahyadri late invoices" });
+  await createRuleViaApi(customer, { name: "Chase Sahyadri late invoices", actions: [{ action_type: "notify.role", config: { roles: ["OWNER"], title: "Heads up", message: "Look at this." } }] });
   expect((await api(customer.session, "POST", `/workspaces/${branch.id}/automation/rules`, {
     name: "Branch only escalation", priority: 100, triggers: ["document.completed"], condition_groups: [], groups_operator: "AND",
-    actions: [], else_actions: [], on_error: "CONTINUE", is_active: true,
+    actions: [{ action_type: "notify.role", config: { roles: ["OWNER"], title: "Heads up", message: "Look at this." } }], else_actions: [], on_error: "CONTINUE", is_active: true,
   })).status).toBe(201);
   // A viewer with a grant on the first workspace only.
   const viewer = await addMember(customer, "searchgst-viewer", "MEMBER", "VIEWER");
@@ -59,9 +59,9 @@ test("a supplier, an invoice and a workflow are found, each opens narrowed, and 
   // A supplier by part of its name: one result per workspace, each in plain words with its GSTIN.
   await searchFor(page, "sahyadri");
   const results = palette(page);
-  await expect(results.getByText("GST suppliers")).toBeVisible({ timeout: 20_000 });
+  await expect(results.getByText("GST suppliers").first()).toBeVisible({ timeout: 20_000 });
   await expect(results.getByText(new RegExp(`GSTIN ${SAHYADRI}`))).toHaveCount(2);
-  await expect(results.getByText("Workflows")).toBeVisible();
+  await expect(results.getByText("Workflows").first()).toBeVisible();
   await expect(results.getByText("Chase Sahyadri late invoices")).toBeVisible();
 
   // Opening the supplier lands on the invoice list narrowed to it.
@@ -73,7 +73,7 @@ test("a supplier, an invoice and a workflow are found, each opens narrowed, and 
 
   // An invoice by number, opened narrowed to that number.
   await searchFor(page, "dec-2001");
-  await expect(palette(page).getByText("GST invoices")).toBeVisible({ timeout: 20_000 });
+  await expect(palette(page).getByText("GST invoices").first()).toBeVisible({ timeout: 20_000 });
   await palette(page).getByText("DEC-2001").first().click();
   await expect(page).toHaveURL(/tab=invoices&number=DEC-2001/);
   await expect(page.getByPlaceholder("Invoice number")).toHaveValue("DEC-2001", { timeout: 20_000 });
@@ -99,7 +99,7 @@ test("a supplier, an invoice and a workflow are found, each opens narrowed, and 
     await viewerPage.keyboard.press("Control+k");
     await viewerPage.getByRole("dialog", { name: "Search pages and records" }).getByRole("combobox").fill("sahyadri");
     const viewerResults = viewerPage.getByRole("dialog", { name: "Search pages and records" });
-    await expect(viewerResults.getByText("GST suppliers")).toBeVisible({ timeout: 20_000 });
+    await expect(viewerResults.getByText("GST suppliers").first()).toBeVisible({ timeout: 20_000 });
     await expect(viewerResults.getByText(new RegExp(`GSTIN ${SAHYADRI}`))).toHaveCount(1);
     await expect(viewerResults.getByText("Workflows")).toHaveCount(0);
     await expect(viewerResults.getByText("Branch office")).toHaveCount(0);
@@ -116,7 +116,7 @@ test("a workspace on a plan that does not open the GST lists shows no GST result
   await page.goto(customer.ws(""));
   await expect(page.locator("main")).toBeVisible({ timeout: 30_000 });
   await searchFor(page, "sahyadri");
-  await expect(palette(page).getByText(/No results|Nothing found|No matches/i).or(palette(page).getByRole("option")).first()).toBeVisible({ timeout: 20_000 });
+  await expect(palette(page).getByText(/Nothing matches/).or(palette(page).getByRole("option")).first()).toBeVisible({ timeout: 20_000 });
   await expect(palette(page).getByText("GST suppliers")).toHaveCount(0);
   await expect(palette(page).getByText("GST invoices")).toHaveCount(0);
   const raw = await api<{ suppliers: unknown[]; gst_invoices: unknown[] }>(customer.session, "GET", `/organizations/${customer.orgId}/search?q=sahyadri`);
