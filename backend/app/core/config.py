@@ -577,6 +577,17 @@ class Settings(BaseSettings):
     #: Days a held or discarded message is kept before `inbound_email.sweep` deletes it and its stored attachments.
     INBOUND_EMAIL_HELD_DAYS: int = 30
 
+    #: Error tracking (Final session 1, 4A). Empty = off, and nothing is sent. Sentry's free plan in its EU region, or a self-hosted
+    #: GlitchTip, speak the same protocol: switching is changing this one address. Only 5xx errors and unhandled exceptions are sent,
+    #: stripped of emails, tokens, cookies, request bodies, document text and field values (`app/core/error_tracking.py`).
+    SENTRY_DSN: str = ""
+    #: Shown beside each error. Empty = ENVIRONMENT.
+    SENTRY_ENVIRONMENT: str = ""
+    #: Which version failed (the image tag or git SHA). Empty = APP_VERSION.
+    SENTRY_RELEASE: str = ""
+    #: Performance traces. 0 = none (the default: it costs quota and sends request timings nobody needs yet).
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.0
+
     #: Zoho Books "Connect" (Final session 1, 3C). Register ONE server-based application in Zoho's API console
     #: (api-console.zoho.in) and put its Client ID and Secret here; leave both empty and the "Connect Zoho Books" button says it
     #: is not set up on this deployment. `ZOHO_REDIRECT_URI` is the address Zoho sends the customer back to, registered in the

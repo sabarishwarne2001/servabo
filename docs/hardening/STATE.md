@@ -24,7 +24,7 @@ backend venv Python 3.12 and `npm ci` in the session scratchpad. The test enviro
 - [x] 3B. Upgrade moments: one test walks every locked surface; 80% usage email one-click
 - [x] 3C. Zoho Books Connect (OAuth) and Tally Prime guided
 - [x] 3D. E-invoice QR badge and signature line
-- [ ] 4A. Error tracking (Sentry / GlitchTip)
+- [x] 4A. Error tracking (Sentry / GlitchTip)
 - [ ] 4B. `scripts/preflight.py`
 - [ ] 5. Screens: accessibility sweep, phone pass, money formatter guard, states, global search, website
 - [ ] 6. Public webhook events, warehouse datasets, document packs that do everything they promise

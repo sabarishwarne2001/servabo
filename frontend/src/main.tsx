@@ -107,6 +107,9 @@ if (import.meta.env.DEV) {
   assertTenantReconciliationIntegrity();
 }
 
+// Final session 1 (4A): error tracking, off unless VITE_SENTRY_DSN is set (then the SDK is fetched here, not before).
+void import("@/monitoring").then((monitoring) => monitoring.initMonitoring());
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>

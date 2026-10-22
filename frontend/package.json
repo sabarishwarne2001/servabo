@@ -27,6 +27,7 @@
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@hookform/resolvers": "^5.1.1",
     "@radix-ui/react-select": "^2.3.7",
+    "@sentry/browser": "11.5.0",
     "@tanstack/react-query": "^5.81.5",
     "@zxcvbn-ts/core": "4.2.0",
     "@zxcvbn-ts/language-common": "4.1.3",

@@ -14,7 +14,7 @@ in the containers unless you add it to the service's `environment:` in `docker-c
 is not read by any code, is missing from this page, or is one production cannot run without and
 is missing from `.env.production.template` (or does not stop the app from starting when unset).
 
-315 settings. Columns: name, type, default, where it appears (`example` =
+319 settings. Columns: name, type, default, where it appears (`example` =
 `.env.example`, `production` = `.env.production.template`, `guard` = checked by the production
 guard), and the comment written above it in the code.
 
@@ -126,7 +126,7 @@ guard), and the comment written above it in the code.
 | `SPEND_DEFAULT_MONTHLY_LLM_INPUT_TOKENS` | `Optional[int]` | `2000000` | — |  |
 | `SPEND_DEFAULT_MONTHLY_LLM_OUTPUT_TOKENS` | `Optional[int]` | `500000` | — |  |
 | `SPEND_DEFAULT_MONTHLY_EMBEDDING_TOKENS` | `Optional[int]` | `5000000` | — |  |
-| `EINVOICE_QR_PUBLIC_KEY_PEM` | `Optional[str]` | `None` | — | NIC's published public key (PEM) for the e-invoice QR code's signature. None ships: without it the QR code's values are read but marked "signature not verified" (app/services/gst/einvoice.py). |
+| `EINVOICE_QR_PUBLIC_KEY_PEM` | `Optional[str]` | `None` | production | NIC's published public key (PEM) for the e-invoice QR code's signature. None ships: without it the QR code's values are read but marked "signature not verified" (app/services/gst/einvoice.py). |
 | `S3_BUCKET` | `Optional[str]` | `None` | example, production, guard |  |
 | `S3_REGION` | `Optional[str]` | `'auto'` | production |  |
 | `S3_ENDPOINT_URL` | `Optional[str]` | `None` | example, production |  |
@@ -184,6 +184,10 @@ guard), and the comment written above it in the code.
 | `INBOUND_EMAIL_MAX_BODY_MB` | `int` | `50` | example, production | The largest webhook body accepted, in MB (Postmark's own limit for a message is 35 MB; attachments travel base64). |
 | `INBOUND_EMAIL_IGNORE_INLINE_IMAGES_KB` | `int` | `30` | example, production | Inline images smaller than this (signatures, logos) are ignored, not read as documents. |
 | `INBOUND_EMAIL_HELD_DAYS` | `int` | `30` | example, production | Days a held or discarded message is kept before `inbound_email.sweep` deletes it and its stored attachments. |
+| `SENTRY_DSN` | `str` | `''` | example, production, guard | Error tracking (Final session 1, 4A). Empty = off, and nothing is sent. Sentry's free plan in its EU region, or a self-hosted GlitchTip, speak the same protocol: switching is changing this one address. Only 5xx errors a… |
+| `SENTRY_ENVIRONMENT` | `str` | `''` | example, production | Shown beside each error. Empty = ENVIRONMENT. |
+| `SENTRY_RELEASE` | `str` | `''` | example, production | Which version failed (the image tag or git SHA). Empty = APP_VERSION. |
+| `SENTRY_TRACES_SAMPLE_RATE` | `float` | `0.0` | example, production | Performance traces. 0 = none (the default: it costs quota and sends request timings nobody needs yet). |
 | `ZOHO_CLIENT_ID` | `str` | `''` | example, production | Zoho Books "Connect" (Final session 1, 3C). Register ONE server-based application in Zoho's API console (api-console.zoho.in) and put its Client ID and Secret here; leave both empty and the "Connect Zoho Books" button s… |
 | `ZOHO_CLIENT_SECRET` | `Optional[SecretStr]` | `None` | example, production |  |
 | `ZOHO_REDIRECT_URI` | `str` | `''` | example, production |  |

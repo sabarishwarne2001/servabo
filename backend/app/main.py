@@ -45,6 +45,9 @@ from app.utils import initialize_storage
 from app.workers.handlers import register_all
 
 setup_logging()
+from app.core import error_tracking  # noqa: E402
+
+error_tracking.init("api")  # Final session 1 (4A): off unless SENTRY_DSN is set
 logger = logging.getLogger("app.main")
 
 CORS_EXPOSED_HEADERS = [

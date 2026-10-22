@@ -49,7 +49,7 @@
         # (E2E_CSP=1 serves the bundle with this exact header, read from this file)
         # passes with it enforced and no violation. Uploaded PDFs render with pdf.js
         # (a blob: worker). Keep the custom-domain block below in step.
-        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' {$SENTRY_INGEST_HOST:}; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         -Server
     }
 
@@ -159,7 +159,7 @@
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()"
         # N-015. The same app as the platform host, so the same enforced policy.
-        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' {$SENTRY_INGEST_HOST:}; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         -Server
     }
 

@@ -386,6 +386,10 @@ def run_jobs_loop(
                         "jobs.handler_failed",
                         extra={"job_id": str(job_id), "job_type": job_type},
                     )
+                    from app.core import error_tracking
+
+                    error_tracking.capture(exc, area="job", job_type=job_type, attempt=f"{attempts}/{max_attempts}",
+                                           organization_id=org_id or "", status_code=500)
                     died = attempts >= max_attempts
                     with SessionLocal() as db:
                         if died:
@@ -605,6 +609,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     from app.core.logging_config import setup_logging
 
     setup_logging(level=args.log_level, fmt="%(asctime)s %(levelname)s %(name)s %(message)s")
+    from app.core import error_tracking
+
+    error_tracking.init("worker")  # Final session 1 (4A): off unless SENTRY_DSN is set
     register_all()
     profile = get_profile(args.profile)
     assert_imports_match_profile(profile)

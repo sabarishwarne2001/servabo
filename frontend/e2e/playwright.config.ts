@@ -29,7 +29,8 @@ function productionCsp(): string | undefined {
   const caddyfile = fs.readFileSync(path.resolve(HERE, "..", "..", "backend", "deploy", "Caddyfile"), "utf8");
   const match = /Content-Security-Policy(?:-Report-Only)?\s+"([^"]+)"/.exec(caddyfile);
   if (!match) throw new Error("E2E_CSP=1 but no Content-Security-Policy header was found in backend/deploy/Caddyfile");
-  return match[1];
+  // Caddy fills {$NAME:default} from its environment; the suite has none of them set, so each becomes its (empty) default.
+  return match[1].replace(/\{\$[A-Z0-9_]+:([^}]*)\}/g, "$1").replace(/\s+;/g, ";");
 }
 const CSP = productionCsp();
 

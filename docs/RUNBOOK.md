@@ -907,3 +907,15 @@ ignored in production). A person turns the whole thing off under Notifications â
 Connect your books. If a customer reports "Reconnect Zoho Books", Zoho no longer accepts their saved sign-in (they removed the app, or changed their
 password policy): they press Reconnect and waiting postings are sent again by themselves. `ZOHO_ACCOUNTS_URL_OVERRIDE` and `ZOHO_API_URL_OVERRIDE` are for the
 test stand-in only and make the API refuse to start in production. The Zoho side has not been run against real Zoho yet (LIVE-VERIFICATION, Final session 2).
+
+### 9.13 Error tracking (Final session 1)
+
+Off until you set `SENTRY_DSN`. To switch on: sign up at sentry.io and **choose the EU data region**, create two projects (one "Python" for the API
+and workers, one "Browser JavaScript" for the web app), and copy each project's DSN (Settings â†’ Client Keys). Put the first in `.env` as `SENTRY_DSN`
+(it must be https; the app refuses to start otherwise). For the web app, put the second in `frontend/.env` as `VITE_SENTRY_DSN` **before building the
+frontend**, and set `SENTRY_INGEST_HOST` in `.env` to that DSN's host (the part after the `@`, e.g. `o4500000.ingest.de.sentry.io`; `python scripts/preflight.py`
+prints it) so the browser is allowed to reach it. Restart. Optional: `SENTRY_ENVIRONMENT`, `SENTRY_RELEASE` (defaults to the image tag),
+`SENTRY_TRACES_SAMPLE_RATE` (0). Only server errors and unhandled exceptions are sent; emails, tokens, document text, GSTINs, amounts, request bodies,
+cookies and the person are removed before they leave (`app/core/error_tracking.py`, `frontend/src/monitoring.ts`; both are tested). What you will see: which
+line failed, which job (`job_type`), which organization and workspace (opaque ids), how often. To switch off, empty the DSNs and restart (rebuild the
+frontend). GlitchTip: the same settings with your GlitchTip DSN.

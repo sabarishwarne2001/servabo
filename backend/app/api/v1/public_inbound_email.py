@@ -49,9 +49,12 @@ def _process(db: Session, parsed: service.Parsed) -> dict[str, Any]:
     try:
         outcome = service.receive(db, address=address, parsed=parsed)
         db.commit()
-    except Exception:
+    except Exception as exc:
         db.rollback()
         logger.exception("inbound_email.failed", extra={"workspace_id": str(address.workspace_id)})
+        from app.core import error_tracking
+
+        error_tracking.capture(exc, area="email_in", workspace_id=address.workspace_id, status_code=500)   # opaque ids only
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Could not process the message; Postmark will retry.")
     logger.info(
         "inbound_email.received",

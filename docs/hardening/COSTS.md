@@ -131,3 +131,16 @@ NEEDS-OWNER, C12). A chargeback costs a further $30.
   (RUNBOOK §9.3).
 - After the first month, replace the estimate in section 3 with the measured figure and note the
   server's peak memory (`docker stats --no-stream`).
+
+## 7. Error tracking (Final session 1, 4A)
+
+**Sentry's free "Developer" plan:** one user and **5,000 errors a month** (secondary sources, a search on 2026-10-22; Sentry's own pricing page
+could not be opened from the build sandbox, so confirm it on the day you sign up). The Team plan, from about $26 a month billed annually, includes
+50,000 errors. Choose the **EU data region when you create the organization** (it cannot be moved afterwards); I could not confirm from here that the
+free plan offers it, so check before you rely on it. Cost today: **$0**. At the settings used here (5xx and unhandled exceptions only, no traces, no
+replays, no breadcrumbs) a healthy product sends a handful a day; 5,000 a month is a loud outage, and past it Sentry drops the extra rather than bill you.
+
+**Sentry or GlitchTip, in plain words.** Both receive errors through the same address (`SENTRY_DSN`), so you can switch by changing that one setting.
+Sentry's own service (EU region): nothing to run, a good screen, free up to the limit above, a US company holding data in the EU. GlitchTip, self-hosted:
+free whatever the volume and the data never leaves your server, but it is another thing to run, update and back up, and it has a plainer screen. Start with
+Sentry's free plan; move to GlitchTip only if you hit the limit or a customer's contract forbids a third party seeing even scrubbed errors.
