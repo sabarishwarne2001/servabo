@@ -15,9 +15,10 @@ import uuid
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.api_tiers import ApiRateTier
+from app.schemas.api_key import clean_key_name, future_expiry, unique_scopes
 from app.core.scopes import ApiKeyScope
 
 
@@ -148,6 +149,10 @@ class DeveloperKeyCreateRequest(BaseModel):
     tier_key: ApiRateTier = ApiRateTier.FREE
     expires_at: Optional[datetime] = None
     enable_public_api: bool = False
+
+    _name = field_validator("name")(clean_key_name)
+    _scopes = field_validator("scopes")(unique_scopes)
+    _expiry = field_validator("expires_at")(future_expiry)
 
 
 class DeveloperKeyIssuedResponse(BaseModel):
