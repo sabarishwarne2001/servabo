@@ -60,4 +60,25 @@ class AutomationRuleTrigger(Base):
         return f"<AutomationRuleTrigger {self.rule_id} {self.event_type}>"
 
 
-__all__ = ["AutomationRuleTrigger"]
+class AutomationEventMark(Base):
+    """Session J: "this occurrence was already announced". One row per (workspace, key), written in the same
+    transaction as the event it guards, so an hourly sweep announces an invoice's 30th day once, even after the
+    outbox has pruned the old event."""
+
+    __tablename__ = "automation_event_marks"
+
+    __table_args__ = (Index("ix_automation_event_marks_created", "created_at"),)
+
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    mark_key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+__all__ = ["AutomationEventMark", "AutomationRuleTrigger"]

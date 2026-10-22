@@ -61,6 +61,8 @@ ENCRYPTED_COLUMNS: Sequence[EncryptedColumn] = (
     EncryptedColumn("sso_auth_requests", "code_verifier_encrypted", binary=True),
     EncryptedColumn("webhook_endpoints", "secret_encrypted"),
     EncryptedColumn("webhook_endpoints", "previous_secret_encrypted"),
+    # Session J: a Slack or Teams incoming-webhook address is a secret (anyone holding it can post to the channel).
+    EncryptedColumn("webhook_endpoints", "url_encrypted"),
     EncryptedColumn("warehouse_destinations", "encrypted_credential"),
     EncryptedColumn("erp_targets", "credential_ciphertext"),
     EncryptedColumn("entity_identifiers", "value_ciphertext"),

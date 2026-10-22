@@ -100,6 +100,11 @@ def _flag(db: Session, *, role: DocumentRole, kind: str, severity: str, summary:
         .on_conflict_do_nothing(index_elements=["work_item_id", "kind"])
         .returning(PaymentRiskFlag.id)
     ).first()
+    if inserted is not None:
+        # Session J: the flag is a trigger, once per invoice and kind (the insert above is the same guarantee).
+        from app.services.automation import emitters
+
+        emitters.payment_risk_flagged(db, flag_id=inserted[0], role=role, kind=kind, severity=severity)
     return inserted is not None
 
 

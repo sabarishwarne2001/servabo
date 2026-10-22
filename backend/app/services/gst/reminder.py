@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from typing import Any, Optional
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models.gst import GstMatch
@@ -25,7 +25,9 @@ MAX_LINES = 100
 
 def known_contact(db: Session, workspace: Workspace, supplier_gstin: str) -> Optional[str]:
     row = db.execute(select(HelmCounterparty.contact_email).where(
-        HelmCounterparty.organization_id == workspace.organization_id, HelmCounterparty.tax_id.ilike(f"%{supplier_gstin}%"),
+        HelmCounterparty.organization_id == workspace.organization_id,
+        # By the tax id Helm's sync records, or by the `gstin:<GSTIN>` key a supplier keyed on its GSTIN carries.
+        or_(HelmCounterparty.tax_id.ilike(f"%{supplier_gstin}%"), HelmCounterparty.key.ilike(f"%{supplier_gstin}")),
         HelmCounterparty.contact_email.isnot(None)).limit(1)).scalar_one_or_none()
     return row or None
 

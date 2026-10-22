@@ -38,94 +38,17 @@ class ActionFailure(RuntimeError):
 def _evaluate_condition(
     actual: Any,
     operator: str,
-    target_value: str,
+    target_value: Any,
 ) -> bool:
-    operator = operator.upper().strip()
-    target_value = target_value.strip() if target_value else ""
+    """One condition, decided by `automation.evaluator` (Session J).
 
-    if operator == "EXISTS":
-        return actual is not None
+    Kept under its old name and signature: `target_value` is the stored value, a string or a list. A plain
+    string, list or array comparison answers exactly as it did before Session J (the compatibility corpus pins
+    1,122 answers); numbers such as "1,18,000.00" are now read, and dates have comparisons.
+    """
+    from app.services.automation import evaluator
 
-    actual_is_empty = (
-        actual is None
-        or str(actual).strip() == ""
-        or (isinstance(actual, (list, dict, set)) and len(actual) == 0)
-    )
-    if operator == "IS_EMPTY":
-        return actual_is_empty
-    if operator == "IS_NOT_EMPTY":
-        return not actual_is_empty
-
-    if actual is None:
-        return operator in ("NOT_EQUALS", "NOT_CONTAINS", "NOT_IN")
-
-    actual_str = str(actual).strip()
-    actual_lower = actual_str.lower()
-    target_lower = target_value.lower()
-
-    if operator in ("CONTAINS", "NOT_CONTAINS"):
-        if isinstance(actual, (list, tuple, set)):
-            actual_list = [str(x).strip().lower() for x in actual]
-            is_contained = target_lower in actual_list
-            return is_contained if operator == "CONTAINS" else not is_contained
-        is_contained = target_lower in actual_lower
-        return is_contained if operator == "CONTAINS" else not is_contained
-
-    if operator == "EQUALS":
-        return actual_lower == target_lower
-    if operator == "NOT_EQUALS":
-        return actual_lower != target_lower
-    if operator == "STARTS_WITH":
-        return actual_lower.startswith(target_lower)
-    if operator == "ENDS_WITH":
-        return actual_lower.endswith(target_lower)
-
-    if operator in ("IN", "NOT_IN"):
-        targets_list = [v.strip().lower() for v in target_value.split(",") if v.strip()]
-        if isinstance(actual, (list, tuple, set)):
-            actual_list = [str(x).strip().lower() for x in actual]
-            has_intersection = any(x in targets_list for x in actual_list)
-            return has_intersection if operator == "IN" else not has_intersection
-        is_in = actual_lower in targets_list
-        return is_in if operator == "IN" else not is_in
-
-    if operator in ("ARRAY_CONTAINS_ANY", "ARRAY_CONTAINS_ALL"):
-        targets = {v.strip().lower() for v in target_value.split(",") if v.strip()}
-        if not targets or not isinstance(actual, (list, tuple, set)):
-            return False
-        actual_set = {str(x).strip().lower() for x in actual}
-        return bool(actual_set & targets) if operator == "ARRAY_CONTAINS_ANY" else targets.issubset(actual_set)
-
-    if operator == "BETWEEN":
-        normalized_range = target_value.replace("..", ",").replace(" - ", ",")
-        if "," not in normalized_range and "-" in normalized_range:
-            split_idx = normalized_range.find("-", 1)
-            if split_idx != -1:
-                normalized_range = normalized_range[:split_idx] + "," + normalized_range[split_idx+1:]
-        parts = [p.strip() for p in normalized_range.split(",") if p.strip()]
-        if len(parts) != 2:
-            return False
-        try:
-            low, high, val = float(parts[0]), float(parts[1]), float(actual)
-            return low <= val <= high
-        except (TypeError, ValueError):
-            return False
-
-    try:
-        actual_num, target_num = float(actual), float(target_value)
-    except (TypeError, ValueError):
-        return False
-
-    if operator == "GREATER_THAN":
-        return actual_num > target_num
-    if operator == "LESS_THAN":
-        return actual_num < target_num
-    if operator == "GREATER_THAN_OR_EQUAL":
-        return actual_num >= target_num
-    if operator == "LESS_THAN_OR_EQUAL":
-        return actual_num <= target_num
-
-    return False
+    return evaluator.evaluate(actual, operator, target_value).matched
 
 
 def _get_nested_value(data: dict[str, Any], field_path: str) -> Any:
@@ -158,7 +81,15 @@ def resolve_field(work_item: WorkItem, field_path: str) -> Any:
         val = _get_nested_value(entities, sub_path)
         if val is not None:
             return val
-    return _get_nested_value(entities, field_path)
+    direct = _get_nested_value(entities, field_path)
+    if direct is not None and not (isinstance(direct, str) and not direct.strip()) and direct != []:
+        return direct
+    # Session J: the same field under another name a model used (`supplier_gstin` for `vendor_gstin`). An empty
+    # value does not hide it, and when nothing is found the empty value is still what the rule sees.
+    from app.services.automation import document_fields
+
+    aliased = document_fields.read_by_alias(entities, field_path)
+    return aliased if aliased is not None else direct
 
 
 def _evaluate_rule_conditions(rule: Any, work_item: WorkItem) -> bool:

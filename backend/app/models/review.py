@@ -150,6 +150,9 @@ class ReviewAssignment(Base, UUIDMixin):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
+    #: Session J: when the review is due, for an item an automation rule assigned with a due time.
+    due_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
     def __repr__(self) -> str:  # pragma: no cover
         return (
             f"<ReviewAssignment {self.kind}/{self.item_id} "

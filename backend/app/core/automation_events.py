@@ -116,6 +116,31 @@ TRIGGER_NATIVE_EVENT_TYPES = TRIGGER_NATIVE_EVENT_TYPES + ARCH47_TRIGGER_EVENT_T
 ARCH49_TRIGGER_EVENT_TYPES: Final[tuple[str, ...]] = ("trigger.process.sla_at_risk",)
 TRIGGER_NATIVE_EVENT_TYPES = TRIGGER_NATIVE_EVENT_TYPES + ARCH49_TRIGGER_EVENT_TYPES
 
+#: Session J:trigger-events. The engines became triggers: GST Credit, payment risk, legal holds, TruthMesh, Helm, a
+#: document received through a request link, a schedule and a person pressing "Run a rule on this document".
+#: `j1a1_automation_triggers` rebuilds ck_outbox_events_visibility_vocabulary to admit them. Emitters (all in
+#: `app/services/automation/emitters.py`, called where the thing happens, once per occurrence through
+#: `automation_event_marks`): gst.store (return imported), automation.sweeps (waiting for a supplier, reversal risk,
+#: schedules), radar.payment_risk, ingestion.retention_service, truthmesh.service, helm (plan_store, webhooks),
+#: cases.requests, and the manual-run route. Never public webhook events (the vocabularies stay disjoint).
+SESSION_J_TRIGGER_EVENT_TYPES: Final[tuple[str, ...]] = (
+    "trigger.gst.return_imported",
+    "trigger.gst.waiting_for_supplier",
+    "trigger.gst.reversal_risk",
+    "trigger.payment_risk.flagged",
+    "trigger.legal_hold.placed",
+    "trigger.legal_hold.released",
+    "trigger.truthmesh.conflict_opened",
+    "trigger.truthmesh.conflict_resolved",
+    "trigger.schedule.daily",
+    "trigger.schedule.weekly",
+    "trigger.manual",
+    "trigger.helm.mandate_breached",
+    "trigger.helm.approval_needed",
+    "trigger.document.received_by_link",
+)
+TRIGGER_NATIVE_EVENT_TYPES = TRIGGER_NATIVE_EVENT_TYPES + SESSION_J_TRIGGER_EVENT_TYPES
+
 #: Internal events that existed before ARCH-37 and that rules may listen to.
 #: `automation_rule_triggers` accepts exactly these plus the `trigger.` names.
 LEGACY_RULE_EVENT_TYPES: Final[tuple[str, ...]] = (

@@ -15,6 +15,8 @@ const builder = (page: import("@playwright/test").Page) => page.getByRole("dialo
 
 /** "Notify a role" needs no external endpoint, so a rule using it is valid on its own. */
 async function pickFirstAvailableAction(page: import("@playwright/test").Page): Promise<string> {
+  // The builder draws the rule as a flow; the "Then" box opens its steps in the inspector (Session J).
+  await builder(page).getByTestId("flow-node-actions").click();
   const picker = builder(page).getByRole("combobox", { name: "Add an action" }).first();
   await picker.selectOption("notify.role");
   await builder(page).getByRole("button", { name: "Owner", exact: true }).click();

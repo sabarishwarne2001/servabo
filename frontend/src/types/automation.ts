@@ -35,13 +35,14 @@ export type AutomationOperator =
   | "ARRAY_CONTAINS_ALL";
 
 export type AutomationActionType = string;
-export type AutomationExecutionStatus = "SUCCESS" | "FAILED";
+export type AutomationExecutionStatus = "SUCCESS" | "FAILED" | "SKIPPED";
 export type AutomationLogicOperator = "AND" | "OR";
 
 export interface AutomationCondition {
   readonly field: string;
   readonly operator: AutomationOperator;
-  readonly value: string;
+  readonly value: string | readonly string[];
+  readonly currency?: string | null;
 }
 
 export type AutomationErrorPolicy = "HALT" | "CONTINUE";
@@ -73,6 +74,15 @@ export interface AutomationRule {
   readonly groups_operator?: AutomationLogicOperator;
   readonly else_actions?: readonly FlowActionEntry[];
   readonly is_flow?: boolean;
+  // Session J: safe at volume
+  readonly max_runs_per_hour?: number | null;
+  readonly cooldown_hours?: number | null;
+  readonly effective_runs_per_hour?: number;
+  /** True when the workspace's automations are paused, so this rule will not run although it is on. */
+  readonly paused?: boolean;
+  readonly version?: number;
+  /** Who built it (display name, else email). */
+  readonly owner_name?: string | null;
 }
 
 /** ARCH-37 flow shape. The server still accepts the ARCH-13 shape. */
@@ -86,6 +96,10 @@ export interface AutomationRuleCreateRequest {
   readonly else_actions: readonly FlowActionEntry[];
   readonly on_error: AutomationErrorPolicy;
   readonly is_active?: boolean;
+  readonly max_runs_per_hour?: number | null;
+  readonly cooldown_hours?: number | null;
+  /** A note kept with the version this save writes. */
+  readonly note?: string;
 }
 
 export interface AutomationRuleUpdateRequest {
@@ -98,6 +112,9 @@ export interface AutomationRuleUpdateRequest {
   readonly actions?: readonly FlowActionEntry[];
   readonly else_actions?: readonly FlowActionEntry[];
   readonly on_error?: AutomationErrorPolicy;
+  readonly max_runs_per_hour?: number | null;
+  readonly cooldown_hours?: number | null;
+  readonly note?: string;
 }
 
 export interface AutomationLog {
@@ -107,7 +124,7 @@ export interface AutomationLog {
   readonly rule_name: string;
   readonly document_name: string;
   readonly action_type: string;
-  readonly status: "SUCCESS" | "FAILED";
+  readonly status: "SUCCESS" | "FAILED" | "SKIPPED";
   readonly log_message: string | null;
   readonly created_at: string;
   readonly updated_at: string;
@@ -145,10 +162,24 @@ export const formatDurationMs = (ms: number | null | undefined): string => {
   return `${(ms / 1000).toFixed(ms < 10_000 ? 2 : 1)}s`;
 };
 
+/** What one condition read, wanted and decided, in words (identifiers masked). */
+export interface ConditionTrace {
+  readonly group: number;
+  readonly index: number;
+  readonly field: string;
+  readonly operator: string;
+  readonly label: string;
+  readonly expected: string;
+  readonly actual: string;
+  readonly matched: boolean;
+  readonly reason: string;
+}
+
 export interface AutomationRuleTestResponse {
   readonly success: boolean;
   readonly matched: boolean;
   readonly notification_sent: boolean;
   readonly message: string;
   readonly execution_time_ms: number;
+  readonly conditions?: readonly ConditionTrace[];
 }

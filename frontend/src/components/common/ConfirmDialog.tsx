@@ -50,6 +50,12 @@ export interface ConfirmDialogInput {
   readonly maxLength?: number;
 }
 
+/**
+ * Session J: the dialogs open right now, oldest first. Escape belongs to the top one only, so a
+ * dialog over another dialog (or over the rule builder) closes alone.
+ */
+const openDialogs: symbol[] = [];
+
 const FOCUSABLE = "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -90,13 +96,21 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       return undefined;
     }
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const token = Symbol("confirm-dialog");
+    openDialogs.push(token);
     const target = inputRef.current
       ?? (initialFocus === "confirm" || hideCancel ? confirmRef.current : cancelRef.current);
     target?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (openDialogs[openDialogs.length - 1] !== token) {
+        return;
+      }
       if (event.key === "Escape") {
         event.preventDefault();
+        // Session J: no parent `window` key handler (the rule builder, a test dialog) reacts to the
+        // same key press, which closed this dialog and then asked the same question again.
+        event.stopPropagation();
         if (!loadingRef.current) {
           onCancelRef.current();
         }
@@ -126,6 +140,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
+      const at = openDialogs.indexOf(token);
+      if (at !== -1) {
+        openDialogs.splice(at, 1);
+      }
       if (previous && document.contains(previous)) {
         previous.focus();
       }

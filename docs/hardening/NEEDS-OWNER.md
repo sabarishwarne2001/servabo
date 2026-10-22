@@ -2133,3 +2133,95 @@ Either:
   arrived and something else was slow (tell the next session); **absent** means the upload was lost, as reproduced; or
 - allow that host in the session's network settings so the next session can read it itself.
 Nothing is blocked on this. If the report is gone by the time anyone looks, F-531 stays "fixed on the reproduced mechanism".
+
+
+## N-149 — The rule builder is a full page, drawn as a flow (DECIDED (Session J))
+
+You shared a picture of the builder you want: a full-page editor, boxes joined by Yes and No branches, a panel on the right
+for whatever box you choose, a status line at the bottom, and Test and Publish at the top. That is what the builder now is,
+in Servabo's own colours. A rule reads **When** (what starts it) → **Only if** (the checks, which fork into Yes and No) →
+**Then** (the Yes steps) and **Otherwise** (the No steps). Choosing a box opens its form on the right, in three tabs
+(Configuration, Input / output, Advanced). **Create rule** is the save button (the tests and your habits keep that name);
+**Test & preview** is the Test button. `Ctrl/⌘ S`, `Ctrl/⌘ Enter` and `Esc` work as before, and closing with unsaved edits asks
+first in Servabo's own dialog.
+- **Why a page and not the old pop-up:** a rule with conditions and two branches does not fit a pop-up, and a person needs to see the
+  whole rule while they edit one part.
+- **What did not change:** every accessible name and test id the earlier tests rely on is still there (a few tests now open the
+  box first, because the forms are no longer all on screen at once).
+
+## N-150 — Automation never moves money; Helm's triggers may only tell, mail, post, call out, review or tag (DECIDED (Session J))
+
+No automation step can approve, pay or schedule a payment. The Helm triggers (a mandate breached, an action waiting for
+approval) accept only: notify, email, post to chat, send a webhook, create a review, tag a document. Every other step is
+refused when the rule is saved, in words. Money stays a person's decision.
+
+## N-151 — A rule may run 200 times an hour unless you say otherwise; the owner is told once a day (DECIDED (Session J))
+
+**Throttle.** Every rule is held to "at most N runs an hour"; the rule's own number wins, and a rule with none gets **200**
+(setting `AUTOMATION_DEFAULT_RUNS_PER_HOUR`; 0 turns the default off). A run over the limit is not lost: it is listed in Run
+history as **Skipped — over the limit**, with the reason, and the rule's author gets **one** notice a day however many were
+held back. Only runs that did something count (a rule whose checks rarely match is not throttled by what it ignored).
+**Cooldown** ("at most once per document every X hours") is off until someone sets it.
+- **Why 200:** a batch of 500 uploads on an "email on upload" rule used to send 500 emails. 200 an hour is far above a
+  normal day for one rule and well below a flood. Change it per rule in the builder's Advanced tab, or for the whole
+  deployment with the setting.
+
+## N-152 — Slack and Microsoft Teams messages go through a channel's incoming-webhook address, kept secret (DECIDED (Session J))
+
+The "Post a message to chat" step uses Slack's or Teams's own incoming-webhook address (a long secret link). It is stored
+**encrypted** with the same keys as other secrets, and is **never shown back**: the page shows only the host, with the rest
+cut off. It goes through the organization's outbound-address policy like every other outbound call, only the real Slack and
+Teams hosts are allowed (plus any named in `CHAT_WEBHOOK_EXTRA_HOSTS`, for a test receiver), and a message cannot mention
+people or channels (Slack's `<`, `>` and `&` are escaped). Chat addresses cannot be used as ordinary webhooks, or the other way
+round. **Not yet tried against a real Slack or Teams workspace: see N-158.**
+
+## N-153 — Amounts are typed in rupees (or the workspace's currency), never in millionths, and are never converted (DECIDED (Session J); F-535, F-536)
+
+A condition on an amount takes a number and a currency ("greater than 10,00,000 INR"). A trigger that stores money in
+millionths (a payment-risk amount, a variance) is shown and typed in whole currency units; the old "micros" fields still work
+for rules saved before. **A document in one currency is never compared with an amount in another: it does not match, and the
+reason says so** (no exchange rate is guessed). A document with no currency of its own is read in the workspace's currency, and
+the reason says that too. Dates are read in the workspace's date format and time zone.
+
+## N-154 — The "Wait" step was not built (DECIDED (Session J))
+
+"Wait N hours, check again, then act" needs a run that is saved part-way, can resume after a restart, is cancelled when the
+rule changes or the document is deleted, and never acts twice. It was the brief's last, optional item, to be built only if
+everything else was green. It was not started. The design notes are in HANDOFF ("Session J → next sessions").
+
+## N-155 — Retry runs the whole rule again, and asks first when a message could go out twice (DECIDED (Session J))
+
+"Retry" on a failed run queues a **new** run of the same rule on the same document (the failed one stays as it was, and a run
+that was already retried successfully cannot be retried again). If the rule has a step whose repeat people would notice (an
+email, a chat message, a notification) Servabo says "This may send the message again: …" and waits for a yes. A webhook
+carries an idempotency key built on the first run, so a receiver that de-duplicates sees one delivery. Only a run that failed,
+timed out or ran out of budget can be retried; a paused workspace refuses it.
+
+## N-156 — The recipe library: 16 ready-made rules, India first, none moves money (DECIDED (Session J))
+
+One list in the backend (`app/services/automation/recipes.py`), served by the API: hold invoices above ₹10 lakh, tag
+high-value invoices, flag a missing e-invoice IRN, invoices due within 3 days, an anomaly alert, a changed bank account, payment
+risk and failed documents to Slack or Teams, a litigation hold, contract renewal follow-up, a Monday review reminder,
+GST reminders and risk alerts, a named reviewer, overdue obligations, and an email about invoices above ₹25 lakh. Each recipe
+shows the plan it needs; a locked one offers Upgrade. A test saves every recipe on an Enterprise tenant, so a recipe that stops
+validating fails the build. **You decide the final set**; adding one is a few lines.
+
+## N-157 — Pausing stops everything, including runs by hand and retries (DECIDED (Session J))
+
+A workspace administrator can pause every automation in one workspace (audited, switched back on the same way). While
+paused, nothing runs: not events, not schedules, not "Run a rule on this document", not a retry. Each run that arrives is listed
+in Run history as **Skipped — paused**, and rule cards show **Paused**. Turning a rule off, deleting it and pausing never need a
+plan that includes automations.
+
+## N-158 — Try a real Slack and a real Teams channel once (OPEN)
+
+Everything is tested against a stand-in receiver and the address rules; nothing has posted to a real Slack or Teams channel.
+Create a free Slack workspace (or use a test channel), add an "incoming webhook" for it, register it under Webhooks as "Slack",
+and use the recipe "Post to chat when a document fails to process". Session D (the real-services session) should do the same for Teams.
+Nothing is blocked on this.
+
+## N-159 — The Pillow security advisory needs a major-version upgrade (OPEN; F-544)
+
+The advisory-only check (`pip-audit`) lists several Pillow 12.3.0 advisories fixed in Pillow 13.0.0. It is advisory and the
+same on `main`; a major version of the image library can change how documents are read, so it was left for a session that can
+run the image and OCR tests with it. Decide whether to schedule that.

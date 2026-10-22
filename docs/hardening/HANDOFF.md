@@ -842,3 +842,38 @@ advisory pip-audit this fixes.
 - Possible follow-ups, none started: read only the picture's region of a page instead of the whole page (a document with a
   picture on every page still pays 1.6 s a page); a CI step that installs the pinned requirements (a bump such as `aiohttp`
   needs its partner pinned too, and `pip-audit --no-deps` cannot see that).
+
+## Session J → next sessions
+
+_2026-10-21. Branch `claude/new-session-otth8f`, PR #35. Decisions N-149 to N-157 (decided), N-158 and N-159 (open); findings F-535 to F-545. Three migrations (`j1a1_automation_triggers`, `j1a2_automation_actions`, `j1a3_automation_volume_safety`); one Alembic head._
+
+**What changed.** Workspace Automation was rebuilt end to end. (1) **Conditions** are decided by one typed evaluator (amounts with a currency, dates,
+fixed values, lists), read through the finance schema's alias map, with a trace of what each condition read and why (F-535 to F-539). (2) **37 triggers**
+(14 new): GST, payment risk, legal holds, TruthMesh, schedules, by hand, Helm, request links; each announced once through `emitters.emit_once`
+(a mark row plus an outbox event in one transaction, only when a rule listens). (3) **16 steps** (7 new, none can move money). (4) **Safe at volume**: throttle
+(200 an hour), cooldown, a workspace pause, retry, versions with a plain diff and Restore, a 30-day preview, "why didn't my rule run?". (5) **A full-page flow
+builder**, a recipe gallery (16), rule cards with health and owner, Run history filters and retry, a document Automation tab. (6) **No browser pop-ups anywhere**:
+13 replaced, three guards (ESLint `no-alert`, two `check:self` scans, the browser fixture). Vitest is now the frontend's unit runner and runs in CI.
+
+**What is proven and what is not.**
+- Proven by tests that failed first, then passed: the evaluator table (96 cases; 37 answered differently), the compatibility corpus (rules saved before answer the same),
+  every emitter exactly once, every new action live, throttle, cooldown, pause, retry, preview (writes nothing), versions and restore, the explainer, "every recipe saves",
+  all new routes refused through a second workspace, the repo's route sweeps over the new routes (F-542 found by the paging sweep), the builder covers every action
+  (`test_automation_frontend_forms.py`), the dialogs (F-540), Vitest (26 tests), and browser specs 109 to 117 (each x3, each on its own tenant, axe in light and dark).
+  F-545 (no GST supplier could ever be reminded) was found by spec 115 and fixed with a test that failed first.
+- Looked at on screen, 1440 and 390 px, light and dark: the builder (found and fixed: cramped condition row, a currency box off its edge, canvas squeezed on a phone, header
+  buttons running off the edge), recipes, Test & preview, Run history, the home page.
+- **Unverified.** (a) A message reaching a real Slack or Teams channel (N-158); not even a stand-in receiver receives it, because the delivery path is https only and the
+  SSRF client refuses loopback: spec 111 proves the message is queued, its URL is never shown and a second sweep sends nothing more. A development-only switch in
+  `webhook_dispatch.attempt_delivery` and `webhook_service._preflight_check_url` would let a local receiver in (see spec 111). (b) The CI run of this branch (below).
+  (c) The Wait step (N-154): not started. Design notes: an execution status `WAITING` with `resume_at`, a job that resumes it, re-reading the rule version it started
+  on, cancelled when the rule is edited or off or the document deleted, idempotent through the run's own key.
+
+**For the next session / the owner.**
+- N-158 (a real Slack and Teams channel, Session D), N-159 (the Pillow 13 advisory).
+- The upgrade dialog for a GST trigger names Business and Enterprise but not the GST Credit add-on, because the trigger passes its capability, not the add-on key
+  (`TriggerCard` → `onUpgrade`). Small, cosmetic.
+- Run history reasons still use Western grouping ("INR 1,250,000.00") while the builder's sentences use lakh grouping; the evaluator's reason text is the place to change it.
+- The schedule trigger's field is `{{event.local_date}}` in a message; `{{trigger.local_date}}` is refused with "Unknown template variable(s)".
+- Browser specs run on a shared stack: two Playwright runs that share `frontend/dist` can wipe each other's bundle mid-run (give each its own `E2E_WEB_PORT`, or its own build).
+- `docs/automation/README.md` is the user guide; `docs/automation/AUDIT.md` the starting inventory.

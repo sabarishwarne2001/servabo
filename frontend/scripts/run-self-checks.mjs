@@ -128,6 +128,64 @@ try {
     failed += stripeWords.length;
     console.log(`FAIL  no Stripe on screen\n${stripeWords.map((f) => `        - ${f}`).join("\n")}`);
   }
+  // Session J: Servabo shows its own dialogs, never the browser's pop-ups ("localhost says"). A person
+  // sees a pop-up in no theme, with no brand and no keyboard rules, and a browser test dismisses one
+  // silently. Use ConfirmDialog (or `useConfirmDialog().ask`) or a sonner toast. Comment-only lines and
+  // the contents of string literals are skipped. `beforeunload` is not a pop-up call and is not matched.
+  const NATIVE_DIALOG = /(?<![\w.$])(?:window\.|globalThis\.)?(?:alert|confirm|prompt)\s*\(/;
+  const withoutStrings = (line) =>
+    line.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g, '""').replace(/\/\/.*$/, "");
+  const nativeDialogs = [];
+  const scanDialogs = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const full = path.join(dir, name);
+      if (statSync(full).isDirectory()) {
+        scanDialogs(full);
+      } else if (/\.(ts|tsx)$/.test(name) && !name.endsWith(".d.ts")) {
+        const relative = path.relative(ROOT, full);
+        readFileSync(full, "utf8").split("\n").forEach((line, index) => {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return;
+          // The call is matched on the line with strings blanked, but a call that precedes its own
+          // string argument (`window.confirm(`Delete ${x}?`)`) still shows its name and bracket.
+          if (NATIVE_DIALOG.test(withoutStrings(line))) nativeDialogs.push(`${relative}:${index + 1}: ${trimmed}`);
+        });
+      }
+    }
+  };
+  scanDialogs(path.join(ROOT, "src"));
+  if (nativeDialogs.length === 0) {
+    console.log("ok    no native browser dialogs");
+  } else {
+    failed += nativeDialogs.length;
+    console.log(`FAIL  no native browser dialogs\n${nativeDialogs.map((f) => `        - ${f}`).join("\n")}`);
+  }
+
+  // The browser specs never answer a dialog themselves: only the fixture (e2e/support/fixtures.ts) listens,
+  // and it fails any test whose page showed an alert, confirm or prompt.
+  const specDialogs = [];
+  const scanSpecs = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const full = path.join(dir, name);
+      if (statSync(full).isDirectory()) {
+        scanSpecs(full);
+      } else if (/\.ts$/.test(name)) {
+        const relative = path.relative(ROOT, full);
+        readFileSync(full, "utf8").split("\n").forEach((line, index) => {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return;
+          if (/(?:on|once|waitForEvent)\(\s*["'`]dialog["'`]/.test(line)) specDialogs.push(`${relative}:${index + 1}: ${trimmed}`);
+        });
+      }
+    }
+  };
+  scanSpecs(path.join(ROOT, "e2e", "tests"));
+  if (specDialogs.length === 0) {
+    console.log("ok    no spec listens for native dialogs");
+  } else {
+    failed += specDialogs.length;
+    console.log(`FAIL  no spec listens for native dialogs\n${specDialogs.map((f) => `        - ${f}`).join("\n")}`);
+  }
   process.exitCode = failed ? 1 : 0;
 } finally {
   rmSync(work, { recursive: true, force: true });

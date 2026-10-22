@@ -9,6 +9,7 @@ import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Copy, Link2, Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirmDialog } from "@/components/common/useConfirmDialog";
 
 import { BUTTON_DESTRUCTIVE, BUTTON_GHOST, BUTTON_PRIMARY, FIELD_LABEL, HINT, INPUT, SELECT, SURFACE } from "@/components/ui/primitives";
 import { feedUrls, issueFeed, listFeeds, obligationKeys, revokeFeed } from "@/services/api/obligations";
@@ -22,6 +23,7 @@ interface Props {
 
 export const CalendarFeeds: React.FC<Props> = ({ workspaceId }) => {
   const queryClient = useQueryClient();
+  const { ask, confirmDialog } = useConfirmDialog();
   const query = useQuery({ queryKey: obligationKeys.feeds(workspaceId), queryFn: () => listFeeds(workspaceId),
     enabled: Boolean(workspaceId) });
   const [label, setLabel] = useState("My obligations");
@@ -130,7 +132,10 @@ export const CalendarFeeds: React.FC<Props> = ({ workspaceId }) => {
               </span>
             ) : (
               <button type="button" className={`${BUTTON_DESTRUCTIVE} ml-auto`} disabled={revoke.isPending}
-                onClick={() => { if (window.confirm(`Revoke "${feed.label}"? Calendars subscribed to it stop updating.`)) { revoke.mutate(feed.id); } }}>
+                onClick={() => {
+                  void ask({ title: `Revoke "${feed.label}"?`, message: "Calendars subscribed to it stop updating. This cannot be undone.", confirmText: "Revoke feed" })
+                    .then((yes) => { if (yes) { revoke.mutate(feed.id); } });
+                }}>
                 Revoke
               </button>
             )}
@@ -138,6 +143,7 @@ export const CalendarFeeds: React.FC<Props> = ({ workspaceId }) => {
         ))}
         {query.data && query.data.items.length === 0 ? <li className={HINT}>No feeds yet.</li> : null}
       </ul>
+      {confirmDialog}
     </div>
   );
 };

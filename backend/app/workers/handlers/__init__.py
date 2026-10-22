@@ -106,6 +106,9 @@ HELM_JOB_TYPES: frozenset[str] = frozenset(
 #: Session F: GST Credit (docs/product/GST-CREDIT.md). On the LIGHT profile.
 GST_JOB_TYPES: frozenset[str] = frozenset({"gst.recompute"})
 
+#: Session J: the hourly sweep that announces what the clock makes true (schedules, the GST clocks). LIGHT profile.
+AUTOMATION_SWEEP_JOB_TYPES: frozenset[str] = frozenset({"automation.sweep"})
+
 #: Every job type this package claims to register, by phase.
 #:
 #: ARCH-27 carried-forward resolution 2. Before this, ARCH16_JOB_TYPES,
@@ -150,6 +153,7 @@ ALL_PHASE_JOB_TYPES: frozenset[str] = (
     | OPS_ALERT_JOB_TYPES
     | HELM_JOB_TYPES
     | GST_JOB_TYPES
+    | AUTOMATION_SWEEP_JOB_TYPES
 )
 
 
@@ -191,6 +195,11 @@ def _usage_seal(payload: dict[str, Any]) -> dict[str, Any]:
 def _usage_reconcile(payload: dict[str, Any]) -> dict[str, Any]:
     from app.workers.handlers.reconcile import handle_usage_reconcile
     return handle_usage_reconcile(payload)
+
+
+def _automation_sweep(payload: dict[str, Any]) -> dict[str, Any]:
+    from app.workers.handlers.automation import handle_automation_sweep
+    return handle_automation_sweep(payload)
 
 
 def _automation_execute(payload: dict[str, Any]) -> dict[str, Any]:
@@ -497,6 +506,7 @@ _HANDLERS = {
     "usage.seal": _usage_seal,
     "usage.reconcile": _usage_reconcile,
     "automation.execute": _automation_execute,
+    "automation.sweep": _automation_sweep,
     "document.verify": _document_verify,
     "billing.reconcile": _billing_reconcile,
     "billing.seat_sync": _billing_seat_sync,

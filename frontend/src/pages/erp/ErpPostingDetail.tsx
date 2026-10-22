@@ -26,6 +26,7 @@ import {
 import { errorMessage } from "@/services/api/errors";
 import { OBJECT_LABELS, SOURCE_LABELS, verdictsFor, type AcknowledgeRequest, type PostingDetail as Detail, type PostingVerdict } from "@/types/erp";
 import { formatTimestamp } from "@/utils/displayTime";
+import { useConfirmDialog } from "@/components/common/useConfirmDialog";
 
 type View = "file" | "mapped" | "canonical" | "ack";
 
@@ -49,6 +50,7 @@ const ErpPostingDetail: React.FC = () => {
   // Retry / accept / cancel / acknowledge change the books: workspace admins and the owner only (F-065).
   const canDecide = canAdminister(workspace?.role);
   const queryClient = useQueryClient();
+  const { ask, confirmDialog } = useConfirmDialog();
   const [view, setView] = useState<View>("file");
   const [note, setNote] = useState("");
   const [reference, setReference] = useState("");
@@ -183,7 +185,11 @@ const ErpPostingDetail: React.FC = () => {
             {verdicts.map((v) => (
               <button key={v} type="button" disabled={decide.isPending}
                 className={v === "CANCEL" ? BUTTON_DESTRUCTIVE : v === "RETRY" ? BUTTON_PRIMARY : BUTTON_SECONDARY}
-                onClick={() => { if (v !== "CANCEL" || window.confirm("This posting will not be sent. Continue?")) { decide.mutate(v); } }}>
+                onClick={() => {
+                  if (v !== "CANCEL") { decide.mutate(v); return; }
+                  void ask({ title: "Do not send this posting?", message: "This posting will not be sent to the target.", confirmText: "Do not send" })
+                    .then((yes) => { if (yes) { decide.mutate(v); } });
+                }}>
                 {VERDICT_LABELS[v]}
               </button>
             ))}
@@ -256,6 +262,7 @@ const ErpPostingDetail: React.FC = () => {
           </ol>
         )}
       </section>
+      {confirmDialog}
     </div>
   );
 };

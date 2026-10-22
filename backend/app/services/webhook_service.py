@@ -97,6 +97,123 @@ def _preflight_check_url(url: str) -> None:
         raise InvalidURLError(f"'{parsed.hostname}' could not be resolved: {exc}") from exc
 
 
+# ---------------------------------------------------------------------------------------------- chat endpoints
+#: Session J. A Slack or Microsoft Teams incoming-webhook URL is a secret: whoever holds it can post to the channel.
+CHAT_KINDS: tuple[str, ...] = ("SLACK", "TEAMS")
+CHAT_EVENT_TYPE = "workflow.triggered"
+_CHAT_HOSTS: dict[str, tuple[str, ...]] = {
+    "SLACK": ("hooks.slack.com", "hooks.slack-gov.com"),
+    # Teams: the older connector hosts and the Workflows (Power Automate) hosts a "post to a channel" flow gives.
+    "TEAMS": ("outlook.office.com", "outlook.office365.com", "*.webhook.office.com", "*.logic.azure.com",
+              "*.environment.api.powerplatform.com"),
+}
+CHAT_LABELS: dict[str, str] = {"SLACK": "Slack", "TEAMS": "Microsoft Teams"}
+
+
+def _chat_host_allowed(kind: str, host: str) -> bool:
+    from app.core.config import settings
+
+    host = (host or "").lower().rstrip(".")
+    extra = {h.strip().lower() for h in (settings.CHAT_WEBHOOK_EXTRA_HOSTS or "").split(",") if h.strip()}
+    if host in extra:
+        return True
+    for pattern in _CHAT_HOSTS.get(kind, ()):
+        if pattern.startswith("*."):
+            if host.endswith(pattern[1:]) and host != pattern[2:]:
+                return True
+        elif host == pattern:
+            return True
+    return False
+
+
+def validate_chat_url(kind: str, url: str) -> str:
+    """The URL if it is an incoming-webhook URL of that chat product, else `InvalidURLError` in words."""
+    from urllib.parse import urlsplit
+
+    if kind not in CHAT_KINDS:
+        raise InvalidURLError(f"{kind!r} is not a chat product Servabo posts to.")
+    parsed = urlsplit(url.strip())
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise InvalidURLError("A chat webhook URL must start with https://.")
+    if not _chat_host_allowed(kind, parsed.hostname):
+        raise InvalidURLError(
+            f"That is not a {CHAT_LABELS[kind]} incoming-webhook address. Copy the URL {CHAT_LABELS[kind]} gives "
+            f"you for an incoming webhook (it names {_CHAT_HOSTS[kind][0].lstrip('*.')} or a similar host)."
+        )
+    if parsed.username or parsed.password:
+        raise InvalidURLError("A chat webhook URL must not carry a user name or password.")
+    return url.strip()
+
+
+def mask_chat_url(url: str) -> str:
+    """What may be shown back: the host, never the path (which holds the token)."""
+    from urllib.parse import urlsplit
+
+    return f"https://{urlsplit(url).hostname}/…"
+
+
+def _slack_escape(text: str) -> str:
+    # Slack parses <...> as links and mentions (<!channel>, <@U123>). Escaping these three neutralises every one.
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def chat_body(kind: str, *, title: str, message: str) -> dict[str, Any]:
+    """The message as each platform expects it. `title` and `message` are plain text, never markup."""
+    if kind == "SLACK":
+        heading = _slack_escape(title)
+        text = _slack_escape(message)
+        return {"text": f"*{heading}*\n{text}" if heading else text}
+    if kind == "TEAMS":
+        # Teams "Workflows" webhooks take a message carrying an Adaptive Card.
+        body: list[dict[str, Any]] = []
+        if title:
+            body.append({"type": "TextBlock", "text": title, "weight": "Bolder", "size": "Medium", "wrap": True})
+        body.append({"type": "TextBlock", "text": message, "wrap": True})
+        return {
+            "type": "message",
+            "attachments": [{
+                "contentType": "application/vnd.microsoft.card.adaptive",
+                "contentUrl": None,
+                "content": {"$schema": "http://adaptivecards.io/schemas/adaptive-card.json", "type": "AdaptiveCard",
+                            "version": "1.4", "body": body},
+            }],
+        }
+    raise InvalidURLError(f"{kind!r} is not a chat product Servabo posts to.")
+
+
+def register_chat_endpoint(
+    db: Session,
+    *,
+    organization_id: uuid.UUID,
+    kind: str,
+    url: str,
+    created_by_user_id: uuid.UUID,
+    workspace_id: Optional[uuid.UUID] = None,
+    description: Optional[str] = None,
+) -> tuple[WebhookEndpoint, str]:
+    """A Slack or Teams endpoint. The URL is stored encrypted; `url` keeps only its host."""
+    from app.core.encryption import encrypt_secret
+
+    clean = validate_chat_url(kind, url)
+    _preflight_check_url(clean)
+    plaintext = _generate_secret()
+    endpoint = WebhookEndpoint(
+        organization_id=organization_id,
+        workspace_id=workspace_id,
+        kind=kind,
+        url=mask_chat_url(clean),
+        url_encrypted=encrypt_secret(clean),
+        description=description or f"{CHAT_LABELS[kind]} channel",
+        event_types=[CHAT_EVENT_TYPE],
+        status=WebhookEndpointStatus.ACTIVE,
+        secret_encrypted=_encrypt_secret(plaintext),
+        created_by_user_id=created_by_user_id,
+    )
+    db.add(endpoint)
+    db.flush()
+    return endpoint, plaintext
+
+
 def register_endpoint(
     db: Session,
     *,
@@ -198,6 +315,8 @@ def fan_out_event(db: Session, event: OutboxEvent) -> list[WebhookDelivery]:
                 WebhookEndpoint.organization_id == event.organization_id,
                 WebhookEndpoint.status == WebhookEndpointStatus.ACTIVE,
                 WebhookEndpoint.event_types.contains([event.event_type]),
+                # Session J: a Slack or Teams endpoint takes only what a rule posts to it, never a public event.
+                WebhookEndpoint.kind == "GENERIC",
             )
         )
         .scalars()

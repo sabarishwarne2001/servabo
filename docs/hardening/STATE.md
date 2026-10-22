@@ -2,7 +2,34 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-20 (Session I)_
+_Last updated: 2026-10-21 (Session J)_
+
+## Current phase — Session J: Automation, end to end (2026-10-21)
+Branch `claude/new-session-otth8f` (the session's assigned branch; CLAUDE.md says `hardening/<topic>`, the brief says "use the assigned branch", so the
+assigned branch is used), based on `main` at `c872828` (PR #34 merged), draft PR below. Founder authority: decisions in NEEDS-OWNER.md as
+`DECIDED (Session J)` (next free N-149), findings from F-535 (used F-535 to F-545; next free F-546). **If cut off, type `continue`: carry on from the first unticked box. Never restart.**
+Local stack this session: Postgres 16 (apt) on :5432 with pgvector 0.8.0 (files from the PyPI wheel `pixeltable-pgserver==0.3.0`), Redis, backend venv Python 3.12 and
+`npm ci` in the session scratchpad. The test environment block is `testenv.sh` in the scratchpad (outside the repo).
+Builder direction: the owner's sample UI (full-page editor, step cards joined by Yes/No branches, an inspector panel, a status bar, Test run and Publish) is the
+look for the new builder, in Lumen colours (N-149 when decided).
+
+- [x] 0. Start-up: docs and code read; `docs/automation/AUDIT.md` written (inventory, 13 native dialogs); this checklist
+- [x] 0b. Emitter test (every catalog trigger's event has an emitter in `app/`), failing first
+- [x] 1. (P0) Phase 1: conditions always right (money, dates, options, lists, finance schema + aliases, derived fields, trace) (F-535 to F-539)
+- [x] 2. (P0/P1) Phase 2: engines become triggers: 14 new, 37 in all (GST, payment risk, schedule, manual, TruthMesh, legal hold, Helm, request link)
+- [x] 3. (P0/P1) Phase 3: seven new actions (tag, assign review, legal hold, chat post, GST reminder, obligation, supplier request)
+- [x] 4. (P0/P1) Phase 4: throttle and cooldown, pause switch, retry, preview, versions, "why didn't my rule run?". **The optional Wait step was not built (N-154)**
+- [x] 5A. (P0) Phase 5A: no browser pop-ups (ConfirmDialog Esc fix, `useConfirmDialog`, 13 replacements, three guards, specs updated) (F-540, F-541)
+- [x] 5. (P0) Phase 5: Automation home (cards with sentence, health, owner; filters), recipe gallery (16), the full-page builder, run history, document panel
+- [x] 6. Tests: Vitest (+ `test:unit` in CI and its contract test), browser specs 109 to 117, backend suites
+- [x] 7. Records: README, NEEDS-OWNER (N-149 to N-159), FINDINGS (F-535 to F-544), COVERAGE, CHANGELOG, CONFIGURATION, HANDOFF, website screenshot and paragraph
+- [x] Finish: one Alembic head (up/down/up, also in CI), lint/typecheck/check:self clean, PR #35 ready, CI green (below)
+- **Verified (CI run #415, head `f20658c`, all jobs green):** encoding, migration head and drift, frontend (typecheck, lint, self-checks, Vitest, build,
+  audit), website, pytest shards 1 to 4, browser tests (main run and the Stripe journeys). The browser specs 109 to 117 also passed three times in a row locally.
+- **Known red, not from this work:** `pip-audit (advisory)` (a Pillow advisory, N-159); it is advisory and does not fail the run.
+- **Unverified:** a real Slack or Teams channel receiving the message (N-158; the test proves it is queued and the URL never shown, because the safe client refuses loopback
+  addresses); the optional Wait step was not built (N-154). Findings this session: F-535 to F-545 (next free F-546); decisions N-149 to N-159 (next free N-160).
+- **Next action:** the owner reviews PR #35 and merges, then confirms the run on `main` is green. Nothing else is open in Session J.
 
 ## Current phase — Session I: make CI green again after PR #33 (2026-10-20)
 Branch `claude/new-session-ko5jbm` (the session's assigned branch), based on `main` at `068afea` (PR #33 merged), draft PR #34.

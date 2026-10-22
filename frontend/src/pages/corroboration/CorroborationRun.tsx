@@ -42,6 +42,7 @@ import {
 } from "@/types/corroboration";
 import { formatDateTime } from "@/utils/formatters";
 import { ViewPlansAction } from "@/components/billing/ViewPlansAction";
+import { useConfirmDialog } from "@/components/common/useConfirmDialog";
 
 type LayerFilter = Layer | "ALL";
 
@@ -149,6 +150,7 @@ const CorroborationRun: React.FC = () => {
   const workspaceId = workspace?.workspaceId ?? "";
   const navigate = useNavigate();
   const client = useQueryClient();
+  const { ask, confirmDialog } = useConfirmDialog();
   const { orgSlug = "", workspaceSlug = "", runId = "" } = useParams<{ orgSlug: string; workspaceSlug: string; runId: string }>();
   const capability = useCapabilityAccess(workspace?.organizationId ?? "", CAPABILITY.universalCorroborator);
   const canEdit = workspace?.role === "ADMIN" || workspace?.role === "OWNER" || workspace?.role === "CONTRIBUTOR";
@@ -194,7 +196,13 @@ const CorroborationRun: React.FC = () => {
   const remove = useMutation({
     mutationFn: () => deleteRun(workspaceId, runId),
     onSuccess: async () => {
-      await refreshAll();
+      // Refresh the lists and the review queue, but not this comparison's own page data: it is gone, and asking the
+      // server for it again is a 404.
+      const gone = JSON.stringify(corroborationKeys.detail(workspaceId, runId));
+      await Promise.all([
+        client.invalidateQueries({ queryKey: corroborationKeys.all(workspaceId), predicate: (q) => JSON.stringify(q.queryKey) !== gone }),
+        client.invalidateQueries({ queryKey: reviewKeys.all(workspaceId) }),
+      ]);
       navigate(corroborationsPath(orgSlug, workspaceSlug));
     },
   });
@@ -286,7 +294,10 @@ const CorroborationRun: React.FC = () => {
             )) : null}
             {canEdit ? (
               <button type="button" className={BUTTON_DESTRUCTIVE} disabled={remove.isPending}
-                onClick={() => { if (window.confirm("Delete this comparison and its decisions?")) { remove.mutate(); } }}>
+                onClick={() => {
+                  void ask({ title: "Delete this comparison?", message: "The comparison and every decision recorded on it are removed. This cannot be undone.", confirmText: "Delete comparison" })
+                    .then((yes) => { if (yes) { remove.mutate(); } });
+                }}>
                 <Trash2 className="h-4 w-4" aria-hidden /> Delete
               </button>
             ) : null}
@@ -473,6 +484,7 @@ const CorroborationRun: React.FC = () => {
           </section>
         </>
       ) : null}
+      {confirmDialog}
     </div>
   );
 };

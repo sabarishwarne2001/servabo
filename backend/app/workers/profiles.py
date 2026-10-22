@@ -40,6 +40,8 @@ LIGHT = WorkerProfile(
             "usage.seal",
             "usage.reconcile",
             "automation.execute",
+            # Session J: schedules and the GST clocks: SQL and dates.
+            "automation.sweep",
             "document.verify",
             "billing.reconcile",
             "billing.seat_sync",

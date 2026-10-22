@@ -1,6 +1,8 @@
 import { formatTimestamp } from "@/utils/displayTime";
 import React, { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   ArrowDown,
   Ban,
@@ -13,7 +15,13 @@ import {
   XCircle,
 } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
+import { useTenant } from "@/hooks/useTenant";
+import { workItemDetailsPath } from "@/routes/tenantPaths";
+import { canManageAutomation } from "@/permissions/workspacePermissions";
+import { ApiError } from "@/services/api/errors";
+import type { WorkspaceRole } from "@/types/tenancy";
 import {
   EXECUTION_STATUS_PRESENTATION,
   listExecutions,
@@ -23,7 +31,7 @@ import type {
   AutomationExecutionStatus,
 } from "@/services/api/executions";
 import { automationKeys, workspaceScope } from "@/services/api/queryKeys";
-import { listExecutionNodes } from "@/services/api/executions";
+import { listExecutionNodes, retryExecution } from "@/services/api/executions";
 import { formatMicros } from "@/types/billing";
 import { pollUnlessRefused } from "@/services/api/polling";
 
@@ -114,7 +122,7 @@ const executionTone = (execution: AutomationExecution): DotTone => {
   if (execution.status === "FAILED" || execution.status === "TIMED_OUT") {
     return "danger";
   }
-  if (execution.is_suppressed) {
+  if (execution.is_suppressed || execution.is_skipped) {
     return "warn";
   }
   if (IN_FLIGHT.has(execution.status)) {
@@ -162,7 +170,11 @@ const StatusIcon: React.FC<{ status: AutomationExecutionStatus }> = ({
     case "SUPPRESSED_DEPTH":
       return <ArrowDown className="h-4 w-4 text-amber-600 shrink-0" />;
     case "BUDGET_EXHAUSTED":
+    case "SKIPPED_THROTTLED":
+    case "SKIPPED_PAUSED":
       return <Ban className="h-4 w-4 text-amber-600 shrink-0" />;
+    case "SKIPPED_COOLDOWN":
+      return <Clock className="h-4 w-4 text-muted-foreground shrink-0" />;
     default:
       return <Clock className="h-4 w-4 text-muted-foreground shrink-0" />;
   }
@@ -201,6 +213,7 @@ const summarise = (items: readonly AutomationExecution[], chains: number) => {
     completed,
     completedPct: items.length ? Math.round((completed / items.length) * 100) : 0,
     blocked: items.filter((execution) => execution.is_suppressed).length,
+    skipped: items.filter((execution) => execution.is_skipped).length,
     failed: items.filter((execution) => execution.status === "FAILED" || execution.status === "TIMED_OUT").length,
     medianMs: percentile(durations, 0.5),
     p95Ms: durations.length >= 5 ? percentile(durations, 0.95) : null,
@@ -301,6 +314,9 @@ export const ExecutionTimeline: React.FC = () => {
   const workspaceId = workspace?.workspaceId ?? "";
 
   const [suppressedOnly, setSuppressedOnly] = useState(false);
+  const [outcomeFilter, setOutcomeFilter] = useState<"ALL" | "FAILED" | "SKIPPED">("ALL");
+  const [ruleFilter, setRuleFilter] = useState("ALL");
+  const [dateFilter, setDateFilter] = useState<"ALL" | "TODAY" | "7_DAYS" | "30_DAYS">("ALL");
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useQuery({
@@ -323,7 +339,21 @@ export const ExecutionTimeline: React.FC = () => {
   const chains = useMemo(() => {
     const grouped = new Map<string, AutomationExecution[]>();
 
-    (data?.items ?? []).forEach((execution) => {
+    (data?.items ?? []).filter((execution) => {
+      if (ruleFilter !== "ALL" && execution.rule_id !== ruleFilter) {return false;}
+      if (dateFilter !== "ALL") {
+        const at = Date.parse(execution.created_at);
+        const age = Date.now() - at;
+        if (dateFilter === "TODAY" ? at < new Date().setHours(0, 0, 0, 0) : age > (dateFilter === "7_DAYS" ? 7 : 30) * 86_400_000) {return false;}
+      }
+      return true;
+    }).filter((execution) =>
+      outcomeFilter === "ALL"
+        ? true
+        : outcomeFilter === "SKIPPED"
+          ? execution.is_skipped === true
+          : execution.status === "FAILED" || execution.status === "TIMED_OUT" || execution.status === "BUDGET_EXHAUSTED",
+    ).forEach((execution) => {
       const existing = grouped.get(execution.correlation_id);
       if (existing) {
         existing.push(execution);
@@ -357,6 +387,12 @@ export const ExecutionTimeline: React.FC = () => {
         durationMs: chainSpanMs(ordered),
       };
     });
+  }, [data, outcomeFilter, ruleFilter, dateFilter]);
+
+  const ruleChoices = useMemo(() => {
+    const names = new Map<string, string>();
+    (data?.items ?? []).forEach((execution) => names.set(execution.rule_id, execution.rule_name ?? `Rule ${execution.rule_id.slice(0, 8)}`));
+    return Array.from(names.entries()).sort((a, b) => a[1].localeCompare(b[1]));
   }, [data]);
 
   const summary = useMemo(() => summarise(data?.items ?? [], chains.length), [data, chains.length]);
@@ -396,6 +432,24 @@ export const ExecutionTimeline: React.FC = () => {
           </p>
         </div>
 
+        <div role="group" aria-label="Show runs" className="flex flex-wrap items-center gap-1.5 self-start sm:self-auto">
+          {([
+            ["ALL", "All runs"],
+            ["FAILED", "Failed"],
+            ["SKIPPED", "Skipped"],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={outcomeFilter === key}
+              onClick={() => setOutcomeFilter(key)}
+              className={`rounded-md border px-3 py-1.5 text-xs ${
+                outcomeFilter === key ? "border-primary bg-primary/10 font-semibold text-primary" : "border-border hover:bg-muted"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         <button
           type="button"
           onClick={() => setSuppressedOnly((current) => !current)}
@@ -410,10 +464,42 @@ export const ExecutionTimeline: React.FC = () => {
           <Filter className="h-3.5 w-3.5" />
           Blocked only
         </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        <label className="flex items-center gap-2">
+          <span className="font-semibold uppercase tracking-wider text-muted-foreground">Rule</span>
+          <select
+            aria-label="Filter runs by rule"
+            value={ruleFilter}
+            onChange={(e) => setRuleFilter(e.target.value)}
+            className="rounded-md border border-border bg-background px-2 py-1.5"
+          >
+            <option value="ALL">All rules</option>
+            {ruleChoices.map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2">
+          <span className="font-semibold uppercase tracking-wider text-muted-foreground">When</span>
+          <select
+            aria-label="Filter runs by date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value as "ALL" | "TODAY" | "7_DAYS" | "30_DAYS")}
+            className="rounded-md border border-border bg-background px-2 py-1.5"
+          >
+            <option value="ALL">Any time</option>
+            <option value="TODAY">Today</option>
+            <option value="7_DAYS">Last 7 days</option>
+            <option value="30_DAYS">Last 30 days</option>
+          </select>
+        </label>
       </div>
 
       {summary.runs > 0 ? (
-        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" aria-label={`The last ${summary.runs} runs`}>
+        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7" aria-label={`The last ${summary.runs} runs`}>
           <Kpi label="Chains" value={summary.chains} />
           <Kpi label="Runs" value={summary.runs} hint={data?.has_more ? `latest ${summary.runs}` : undefined} />
           <Kpi
@@ -423,6 +509,7 @@ export const ExecutionTimeline: React.FC = () => {
             tone={summary.completedPct === 100 ? "ok" : undefined}
           />
           <Kpi label="Blocked" value={summary.blocked} hint="loops, depth, budget" tone={summary.blocked > 0 ? "warn" : undefined} />
+          <Kpi label="Skipped" value={summary.skipped} hint="paused, over a limit, cooldown" tone={summary.skipped > 0 ? "warn" : undefined} />
           <Kpi label="Failed" value={summary.failed} tone={summary.failed > 0 ? "danger" : undefined} />
           <Kpi label="Median run" value={summary.medianMs === null ? "–" : formatDuration(summary.medianMs)} hint={summary.p95Ms === null ? undefined : `p95 ${formatDuration(summary.p95Ms)}`} />
         </dl>
@@ -432,7 +519,11 @@ export const ExecutionTimeline: React.FC = () => {
         <p className="rounded-md border border-border bg-card p-4 text-sm text-muted-foreground">
           {suppressedOnly
             ? "Nothing has been blocked. No rule loops or depth limits have been hit."
-            : "No automation has run yet in this workspace."}
+            : outcomeFilter === "FAILED"
+              ? "Nothing has failed in the runs loaded here."
+              : outcomeFilter === "SKIPPED"
+                ? "Nothing has been skipped. No run was held back by a pause, a limit or a cooldown."
+                : "No automation has run yet in this workspace."}
         </p>
       ) : (
         <ul className="space-y-3 w-full min-w-0">
@@ -532,6 +623,32 @@ const ExecutionStep: React.FC<ExecutionStepProps> = ({
   isLast,
 }) => {
   const [showNodes, setShowNodes] = useState(false);
+  const workspace = useActiveWorkspace();
+  const workspaceId = workspace?.workspaceId ?? "";
+  const queryClient = useQueryClient();
+  const { state: tenantState } = useTenant();
+  const documentPath =
+    execution.work_item_id && tenantState.status === "ready"
+      ? workItemDetailsPath(tenantState.organization.organization_slug, tenantState.workspace.slug, execution.work_item_id)
+      : null;
+  const canManage = canManageAutomation((workspace?.role ?? "VIEWER") as WorkspaceRole);
+  const [repeatWarning, setRepeatWarning] = useState<string | null>(null);
+  const retry = useMutation({
+    mutationFn: (acknowledge: boolean) => retryExecution(workspaceId, execution.id, acknowledge),
+    onSuccess: async () => {
+      setRepeatWarning(null);
+      toast.success("Retrying. The new run appears below in a moment.");
+      await queryClient.invalidateQueries({ queryKey: [...workspaceScope(workspaceId), "automation"] });
+    },
+    onError: (error: unknown) => {
+      if (error instanceof ApiError && error.code === "may_repeat") {
+        setRepeatWarning(error.message);
+        return;
+      }
+      setRepeatWarning(null);
+      toast.error(error instanceof ApiError ? error.message : "The run could not be retried.");
+    },
+  });
   const presentation = EXECUTION_STATUS_PRESENTATION[execution.status] ?? {
     label: execution.status,
     tone: "muted" as const,
@@ -601,9 +718,37 @@ const ExecutionStep: React.FC<ExecutionStepProps> = ({
         )}
 
         {execution.error && (
-          <p className="mt-1.5 break-all rounded bg-background/60 px-2 py-1 font-mono text-[11px] text-destructive">
+          <p
+            className={`mt-1.5 break-words rounded bg-background/60 px-2 py-1 text-[11px] ${
+              execution.is_skipped ? "text-foreground" : "break-all font-mono text-destructive"
+            }`}
+          >
             {execution.error}
           </p>
+        )}
+
+        {documentPath && (
+          <p className="mt-1.5 text-[11px]">
+            <Link to={documentPath} className="font-semibold text-primary hover:underline">Open the document</Link>
+          </p>
+        )}
+
+        {execution.retry_of_id && (
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            A retry of run <span className="font-mono">{execution.retry_of_id.slice(0, 8)}</span>.
+          </p>
+        )}
+
+        {execution.retryable && canManage && (
+          <button
+            type="button"
+            disabled={retry.isPending}
+            onClick={() => retry.mutate(false)}
+            aria-label={`Retry the run of ${execution.rule_name ?? "this rule"}`}
+            className="mt-2 inline-flex items-center gap-1 rounded-md border border-primary px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
+          >
+            <RotateCcw className="h-3 w-3" aria-hidden="true" /> Retry this run
+          </button>
         )}
 
         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
@@ -646,6 +791,18 @@ const ExecutionStep: React.FC<ExecutionStepProps> = ({
 
         {showNodes && <NodeRuns executionId={execution.id} />}
       </div>
+      <ConfirmDialog
+        open={repeatWarning !== null}
+        tone="primary"
+        title="Retry this run?"
+        message={repeatWarning ?? ""}
+        confirmText="Retry anyway"
+        cancelText="Do not retry"
+        initialFocus="cancel"
+        loading={retry.isPending}
+        onConfirm={() => retry.mutate(true)}
+        onCancel={() => setRepeatWarning(null)}
+      />
     </li>
   );
 };
@@ -691,6 +848,15 @@ const NodeRuns: React.FC<{ readonly executionId: string }> = ({ executionId }) =
             </span>
           )}
           {node.outcome && <span className="text-muted-foreground break-words">— {node.outcome}</span>}
+          {(node.conditions ?? []).length > 0 && (
+            <ul className="w-full space-y-0.5 pl-1" aria-label="What each condition decided">
+              {(node.conditions ?? []).map((condition, i) => (
+                <li key={i} className={condition.matched ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}>
+                  {condition.matched ? "✓" : "✗"} {condition.reason}
+                </li>
+              ))}
+            </ul>
+          )}
           {node.error && <span className="w-full break-all font-mono text-destructive">{node.error}</span>}
         </li>
       ))}

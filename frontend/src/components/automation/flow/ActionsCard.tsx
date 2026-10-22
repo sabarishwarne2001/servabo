@@ -13,6 +13,7 @@ import { ArrowDown, ArrowUp, GitBranch, Lock, Play, Plus, Trash2 } from "lucide-
 
 import type { FlowAction, FlowCatalog } from "@/types/automationFlow";
 import { ActionConfigForm } from "./ActionConfigForm";
+import { ActionIcon } from "./ActionIcon";
 import {
   defaultConfig,
   excludedActions,
@@ -34,10 +35,13 @@ interface ActionsCardProps {
   readonly issues: readonly CardIssue[];
   readonly disabled: boolean;
   readonly hasConditions: boolean;
+  readonly bare?: boolean;
+  /** Session J: the step the canvas pointed at; it is scrolled into view and outlined. */
+  readonly focusIndex?: number | null;
 }
 
 export const ActionsCard: React.FC<ActionsCardProps> = ({
-  catalog, card, step, triggers, actions, onChange, issues, disabled, hasConditions,
+  catalog, card, step, triggers, actions, onChange, issues, disabled, hasConditions, bare = false, focusIndex = null,
 }) => {
   const [picking, setPicking] = useState<string>("");
   const excluded = excludedActions(catalog, triggers);
@@ -90,6 +94,7 @@ export const ActionsCard: React.FC<ActionsCardProps> = ({
       }
       icon={isElse ? <GitBranch className="h-4 w-4" /> : <Play className="h-4 w-4" />}
       issues={issues}
+      bare={bare}
     >
       <ol className="space-y-3">
         {actions.map((entry, index) => {
@@ -99,12 +104,14 @@ export const ActionsCard: React.FC<ActionsCardProps> = ({
           return (
             <li
               key={entry.uid}
-              className={`rounded-lg border p-3 ${own.length ? "border-destructive/60" : "border-border"} bg-background`}
+              id={`${card}-step-${index}`}
+              className={`rounded-lg border p-3 ${own.length ? "border-destructive/60" : focusIndex === index ? "border-primary ring-2 ring-primary/20" : "border-border"} bg-background`}
             >
               <div className="mb-3 flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
                     <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">#{index + 1}</span>
+                    <span className="text-primary"><ActionIcon actionType={entry.action_type} word={action?.icon} className="h-4 w-4" /></span>
                     {action?.label ?? entry.action_type}
                     {action && <span className="text-[10px] font-semibold uppercase text-muted-foreground">{action.category}</span>}
                     {action && !action.available && (

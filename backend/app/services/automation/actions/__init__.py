@@ -17,11 +17,18 @@ from typing import Any, Mapping
 
 from app.services.automation.actions import (
     autonomy_decide,
+    chat_post,
+    document_tag,
     email_send,
     erp_post,
+    gst_remind_supplier,
+    legal_hold_place,
     notify_role,
+    obligation_create,
     redaction_start,
+    review_assign,
     review_escalate,
+    supplier_request_document,
     warehouse_export,
     webhook_send,
     work_item_mutate,
@@ -44,6 +51,14 @@ _MODULES = (
     email_send,
     work_item_mutate,
     erp_post,  # ARCH47-S1:action-erp-post
+    # Session J
+    document_tag,
+    review_assign,
+    legal_hold_place,
+    chat_post,
+    gst_remind_supplier,
+    obligation_create,
+    supplier_request_document,
 )
 
 ACTIONS: Mapping[str, ActionDefinition] = {
@@ -94,10 +109,32 @@ def perform_action(state: Any, spec: Any) -> ActionOutcome:
     definition = get(spec.action_type)
     if definition is None:
         raise ActionFailure(f"Unsupported action type '{spec.action_type}'.", recoverable=False)
+    _recheck_plan(state, definition)
     outcome = definition.perform(state, spec)
     if not isinstance(outcome, ActionOutcome):
         raise TypeError(f"{definition.action_type}.perform returned {type(outcome).__name__}")
     return outcome
+
+
+def _recheck_plan(state: Any, definition: ActionDefinition) -> None:
+    """Session J: a capability or add-on can change after a rule is saved. The run asks again (an action that checks for
+    itself, like `erp.post`, still does)."""
+    if definition.capability is None and definition.addon is None:
+        return
+    from app.api import capability_gate
+    from app.services.billing import entitlement_service
+
+    organization_id = state.execution.organization_id
+    has_cap = definition.capability is None or capability_gate.has_capability(
+        state.db, organization_id=organization_id, capability_key=definition.capability)
+    has_addon = definition.addon is None or entitlement_service.addon_access(
+        state.db, organization_id=organization_id, addon_key=definition.addon).can_maintain
+    ok = (
+        ((definition.capability is not None and has_cap) or (definition.addon is not None and has_addon))
+        if definition.either else (has_cap and has_addon)
+    )
+    if not ok:
+        raise ActionFailure(f"{definition.label} is not included in your plan any more.", recoverable=False)
 
 
 def _assert_registry_complete() -> None:

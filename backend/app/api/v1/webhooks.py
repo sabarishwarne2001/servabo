@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Annotated, Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from fastapi import Request
@@ -38,8 +38,17 @@ router = APIRouter(
 # ======================================================================
 class EndpointCreate(BaseModel):
     url: str = Field(..., max_length=2000)
-    event_types: list[str] = Field(..., min_length=1)
+    #: Session J: 'GENERIC' (a signed JSON event, the default) or a chat incoming webhook ('SLACK', 'TEAMS'), which
+    #: takes the messages automation rules post to it and needs no event types.
+    kind: Literal["GENERIC", "SLACK", "TEAMS"] = "GENERIC"
+    event_types: Optional[list[str]] = Field(None, min_length=1)
     description: Optional[str] = Field(None, max_length=500)
+
+    @model_validator(mode="after")
+    def _events_for_generic(self) -> "EndpointCreate":
+        if self.kind == "GENERIC" and not self.event_types:
+            raise ValueError("Choose at least one event type.")
+        return self
 
     @field_validator("url")
     @classmethod
@@ -50,7 +59,9 @@ class EndpointCreate(BaseModel):
 
     @field_validator("event_types")
     @classmethod
-    def _known_events(cls, v: list[str]) -> list[str]:
+    def _known_events(cls, v: Optional[list[str]]) -> Optional[list[str]]:
+        if v is None:
+            return v
         unknown = sorted(set(v) - WEBHOOK_EVENT_TYPES)
         if unknown:
             raise ValueError(
@@ -92,7 +103,10 @@ class EndpointUpdate(BaseModel):
 class EndpointOut(BaseModel):
     id: uuid.UUID
     organization_id: uuid.UUID
+    #: For a Slack or Teams endpoint this is only the host ("https://hooks.slack.com/…"): the real URL is a secret
+    #: and is never shown back.
     url: str
+    kind: str = "GENERIC"
     description: Optional[str]
     event_types: list[str]
     status: str
@@ -112,6 +126,7 @@ class EndpointOut(BaseModel):
             id=e.id,
             organization_id=e.organization_id,
             url=e.url,
+            kind=e.kind or "GENERIC",
             description=e.description,
             event_types=list(e.event_types or []),
             status=e.status.value if e.status else "ACTIVE",
@@ -287,14 +302,24 @@ def create_endpoint(
     """Register an endpoint. Returns the plaintext secret exactly once."""
     _cap_gate.require_capability(db, context=context, capability_key=_ent.OUTGOING_WEBHOOKS_CAPABILITY, operation="webhook.endpoint.create")
     try:
-        endpoint, secret = webhook_service.register_endpoint(
-            db,
-            organization_id=context.organization_id,
-            url=body.url,
-            event_types=body.event_types,
-            created_by_user_id=context.user_id,
-            description=body.description,
-        )
+        if body.kind != "GENERIC":
+            endpoint, secret = webhook_service.register_chat_endpoint(
+                db,
+                organization_id=context.organization_id,
+                kind=body.kind,
+                url=body.url,
+                created_by_user_id=context.user_id,
+                description=body.description,
+            )
+        else:
+            endpoint, secret = webhook_service.register_endpoint(
+                db,
+                organization_id=context.organization_id,
+                url=body.url,
+                event_types=list(body.event_types or []),
+                created_by_user_id=context.user_id,
+                description=body.description,
+            )
     except webhook_service.InvalidURLError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except webhook_service.InvalidEventTypesError as exc:
@@ -356,7 +381,18 @@ def update_endpoint(
     endpoint = _get_endpoint(db, context.organization_id, endpoint_id)
     changed: dict[str, Any] = {}
 
-    if body.url is not None and body.url != endpoint.url:
+    if body.url is not None and body.url != endpoint.url and endpoint.is_chat:
+        from app.core.encryption import encrypt_secret
+
+        try:
+            clean = webhook_service.validate_chat_url(endpoint.kind, body.url)
+            webhook_service._preflight_check_url(clean)
+        except webhook_service.InvalidURLError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        changed["host"] = {"from": _host(endpoint.url), "to": _host(clean)}
+        endpoint.url = webhook_service.mask_chat_url(clean)
+        endpoint.url_encrypted = encrypt_secret(clean)
+    elif body.url is not None and body.url != endpoint.url:
         try:
             webhook_service._preflight_check_url(body.url)
         except webhook_service.InvalidURLError as exc:
@@ -364,7 +400,7 @@ def update_endpoint(
         changed["host"] = {"from": _host(endpoint.url), "to": _host(body.url)}
         endpoint.url = body.url
 
-    if body.event_types is not None:
+    if body.event_types is not None and not endpoint.is_chat:
         if list(body.event_types) != list(endpoint.event_types or []):
             changed["event_types"] = list(body.event_types)
         endpoint.event_types = body.event_types
@@ -501,6 +537,10 @@ def send_test_event(
             "endpoint_id": str(endpoint.id),
             "message": "This is a test event from Servabo. No action is needed.",
             "requested_at": datetime.now(timezone.utc).isoformat(),
+            # A chat endpoint is sent a message it can show, not the signed event.
+            **({"chat": webhook_service.chat_body(
+                endpoint.kind, title="Servabo test message",
+                message="This is a test message from Servabo. No action is needed.")} if endpoint.is_chat else {}),
         },
         status=WebhookDeliveryStatus.PENDING,
     )

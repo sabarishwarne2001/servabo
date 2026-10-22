@@ -136,9 +136,10 @@
         {
           "id": "automations",
           "name": "Automations",
-          "result": "Rules that act as documents arrive: route, tag, notify, request review or call your systems.",
-          "detail": "Build a rule from a trigger, conditions and actions, or install a ready workflow from the marketplace. Every run is logged with what it did and why.",
-          "capability": "capability.automations"
+          "result": "Rules that act as documents arrive: hold for review, tag, notify, post to Slack or Teams, or call your systems.",
+          "detail": "Start from one of sixteen ready-made recipes (hold invoices above ₹10 lakh, flag an invoice with no e-invoice IRN, post a failed document to chat) or build a rule from 37 triggers and sixteen steps. Amounts and dates are checked the way you write them (₹10,00,000, older than 150 days), and a rule can be tried on a recent document, or on the last 30 days, before it is switched on. Every run is logged with the reason for each check. A limit, a cooldown and one pause switch stop a flood, and no step can approve or pay anything. Honest limits: a rule cannot yet wait and check again later, and posting to a real Slack or Teams channel has so far been tried only against a test receiver.",
+          "capability": "capability.automations",
+          "shot": "automation-builder"
         },
         {
           "id": "erp",

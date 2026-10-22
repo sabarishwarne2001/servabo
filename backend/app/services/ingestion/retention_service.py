@@ -191,6 +191,9 @@ def place_hold(
     )
     db.add(hold)
     db.flush([hold])
+    from app.services.automation import emitters
+
+    emitters.legal_hold(db, hold=hold, workspace_id=workspace_id, placed=True)
     return hold
 
 
@@ -225,6 +228,9 @@ def release_hold(
         hold.released_at = _now()
         hold.released_by_user_id = user_id
         db.flush([hold])
+        from app.services.automation import emitters
+
+        emitters.legal_hold(db, hold=hold, workspace_id=workspace_id, placed=False)
     return hold
 
 

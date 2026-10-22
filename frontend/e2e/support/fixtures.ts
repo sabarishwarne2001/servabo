@@ -7,7 +7,11 @@
  *   - an unhandled promise rejection (an init script reports them);
  *   - a `console.error` message;
  *   - an HTTP response with status >= 400 from the app or the API;
- *   - a failed request (connection refused, CORS), except navigation aborts.
+ *   - a failed request (connection refused, CORS), except navigation aborts;
+ *   - a NATIVE BROWSER DIALOG (`alert`, `confirm`, `prompt`; Session J). Servabo shows its own dialogs, so
+ *     a test whose page opens one fails. The fixture answers it (dismiss) so the page cannot hang, and
+ *     the specs themselves never listen for dialogs (`npm run check:self` fails if one does). A
+ *     `beforeunload` prompt is the one native exception: it is accepted and not recorded.
  *
  * A test that EXPECTS an error says so up front, with a reason:
  *   problems.allowHttp(/\/billing\/checkout/, [402], "Developer plan lacks it");
@@ -30,13 +34,13 @@
  */
 import fs from "node:fs";
 
-import { test as base, expect, type Page, type TestInfo } from "@playwright/test";
+import { test as base, expect, type BrowserContext, type Page, type TestInfo } from "@playwright/test";
 
 import { SHARED_PERSONA_SIGN_OUT, api, loginAs, type ApiResult, type ApiSession } from "./api";
 import { BROWSER_API_ORIGIN, TENANTS, type UserKey } from "./env";
 
 export interface Problem {
-  readonly kind: "pageerror" | "unhandledrejection" | "console" | "http" | "requestfailed";
+  readonly kind: "pageerror" | "unhandledrejection" | "console" | "http" | "requestfailed" | "nativedialog";
   message: string;
   readonly url?: string;
   readonly status?: number;
@@ -156,7 +160,35 @@ const STRICT_KNOWN = process.env.E2E_STRICT_KNOWN === "1";
 
 const IGNORED_REQUEST_FAILURES = /net::ERR_ABORTED|NS_BINDING_ABORTED|net::ERR_BLOCKED_BY_CLIENT/;
 
+/**
+ * Session J: one dialog listener per browser CONTEXT (so a pop-up opened in a second tab is covered
+ * too), recording into every tracker attached to that context. A listener must answer every dialog or
+ * the page hangs: `beforeunload` is accepted unrecorded, anything else is recorded and dismissed.
+ */
+const dialogTrackers = new WeakMap<BrowserContext, ProblemTracker[]>();
+
+function watchDialogs(context: BrowserContext, tracker: ProblemTracker): void {
+  const known = dialogTrackers.get(context);
+  if (known) {
+    known.push(tracker);
+    return;
+  }
+  const trackers = [tracker];
+  dialogTrackers.set(context, trackers);
+  context.on("dialog", (dialog) => {
+    if (dialog.type() === "beforeunload") {
+      void dialog.accept().catch(() => undefined);
+      return;
+    }
+    for (const each of trackers) {
+      each.record({ kind: "nativedialog", message: `${dialog.type()}: ${dialog.message().slice(0, 300)}` });
+    }
+    void dialog.dismiss().catch(() => undefined);
+  });
+}
+
 export function attachProblemListeners(page: Page, tracker: ProblemTracker): void {
+  watchDialogs(page.context(), tracker);
   page.on("framenavigated", (frame) => {
     if (frame === page.mainFrame()) tracker.setPageUrl(frame.url());
   });

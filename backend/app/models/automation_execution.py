@@ -58,6 +58,12 @@ class AutomationExecutionStatus(str, PyEnum):
     SUPPRESSED_DEPTH = "SUPPRESSED_DEPTH"
     #: A6. The execution hit `budget_cost_micros` mid-graph.
     BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED"
+    #: Session J. The rule hit its "at most N runs per hour" limit; the event was recorded, not run.
+    SKIPPED_THROTTLED = "SKIPPED_THROTTLED"
+    #: Session J. The rule already ran for this document inside its cooldown.
+    SKIPPED_COOLDOWN = "SKIPPED_COOLDOWN"
+    #: Session J. The workspace's automations are paused.
+    SKIPPED_PAUSED = "SKIPPED_PAUSED"
 
 
 class AutomationNodeRunStatus(str, PyEnum):
@@ -78,6 +84,16 @@ TERMINAL_EXECUTION_STATUSES: tuple[AutomationExecutionStatus, ...] = (
     AutomationExecutionStatus.SUPPRESSED_CYCLE,
     AutomationExecutionStatus.SUPPRESSED_DEPTH,
     AutomationExecutionStatus.BUDGET_EXHAUSTED,
+    AutomationExecutionStatus.SKIPPED_THROTTLED,
+    AutomationExecutionStatus.SKIPPED_COOLDOWN,
+    AutomationExecutionStatus.SKIPPED_PAUSED,
+)
+
+#: Session J. Held back on purpose before any node ran; shown as "Skipped" in Run history.
+SKIPPED_STATUSES: tuple[AutomationExecutionStatus, ...] = (
+    AutomationExecutionStatus.SKIPPED_THROTTLED,
+    AutomationExecutionStatus.SKIPPED_COOLDOWN,
+    AutomationExecutionStatus.SKIPPED_PAUSED,
 )
 
 SUPPRESSED_STATUSES: tuple[AutomationExecutionStatus, ...] = (
@@ -150,6 +166,13 @@ class AutomationExecution(Base, UUIDMixin, TimestampMixin):
             ),
         ),
         Index(
+            "ix_automation_executions_rule_work_item_created",
+            "rule_id",
+            "work_item_id",
+            text("created_at DESC"),
+        ),
+        Index("ix_automation_executions_rule_created", "rule_id", text("created_at DESC")),
+        Index(
             "ix_automation_executions_workspace_created",
             "workspace_id",
             text("created_at DESC"),
@@ -184,6 +207,13 @@ class AutomationExecution(Base, UUIDMixin, TimestampMixin):
     outbox_event_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("outbox_events.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    #: Session J. The run this one retries (a retry is a new row; the failed one stays as it was).
+    retry_of_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("automation_executions.id", ondelete="SET NULL"),
         nullable=True,
     )
 
@@ -242,6 +272,10 @@ class AutomationExecution(Base, UUIDMixin, TimestampMixin):
     @property
     def is_terminal(self) -> bool:
         return self.status in TERMINAL_EXECUTION_STATUSES
+
+    @property
+    def is_skipped(self) -> bool:
+        return self.status in SKIPPED_STATUSES
 
     @property
     def is_suppressed(self) -> bool:

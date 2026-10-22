@@ -101,7 +101,7 @@ def test_a_conditional_rule_runs_both_branches_and_is_traced(engines: Engines) -
 def test_a_new_workspace_can_build_data_conditions_before_its_first_document(engines: Engines) -> None:
     fields = {f["key"]: f["type"] for f in engines.get("/automation/catalog").json()["document_fields"]}
     assert fields.get("classification_details.document_classification") == "string", fields
-    assert fields.get("total_amount") == "number", fields
+    assert fields.get("total_amount") == "money", fields  # Session J: an amount is typed as money
     assert engines.post("/automation/rules", RULE).status_code == 201
 
 

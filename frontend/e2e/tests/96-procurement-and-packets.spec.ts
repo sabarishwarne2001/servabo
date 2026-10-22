@@ -24,7 +24,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import type { Dialog, Locator, Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import { test, expect, expectHealthyPage, settle } from "../support/fixtures";
 import { api, listWorkItems, loginAs, uploadFile, type ApiSession } from "../support/api";
@@ -704,20 +704,29 @@ test.describe("Supplier cost console — Record invoice, Reconcile, Accept", () 
     const accept = row.getByRole("button", { name: "Accept" });
     await expect(accept).toBeVisible();
 
-    // The browser's own prompt: dismissed, then answered with nothing.
-    const asked: string[] = [];
-    page.once("dialog", (d: Dialog) => { asked.push(d.message()); void d.dismiss(); });
+    // The in-app question (it was the browser's own prompt): Cancel runs nothing, a note of only
+    // spaces cannot be confirmed, and a real note accepts.
+    const question = page.getByRole("dialog", { name: "Accept this variance?" });
     await accept.click();
-    await expect.poll(() => asked.length).toBe(1);
-    expect(asked[0]).toContain("Why is this variance acceptable?");
-    page.once("dialog", (d: Dialog) => { asked.push(d.message()); void d.accept("   "); });
+    await expect(question).toBeVisible();
+    await expect(question).toContainText("Why is this variance acceptable?");
+    await question.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(question).toHaveCount(0);
+    expect(await runsOf(invoice?.id ?? "")).toHaveLength(runsBefore.length);
+
     await accept.click();
-    await expect.poll(() => asked.length).toBe(2);
+    await expect(question).toBeVisible();
+    await question.getByLabel("Why is it acceptable?").fill("   ");
+    await expect(question.getByRole("button", { name: "Accept variance", exact: true })).toBeDisabled();
+    await question.getByLabel("Why is it acceptable?").press("Enter");
+    await expect(question).toBeVisible();
+    await question.getByRole("button", { name: "Cancel", exact: true }).click();
     expect(await runsOf(invoice?.id ?? "")).toHaveLength(runsBefore.length);
 
     const note = `Provider billed a flat fee outside our metering; signed off in test ${tag}.`;
-    page.once("dialog", (d: Dialog) => { void d.accept(note); });
     await accept.click();
+    await question.getByLabel("Why is it acceptable?").fill(note);
+    await question.getByRole("button", { name: "Accept variance", exact: true }).click();
     await expect(row.getByText("ACCEPTED", { exact: true })).toBeVisible();
     await expect(row).toContainText(note);
     await expect(row.getByRole("button", { name: "Accept" })).toHaveCount(0);

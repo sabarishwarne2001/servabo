@@ -5,12 +5,14 @@
  * Operators are filtered by the field's type.
  */
 
-import React from "react";
-import { Filter, Plus, Trash2 } from "lucide-react";
+import React, { useState } from "react";
+import { Filter, Plus, Search, Trash2 } from "lucide-react";
 
 import type { AutomationLogicOperator } from "@/types/automation";
-import type { FlowCatalog } from "@/types/automationFlow";
+import type { FlowCatalog, FlowConditionValue } from "@/types/automationFlow";
+import { ConditionValue } from "./ConditionValue";
 import {
+  LIST_OPERATORS,
   availableFields,
   commonEventFields,
   fieldFor,
@@ -18,6 +20,7 @@ import {
   operatorLabel,
   operatorsFor,
   uid,
+  valueItems,
   type CardIssue,
   type ConditionDraft,
   type GroupDraft,
@@ -32,6 +35,7 @@ interface ConditionsCardProps {
   readonly onChange: (groups: readonly GroupDraft[], groupsOperator: AutomationLogicOperator) => void;
   readonly issues: readonly CardIssue[];
   readonly disabled: boolean;
+  readonly bare?: boolean;
 }
 
 const OperatorToggle: React.FC<{
@@ -78,10 +82,26 @@ const Keyword: React.FC<{ readonly word: "IF" | "AND" | "OR"; readonly className
 );
 
 export const ConditionsCard: React.FC<ConditionsCardProps> = ({
-  catalog, triggers, groups, groupsOperator, onChange, issues, disabled,
+  catalog, triggers, groups, groupsOperator, onChange, issues, disabled, bare = false,
 }) => {
-  const eventFields = commonEventFields(catalog, triggers);
-  const documentFields = availableFields(catalog, triggers).filter((f) => f.source === "document");
+  const [fieldQuery, setFieldQuery] = useState("");
+  const chosenFields = new Set(groups.flatMap((group) => group.conditions.map((condition) => condition.field)));
+  // A field is found by its name, its group or any other name a model may give it; the ones already used stay listed.
+  const fieldMatches = (f: { key: string; label: string; group?: string | undefined; aliases?: readonly string[] | undefined }): boolean => {
+    const needle = fieldQuery.trim().toLowerCase();
+    if (!needle || chosenFields.has(f.key)) {return true;}
+    return [f.label, f.key, f.group ?? "", ...(f.aliases ?? [])].some((text) => text.toLowerCase().includes(needle));
+  };
+  const eventFields = commonEventFields(catalog, triggers).filter(fieldMatches);
+  const documentFields = availableFields(catalog, triggers).filter((f) => f.source === "document").filter(fieldMatches);
+  const derivedFields = availableFields(catalog, triggers).filter((f) => f.source === "derived").filter(fieldMatches);
+  const documentGroups = Array.from(
+    documentFields.reduce((groups, f) => {
+      const key = f.group ?? "From the document";
+      groups.set(key, [...(groups.get(key) ?? []), f]);
+      return groups;
+    }, new Map<string, typeof documentFields>()),
+  );
   const limits = catalog.limits;
 
   const setGroup = (index: number, next: GroupDraft): void =>
@@ -94,13 +114,24 @@ export const ConditionsCard: React.FC<ConditionsCardProps> = ({
       if (i !== c) {return condition;}
       const field = patch.field ?? condition.field;
       let operator = patch.operator ?? condition.operator;
-      let value = patch.value ?? condition.value;
+      let value: FlowConditionValue = patch.value ?? condition.value;
+      let currency = patch.currency ?? condition.currency;
       if (patch.field !== undefined) {
-        const allowed = operatorsFor(catalog, fieldFor(catalog, triggers, field)?.type);
+        const declared = fieldFor(catalog, triggers, field);
+        const allowed = operatorsFor(catalog, declared?.type);
         if (!allowed.includes(operator)) {operator = allowed[0] ?? "EQUALS";}
+        // A different field is a different kind of value: start it empty, and drop a currency that no longer applies.
+        if (patch.value === undefined) {value = "";}
+        if (declared?.type !== "money") {currency = "";}
       }
-      if (isValueless(catalog, operator)) {value = "";}
-      return { uid: condition.uid, field, operator, value };
+      if (isValueless(catalog, operator)) {
+        value = "";
+      } else if (patch.operator !== undefined && patch.value === undefined) {
+        // Moving between a single value and a list keeps what was typed.
+        const was = valueItems(condition.value);
+        value = LIST_OPERATORS.includes(operator) ? (operator === "BETWEEN" ? was.slice(0, 2) : was) : (was[0] ?? "");
+      }
+      return { uid: condition.uid, field, operator, value, currency };
     });
     setGroup(g, { ...group, conditions });
   };
@@ -108,7 +139,7 @@ export const ConditionsCard: React.FC<ConditionsCardProps> = ({
   const freshCondition = (): ConditionDraft => {
     const first = eventFields[0] ?? documentFields[0];
     const operators = operatorsFor(catalog, first?.type);
-    return { uid: uid("condition"), field: first?.key ?? "", operator: operators[0] ?? "EQUALS", value: "" };
+    return { uid: uid("condition"), field: first?.key ?? "", operator: operators[0] ?? "EQUALS", value: "", currency: "" };
   };
 
   const addCondition = (g: number): void => {
@@ -136,6 +167,7 @@ export const ConditionsCard: React.FC<ConditionsCardProps> = ({
       }
       icon={<Filter className="h-4 w-4" />}
       issues={issues}
+      bare={bare}
       aside={
         groups.length > 1 ? (
           <OperatorToggle
@@ -148,6 +180,20 @@ export const ConditionsCard: React.FC<ConditionsCardProps> = ({
       }
     >
       <div className="space-y-3">
+        {groups.length > 0 && (
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <input
+              type="search"
+              aria-label="Search fields"
+              value={fieldQuery}
+              disabled={disabled}
+              placeholder="Search fields: total, GSTIN, due date…"
+              onChange={(e) => setFieldQuery(e.target.value)}
+              className={`${inputClass(false)} py-1.5 pl-8 text-xs`}
+            />
+          </div>
+        )}
         {groups.map((group, g) => (
           <React.Fragment key={group.uid}>
             {g > 0 && (
@@ -192,8 +238,8 @@ export const ConditionsCard: React.FC<ConditionsCardProps> = ({
                         word={c === 0 ? "IF" : group.logic_operator === "AND" ? "AND" : "OR"}
                         className="mt-2 shrink-0"
                       />
-                      <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 md:grid-cols-12">
-                        <div className="md:col-span-5">
+                      <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
+                        <div className="col-span-2">
                           <select
                             aria-label="Field"
                             disabled={disabled}
@@ -211,14 +257,21 @@ export const ConditionsCard: React.FC<ConditionsCardProps> = ({
                                 ))}
                               </optgroup>
                             )}
-                            {documentFields.length > 0 && (
-                              <optgroup label="From the document">
-                                {documentFields.map((f) => (
+                            {documentGroups.map(([group, list]) => (
+                              <optgroup key={group} label={group === "From the document" ? group : `Document: ${group}`}>
+                                {list.map((f) => (
+                                  <option key={f.key} value={f.key}>{f.label}</option>
+                                ))}
+                              </optgroup>
+                            ))}
+                            {derivedFields.length > 0 && (
+                              <optgroup label="Worked out when the rule runs">
+                                {derivedFields.map((f) => (
                                   <option key={f.key} value={f.key}>{f.label}</option>
                                 ))}
                               </optgroup>
                             )}
-                            {triggers.length > 0 && <option value="__custom__">Another document field…</option>}
+                            {triggers.length > 0 && <option value="__custom__">A field I name myself (advanced)…</option>}
                           </select>
                           {custom && (
                             <input
@@ -232,7 +285,7 @@ export const ConditionsCard: React.FC<ConditionsCardProps> = ({
                           )}
                           <IssueText issues={byField("field")} />
                         </div>
-                        <div className="md:col-span-3">
+                        <div>
                           <select
                             aria-label="Comparison"
                             disabled={disabled}
@@ -246,36 +299,31 @@ export const ConditionsCard: React.FC<ConditionsCardProps> = ({
                           </select>
                           <IssueText issues={byField("operator")} />
                         </div>
-                        <div className="md:col-span-3">
+                        <div>
                           {!isValueless(catalog, condition.operator) && (
-                            <input
-                              aria-label="Value"
-                              disabled={disabled}
-                              type={field?.type === "number" && !["IN", "NOT_IN", "BETWEEN"].includes(condition.operator) ? "number" : "text"}
+                            <ConditionValue
+                              catalog={catalog}
+                              field={field}
+                              operator={condition.operator}
                               value={condition.value}
-                              placeholder={
-                                ["IN", "NOT_IN", "BETWEEN", "ARRAY_CONTAINS_ANY", "ARRAY_CONTAINS_ALL"].includes(condition.operator)
-                                  ? "comma, separated"
-                                  : field?.example || "value"
-                              }
-                              onChange={(e) => setCondition(g, c, { value: e.target.value })}
-                              className={inputClass(byField("value").length > 0)}
+                              currency={condition.currency}
+                              invalid={byField("value").length > 0}
+                              disabled={disabled}
+                              onChange={(patch) => setCondition(g, c, patch)}
                             />
                           )}
                           <IssueText issues={[...byField("value"), ...own.filter((i) => i.field === null)]} />
                         </div>
-                        <div className="flex items-start justify-end md:col-span-1">
-                          <button
-                            type="button"
-                            disabled={disabled}
-                            onClick={() => setGroup(g, { ...group, conditions: group.conditions.filter((_, i) => i !== c) })}
-                            className="rounded p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                            aria-label="Remove condition"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
                       </div>
+                      <button
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => setGroup(g, { ...group, conditions: group.conditions.filter((_, i) => i !== c) })}
+                        className="mt-1 shrink-0 rounded p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        aria-label="Remove condition"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   );
                 })}

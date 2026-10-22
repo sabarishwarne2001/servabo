@@ -13,7 +13,10 @@ export type AutomationExecutionStatus =
   | "TIMED_OUT"
   | "SUPPRESSED_CYCLE"
   | "SUPPRESSED_DEPTH"
-  | "BUDGET_EXHAUSTED";
+  | "BUDGET_EXHAUSTED"
+  | "SKIPPED_THROTTLED"
+  | "SKIPPED_COOLDOWN"
+  | "SKIPPED_PAUSED";
 
 export interface AutomationExecution {
   readonly id: string;
@@ -44,6 +47,12 @@ export interface AutomationExecution {
   readonly details: Record<string, unknown>;
   readonly is_suppressed: boolean;
   readonly duration_ms: number | null;
+  /** Session J: held back on purpose (paused, throttled, cooldown); `error` says why. */
+  readonly is_skipped?: boolean;
+  /** Session J: this run is a retry of that one. */
+  readonly retry_of_id?: string | null;
+  /** Session J: the run broke part way, so Retry is offered. */
+  readonly retryable?: boolean;
 }
 
 export interface AutomationExecutionPage {
@@ -173,6 +182,44 @@ export const EXECUTION_STATUS_PRESENTATION: Record<
     explanation:
       "The execution reached its cost ceiling partway through and stopped.",
   },
+  SKIPPED_THROTTLED: {
+    label: "Skipped — over the limit",
+    tone: "warn",
+    explanation:
+      "The rule had already run as many times this hour as its limit allows, so this run was held back, not lost.",
+  },
+  SKIPPED_COOLDOWN: {
+    label: "Skipped — ran recently",
+    tone: "muted",
+    explanation:
+      "The rule already ran for this document inside its cooldown, so it was not run again.",
+  },
+  SKIPPED_PAUSED: {
+    label: "Skipped — paused",
+    tone: "warn",
+    explanation:
+      "This workspace's automations were paused, so nothing ran. Resume them from the Automation page.",
+  },
+};
+
+export interface RetryResult {
+  readonly queued: boolean;
+  readonly execution_id: string;
+  readonly retry_of: string;
+  readonly rule_id: string;
+}
+
+/** Runs a failed run again. A 409 with code `may_repeat` names the steps that could send a message twice. */
+export const retryExecution = async (
+  workspaceId: string,
+  executionId: string,
+  acknowledgeRepeat = false,
+): Promise<RetryResult> => {
+  const response = await apiClient.post<RetryResult>(
+    `${EXECUTION_ENDPOINTS.detail(workspaceId, executionId)}/retry`,
+    { acknowledge_repeat: acknowledgeRepeat },
+  );
+  return response.data;
 };
 
 /*

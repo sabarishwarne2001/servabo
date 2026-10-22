@@ -83,6 +83,8 @@ class ActionDefinition:
     capability: Optional[str]
     minimum_role: str
     addon: Optional[str] = None
+    #: Session J. True when the capability OR the add-on opens the action (GST Credit on Developer is the add-on).
+    either: bool = False
     aliases: tuple[str, ...] = ()
     #: Config keys that hold templates. Their variables are checked on save.
     template_fields: tuple[str, ...] = ()
@@ -91,6 +93,12 @@ class ActionDefinition:
     validate_resources: Optional[Callable[[SaveContext, ActionConfig], dict[str, str]]] = None
     #: True when `perform` has an external effect a test run must not cause.
     side_effect: bool = True
+    #: Session J. True when running the action again for the same document does the same thing (a tag, a hold, a
+    #: webhook with its idempotency key). False when it may repeat an effect a person would notice (an email, a chat
+    #: message, a notification): "Retry" then warns "This may send the message again".
+    idempotent: bool = False
+    #: Session J. A short word for the icon the builder draws (the builder maps it to a drawing).
+    icon: str = "zap"
 
     def parse(self, values: Mapping[str, Any]) -> ActionConfig:
         return self.config_model.model_validate(dict(values))
@@ -173,6 +181,32 @@ class TemplateValues(dict):
         return html.escape(_scalar(current), quote=True)
 
 
+class PlainValues(dict):
+    """Resolved variables as plain text, for a destination that is not HTML (a chat message). `field.<path>` is read from
+    the document on demand. The caller escapes for its own destination (Slack's `&` `<` `>`, Teams' card text)."""
+
+    def __init__(self, values: Mapping[str, str], entities: Mapping[str, Any]) -> None:
+        super().__init__(values)
+        self._entities = entities
+
+    def __missing__(self, key: str) -> str:
+        if not _SAFE_FIELD.match(key):
+            return ""
+        current: Any = self._entities
+        for part in key[len("field."):].split("."):
+            if not isinstance(current, Mapping):
+                return ""
+            current = current.get(part)
+        return _scalar(current)
+
+
+def plain_variables_for(state: Any) -> PlainValues:
+    """Runtime values for a non-HTML destination: scalars only and truncated, never HTML-escaped."""
+    escaped = variables_for(state)
+    plain = {key: html.unescape(value) for key, value in dict.items(escaped)}
+    return PlainValues(plain, escaped._entities)
+
+
 def variables_for(state: Any) -> TemplateValues:
     """Runtime values. Scalars only, truncated, and HTML-escaped."""
     from app.services.automation.triggers import TRIGGER_BY_EVENT
@@ -203,8 +237,27 @@ def variables_for(state: Any) -> TemplateValues:
     for key, value in payload.items():
         text = _scalar(value)
         values[f"event.{key}"] = format_calendar_date(text, date_format) if is_iso_date(text) else text
+    # Session J: an amount a trigger stores in micros (`variance_micros`) is offered to templates as an amount in
+    # currency units (`{{event.variance}}`), with its currency when the event names one.
+    for declared in (spec.fields if spec else ()):
+        if declared.type == "money" and declared.source_key:
+            values[f"event.{declared.key}"] = _money_text(payload, declared)
     escaped = {k: html.escape(v, quote=True) for k, v in values.items()}
     return TemplateValues(escaped, entities)
+
+
+def _money_text(payload: Mapping[str, Any], declared: Any) -> str:
+    from decimal import Decimal
+
+    from app.services.automation import evaluator
+
+    parsed = evaluator.parse_number(payload.get(declared.source_key))
+    if parsed.value is None:
+        return ""
+    units = parsed.value / Decimal(1_000_000) if declared.unit == "micros" else parsed.value
+    currency = payload.get(declared.currency_key) if declared.currency_key else None
+    text = f"{units:,.2f}"
+    return f"{str(currency).upper()} {text}" if currency else text
 
 
 def _workspace_date_format(state: Any) -> Optional[str]:
@@ -219,7 +272,10 @@ def _workspace_date_format(state: Any) -> Optional[str]:
 
 
 def render(template: str, values: Mapping[str, str]) -> str:
-    return _VARIABLE.sub(lambda m: values[m.group(1)] if isinstance(values, TemplateValues) else values.get(m.group(1), ""), template or "")
+    return _VARIABLE.sub(
+        lambda m: values[m.group(1)] if isinstance(values, (TemplateValues, PlainValues)) else values.get(m.group(1), ""),
+        template or "",
+    )
 
 
 def require_work_item(state: Any, action_type: str) -> Any:
@@ -247,12 +303,14 @@ __all__ = [
     "ActionFailure",
     "ActionOutcome",
     "MINIMUM_ROLES",
+    "PlainValues",
     "ROLE_ORGANIZATION_ADMIN",
     "ROLE_WORKSPACE_ADMIN",
     "STATIC_VARIABLES",
     "SaveContext",
     "TemplateValues",
     "has_capability",
+    "plain_variables_for",
     "invalid_variables",
     "render",
     "require_work_item",

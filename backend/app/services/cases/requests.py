@@ -117,6 +117,9 @@ def fulfil_upload(db: Session, *, token: str, handle: Any, size: int, filename: 
     assembly.add_document(db, case=case, work_item_id=item.id, document_type=request.document_type, source=v.SOURCE_REQUEST)
     assembly.evaluate(db, case=case)
     db.flush()
+    from app.services.automation import emitters
+
+    emitters.document_received_by_link(db, request=request, work_item_id=item.id, case_title=case.title)
     return {"received": True, "document_type": request.document_type, "work_item_id": str(item.id)}
 
 

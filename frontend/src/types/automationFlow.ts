@@ -7,7 +7,12 @@
  * action list of its own; `verify_arch37.py` fails if one appears.
  */
 
-export type FlowFieldType = "string" | "number" | "boolean" | "array" | "date";
+export type FlowFieldType = "string" | "number" | "money" | "boolean" | "array" | "date";
+
+export interface FlowFieldOption {
+  readonly value: string;
+  readonly label: string;
+}
 
 export interface FlowField {
   readonly key: string;
@@ -15,7 +20,15 @@ export interface FlowField {
   readonly type: FlowFieldType;
   readonly example: string;
   readonly description: string;
-  readonly source: "event" | "document";
+  readonly source: "event" | "document" | "derived";
+  /** Session J: the fixed values the field takes; the builder offers a dropdown, never a free-text code. */
+  readonly options?: readonly FlowFieldOption[];
+  /** Session J: "micros" for a trigger amount stored in millionths (the builder shows and takes whole units). */
+  readonly unit?: string | null;
+  readonly currency_key?: string | null;
+  readonly legacy?: boolean;
+  readonly group?: string;
+  readonly aliases?: readonly string[];
 }
 
 export interface FlowTrigger {
@@ -30,6 +43,10 @@ export interface FlowTrigger {
   readonly excluded_actions: readonly string[];
   readonly runs_during_review: boolean;
   readonly available: boolean;
+  /** Session J: one line for the picker; `description` is the long form, shown on demand. */
+  readonly summary?: string;
+  readonly unavailable_reason?: string | null;
+  readonly addon?: string | null;
 }
 
 export interface JsonSchemaProperty {
@@ -65,6 +82,10 @@ export interface FlowAction {
   readonly unavailable_reason: string | null;
   readonly commercial: boolean;
   readonly needs_document: boolean;
+  /** Session J: running it again does the same thing (a tag, a hold). False for an email or a chat message. */
+  readonly idempotent?: boolean;
+  /** Session J: a short word the builder maps to a drawing. */
+  readonly icon?: string;
   readonly template_fields: readonly string[];
   readonly aliases: readonly string[];
   readonly config_schema: FlowActionSchema;
@@ -91,11 +112,25 @@ export interface FlowDestinationOption {
   readonly kind: string;
 }
 
+export interface FlowChatEndpointOption {
+  readonly id: string;
+  readonly label: string;
+  readonly kind: "SLACK" | "TEAMS";
+}
+
+export interface FlowMemberOption {
+  readonly email: string;
+  readonly name: string;
+}
+
 export interface FlowCatalog {
   readonly triggers: readonly FlowTrigger[];
   readonly actions: readonly FlowAction[];
   readonly operators: Readonly<Record<FlowFieldType, readonly string[]>>;
   readonly valueless_operators: readonly string[];
+  readonly day_count_operators?: readonly string[];
+  readonly list_value_operators?: readonly string[];
+  readonly workspace?: { readonly currency: string; readonly date_format: string; readonly timezone: string };
   readonly template_variables: readonly string[];
   readonly document_fields: readonly FlowField[];
   readonly resources: {
@@ -108,19 +143,29 @@ export interface FlowCatalog {
     // ARCH47-S2:flow-resources-erp
     readonly erp_targets: readonly FlowErpTargetOption[];
     readonly erp_object_kinds: readonly string[];
+    readonly chat_endpoints?: readonly FlowChatEndpointOption[];
+    readonly case_templates?: readonly FlowDestinationOption[];
+    readonly members?: readonly FlowMemberOption[];
+    readonly obligation_kinds?: readonly string[];
   };
   readonly limits: {
     readonly triggers: number;
     readonly groups: number;
     readonly conditions_per_group: number;
     readonly actions_per_branch: number;
+    readonly default_runs_per_hour?: number;
   };
 }
+
+/** A value is a string, or a list of strings for "is one of", "between" and the list operators. */
+export type FlowConditionValue = string | readonly string[];
 
 export interface FlowCondition {
   readonly field: string;
   readonly operator: string;
-  readonly value: string;
+  readonly value: FlowConditionValue;
+  /** Session J: the currency an amount is compared in. Never converted. */
+  readonly currency?: string | null;
 }
 
 export interface FlowConditionGroup {
@@ -148,4 +193,7 @@ export interface AutomationNodeRun {
   readonly external_ref: string | null;
   readonly duration_ms: number | null;
   readonly outcome: string | null;
+  /** Session J: what each condition read, wanted and decided, in words (condition nodes only). */
+  readonly conditions?: readonly import("@/types/automation").ConditionTrace[];
+  readonly matched?: boolean | null;
 }

@@ -710,6 +710,12 @@ class Settings(BaseSettings):
     AUTOMATION_MAX_ACTIONS_PER_EXECUTION: int = 20
     AUTOMATION_DEFAULT_BUDGET_MICROS: int = 50_000
     AUTOMATION_ENGINE_ENABLED: bool = True
+    # ---- Session J: automation safety and chat ------------------------------
+    #: The default "at most N runs per hour" for a rule that sets none (N-151). 0 turns the default off.
+    AUTOMATION_DEFAULT_RUNS_PER_HOUR: int = 200
+    #: Extra hosts a Slack or Teams incoming-webhook URL may name, comma separated (the stand-in receiver of the test
+    #: suites). The real hosts (hooks.slack.com, *.webhook.office.com, *.logic.azure.com) are always allowed.
+    CHAT_WEBHOOK_EXTRA_HOSTS: str = ""
 
     # ---- ARCH-13 Step 13.7/13.8: verification ------------------------------
     AUTOMATION_VERIFICATION_AGENTS: int = 2

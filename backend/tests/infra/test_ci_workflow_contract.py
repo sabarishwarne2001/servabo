@@ -7,6 +7,8 @@
   Making the shipped-dependency check non-blocking, or removing it, would let a real customer-facing advisory through.
 * Every job runs on a pinned runner image, not `ubuntu-latest`: when the label moves to a newer Ubuntu, a prebuilt
   Python can be missing and every backend job breaks without a code change.
+* The Frontend job runs the unit tests (`npm run test:unit`, Session J); dropping the step would let the builder's model
+  and the dialogs change with nothing watching them.
 * The three setup actions run on Node.js 24 (GitHub is retiring Node.js 20 for actions).
 """
 
@@ -62,3 +64,10 @@ def test_the_setup_actions_run_on_node_24(jobs, action):
     versions = {s["uses"] for job in jobs.values() for s in job["steps"] if s.get("uses", "").startswith(action + "@")}
     assert versions, f"{action} is used"
     assert all(int(v.split("@v")[1].split(".")[0]) >= FIRST_NODE_24[action] for v in versions), versions
+
+
+def test_the_frontend_job_runs_the_unit_tests(jobs):
+    runs = [s.get("run", "") for s in jobs["frontend"]["steps"]]
+    assert "npm run test:unit" in runs
+    step = next(s for s in jobs["frontend"]["steps"] if s.get("run") == "npm run test:unit")
+    assert not step.get("continue-on-error"), "a failing unit test must fail the Frontend job"

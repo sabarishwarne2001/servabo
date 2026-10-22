@@ -252,6 +252,8 @@ test.describe("Automation rules: switch, test, edit, duplicate, delete", () => {
     await expect(builder).toBeVisible();
     await expect(builder.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(original);
     await builder.getByRole("textbox", { name: "Name", exact: true }).fill(renamed);
+    // Priority and the failure policy live under the inspector's Advanced tab (Session J).
+    await builder.getByRole("tab", { name: "Advanced" }).click();
     await builder.getByRole("spinbutton", { name: "Priority" }).fill("7");
     await builder.getByLabel("On failure").selectOption("CONTINUE");
     await builder.getByRole("button", { name: "Save changes" }).click();
@@ -756,18 +758,18 @@ test.describe("Obligations: waive with a reason, revoke a calendar feed", () => 
     }).toBeGreaterThan(0);
 
     // 2. Revoke asks first. "No" leaves the feed alone.
-    page.once("dialog", (dialog) => {
-      expect(dialog.message()).toContain(label);
-      void dialog.dismiss();
-    });
+    const question = page.getByRole("alertdialog");
     await row.getByRole("button", { name: "Revoke" }).click();
+    await expect(question).toContainText(label);
+    await question.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(question).toHaveCount(0);
     await expect(row.getByRole("button", { name: "Revoke" })).toBeVisible();
     expect((await fetchOnce(link, {})).status).toBe(200);
 
     // 3. "Yes" revokes it.
-    page.once("dialog", (dialog) => { void dialog.accept(); });
     const revoked = page.waitForResponse((r) => /\/calendar-feeds\/[0-9a-f-]+$/.test(r.url()) && r.request().method() === "DELETE");
     await row.getByRole("button", { name: "Revoke" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Revoke feed", exact: true }).click();
     expect((await revoked).status()).toBe(204);
     await expect(page.getByText("Feed revoked. Calendars subscribed to it stop updating.")).toBeVisible();
     await expect(row).toContainText("Revoked");

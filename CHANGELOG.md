@@ -6,6 +6,48 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Added — Automation, end to end (Session J, 2026-10-21)
+
+- **Conditions that are always right** (F-535 to F-539, N-153). A condition on an amount used to compare with `float()`, so
+  `₹ 1,18,000` or `INR 118,000.00` never matched "greater than"; a date could not be compared at all; a comma split "Acme, Inc";
+  and a model's `supplier_gstin` never matched a condition on `vendor_gstin`. One typed evaluator now reads amounts (with a
+  currency, never converted), dates (before, after, within, older than, in the workspace's format and zone), fixed values,
+  lists and booleans, reads documents through the finance schema's alias map, and offers three worked-out fields (document age,
+  has an IRN, days until due). Every rule saved before answers exactly as it did (a compatibility corpus proves it). A run's trace
+  now says what each condition read and why it decided.
+- **Fourteen more triggers** (37 in all): GSTR-2B imported, an invoice waiting for its supplier, GST credit at risk of reversal,
+  payment-risk flags, legal holds placed and released, TruthMesh conflicts opened and resolved, every day, every week, run by
+  hand on one document, Helm (a mandate breached, an action waiting for approval; these can only tell, mail, post, call out,
+  review or tag, N-150), and a document received through a request link. Each is announced exactly once, from the engine that
+  knows, and only when a rule is listening.
+- **Seven more steps** (16 in all): tag a document, send to review assigned to a person or role, place a legal hold, post to
+  Slack or Microsoft Teams (the channel's address is stored encrypted and never shown, N-152), remind a GST supplier, create a
+  follow-up, ask a supplier for a document. None can approve or pay anything.
+- **Safe at volume** (N-151, N-155, N-157). Each rule is held to 200 runs an hour unless it says otherwise, with an optional
+  once-per-document cooldown; runs held back are listed as Skipped, never lost, and the author gets one notice a day. A
+  workspace administrator can pause every automation. A failed run can be retried (with a warning before a message could go
+  twice). Every save keeps a version with a plain-words diff and Restore. Preview shows what a rule would have done on the last
+  30 days, without sending or writing anything, and "Why didn't my rule run?" answers for a document. Three migrations
+  (`j1a1`, `j1a2`, `j1a3`); one Alembic head.
+- **A new builder and pages** (N-149, N-156). The builder is a full-page editor drawn as a flow (When, Only if, Yes and No,
+  Then and Otherwise) with an inspector, a searchable trigger picker, typed inputs (an amount with a currency, a date picker,
+  dropdowns for fixed values, lists, between), live message previews, Test & preview and an hourly limit and cooldown. Sixteen
+  ready-made recipes (India first) open it filled in; rule cards show their sentence, health and owner and can be filtered;
+  Run history filters by outcome, rule and date, shows Skipped runs and retries failed ones; each document has an Automation
+  tab.
+- **Servabo's own dialogs instead of the browser's pop-ups** (F-540, F-541). Thirteen `confirm` and `prompt` calls are replaced;
+  Escape closes only the top dialog; an ESLint rule, two `check:self` scans and a browser-test fixture stop them coming back.
+- **Unit tests for the frontend** (Vitest, `npm run test:unit`, in the Frontend CI job and its contract test): the builder's
+  model, the sentence builder, the value inputs and the dialogs.
+
+### Fixed — CI on this branch (Session J)
+
+- **`npm audit` turned red** on `follow-redirects` 1.16.0 (two new high advisories, also red on `main`): lockfile bump to 1.16.1
+  (F-544). The advisory Pillow warning from `pip-audit` is left for a decision (N-159).
+- **People you could assign a review to were listed by email only**; they now show their name (F-543).
+- **The version history could page unstably**; it now ends on a unique key (F-542).
+- **A GST supplier reminder could never be sent**: Helm stores a supplier it derived from documents under `gstin:<GSTIN>` and never filled the `tax_id` column the reminder searched, so no supplier ever had a "known contact" (F-545).
+
 ### Fixed — CI after PR #33 (Session I, 2026-10-20)
 
 - **A browser test could lose its own upload.** The run-history test (spec 13) clicked "Start Ingestion" and left the page at

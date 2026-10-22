@@ -19,6 +19,7 @@ import type {
   FlowAction,
   FlowActionEntry,
   FlowCatalog,
+  FlowConditionValue,
   FlowField,
   FlowFieldType,
   FlowTrigger,
@@ -29,7 +30,10 @@ export interface ConditionDraft {
   readonly uid: string;
   readonly field: string;
   readonly operator: string;
-  readonly value: string;
+  /** A string, or a list of strings for "is one of", "between" and the list operators (a value may hold a comma). */
+  readonly value: FlowConditionValue;
+  /** An amount's currency ("INR"); empty means the document's own. Never converted. */
+  readonly currency: string;
 }
 
 export interface GroupDraft {
@@ -54,6 +58,12 @@ export interface FlowDraft {
   readonly groups_operator: AutomationLogicOperator;
   readonly actions: readonly ActionDraft[];
   readonly else_actions: readonly ActionDraft[];
+  /** Session J: "at most N runs an hour"; null means the workspace default. */
+  readonly max_runs_per_hour: number | null;
+  /** Session J: "at most once per document every X hours"; null means off. */
+  readonly cooldown_hours: number | null;
+  /** A note kept with the version this save writes. */
+  readonly note: string;
 }
 
 export type CardKey = "general" | "trigger" | "conditions" | "actions" | "else";
@@ -94,6 +104,62 @@ export const OPERATOR_LABELS: Readonly<Record<string, string>> = {
   IS_NOT_EMPTY: "is not empty",
   ARRAY_CONTAINS_ANY: "contains any of",
   ARRAY_CONTAINS_ALL: "contains all of",
+  BEFORE: "is before",
+  AFTER: "is after",
+  ON_OR_BEFORE: "is on or before",
+  ON_OR_AFTER: "is on or after",
+  WITHIN_NEXT_DAYS: "is within the next",
+  WITHIN_LAST_DAYS: "was within the last",
+  OLDER_THAN_DAYS: "is older than",
+};
+
+/** The words after the value of a day-count comparison: "is older than 30 days". */
+export const DAY_COUNT_OPERATORS: readonly string[] = ["WITHIN_NEXT_DAYS", "WITHIN_LAST_DAYS", "OLDER_THAN_DAYS"];
+export const LIST_OPERATORS: readonly string[] = ["IN", "NOT_IN", "BETWEEN", "ARRAY_CONTAINS_ANY", "ARRAY_CONTAINS_ALL"];
+
+export const valueItems = (value: FlowConditionValue | undefined): string[] =>
+  (Array.isArray(value) ? [...value] : typeof value === "string" ? [value] : [])
+    .map((item) => String(item).trim())
+    .filter((item) => item !== "");
+
+export const valueIsEmpty = (value: FlowConditionValue | undefined): boolean => valueItems(value).length === 0;
+
+/**
+ * An amount as people write it: rupees in lakh grouping ("10,00,000"), other currencies in thousands. Text that is
+ * not a plain number ("₹10,00,000", "1.5 crore") is shown exactly as typed.
+ */
+export const groupAmount = (text: string, currency: string): string => {
+  if (!/^\d+(\.\d+)?$/.test(text)) {return text;}
+  const [whole = "", fraction] = text.split(".");
+  const digits = whole.replace(/^0+(?=\d)/, "");
+  let grouped: string;
+  if (currency.toUpperCase() === "INR" && digits.length > 3) {
+    // Lakh grouping: the last three digits, then pairs (10,00,000).
+    const head = digits.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ",");
+    grouped = `${head},${digits.slice(-3)}`;
+  } else {
+    grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+  return fraction === undefined ? grouped : `${grouped}.${fraction}`;
+};
+
+/** The value as a person reads it: "10,00,000 INR", "Acme, Inc or Beta", "5 and 10". */
+export const valueText = (
+  operator: string,
+  value: FlowConditionValue | undefined,
+  currency = "",
+): string => {
+  const items = valueItems(value);
+  if (items.length === 0) {return "";}
+  const unit = currency ? ` ${currency}` : "";
+  const shown = (item: string): string => (currency ? groupAmount(item, currency) : item);
+  if (operator === "BETWEEN" && items.length === 2) {return `${shown(items[0] ?? "")} and ${shown(items[1] ?? "")}${unit}`;}
+  if (items.length > 1) {
+    const last = items[items.length - 1] ?? "";
+    return `${items.slice(0, -1).join(", ")} or ${last}${unit}`;
+  }
+  const only = items[0] ?? "";
+  return DAY_COUNT_OPERATORS.includes(operator) ? `${only} day${only === "1" ? "" : "s"}` : `${shown(only)}${unit}`;
 };
 
 export const operatorLabel = (operator: string): string =>
@@ -115,6 +181,9 @@ export const emptyDraft = (): FlowDraft => ({
   groups_operator: "AND",
   actions: [],
   else_actions: [],
+  max_runs_per_hour: null,
+  cooldown_hours: null,
+  note: "",
 });
 
 export const findTrigger = (catalog: FlowCatalog | undefined, key: string): FlowTrigger | undefined =>
@@ -226,11 +295,18 @@ const toActionDraft = (catalog: FlowCatalog | undefined, entry: FlowActionEntry)
   };
 };
 
-export const draftFromRule = (
-  rule: AutomationRule,
-  catalog: FlowCatalog | undefined,
-  mode: "edit" | "duplicate",
-): FlowDraft => {
+/** The pieces of a rule a draft is built from; a stored rule and a recipe both have them. */
+type RuleShape = Pick<
+  AutomationRuleCreateRequest,
+  "name" | "priority" | "on_error" | "triggers" | "groups_operator" | "actions" | "else_actions"
+> & {
+  readonly is_active?: boolean | undefined;
+  readonly condition_groups?: AutomationRuleCreateRequest["condition_groups"] | undefined;
+  readonly max_runs_per_hour?: number | null | undefined;
+  readonly cooldown_hours?: number | null | undefined;
+};
+
+const draftFromShape = (rule: RuleShape, catalog: FlowCatalog | undefined, name: string, active: boolean): FlowDraft => {
   const groups: GroupDraft[] = (rule.condition_groups ?? []).map((group) => ({
     uid: uid("group"),
     logic_operator: group.logic_operator,
@@ -239,19 +315,75 @@ export const draftFromRule = (
       field: condition.field,
       operator: condition.operator,
       value: condition.value ?? "",
+      currency: condition.currency ?? "",
     })),
   }));
   return {
-    name: mode === "duplicate" ? `${rule.name} (copy)`.slice(0, 100) : rule.name,
+    name,
     priority: rule.priority,
-    is_active: mode === "duplicate" ? false : rule.is_active,
+    is_active: active,
     on_error: rule.on_error ?? "HALT",
     triggers: [...(rule.triggers ?? [])],
     groups,
     groups_operator: rule.groups_operator ?? "AND",
     actions: rule.actions.map((entry) => toActionDraft(catalog, entry)),
     else_actions: (rule.else_actions ?? []).map((entry) => toActionDraft(catalog, entry)),
+    max_runs_per_hour: rule.max_runs_per_hour ?? null,
+    cooldown_hours: rule.cooldown_hours ?? null,
+    note: "",
   };
+};
+
+export const draftFromRule = (
+  rule: AutomationRule,
+  catalog: FlowCatalog | undefined,
+  mode: "edit" | "duplicate",
+): FlowDraft =>
+  draftFromShape(
+    {
+      name: rule.name,
+      priority: rule.priority,
+      on_error: rule.on_error ?? "HALT",
+      triggers: rule.triggers ?? [],
+      groups_operator: rule.groups_operator ?? "AND",
+      actions: rule.actions,
+      else_actions: rule.else_actions ?? [],
+      condition_groups: rule.condition_groups,
+      max_runs_per_hour: rule.max_runs_per_hour,
+      cooldown_hours: rule.cooldown_hours,
+    },
+    catalog,
+    mode === "duplicate" ? `${rule.name} (copy)`.slice(0, 100) : rule.name,
+    mode === "duplicate" ? false : rule.is_active,
+  );
+
+/** A recipe's rule as a draft, ready for the builder. A recipe starts switched on: the person decides when they save. */
+/**
+ * A rule document (a recipe) to a draft. A recipe carries no priority of its own (the server fills it in on save), so the
+ * draft gets the default one; without it the builder said "Priority must be a whole number" and refused to save.
+ */
+export const draftFromPayload = (payload: AutomationRuleCreateRequest, catalog: FlowCatalog | undefined): FlowDraft =>
+  draftFromShape({ ...payload, priority: payload.priority ?? emptyDraft().priority }, catalog, payload.name, payload.is_active ?? true);
+
+/** Answers a recipe asked for, written into its rule at the `path` each fill-in names (`actions.0.config.endpoint_id`). */
+export const applyFillIns = (
+  rule: AutomationRuleCreateRequest,
+  answers: Readonly<Record<string, string>>,
+): AutomationRuleCreateRequest => {
+  const copy = JSON.parse(JSON.stringify(rule)) as Record<string, unknown>;
+  for (const [path, value] of Object.entries(answers)) {
+    const parts = path.split(".");
+    let target: unknown = copy;
+    for (const part of parts.slice(0, -1)) {
+      if (target === null || typeof target !== "object") {break;}
+      target = (target as Record<string, unknown>)[part];
+    }
+    const last = parts[parts.length - 1];
+    if (target !== null && typeof target === "object" && last !== undefined) {
+      (target as Record<string, unknown>)[last] = value;
+    }
+  }
+  return copy as unknown as AutomationRuleCreateRequest;
 };
 
 export const payloadFromDraft = (draft: FlowDraft, catalog: FlowCatalog | undefined): AutomationRuleCreateRequest => {
@@ -269,11 +401,19 @@ export const payloadFromDraft = (draft: FlowDraft, catalog: FlowCatalog | undefi
       .filter((group) => group.conditions.length > 0)
       .map((group) => ({
         logic_operator: group.logic_operator,
-        conditions: group.conditions.map(({ field, operator, value }) => ({ field, operator, value })),
+        conditions: group.conditions.map(({ field, operator, value, currency }) => ({
+          field,
+          operator,
+          value: typeof value === "string" ? value.trim() : valueItems(value),
+          ...(currency ? { currency } : {}),
+        })),
       })),
     groups_operator: draft.groups_operator,
     actions: draft.actions.map(actionEntry),
     else_actions: draft.else_actions.map(actionEntry),
+    max_runs_per_hour: draft.max_runs_per_hour,
+    cooldown_hours: draft.cooldown_hours,
+    ...(draft.note.trim() ? { note: draft.note.trim() } : {}),
   };
 };
 
@@ -285,6 +425,12 @@ export const localIssues = (draft: FlowDraft, catalog: FlowCatalog | undefined):
   };
   if (!draft.name.trim()) {push("general", "Give the rule a name.", null, null, "name");}
   if (!Number.isInteger(draft.priority) || draft.priority < 1) {push("general", "Priority must be a whole number of at least 1.", null, null, "priority");}
+  if (draft.max_runs_per_hour !== null && (!Number.isInteger(draft.max_runs_per_hour) || draft.max_runs_per_hour < 1 || draft.max_runs_per_hour > 100000)) {
+    push("general", "The hourly limit must be a whole number from 1 to 100,000, or empty.", null, null, "max_runs_per_hour");
+  }
+  if (draft.cooldown_hours !== null && (!Number.isInteger(draft.cooldown_hours) || draft.cooldown_hours < 1 || draft.cooldown_hours > 8760)) {
+    push("general", "The cooldown must be a whole number of hours from 1 to 8,760, or empty.", null, null, "cooldown_hours");
+  }
   if (draft.triggers.length === 0) {push("trigger", "Choose at least one trigger.");}
   draft.triggers.forEach((key, index) => {
     const trigger = findTrigger(catalog, key);
@@ -298,8 +444,12 @@ export const localIssues = (draft: FlowDraft, catalog: FlowCatalog | undefined):
         push("conditions", "Not every selected trigger carries this field.", g, c, "field");
       }
       if (!condition.operator) {push("conditions", "Choose a comparison.", g, c, "operator");}
-      if (condition.operator && !isValueless(catalog, condition.operator) && !condition.value.trim()) {
+      if (condition.operator && !isValueless(catalog, condition.operator) && valueIsEmpty(condition.value)) {
         push("conditions", "Enter a value.", g, c, "value");
+      } else if (condition.operator === "BETWEEN" && valueItems(condition.value).length !== 2) {
+        push("conditions", "Give a low and a high value.", g, c, "value");
+      } else if (DAY_COUNT_OPERATORS.includes(condition.operator) && !/^\d+$/.test(valueItems(condition.value)[0] ?? "")) {
+        push("conditions", "Enter a whole number of days.", g, c, "value");
       }
     });
   });
@@ -387,6 +537,14 @@ const joinWords = (parts: readonly string[], word: string): string => {
   return `${parts.slice(0, -1).join(", ")} ${word} ${parts[parts.length - 1] ?? ""}`;
 };
 
+/** One condition as a person reads it: "total amount is greater than 1,000,000 INR". */
+export const conditionText = (catalog: FlowCatalog | undefined, condition: ConditionDraft): string => {
+  const label = fieldLabel(catalog, condition.field).toLowerCase();
+  if (isValueless(catalog, condition.operator)) {return `${label} ${operatorLabel(condition.operator)}`;}
+  const shown = valueText(condition.operator, condition.value, condition.currency);
+  return `${label} ${operatorLabel(condition.operator)} ${shown ? shown : "…"}`.trim();
+};
+
 /** A plain-English sentence for the summary rail and the rule list. */
 export const summarize = (draft: FlowDraft, catalog: FlowCatalog | undefined): string => {
   const when = draft.triggers.length
@@ -395,10 +553,7 @@ export const summarize = (draft: FlowDraft, catalog: FlowCatalog | undefined): s
   const groups = draft.groups
     .filter((group) => group.conditions.length > 0)
     .map((group) => {
-      const parts = group.conditions.map((condition) => {
-        const valueless = isValueless(catalog, condition.operator);
-        return `${fieldLabel(catalog, condition.field).toLowerCase()} ${operatorLabel(condition.operator)}${valueless ? "" : ` “${condition.value}”`}`;
-      });
+      const parts = group.conditions.map((condition) => conditionText(catalog, condition));
       return joinWords(parts, group.logic_operator === "OR" ? "or" : "and");
     });
   const condition = groups.length

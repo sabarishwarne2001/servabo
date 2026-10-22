@@ -33,6 +33,7 @@ import {
 import { formatDateTime } from "@/utils/formatters";
 import { ViewPlansAction } from "@/components/billing/ViewPlansAction";
 import { CapabilityLoading } from "@/components/common/CapabilityLoading";
+import { useConfirmDialog } from "@/components/common/useConfirmDialog";
 
 const EVENT_LABELS: Readonly<Record<string, string>> = {
   CREATED: "Created", UPDATED: "Edited", DUE_SOON: "Became due soon", OVERDUE: "Became overdue", REOPENED: "Reopened",
@@ -48,6 +49,7 @@ const ObligationDetail: React.FC = () => {
   const role = workspace?.role;
   const canEdit = role === "ADMIN" || role === "OWNER" || role === "CONTRIBUTOR";
   const queryClient = useQueryClient();
+  const { ask, confirmDialog } = useConfirmDialog();
   const navigate = useNavigate();
   const [waiveReason, setWaiveReason] = useState("");
   const [note, setNote] = useState("");
@@ -74,7 +76,12 @@ const ObligationDetail: React.FC = () => {
   const edit = useMutation({ mutationFn: (body: ObligationUpdate) => updateObligation(workspaceId, obligationId, body),
     onSuccess: (d) => { setNewDate(""); done(d); } });
   const remove = useMutation({ mutationFn: () => deleteObligation(workspaceId, obligationId),
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: obligationKeys.all(workspaceId) }); navigate(obligationsPath(orgSlug, workspaceSlug)); } });
+    onSuccess: () => {
+      // Refresh every list, but not this obligation's own page data: it is gone, and asking the server for it again is a 404.
+      const gone = JSON.stringify(obligationKeys.detail(workspaceId, obligationId));
+      void queryClient.invalidateQueries({ queryKey: obligationKeys.all(workspaceId), predicate: (q) => JSON.stringify(q.queryKey) !== gone });
+      navigate(obligationsPath(orgSlug, workspaceSlug));
+    } });
   const busy = complete.isPending || waive.isPending || reopen.isPending || review.isPending || edit.isPending || remove.isPending;
   const failure = [complete, waive, reopen, review, edit, remove].find((m) => m.isError)?.error;
 
@@ -195,7 +202,10 @@ const ObligationDetail: React.FC = () => {
             </button>
             {o.origin === "MANUAL" ? (
               <button type="button" className={`${BUTTON_DESTRUCTIVE} ml-auto`} disabled={busy}
-                onClick={() => { if (window.confirm("Delete this obligation?")) { remove.mutate(); } }}>
+                onClick={() => {
+                  void ask({ title: "Delete this obligation?", message: "The obligation is removed. This cannot be undone.", confirmText: "Delete obligation" })
+                    .then((yes) => { if (yes) { remove.mutate(); } });
+                }}>
                 <Trash2 className="h-4 w-4" aria-hidden /> Delete
               </button>
             ) : null}
@@ -266,6 +276,7 @@ const ObligationDetail: React.FC = () => {
           ))}
         </ol>
       </section>
+      {confirmDialog}
     </div>
   );
 };

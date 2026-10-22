@@ -130,6 +130,23 @@ def select_erp_post(
     return _select("automation.flow.erp_post", node_config=node_config, facts=facts, tenant=tenant)
 
 
+def _register_session_j_selectors() -> None:
+    """Session J: one R33 selector per new action. Each copies the author's configuration into an ActionSpec and proves
+    nothing in it came from a document (the generic `_select`); none of the new actions needs more than that."""
+    for suffix in ("document_tag", "review_assign", "legal_hold_place", "chat_post", "gst_remind_supplier",
+                   "obligation_create", "supplier_request_document"):
+        name = f"{SELECTOR_PREFIX}{suffix}"
+
+        def selector(*, node_config: ActionNodeConfig, facts: FactSet, tenant: TenantScope, _name: str = name) -> ActionSpec:
+            return _select(_name, node_config=node_config, facts=facts, tenant=tenant)
+
+        selector.__name__ = f"select_{suffix}"
+        register_tool_selector(name)(selector)
+
+
+_register_session_j_selectors()
+
+
 __all__ = [
     "SELECTOR_PREFIX",
     "select_autonomy_decide",

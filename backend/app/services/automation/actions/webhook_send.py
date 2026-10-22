@@ -60,8 +60,10 @@ def load_endpoint(
     endpoint_id: uuid.UUID,
     organization_id: uuid.UUID,
     workspace_id: uuid.UUID,
+    chat: bool = False,
 ) -> tuple[Optional[Any], Optional[str]]:
-    """The endpoint if this workspace may target it, else a refusal reason."""
+    """The endpoint if this workspace may target it, else a refusal reason. `chat` asks for a Slack or Teams endpoint
+    (`chat.post`); the default asks for an ordinary signed-JSON endpoint (`webhook.send`)."""
     from sqlalchemy import select
 
     from app.models.webhook_endpoint import WebhookEndpoint, WebhookEndpointStatus
@@ -77,6 +79,10 @@ def load_endpoint(
         return None, "This webhook endpoint is scoped to a different workspace."
     if endpoint.status is not WebhookEndpointStatus.ACTIVE:
         return None, "This webhook endpoint is disabled."
+    if chat and not endpoint.is_chat:
+        return None, "Choose a Slack or Microsoft Teams channel. This endpoint is an ordinary webhook."
+    if not chat and endpoint.is_chat:
+        return None, "This endpoint posts to Slack or Teams. Use 'Post a message to chat' for it."
     return endpoint, None
 
 
@@ -119,6 +125,8 @@ def build_payload(state: Any, config: WebhookSendConfig) -> dict[str, Any]:
     return {
         "rule": {"id": str(state.rule.id), "name": state.rule.name},
         "execution_id": str(state.execution.id),
+        # Session J: the same on a retry of this run, so a receiver that de-duplicates on it sees one delivery.
+        "idempotency_key": f"{_root_execution_id(state)}:{int(getattr(state, 'actions_executed', 0) or 0)}",
         "workspace_id": str(state.execution.workspace_id),
         "trigger": {
             "key": spec.key if spec else None,
@@ -139,10 +147,19 @@ def build_payload(state: Any, config: WebhookSendConfig) -> dict[str, Any]:
         "event": {
             f.key: _scalar(event_payload.get(f.key))
             for f in (spec.fields if spec else ())
-            if f.key not in ("failure_reason",)
+            # Session J: a money field is the same value as a payload key already listed (`variance_micros`,
+            # `amount`), shown in currency units to people; the webhook keeps the keys it always had.
+            if f.key not in ("failure_reason",) and not f.source_key
         },
         "fields": fields,
     }
+
+
+def _root_execution_id(state: Any) -> str:
+    from app.services.automation import volume
+
+    db = getattr(state, "db", None)
+    return str(volume.root_execution_id(db, state.execution) if db is not None else state.execution.id)
 
 
 def perform(state: Any, spec: Any) -> ActionOutcome:
@@ -188,4 +205,6 @@ DEFINITION = ActionDefinition(
     minimum_role=ROLE_ORGANIZATION_ADMIN,
     aliases=("webhook",),
     validate_resources=_validate,
+    # The payload carries an idempotency key that a retry repeats, so a receiver that de-duplicates sees one delivery.
+    idempotent=True,
 )

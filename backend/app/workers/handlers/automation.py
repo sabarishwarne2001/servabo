@@ -23,6 +23,7 @@ from app.models.workspace import Workspace
 logger = logging.getLogger("app.workers.handlers.automation")
 
 JOB_TYPE = "automation.execute"
+SWEEP_JOB_TYPE = "automation.sweep"
 
 
 class Outcome:
@@ -91,6 +92,9 @@ def handle_automation_execute(payload: dict[str, Any]) -> dict[str, Any]:
     from app.core.config import settings
     from app.db.session import SessionLocal
     from app.services.automation import executor
+
+    if payload.get("retry_execution_id"):
+        return _handle_retry(payload)
 
     raw_event_id = payload.get("outbox_event_id")
     if not raw_event_id:
@@ -164,6 +168,10 @@ def handle_automation_execute(payload: dict[str, Any]) -> dict[str, Any]:
         rules = _resolve_rules(
             db, workspace_id=workspace_id, event_type=event.event_type
         )
+        if event.event_type == "trigger.manual":
+            # Session J: pressing "Run a rule on this document" runs THAT rule, not every rule on the manual trigger.
+            wanted = str((event.payload or {}).get("rule_id") or "")
+            rules = [r for r in rules if str(r.id) == wanted]
         if not rules:
             return {"outcome": Outcome.SKIPPED, "reason": "no matching rules"}
 
@@ -182,8 +190,11 @@ def handle_automation_execute(payload: dict[str, Any]) -> dict[str, Any]:
             return {"outcome": Outcome.SKIPPED, "reason": "automations are not on this organization's plan"}
 
         from app import crud
+        from app.services.automation import volume
 
         ai_settings = crud.get_ai_settings(db, workspace_id=workspace_id)
+        workspace = db.get(Workspace, workspace_id)
+        manual_run = event.event_type == "trigger.manual"
 
         for rule in rules:
             if _already_ran_for_document(db, rule=rule, work_item=work_item, event=event):
@@ -195,6 +206,11 @@ def handle_automation_execute(payload: dict[str, Any]) -> dict[str, Any]:
                 results.append({"rule_id": str(rule.id), "status": "ALREADY_RAN"})
                 continue
             try:
+                # Session J: paused, throttled and in-cooldown runs are recorded as skipped, never run, never dropped.
+                hold = volume.gate(
+                    db, rule=rule, workspace=workspace, work_item_id=work_item.id if work_item else None,
+                    manual=manual_run,
+                )
                 execution, created = executor.create_execution(
                     db,
                     rule=rule,
@@ -205,6 +221,7 @@ def handle_automation_execute(payload: dict[str, Any]) -> dict[str, Any]:
                     work_item_id=work_item.id if work_item else None,
                     outbox_event_id=event.id,
                     causation_id=event.causation_id,
+                    hold=hold,
                 )
                 db.commit()
             except IntegrityError:
@@ -249,10 +266,12 @@ def handle_automation_execute(payload: dict[str, Any]) -> dict[str, Any]:
                 results.append({"rule_id": str(rule.id), "status": "REPLAY"})
                 continue
 
-            if execution.is_suppressed:
+            if execution.is_suppressed or execution.is_skipped:
                 results.append(
                     {"rule_id": str(rule.id), "status": execution.status.value}
                 )
+                if execution.status is AutomationExecutionStatus.SKIPPED_THROTTLED:
+                    _notify_throttled(db, rule=rule, execution=execution)
                 continue
 
             result = executor.run_execution(
@@ -288,12 +307,88 @@ def handle_automation_execute(payload: dict[str, Any]) -> dict[str, Any]:
         outcome = Outcome.TIMED_OUT
     elif AutomationExecutionStatus.FAILED.value in statuses:
         outcome = Outcome.FAILED
-    elif statuses and statuses <= {"SUPPRESSED_CYCLE", "SUPPRESSED_DEPTH", "REPLAY", "ALREADY_RAN"}:
+    elif statuses and statuses <= {
+        "SUPPRESSED_CYCLE", "SUPPRESSED_DEPTH", "REPLAY", "ALREADY_RAN",
+        "SKIPPED_THROTTLED", "SKIPPED_COOLDOWN", "SKIPPED_PAUSED",
+    }:
         outcome = Outcome.SUPPRESSED
     else:
         outcome = Outcome.COMPLETED
 
     return {"outcome": outcome, "executions": results}
+
+
+def _handle_retry(payload: dict[str, Any]) -> dict[str, Any]:
+    """Session J: run a retry that a person asked for from Run history (the run was already created, QUEUED)."""
+    from datetime import datetime, timezone
+
+    from app import crud
+    from app.api import capability_gate
+    from app.core import entitlements
+    from app.core.config import settings
+    from app.db.session import SessionLocal
+    from app.models.automation_execution import AutomationExecution
+    from app.services.automation import executor, volume
+
+    if not settings.AUTOMATION_ENGINE_ENABLED:
+        return {"outcome": Outcome.SKIPPED, "reason": "engine disabled"}
+
+    execution_id = uuid.UUID(str(payload["retry_execution_id"]))
+    with SessionLocal() as db:
+        execution = db.get(AutomationExecution, execution_id)
+        if execution is None or execution.status is not AutomationExecutionStatus.QUEUED:
+            return {"outcome": Outcome.SKIPPED, "reason": "retry is not waiting to run"}
+        rule = db.get(AutomationRule, execution.rule_id)
+        workspace = db.get(Workspace, execution.workspace_id)
+
+        def _skip(status: AutomationExecutionStatus, reason: str) -> dict[str, Any]:
+            execution.status = status
+            execution.error = reason
+            execution.completed_at = datetime.now(timezone.utc)
+            db.commit()
+            return {"outcome": Outcome.SKIPPED, "executions": [{"rule_id": str(execution.rule_id), "status": status.value}]}
+
+        if rule is None or rule.deleted_at is not None:
+            return _skip(AutomationExecutionStatus.FAILED, "The rule was deleted before the retry could run.")
+        if volume.is_paused(workspace):
+            return _skip(
+                AutomationExecutionStatus.SKIPPED_PAUSED,
+                "This workspace's automations are paused, so the retry did not run.",
+            )
+        if not capability_gate.has_capability(
+            db, organization_id=execution.organization_id, capability_key=entitlements.AUTOMATIONS_CAPABILITY
+        ):
+            return _skip(AutomationExecutionStatus.FAILED, "Automations are not on this organization's plan.")
+
+        root_id = volume.root_execution_id(db, execution)
+        root = db.get(AutomationExecution, root_id)
+        event = (
+            db.execute(select(OutboxEvent).where(OutboxEvent.id == root.outbox_event_id)).scalar_one_or_none()
+            if root is not None and root.outbox_event_id is not None
+            else None
+        )
+        work_item = (
+            db.execute(
+                select(WorkItem).where(WorkItem.id == execution.work_item_id, WorkItem.workspace_id == execution.workspace_id)
+            ).scalar_one_or_none()
+            if execution.work_item_id
+            else None
+        )
+        ai_settings = crud.get_ai_settings(db, workspace_id=execution.workspace_id)
+        result = executor.run_execution(
+            db,
+            execution=execution,
+            rule=rule,
+            work_item=work_item,
+            trigger_event=event,
+            call_model=_model_caller(db, execution, rule, ai_settings) if ai_settings is not None else None,
+        )
+        _notify_rule_owner(db, rule=rule, execution=execution, work_item=work_item, status=result.status)
+        rule_id = str(rule.id)
+    return {
+        "outcome": Outcome.COMPLETED if result.status is AutomationExecutionStatus.COMPLETED else Outcome.FAILED,
+        "executions": [{"rule_id": rule_id, "status": result.status.value}],
+    }
 
 
 def _already_ran_for_document(
@@ -461,6 +556,48 @@ def _notify_rule_owner(
         )
 
 
+def _notify_throttled(db: Session, *, rule: Any, execution: Any) -> None:
+    """Session J: tell the rule's author, once a day at most, that the rule is being held back by its limit."""
+    from datetime import datetime, timezone
+
+    from app.services.automation import volume
+
+    if rule.created_by_user_id is None or not volume.should_notify_throttled(rule):
+        return
+    try:
+        from app import crud
+        from app.models.notification import NotificationChannel, NotificationPriority, NotificationType
+        from app.schemas.notification import NotificationCreate
+
+        limit = volume.effective_runs_per_hour(rule)
+        crud.create_notification(
+            db,
+            workspace_id=rule.workspace_id,
+            notification_in=NotificationCreate(
+                user_id=rule.created_by_user_id,
+                work_item_id=None,
+                title=f"Automation held back: {rule.name}"[:150],
+                message=(
+                    f"{rule.name} reached its limit of {limit} runs an hour, so further runs are being skipped "
+                    "until the hour passes. They are listed in Run history as Skipped. "
+                    "Raise the limit on the rule if that is too low."
+                )[:500],
+                notification_type=NotificationType.AUTOMATION,
+                priority=NotificationPriority.WARNING,
+                delivery_channel=NotificationChannel.IN_APP,
+            ),
+        )
+        rule.throttle_notified_at = datetime.now(timezone.utc)
+        db.commit()
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        logger.warning(
+            "automation.throttle_notice_failed",
+            extra={"rule_id": str(rule.id), "execution_id": str(getattr(execution, "id", None))},
+            exc_info=True,
+        )
+
+
 def _emit_budget_exhausted(db: Session, *, execution: Any, event: OutboxEvent) -> None:
     from app.services import outbox_service
 
@@ -481,4 +618,15 @@ def _emit_budget_exhausted(db: Session, *, execution: Any, event: OutboxEvent) -
     db.commit()
 
 
-__all__ = ["JOB_TYPE", "Outcome", "handle_automation_execute"]
+def handle_automation_sweep(payload: dict[str, Any]) -> dict[str, Any]:
+    """Session J: the hourly announcements the clock makes true (schedules, the GST clocks)."""
+    from app.db.session import SessionLocal
+    from app.services.automation import sweeps
+
+    with SessionLocal() as db:
+        result = sweeps.run(db)
+        db.commit()
+    return {"outcome": Outcome.COMPLETED, **result}
+
+
+__all__ = ["JOB_TYPE", "SWEEP_JOB_TYPE", "Outcome", "handle_automation_execute", "handle_automation_sweep"]

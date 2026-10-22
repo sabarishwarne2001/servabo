@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Eye, Loader2, RotateCcw, Save } from "lucide-react";
 
 import { PreviewPanel } from "@/components/erp/PreviewPanel";
+import { useConfirmDialog } from "@/components/common/useConfirmDialog";
 import { BUTTON_GHOST, BUTTON_PRIMARY, FIELD_LABEL, HINT, INPUT, SELECT, TEXTAREA } from "@/components/ui/primitives";
 import {
   erpKeys, getMappings, listOutcomes, previewPosting, restoreDefaultMapping, saveMapping, validateMapping,
@@ -34,6 +35,7 @@ const Draft: React.FC<MappingEditorProps & { readonly versions: MappingVersions 
   workspaceId, targetId, kind, catalog, isAdmin, versions,
 }) => {
   const queryClient = useQueryClient();
+  const { ask, confirmDialog } = useConfirmDialog();
   const [text, setText] = useState(pretty(versions.active?.spec ?? versions.default_spec));
   const [note, setNote] = useState("");
   const [check, setCheck] = useState<MappingCheck | null>(null);
@@ -125,7 +127,10 @@ const Draft: React.FC<MappingEditorProps & { readonly versions: MappingVersions 
             {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Save className="h-4 w-4" aria-hidden />} Save as new version
           </button>
           <button type="button" className={BUTTON_GHOST} disabled={restore.isPending}
-            onClick={() => { if (window.confirm("Replace the active mapping with the default for this format?")) { restore.mutate(); } }}>
+            onClick={() => {
+              void ask({ title: "Restore the default mapping?", message: "The active mapping is replaced by the default for this format, as a new version. Earlier versions are kept.", confirmText: "Restore default", tone: "primary" })
+                .then((yes) => { if (yes) { restore.mutate(); } });
+            }}>
             <RotateCcw className="h-4 w-4" aria-hidden /> Restore default
           </button>
           {candidates.length > 0 ? (
@@ -177,6 +182,7 @@ const Draft: React.FC<MappingEditorProps & { readonly versions: MappingVersions 
           </div>
         </details>
       ) : null}
+      {confirmDialog}
     </div>
   );
 };

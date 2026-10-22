@@ -119,6 +119,7 @@ def run(db: Session, book: HelmBook, *, triggered_by: str = v.TRIGGER_SCHEDULE, 
 
     keep: set[str] = set()
     auto_run: list[HelmAction] = []
+    persisted: list[HelmAction] = []
     chain_waits = 0
     for proposal in composition.proposals:
         candidate = proposal.candidate
@@ -131,6 +132,7 @@ def run(db: Session, book: HelmBook, *, triggered_by: str = v.TRIGGER_SCHEDULE, 
         if action is None:
             continue
         keep.add(action.idempotency_key)
+        persisted.append(action)
         mandate = candidate.mandate
         # An action an approval chain covers waits for its people, whatever the act cap says.
         if (action.state == v.ACTION_PROPOSED and proposal.result.can_run_alone and need.approvals <= 1
@@ -162,9 +164,29 @@ def run(db: Session, book: HelmBook, *, triggered_by: str = v.TRIGGER_SCHEDULE, 
     from app.services.helm import webhooks
 
     webhooks.after_plan(db, book=book, plan=plan, previous=previous_states)
+    _announce_to_automation(db, book=book, plan=plan, previous=previous_states, actions=persisted)
     logger.info("helm.planned", extra={"book_id": str(book.id), "version": version, "status": composition.status,
                                        "actions": len(composition.proposals), "ms": plan.duration_ms})
     return plan
+
+
+def _announce_to_automation(db: Session, *, book: HelmBook, plan: HelmPlan, previous: dict[str, str],
+                            actions: list[HelmAction]) -> None:
+    """Session J: a mandate that became breached, and an action that now waits for a person, are automation triggers
+    (once each: the mark is the plan and mandate, or the action). Never the sample company. Rules on these triggers can
+    tell people and open a review; none of the actions they may run moves money."""
+    if book.kind == v.BOOK_SAMPLE:
+        return
+    from app.services.automation import emitters
+    from app.services.helm.mandates import base
+
+    for row in (plan.summary or {}).get("instruments") or []:
+        mandate_id = str(row.get("mandate_id"))
+        if row.get("state") == base.BREACHED and previous.get(mandate_id) != base.BREACHED:
+            emitters.helm_mandate_breached(db, book=book, plan=plan, instrument=row, previous_state=previous.get(mandate_id))
+    for action in actions:
+        if action.state == v.ACTION_PROPOSED and action.needs_approval:
+            emitters.helm_approval_needed(db, book=book, action=action)
 
 
 def _persist(db: Session, *, book: HelmBook, plan: HelmPlan, proposal: planner.Proposal, snapshot, mandates,

@@ -37,6 +37,8 @@ class WebhookEndpoint(Base, UUIDMixin, TimestampMixin):
 
     __table_args__ = (
         CheckConstraint("url LIKE 'https://%'", name="ck_webhook_endpoints_https_only"),
+        CheckConstraint("kind IN ('GENERIC', 'SLACK', 'TEAMS')", name="ck_webhook_endpoints_kind"),
+        CheckConstraint("(kind = 'GENERIC') = (url_encrypted IS NULL)", name="ck_webhook_endpoints_chat_url_encrypted"),
         CheckConstraint(
             "cardinality(event_types) >= 1",
             name="ck_webhook_endpoints_event_types_non_empty",
@@ -89,6 +91,10 @@ class WebhookEndpoint(Base, UUIDMixin, TimestampMixin):
     )
 
     url: Mapped[str] = mapped_column(Text, nullable=False)
+    #: Session J. 'GENERIC' (a signed JSON event), or a chat incoming webhook ('SLACK', 'TEAMS'). For a chat endpoint `url` is
+    #: a masked display form and the real URL, which is a secret, is `url_encrypted` (MultiFernet).
+    kind: Mapped[str] = mapped_column(String(8), nullable=False, server_default=text("'GENERIC'"))
+    url_encrypted: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     event_types: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False)
 
@@ -150,6 +156,19 @@ class WebhookEndpoint(Base, UUIDMixin, TimestampMixin):
     @property
     def is_auto_disabled(self) -> bool:
         return self.auto_disabled and not self.is_active
+
+    @property
+    def is_chat(self) -> bool:
+        return self.kind != "GENERIC"
+
+    @property
+    def delivery_url(self) -> str:
+        """Where a delivery is sent: the decrypted secret URL of a chat endpoint, else `url`."""
+        if self.url_encrypted:
+            from app.core.encryption import decrypt_secret
+
+            return decrypt_secret(self.url_encrypted)
+        return self.url
 
     @property
     def is_active(self) -> bool:

@@ -77,6 +77,9 @@ export default [
       ...tsPlugin.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
 
+      // Session J: Servabo shows its own dialogs (ConfirmDialog), never the browser's pop-ups.
+      "no-alert": "error",
+
       "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": [
         "error",

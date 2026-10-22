@@ -72,6 +72,7 @@ import {
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TabList, TabPanel, useUrlTab, type TabDefinition } from "@/components/ui/Tabs";
 import { formatNumber } from "@/utils/displayTime";
+import { useConfirmDialog } from "@/components/common/useConfirmDialog";
 
 const CARD =
   "rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm";
@@ -251,6 +252,7 @@ const DestinationRow: React.FC<{
   destination: WarehouseDestination;
 }> = ({ organizationId, destination }) => {
   const queryClient = useQueryClient();
+  const { ask, confirmDialog } = useConfirmDialog();
   const [editing, setEditing] = useState(false);
 
   const probe = useMutation({
@@ -338,9 +340,8 @@ const DestinationRow: React.FC<{
             className={DANGER}
             disabled={remove.isPending}
             onClick={() => {
-              if (window.confirm(`Delete "${destination.label}"?`)) {
-                remove.mutate();
-              }
+              void ask({ title: `Delete "${destination.label}"?`, message: "The warehouse destination is removed. This cannot be undone.", confirmText: "Delete destination" })
+                .then((yes) => { if (yes) { remove.mutate(); } });
             }}
           >
             <Trash2 className="h-4 w-4" />
@@ -366,6 +367,7 @@ const DestinationRow: React.FC<{
       {remove.isError ? (
         <p className="text-sm text-red-700">{errorMessage(remove.error)}</p>
       ) : null}
+      {confirmDialog}
     </div>
   );
 };
