@@ -479,6 +479,7 @@ export const WorkItemDetails: React.FC = () => {
                         activeField={activeField}
                         onSelectField={selectField}
                         confidence={confidence.data}
+                        einvoiceQr={workItem.einvoice_qr ?? null}
                       />
                     )}
                   </div>

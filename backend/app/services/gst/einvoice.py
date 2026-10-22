@@ -9,7 +9,7 @@ value, the item count, the main HSN code and the **IRN**. An IRN read from the c
   detectors. That runs in the **OCR worker** (`document.extract`), the only image that carries OpenCV, and keeps the
   decoded token texts in `extraction_metadata["qr_codes"]`. Reading the token (this module: base64, JSON, RSA) is plain
   Python and happens in the enrich worker.
-* **Trust.** The signature is **verified only when a public key is configured** (`EINVOICE_QR_PUBLIC_KEY_PEM`, NIC's
+* **Trust.** (Three states are shown on the document: signature not checked, checked, does not match.) The signature is **verified only when a public key is configured** (`EINVOICE_QR_PUBLIC_KEY_PEM`, NIC's
   published key; none is shipped). Otherwise the values are marked "signature not verified" and are used as a person
   would use a scribble that agrees: they fill what the model left empty and never replace what it read; a difference
   is recorded for a person to see. Values from a **verified** code win over the model's reading.
@@ -37,6 +37,9 @@ from app.services.gst import fields as f
 logger = logging.getLogger("app.services.gst.einvoice")
 
 SOURCE = "from the e-invoice QR code"
+SIGNATURE_NOT_CHECKED = "not_checked"
+SIGNATURE_CHECKED = "checked"
+SIGNATURE_DOES_NOT_MATCH = "does_not_match"
 MAX_PAGES = 3
 RENDER_SCALE = 2.5
 MAX_TOKEN_CHARS = 20_000
@@ -58,6 +61,9 @@ class EInvoiceQr:
     irn_date: Optional[str] = None
     issuer: Optional[str] = None
     signature_verified: bool = False
+    #: Final session 1 (3D). "not_checked" (no NIC key is configured), "checked" (the signature verifies with it) or
+    #: "does_not_match" (a key is configured and the signature fails: the code may be forged or damaged).
+    signature_state: str = SIGNATURE_NOT_CHECKED
 
 
 # --------------------------------------------------------------------------------------------- the payload
@@ -110,6 +116,7 @@ def parse_token(token: str, *, public_key_pem: Optional[str] = None) -> Optional
     if seller is None or not _IRN.match(irn) or not number:
         return None
     verified = bool(public_key_pem) and verify_signature(text, public_key_pem or "")
+    state = (SIGNATURE_CHECKED if verified else SIGNATURE_DOES_NOT_MATCH) if public_key_pem else SIGNATURE_NOT_CHECKED
     item_count = data.get("ItemCnt")
     return EInvoiceQr(
         seller_gstin=seller, buyer_gstin=f.gstin_of(data.get("BuyerGstin")), doc_number=number,
@@ -119,7 +126,7 @@ def parse_token(token: str, *, public_key_pem: Optional[str] = None) -> Optional
         main_hsn=str(data["MainHsnCode"]).strip()[:8] if data.get("MainHsnCode") else None,
         irn_date=str(data["IrnDt"]) if data.get("IrnDt") else None,
         issuer=str(payload.get("iss")) if isinstance(payload, dict) and payload.get("iss") else None,
-        signature_verified=verified)
+        signature_verified=verified, signature_state=state)
 
 
 def verify_signature(token: str, public_key_pem: str) -> bool:
@@ -196,11 +203,26 @@ def apply(entities: dict[str, Any], qr: EInvoiceQr) -> dict[str, Any]:
             conflicts.append({"field": key, "model": model, "qr": value, "used": "qr"})
         else:
             conflicts.append({"field": key, "model": model, "qr": value, "used": "model"})
-    return {"source": SOURCE, "signature_verified": qr.signature_verified, "issuer": qr.issuer, "irn": qr.irn,
-            "filled": filled, "confirmed": confirmed, "overridden": overridden, "conflicts": conflicts,
-            "note": ("The signature was verified with the configured public key." if qr.signature_verified else
-                     "The signature was not verified (no public key is configured), so these values do not replace "
-                     "what was read from the page.")}
+    notes = {
+        SIGNATURE_CHECKED: "The signature was verified with the configured public key.",
+        SIGNATURE_DOES_NOT_MATCH: "The signature was not verified: it does not match the configured public key, so these values do not "
+                                  "replace what was read from the page. The code may be damaged or not genuine.",
+        SIGNATURE_NOT_CHECKED: "The signature was not verified (no public key is configured), so these values do not replace what was "
+                               "read from the page.",
+    }
+    return {"source": SOURCE, "signature_verified": qr.signature_verified, "signature": qr.signature_state, "issuer": qr.issuer,
+            "irn": qr.irn, "filled": filled, "confirmed": confirmed, "overridden": overridden, "conflicts": conflicts,
+            "note": notes[qr.signature_state]}
+
+
+def provenance(record: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
+    """What the document page shows of the stored record: the same, with `signature` filled in for records stored before the three
+    states existed."""
+    if not isinstance(record, dict):
+        return None
+    out = dict(record)
+    out.setdefault("signature", SIGNATURE_CHECKED if record.get("signature_verified") else SIGNATURE_NOT_CHECKED)
+    return out
 
 
 def enrich_work_item(entities: dict[str, Any], work_item: Any) -> Optional[dict[str, Any]]:
@@ -219,4 +241,4 @@ def enrich_work_item(entities: dict[str, Any], work_item: Any) -> Optional[dict[
     return None
 
 
-__all__ = ["EInvoiceQr", "SOURCE", "apply", "enrich_work_item", "fields_of", "parse_token", "verify_signature"]
+__all__ = ["EInvoiceQr", "SIGNATURE_CHECKED", "SIGNATURE_DOES_NOT_MATCH", "SIGNATURE_NOT_CHECKED", "SOURCE", "apply", "provenance", "enrich_work_item", "fields_of", "parse_token", "verify_signature"]

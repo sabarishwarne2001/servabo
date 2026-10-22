@@ -615,7 +615,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("command", choices=[
         "subscribe", "seats", "change-plan", "cancel", "cancel-at-period-end", "renewal-fails", "payment-fails-again", "mark-unpaid",
         "card-fixed", "refund", "dodo-catalogue", "cancel-addon", "addon-grace-ends", "trial-ending", "trial-ends", "run-job", "dns-publish", "saml-idp",
-        "saml-response", "truthmesh-fill", "truthmesh-stick", "fail-document", "calibration-history", "inbound-email"])
+        "saml-response", "truthmesh-fill", "truthmesh-stick", "fail-document", "calibration-history", "inbound-email", "einvoice-qr"])
     parser.add_argument("--gateway", choices=["dodo", "stripe"], type=str.lower,
                         default=_gateway_from_argv([]), help="whose side to play (default: E2E_GATEWAY, else dodo)")
     parser.add_argument("--amount", type=int, help="refund: in cents (default: the whole payment)")
@@ -623,6 +623,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--plan", default="developer")
     parser.add_argument("--seats", type=int, default=1)
     parser.add_argument("--job", help="job type for run-job")
+    parser.add_argument("--signature", choices=["not_checked", "checked", "does_not_match"], default="not_checked",
+                        help="einvoice-qr: the state of the QR code's signature on the document")
     parser.add_argument("--now", help="run-job: the clock the job sees (ISO 8601 with an offset), for the jobs that read it "
                                       "(gst.digest, gst.notices); ignored in production")
     parser.add_argument("--addon", default="addon.gst_credit", help="cancel-addon, addon-grace-ends: the add-on key")
@@ -635,7 +637,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--domain", help="saml-idp, saml-response: the customer's email domain")
     parser.add_argument("--email", help="saml-response: who signs in")
     parser.add_argument("--saml-request", help="saml-response: the SAMLRequest Servabo sent (redirect binding)")
-    parser.add_argument("--document", help="fail-document: the document (work item) id")
+    parser.add_argument("--document", help="fail-document, einvoice-qr: the document (work item) id")
     parser.add_argument("--count", type=int, default=600, help="calibration-history: how many reviewed outcomes to add")
     parser.add_argument("--file", help="inbound-email: a file to attach (a PDF, a zip, ...)")
     parser.add_argument("--from", dest="sender", default="ap@supplier.example", help="inbound-email: the sender's address")
@@ -673,6 +675,45 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if args.command == "inbound-email":
         return _inbound_email(args)
+
+    if args.command == "einvoice-qr":
+        # What the OCR and enrich workers leave on a document that carried an e-invoice QR code (a real signed token, generated
+        # here with a fresh key), in one of the three signature states. The browser cannot draw a QR code for the OCR worker to read.
+        import base64
+        import json as _json
+
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import padding, rsa
+        from sqlalchemy.orm.attributes import flag_modified
+
+        from app.models.work_item import WorkItem
+        from app.services.gst import builder as gst_builder
+        from app.services.gst import einvoice
+
+        def b64(raw: bytes) -> str:
+            return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+        seller = gst_builder.make_gstin("27", "AABCS5555K")
+        private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        other = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        pem = lambda key: key.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode()  # noqa: E731
+        data = {"SellerGstin": seller, "BuyerGstin": gst_builder.make_gstin("27", "AAACM1234F"), "DocNo": "INV/25-26/0042", "DocTyp": "INV",
+                "DocDt": "05/09/2026", "TotInvVal": 118000.0, "ItemCnt": 3, "MainHsnCode": "8708", "Irn": "9f1c" * 16}
+        header = b64(_json.dumps({"alg": "RS256", "typ": "JWT"}).encode())
+        payload = b64(_json.dumps({"data": _json.dumps(data), "iss": "NIC"}).encode())
+        token = f"{header}.{payload}.{b64(private.sign(f'{header}.{payload}'.encode(), padding.PKCS1v15(), hashes.SHA256()))}"
+        key = {"not_checked": None, "checked": pem(private), "does_not_match": pem(other)}[args.signature]
+        with SessionLocal() as db, db.begin():
+            item = db.get(WorkItem, uuid.UUID(args.document))
+            entities = dict(item.extracted_entities or {})
+            entities.update({"invoice_number": "INV/25-26/0042", "vendor_gstin": seller, "total_amount": "99999.00"})
+            record = einvoice.apply(entities, einvoice.parse_token(token, public_key_pem=key))
+            item.extracted_entities = entities
+            item.extraction_metadata = {**(item.extraction_metadata or {}), "einvoice_qr": record}
+            flag_modified(item, "extracted_entities")
+            flag_modified(item, "extraction_metadata")
+        print(_json.dumps({"document": args.document, "signature": args.signature, "irn": data["Irn"]}))
+        return 0
 
     if args.command == "fail-document":
         # A worker that died on a document: the document reads FAILED, as the "Retry processing" button expects.

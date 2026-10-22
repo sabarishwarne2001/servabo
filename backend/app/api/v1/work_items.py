@@ -236,6 +236,10 @@ def get_work_item(
 
     # Final session 1 (2B): the document page says "Arrived by email from ..." when it did.
     work_item.source = db.get(WorkItemSource, work_item.id)  # type: ignore[attr-defined]
+    from app.services.gst import einvoice
+
+    # Final session 1 (3D): "From the e-invoice QR code", the IRN and the signature line.
+    work_item.einvoice_qr = einvoice.provenance((work_item.extraction_metadata or {}).get("einvoice_qr"))  # type: ignore[attr-defined]
     return work_item
 
 

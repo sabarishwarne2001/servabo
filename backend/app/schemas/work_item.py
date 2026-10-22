@@ -113,6 +113,8 @@ class WorkItemResponse(WorkItemBase):
     duplicate_of: Union[WorkItemReference, None] = None
     # Final session 1 (2B): "Arrived by email from ...", on the document's own page.
     source: Union[WorkItemSourceInfo, None] = None
+    # Final session 1 (3D): which fields came from the e-invoice QR code, the IRN and the state of the signature.
+    einvoice_qr: Union[dict[str, Any], None] = None
 
     model_config = {
         "from_attributes": True  # Enables direct mapping from SQLAlchemy 2.0 ORM objects

@@ -175,3 +175,36 @@ def test_the_ocr_worker_keeps_the_token_and_the_enrich_worker_merges_it(monkeypa
     assert einvoice.enrich_work_item({}, SimpleNamespace(extraction_metadata={"qr_codes": ["a.b.c", 7]})) is None
     assert einvoice_scan.scan_work_item(SimpleNamespace(file_type="application/pdf", stored_filename="missing.pdf")) == []
     assert einvoice_scan.scan_work_item(SimpleNamespace(file_type="text/plain", stored_filename="stored.pdf")) == []
+
+
+# ---------------------------------------------------------------------------------------- Final session 1 (3D): three signature states
+
+def test_the_signature_has_three_states_not_checked_checked_and_does_not_match():
+    private = key()
+    text = token(private)
+    assert einvoice.parse_token(text).signature_state == einvoice.SIGNATURE_NOT_CHECKED                       # no key configured
+    assert einvoice.parse_token(text, public_key_pem=pem(private)).signature_state == einvoice.SIGNATURE_CHECKED
+    assert einvoice.parse_token(text, public_key_pem=pem(key())).signature_state == einvoice.SIGNATURE_DOES_NOT_MATCH   # another key
+    head, _payload, signature = text.split(".")
+    forged = b64(json.dumps({"data": json.dumps({"SellerGstin": SUPPLIER_A, "DocNo": "X", "Irn": IRN}), "iss": "NIC"}).encode())
+    assert einvoice.parse_token(f"{head}.{forged}.{signature}", public_key_pem=pem(private)).signature_state == einvoice.SIGNATURE_DOES_NOT_MATCH
+
+
+def test_the_stored_record_says_which_state_and_a_mismatch_never_overrides_the_model():
+    private = key()
+    entities = {"total_amount": "99999.00"}
+    mismatch = einvoice.apply(entities, einvoice.parse_token(token(private), public_key_pem=pem(key())))
+    assert mismatch["signature"] == "does_not_match" and mismatch["signature_verified"] is False
+    assert entities["total_amount"] == "99999.00"                       # a code that fails its signature is not preferred
+    assert mismatch["conflicts"] == [{"field": "total_amount", "model": "99999.00", "qr": "118000.00", "used": "model"}]
+    assert "does not match" in mismatch["note"]
+    checked = einvoice.apply({"total_amount": "99999.00"}, einvoice.parse_token(token(private), public_key_pem=pem(private)))
+    assert checked["signature"] == "checked"
+    plain = einvoice.apply({}, einvoice.parse_token(token(private)))
+    assert plain["signature"] == "not_checked"
+
+
+def test_a_record_stored_before_the_three_states_still_reads_as_two_of_them():
+    assert einvoice.provenance({"signature_verified": True, "irn": IRN})["signature"] == "checked"
+    assert einvoice.provenance({"signature_verified": False, "irn": IRN})["signature"] == "not_checked"
+    assert einvoice.provenance(None) is None and einvoice.provenance({"signature": "does_not_match"})["signature"] == "does_not_match"

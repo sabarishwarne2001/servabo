@@ -29,6 +29,8 @@ import { ApiError } from "@/services/api/client";
 import { workItemKeys } from "@/services/api/queryKeys";
 import { formatDateTime } from "@/utils/formatters";
 import { evidenceKey } from "@/components/workItems/DocumentPageViewer";
+import { EinvoiceQrStrip, QrConflict, QrFieldBadge, qrFields } from "@/components/workItems/EinvoiceQrBadge";
+import type { EinvoiceQr } from "@/types/workItem";
 
 type Plain = string | number | boolean | null;
 
@@ -84,6 +86,8 @@ interface ExtractedFieldsPanelProps {
   readonly onSelectField: (field: string, page: number | null) => void;
   /** Verification's score for the document and each field; absent or null when never verified. */
   readonly confidence?: DocumentConfidence | undefined;
+  /** Final session 1 (3D): what the e-invoice QR code supplied, and its signature. */
+  readonly einvoiceQr?: EinvoiceQr | null | undefined;
 }
 
 /** The pipeline's own bookkeeping, shown in the header rather than as a field. */
@@ -107,6 +111,7 @@ export const ExtractedFieldsPanel: React.FC<ExtractedFieldsPanelProps> = ({
   activeField,
   onSelectField,
   confidence,
+  einvoiceQr = null,
 }) => {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState("");
@@ -114,6 +119,7 @@ export const ExtractedFieldsPanel: React.FC<ExtractedFieldsPanelProps> = ({
     () => new Map((confidence?.fields ?? []).map((f) => [f.field, f] as const)),
     [confidence],
   );
+  const fromQr = useMemo(() => qrFields(einvoiceQr), [einvoiceQr]);
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [reason, setReason] = useState("");
@@ -247,6 +253,7 @@ export const ExtractedFieldsPanel: React.FC<ExtractedFieldsPanelProps> = ({
           </div>
         ) : null}
       </header>
+      {einvoiceQr ? <EinvoiceQrStrip qr={einvoiceQr} /> : null}
       {!canEdit && readOnlyReason && (
         <p role="note" className="border-b border-border bg-primary/[0.04] px-4 py-2.5 text-xs leading-relaxed text-muted-foreground">
           {readOnlyReason}
@@ -284,6 +291,7 @@ export const ExtractedFieldsPanel: React.FC<ExtractedFieldsPanelProps> = ({
                 >
                   <span className="flex items-center gap-1.5">
                     <span className="fp-eyebrow block text-[10.5px]">{fieldLabel(key)}</span>
+                    {fromQr.has(key) ? <QrFieldBadge /> : null}
                     {fieldScores.get(key) ? (
                       <span
                         className={`inline-flex items-center gap-0.5 rounded border px-1 text-[10px] font-semibold tabular-nums ${confidenceTone(fieldScores.get(key)?.confidence ?? 0)}`}
@@ -299,6 +307,7 @@ export const ExtractedFieldsPanel: React.FC<ExtractedFieldsPanelProps> = ({
                   {!isEditing && (
                     <span className="mt-1 block break-words text-sm font-medium text-foreground">{show(value)}</span>
                   )}
+                  {!isEditing && einvoiceQr ? <QrConflict qr={einvoiceQr} field={key} /> : null}
                 </button>
                 {!isEditing && (
                   <div className="flex flex-shrink-0 items-center gap-1.5">

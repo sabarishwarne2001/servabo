@@ -2370,3 +2370,11 @@ A guided form (company and five ledger names) makes a download target in Tally's
 and SGST to their own Input ledgers for a supplier in the buyer's state, IGST to one ledger for another state. It is the ERP posting capability, so it is on
 Business and Enterprise like every posting target. **OPEN:** Tally is what many Indian small businesses use and a download file needs no live connection; if
 Developer should get it (alone, or as an add-on), that is a plan and price decision for the owner and nothing was changed.
+
+## N-175 — The e-invoice QR code on the document screen (DECIDED (Final 1), following Session F)
+
+Every field the QR code supplied or checked shows "From the e-invoice QR code"; the IRN has a copy button; one line says "signature not checked" (no NIC
+key configured, today), "signature checked" (the key verifies it) or "signature does not match" (a key is configured and fails; warning colour). Where the
+page's reading and the code differ both values are shown. **Which one is used follows Session F's rule, which was in the code but never written down:** the
+code's value wins only when its signature was checked; otherwise the page's reading stays and the difference is shown for a person to decide. A wrong key in
+`EINVOICE_QR_PUBLIC_KEY_PEM` makes every code read "does not match", so set it from NIC's published key (not shipped).
