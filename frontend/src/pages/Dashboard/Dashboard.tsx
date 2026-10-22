@@ -38,6 +38,7 @@ import { canCreateContent, isAtLeast } from "@/permissions/workspacePermissions"
 import { workItemDetailsPath, workItemsPath } from "@/routes/tenantPaths";
 import { formatDateTime } from "@/utils/formatters";
 import type { DashboardDocTypeDistribution, DashboardEventType } from "@/types/dashboard";
+import { errorMessage } from "@/services/api/errors";
 
 // Each event wears a colour, an icon and its name, never the colour alone.
 const EVENTS: Readonly<Record<DashboardEventType, { readonly tone: string; readonly icon: React.ElementType; readonly label: string }>> = {
@@ -173,7 +174,7 @@ export const Dashboard: React.FC = () => {
     },
     onError: (error: unknown) => {
       if (error instanceof ApiError) {
-        toast.error(error.message ?? "Unable to reprocess the document.");
+        toast.error(errorMessage(error, "Unable to reprocess the document."));
         return;
       }
       toast.error("Unexpected network error.");

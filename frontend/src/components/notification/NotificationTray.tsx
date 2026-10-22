@@ -22,6 +22,7 @@ import { useActiveWorkspaceId } from "@/hooks/useActiveWorkspace";
 import { notificationKeys, keepPreviousWithinWorkspace } from "@/services/api/queryKeys";
 import type { Notification } from "@/types/notification";
 import { pollUnlessRefused } from "@/services/api/polling";
+import { errorMessage } from "@/services/api/errors";
 
 interface NotificationTrayProps {
   readonly isOpen: boolean;
@@ -76,7 +77,7 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
     },
     onError: (err: unknown) => {
       if (err instanceof ApiError) {
-        toast.error(err.message || "Failed to update notification state.");
+        toast.error(errorMessage(err, "Failed to update notification state."));
       }
     },
   });
@@ -91,7 +92,7 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
     },
     onError: (err: unknown) => {
       if (err instanceof ApiError) {
-        toast.error(err.message || "Failed to process bulk read updates.");
+        toast.error(errorMessage(err, "Failed to process bulk read updates."));
       }
     },
   });
@@ -110,7 +111,7 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
     },
     onError: (err: unknown) => {
       if (err instanceof ApiError) {
-        toast.error(err.message || "Failed to remove notification card.");
+        toast.error(errorMessage(err, "Failed to remove notification card."));
       }
     },
   });

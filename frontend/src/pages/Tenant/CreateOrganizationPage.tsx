@@ -29,6 +29,7 @@ import {
 } from "@/services/api/organization";
 import { authApi } from "@/services/api/auth";
 import { useAuthStore } from "@/store/useAuthStore";
+import { errorMessage } from "@/services/api/errors";
 
 const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
   const [debounced, setDebounced] = useState<T>(value);
@@ -147,11 +148,11 @@ export const CreateOrganizationPage: React.FC = () => {
           error.code === API_ERROR_CODES.SLUG_UNAVAILABLE ||
           error.code === API_ERROR_CODES.SLUG_RESERVED
         ) {
-          toast.error(error.message);
+          toast.error(errorMessage(error, "That identifier cannot be used. Choose another."));
           setSlugTouched(true);
           return;
         }
-        toast.error(error.message);
+        toast.error(errorMessage(error, "Unable to create your organization. Please try again."));
         return;
       }
       toast.error("Unable to create your organization. Please try again.");

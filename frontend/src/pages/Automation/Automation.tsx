@@ -70,6 +70,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/Select";
+import { errorMessage } from "@/services/api/errors";
 
 // Human-readable labels for logic operators displayed in lists
 const OPERATOR_DISPLAY_MAP: Record<string, string> = {
@@ -317,7 +318,7 @@ export const Automation: React.FC = () => {
     },
     onError: (err: unknown) => {
       if (err instanceof ApiError) {
-        toast.error(err.message || "Failed to remove automation rule.");
+        toast.error(errorMessage(err, "Failed to remove automation rule."));
       } else {
         toast.error("An unexpected validation failure occurred.");
       }
@@ -365,7 +366,7 @@ export const Automation: React.FC = () => {
         }
 
         if (err instanceof ApiError) {
-          toast.error(err.message);
+          toast.error(errorMessage(err, "The rule could not be changed. Please try again."));
         } else {
           toast.error(
             `Failed to ${

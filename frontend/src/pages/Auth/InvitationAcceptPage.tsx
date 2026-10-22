@@ -32,6 +32,7 @@ import {
 } from "@/components/auth/authStyles";
 import { formatTimestamp } from "@/utils/displayTime";
 import type { WorkspaceInvitationPreview } from "@/types/tenancy";
+import { errorMessage } from "@/services/api/errors";
 
 type Phase =
   | "preview"
@@ -258,7 +259,7 @@ export const InvitationAcceptPage: React.FC = () => {
           setErrorMsg(error.message);
           return;
         }
-        toast.error(error.message);
+        toast.error(errorMessage(error, "Failed to accept the invitation."));
         return;
       }
       toast.error("Failed to accept the invitation.");
@@ -278,7 +279,7 @@ export const InvitationAcceptPage: React.FC = () => {
           setPhase("auth_required");
           return;
         }
-        toast.error(error.message);
+        toast.error(errorMessage(error, "Failed to decline the invitation."));
         return;
       }
       toast.error("Failed to decline the invitation.");

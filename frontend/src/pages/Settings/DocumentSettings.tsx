@@ -20,6 +20,7 @@ import { useResolvedTenant } from "@/routes/TenantContext";
 import KnowledgeBaseReindex from "@/components/settings/KnowledgeBaseReindex";
 import PresetGallery from "@/components/settings/PresetGallery";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { errorMessage } from "@/services/api/errors";
 
 export const DocumentSettings: React.FC = () => {
   const queryClient = useQueryClient();
@@ -89,7 +90,7 @@ export const DocumentSettings: React.FC = () => {
       },
       onError: (error: unknown) => {
         if (error instanceof ApiError) {
-          toast.error(error.message);
+          toast.error(errorMessage(error, "Failed to save document settings."));
           return;
         }
         toast.error("Failed to save document settings.");

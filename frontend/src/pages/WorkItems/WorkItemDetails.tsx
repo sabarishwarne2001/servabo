@@ -51,6 +51,7 @@ import type { WorkspaceRole } from "@/types/tenancy";
 import { ApiError } from "@/services/api/client";
 import type { WorkItemStatus } from "@/types/workItem";
 import { formatNumber } from "@/utils/displayTime";
+import { errorMessage } from "@/services/api/errors";
 
 type DetailTab = "document" | "summary" | "entities" | "obligations" | "postings" | "automation" | "ocr" | "chat";
 
@@ -182,7 +183,7 @@ export const WorkItemDetails: React.FC = () => {
     },
     onError: (error: unknown) => {
       if (error instanceof ApiError) {
-        toast.error(error.message ?? "Unable to reprocess document.");
+        toast.error(errorMessage(error, "Unable to reprocess document."));
         return;
       }
       toast.error("Unexpected server error.");
