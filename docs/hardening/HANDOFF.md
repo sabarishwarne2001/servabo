@@ -694,7 +694,11 @@ Follow RUNBOOK §9.2 steps 1 to 7 exactly: the user and folders, the code, `.env
 template (secrets generated with the commands shown; Postmark, Groq, R2 from step 5;
 `OPERATOR_ALERT_EMAILS` = your own address; `FRONTEND_URL=https://app.servabo.app`,
 `WEBSITE_URL=https://servabo.app`; Dodo's **test** API key and `DODO_LIVEMODE=false`), the build, the
-migrations and the start. *Done when:* `https://app.servabo.app/api/v1/health/ready` says ready.
+migrations and the start. **Before the first start, and after every change of settings, run**
+`docker compose ... run --rm web python scripts/preflight.py` (RUNBOOK §9.14): it prints OK, MISSING, WRONG or SKIPPED for every setting with
+the one-line fix and where to click, never a secret, and says READY or NOT READY. Add `--online` for read-only checks of the database, Redis,
+the R2 bucket, the mail login, Groq and Dodo, and `--send-test-email you@yourcompany.com` to send exactly one message.
+*Done when:* preflight says READY and `https://app.servabo.app/api/v1/health/ready` says ready.
 
 **Step 8 — Create the plans in Dodo (test mode) and publish them.**
 RUNBOOK §9.2 step 8: `dodo_setup.py --create-test-products` creates the five plan products and three

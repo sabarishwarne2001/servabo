@@ -919,3 +919,15 @@ prints it) so the browser is allowed to reach it. Restart. Optional: `SENTRY_ENV
 cookies and the person are removed before they leave (`app/core/error_tracking.py`, `frontend/src/monitoring.ts`; both are tested). What you will see: which
 line failed, which job (`job_type`), which organization and workspace (opaque ids), how often. To switch off, empty the DSNs and restart (rebuild the
 frontend). GlitchTip: the same settings with your GlitchTip DSN.
+
+### 9.14 Is this setup ready? `scripts/preflight.py` (Final session 1)
+
+Run it before the first start, after every change of settings and before each launch step:
+`docker compose -f backend/docker-compose.prod.yml run --rm web python scripts/preflight.py`. It reads the settings exactly as the app does and prints a
+table: **OK**, **MISSING** (not set), **WRONG** (set to something that will not work) or **SKIPPED** (optional and off, or needs `--online`), each with a
+one-line fix and where to click. It never prints a secret (at most "set", or the last four characters of a public id). It exits 0 when ready, 1 when not;
+`--json` gives machine-readable output. `--online` adds read-only calls (database, Redis, storage bucket, SMTP login without sending, Groq's model list,
+Dodo's product list, Postmark's server record); against a **live** Dodo account it refuses unless you add `--i-mean-live` (it still only reads).
+`--send-test-email you@example.com` sends exactly one message. It checks: the environment and URLs, the production guard, database, Redis, storage (and R2's EU
+endpoint), the mail relay, the Groq, Gemini and encryption keys, Dodo (test or live agree, the webhook secret, all eight product ids), email-in, Zoho,
+error tracking, the NIC key, the backup key and folder, `ALERT_WEBHOOK`, `OPERATOR_ALERT_EMAILS` and the CPU-only image.
