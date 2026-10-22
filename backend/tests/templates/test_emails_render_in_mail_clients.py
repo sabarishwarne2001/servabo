@@ -144,7 +144,10 @@ def test_the_email_suits_every_mail_client(name: str) -> None:
 def test_servabo_mail_shows_the_mark_beside_the_name() -> None:
     _, html, _ = EMAILS["verify"]()
     header = html.split('<div class="content"', 1)[0]
-    assert re.search(r'<span class="mark" aria-hidden="true" style="[^"]*background-color:#1555e0[^"]*">S</span>', header)
+    # The new logo (Final session 1): the navy tile with the ribbon's bright blue "S".
+    assert re.search(
+        r'<span class="mark" aria-hidden="true" style="[^"]*background-color:#0b1a3a[^"]*color:#4f9bff[^"]*">S</span>', header
+    )
     assert ">Servabo</span>" in header
     assert "<img" not in header, "no remote image: clients hold them, and some emails must carry no address"
 

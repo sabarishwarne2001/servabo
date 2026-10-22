@@ -57,14 +57,7 @@ import { InfoTooltip } from "@/components/forms/InfoTooltip";
 import { TimezoneField } from "@/components/forms/TimezoneField";
 import { currencyLabel, currencyOptions } from "@/utils/currencies";
 import { LegalHoldsPanel } from "@/components/compliance/LegalHoldsPanel";
-
-const workspaceInitials = (name: string): string =>
-  (name || "WS")
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((word) => word.charAt(0).toUpperCase())
-    .join("") || "WS";
+import { ServaboMark } from "@/components/branding/ServaboMark";
 
 export const Workspace: React.FC = () => {
   const navigate = useNavigate();
@@ -628,17 +621,14 @@ export const Workspace: React.FC = () => {
                 />
               ) : (
                 <div
-                  className="flex h-20 w-20 flex-col items-center justify-center gap-0.5 rounded-lg border border-border bg-primary/10 text-primary"
+                  className="flex h-20 w-20 flex-col items-center justify-center gap-0.5"
                   title={logoImage.failed ? "The logo could not be displayed" : undefined}
                 >
-                  <span className="text-xl font-semibold" aria-hidden="true">
-                    {workspaceInitials(workspace.workspace_name)}
+                  {/* No logo of its own: the Servabo logo is the default. */}
+                  <ServaboMark className="h-16 w-16 rounded-xl" />
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {logoImage.failed ? "Unavailable" : "Default logo"}
                   </span>
-                  {(logoImage.failed || !logoPreview) && (
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {logoImage.failed ? "Unavailable" : "No logo"}
-                    </span>
-                  )}
                 </div>
               )}
 

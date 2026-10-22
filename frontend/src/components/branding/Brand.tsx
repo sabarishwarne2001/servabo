@@ -124,17 +124,9 @@ export const Brand: React.FC<BrandProps> = ({
   // F-143. Remembered per source, so a newly uploaded logo is tried again.
   const { failed: imgError, onError: onLogoError } = useImageFallback(logoSrc);
 
-  const initials = (workspaceName || companyName || "S")
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((word: string) => word.charAt(0).toUpperCase())
-    .join("");
-
   const config = BRAND_VARIANTS[variant];
   const compact = config.compact;
   const showSubtitle = config.subtitle;
-  const isAuthPage = variant === "login" || !tenant;
 
   return (
     <div
@@ -158,11 +150,7 @@ export const Brand: React.FC<BrandProps> = ({
           justify-center
           overflow-hidden
           rounded-lg
-          ${logoSrc && !imgError
-            ? "border border-border bg-background"
-            : isAuthPage && !publicBrand
-              ? ""
-              : "bg-primary text-primary-foreground"}
+          ${logoSrc && !imgError ? "border border-border bg-background" : ""}
         `}
       >
         {logoSrc && !imgError ? (
@@ -172,12 +160,9 @@ export const Brand: React.FC<BrandProps> = ({
             className="h-full w-full object-cover"
             onError={onLogoError}
           />
-        ) : isAuthPage && !publicBrand ? (
-          <ServaboMark className="h-full w-full" />
         ) : (
-          <span className="font-semibold text-xs sm:text-sm text-primary-foreground">
-            {initials}
-          </span>
+          // No logo of its own (or one that will not load): the Servabo logo, never initials.
+          <ServaboMark className="h-full w-full" />
         )}
       </div>
 

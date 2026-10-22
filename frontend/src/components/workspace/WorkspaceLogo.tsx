@@ -1,5 +1,6 @@
 import { useAuthenticatedImage } from "@/hooks/useAuthenticatedImage";
 import { useImageFallback } from "@/hooks/useImageFallback";
+import { ServaboMark } from "@/components/branding/ServaboMark";
 
 interface WorkspaceLogoProps {
   workspace: {
@@ -7,41 +8,23 @@ interface WorkspaceLogoProps {
     workspace_name: string;
     company_logo_url?: string | null;
   };
+  /** Size and shape. Used for the workspace's own logo and for the Servabo logo shown in its place. */
   className?: string;
-  fallbackClassName?: string;
 }
 
-export function WorkspaceLogo({
-  workspace,
-  className = "h-8 w-8 rounded object-cover",
-  fallbackClassName = "flex h-8 w-8 items-center justify-center rounded bg-primary/10 text-xs font-semibold text-primary",
-}: WorkspaceLogoProps) {
+/**
+ * A workspace's logo. A workspace that has not uploaded one (every new workspace), or whose logo cannot be
+ * loaded, shows the Servabo logo instead, so there is never an empty or initials-only badge.
+ */
+export function WorkspaceLogo({ workspace, className = "h-8 w-8 rounded object-cover" }: WorkspaceLogoProps) {
   const src = useAuthenticatedImage(workspace.company_logo_url ?? null);
   const { failed: loadError, onError } = useImageFallback(src);
 
-  const initials = (workspace.workspace_name || "WS")
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((word) => word.charAt(0).toUpperCase())
-    .join("");
-
   if (!src || loadError) {
-    return (
-      <div className={fallbackClassName}>
-        {initials || "WS"}
-      </div>
-    );
+    return <ServaboMark className={className} title={`${workspace.workspace_name} (Servabo logo)`} />;
   }
 
-  return (
-    <img
-      src={src}
-      alt={`${workspace.workspace_name} logo`}
-      className={className}
-      onError={onError}
-    />
-  );
+  return <img src={src} alt={`${workspace.workspace_name} logo`} className={className} onError={onError} />;
 }
 
 export default WorkspaceLogo;

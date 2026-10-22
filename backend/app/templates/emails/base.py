@@ -88,14 +88,17 @@ def _bulletproof_buttons(html: str) -> str:
     return _BUTTON.sub(one, html)
 
 
+# The mark at email size: the logo's navy tile and the ribbon's bright blue (brand/tokens.json).
+_MARK_TILE = "#0b1a3a"
+_MARK_S = "#4f9bff"
 _WORDMARK = '<span class="logo" style="font-size:24px;font-weight:bold;color:{color};vertical-align:middle;">{name}</span>'
 
 
 def _brand_header(brand_name: str) -> str:
     """The email's header: the Servabo mark and name, or a white-label brand's name alone.
 
-    The mark is drawn in HTML (a blue rounded tile with a white "S", the app's mark at email
-    size), not loaded as an image: mail clients hold remote images until the reader allows them,
+    The mark is drawn in HTML (a deep-navy rounded tile with a bright blue "S", the app's mark at
+    email size; mail clients cannot draw gradients), not loaded as an image: mail clients hold remote images until the reader allows them,
     and an email that must carry no web address (a revocation notice, a completed transfer)
     stays that way. Outlook for Windows ignores the rounded corners and shows a square tile.
     An organization sending under its own brand never gets Servabo's mark in its mail.
@@ -107,7 +110,7 @@ def _brand_header(brand_name: str) -> str:
         return name_html
     tile = (
         f'<span class="mark" aria-hidden="true" style="display:inline-block;width:30px;height:30px;'
-        f"border-radius:8px;background-color:{_BRAND_BLUE};color:#ffffff;font-family:{_FONT};"
+        f"border-radius:8px;background-color:{_MARK_TILE};color:{_MARK_S};font-family:{_FONT};"
         'font-size:19px;font-weight:700;line-height:30px;text-align:center;vertical-align:middle;'
         'margin-right:10px;">S</span>'
     )

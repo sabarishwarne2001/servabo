@@ -141,11 +141,10 @@ export const OrgWorkspaceSwitcher: React.FC<OrgWorkspaceSwitcherProps> = ({
     navigate(rebaseTenantPath(location.pathname, orgSlug, workspaceSlug));
   };
 
-  const logo = (sizeClass: string, text: string) => (
+  const logo = (sizeClass: string) => (
     <WorkspaceLogo
       workspace={workspace}
       className={`${sizeClass} shrink-0 rounded-md object-cover ring-1 ring-border-strong/60`}
-      fallbackClassName={`flex ${sizeClass} shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-primary to-violet-500 ${text} font-semibold text-white shadow-inner-highlight`}
     />
   );
 
@@ -160,7 +159,7 @@ export const OrgWorkspaceSwitcher: React.FC<OrgWorkspaceSwitcherProps> = ({
           title={`${organization.organization_name} · ${workspace.workspace_name}`}
           className={`mx-auto flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent ${open ? "bg-accent" : ""}`}
         >
-          {logo("h-7 w-7", "text-[11px]")}
+          {logo("h-7 w-7")}
         </button>
       ) : (
         <button
@@ -171,7 +170,7 @@ export const OrgWorkspaceSwitcher: React.FC<OrgWorkspaceSwitcherProps> = ({
             open ? "bg-accent/70" : ""
           }`}
         >
-          {logo("h-8 w-8", "text-xs")}
+          {logo("h-8 w-8")}
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[13px] font-semibold leading-5 text-foreground">
               {workspace.workspace_name}
