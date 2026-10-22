@@ -6,6 +6,16 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Docs — The two final sessions (2026-10-22)
+
+- **Sessions D and E are replaced by two final sessions** (N-160). `docs/FINAL-SESSIONS.md` explains them for the owner;
+  `docs/sessions/FINAL-1-UPGRADE.md` (study, bring every part up to date, build what earns money) and
+  `docs/sessions/FINAL-2-LIVE.md` (everything for real on the owner's PC) are the prompts. STATE, HANDOFF, NEEDS-OWNER, the Dodo
+  walk-through and the GST unverified list now point at them.
+- **`docs/PRODUCT-NEXT.md` tells the truth again:** "correct a field beside the page" (#9) and the yearly switch (#3) were already
+  built, the final overage invoice (#2) does not apply on Dodo, and accounting connections (#5) are retargeted to Zoho Books and
+  Tally for India.
+
 ### Added — Automation, end to end (Session J, 2026-10-21)
 
 - **Conditions that are always right** (F-535 to F-539, N-153). A condition on an amount used to compare with `float()`, so

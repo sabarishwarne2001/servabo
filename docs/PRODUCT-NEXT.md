@@ -1,9 +1,25 @@
 # What to build next (campaign session 4, §E)
 
 A short list, best first, of ideas that build on what Servabo already has. Each says what it is
-worth, what it costs to build, and what it costs to run. **None of them is built.** At launch,
-stability earns more than novelty: build one only after the launch checklist (HANDOFF "Owner launch
-checklist") is done and the first customers are happy.
+worth, what it costs to build, and what it costs to run. It was written before the launch checklist
+(HANDOFF "Owner launch checklist"); some items have been built since.
+
+**Status on 2026-10-22** (Final session 1, `docs/sessions/FINAL-1-UPGRADE.md`, rewrites this file when it finishes):
+
+| # | Idea | Status |
+| --- | --- | --- |
+| 1 | Email-in | Not built. Final session 1, Phase 2B (Postmark inbound) |
+| 2 | Final overage invoice | Not applicable while Dodo bills hard limits (N-118) |
+| 3 | Yearly billing switch | Built (the owner creates the yearly prices in Dodo) |
+| 4 | Error tracking | Not built. Final session 1, Phase 4A (Sentry, EU region) |
+| 5 | Accounting connections | Retargeted for India: Zoho Books "Connect" and a guided Tally Prime file, Final session 1, Phase 3C. Xero and QuickBooks Online later, for other markets (QuickBooks left India in 2023) |
+| 6 | Zip upload | Not built. Final session 1, Phase 2A |
+| 7 | Premium models as credits | Not started |
+| 8 | Industry benchmarks | Not started (needs many customers) |
+| 9 | Correct a field beside the page | **Built** (`f53ccc8`: `field_correction_service.py`, `PATCH …/work-items/{id}/fields`, `ExtractedFieldsPanel.tsx`) |
+| 10 | Packs that do everything | Not built (F-408). Final session 1, Phase 6, if time allows |
+
+Billing moved from Stripe to Dodo Payments; where an item below says Stripe, read Dodo.
 
 Build cost is in focused engineering days for one person who knows the code. Running cost is what
 it adds to the monthly bill (COSTS.md has the baseline).
@@ -134,5 +150,5 @@ severity), and the redaction dialog already takes a profile key.
 
 ---
 
-**Recommendation:** build 2 and 3 first. Together they take about three days, earn money from the
-first customers, and touch only code that is already tested. Then 1, the biggest product win.
+**Recommendation (2026-10-22):** 2 does not apply on Dodo and 3 is built. Final session 1 builds 1, 4, 5 (for India) and 6,
+then 10 if time allows, and writes the next ranked list here.
