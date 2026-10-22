@@ -14,7 +14,7 @@ in the containers unless you add it to the service's `environment:` in `docker-c
 is not read by any code, is missing from this page, or is one production cannot run without and
 is missing from `.env.production.template` (or does not stop the app from starting when unset).
 
-301 settings. Columns: name, type, default, where it appears (`example` =
+302 settings. Columns: name, type, default, where it appears (`example` =
 `.env.example`, `production` = `.env.production.template`, `guard` = checked by the production
 guard), and the comment written above it in the code.
 
@@ -176,6 +176,7 @@ guard), and the comment written above it in the code.
 | `BRANDING_MAX_FAVICON_BYTES` | `int` | `512 * 1024` | — |  |
 | `BRANDING_MAX_IMAGE_DIMENSION` | `int` | `2048` | — |  |
 | `COMPLIANCE_EXPORT_TTL_HOURS` | `int` | `72` | — | How long a generated DPA archive stays downloadable. |
+| `ZIP_UPLOAD_MAX_MB` | `int` | `256` | example, production | The largest zip one upload accepts, in MB (Final session 1, 2A). What it may unpack to is bounded separately (`ingestion/archive.py`: 512 MB, 2,000 files, 100x compression, one level deep). |
 | `ARCHIVED_PURGE_GRACE_DAYS` | `int` | `30` | example, production | Days after an organization or workspace is archived before its documents, conversations and settings are purged (`scripts/sweep_compliance.py --archived`). Until then "restore" still works. Money records stay. |
 | `ARCHIVED_FINAL_DELETE_MONTHS` | `int` | `72` | example, production | Months after an organization is archived before the organization itself is deleted. 72 months because the CGST Act 2017 s.36 makes a registered person keep books of account until 72 months after the annual return's due … |
 | `STORAGE_SAMPLE_INTERVAL_MINUTES` | `int` | `60` | — |  |

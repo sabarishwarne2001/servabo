@@ -37,6 +37,13 @@ export interface BatchItem {
   readonly upload_session_id?: string | null;
 }
 
+/** A member of an unpacked zip that was not made into a document (Final session 1, 2A). */
+export interface SkippedFile {
+  readonly name: string;
+  readonly code: "UNSUPPORTED_TYPE" | "GSTR2B" | string;
+  readonly message: string;
+}
+
 export interface Batch {
   readonly id: string;
   readonly status: string;
@@ -46,6 +53,7 @@ export interface Batch {
   readonly failed_items: number;
   readonly created_at: string;
   readonly completed_at?: string | null;
+  readonly skipped?: readonly SkippedFile[];
   readonly items: readonly BatchItem[];
 }
 
@@ -124,6 +132,19 @@ export const getBatch = async (
     INGESTION_ENDPOINTS.batch(workspaceId, batchId),
     { headers: JSON_HEADERS },
   );
+  return response.data;
+};
+
+/**
+ * Upload a zip of documents. It is unpacked in the background; poll `getBatch` for progress. A zip the server refuses
+ * (password-protected, nested, too large, unsafe path, ...) rejects with its sentence in `ApiError.message`.
+ */
+export const uploadArchive = async (workspaceId: string, file: File): Promise<Batch> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await apiClient.post<Batch>(INGESTION_ENDPOINTS.batchArchive(workspaceId), formData, {
+    headers: { "Content-Type": "multipart/form-data", ...JSON_HEADERS },
+  });
   return response.data;
 };
 

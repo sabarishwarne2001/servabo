@@ -89,5 +89,8 @@
     "src/**/*.json": [
       "prettier --write"
     ]
+  },
+  "overrides": {
+    "playwright-core": "1.56.1"
   }
 }

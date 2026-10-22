@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import Any, Optional, TYPE_CHECKING
 
 from sqlalchemy import (
+    CheckConstraint,
     BigInteger,
     Boolean,
     DateTime,
@@ -79,6 +80,7 @@ class IngestionBatch(Base):
 
     __table_args__ = (
         UniqueConstraint("id", "workspace_id", name="uq_ingestion_batches_id_workspace_id"),
+        CheckConstraint("jsonb_typeof(skipped) = 'array'", name="ck_ingestion_batches_skipped_is_list"),
         Index("ix_ingestion_batches_workspace_created", "workspace_id", "created_at"),
         ForeignKeyConstraint(
             ["workspace_id"],
@@ -111,6 +113,10 @@ class IngestionBatch(Base):
     )
     completed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+    #: Members of an unpacked zip that were not made into documents: [{"name", "code", "message"}], at most 200 (k1a2).
+    skipped: Mapped[list[dict[str, str]]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
     )
 
     items: Mapped[list["IngestionBatchItem"]] = relationship(

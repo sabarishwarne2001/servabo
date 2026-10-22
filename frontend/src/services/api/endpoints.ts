@@ -231,6 +231,8 @@ export const INGESTION_ENDPOINTS = {
     `${scoped(workspaceId)}/ingestion-batches`,
   batch: (workspaceId: string, batchId: string): string =>
     `${scoped(workspaceId)}/ingestion-batches/${seg(batchId)}`,
+  batchArchive: (workspaceId: string): string =>
+    `${scoped(workspaceId)}/ingestion-batches/archive`,
   presets: (workspaceId: string): string =>
     `${scoped(workspaceId)}/document-presets`,
   presetApply: (workspaceId: string): string =>

@@ -32,7 +32,7 @@ import logging
 import uuid
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
@@ -66,6 +66,7 @@ from app.schemas.ingestion import (
 )
 from app.services import audit_service, document_intake_service, file_validation_service, plan_admission
 from app.services.ingestion import (
+    archive_intake,
     batch_service,
     bulk_service,
     preset_service,
@@ -387,6 +388,56 @@ def create_batch(
         outcome=AuditOutcome.ALLOWED,
         details={"source": batch.source, "total_items": batch.total_items},
     )
+    db.commit()
+    db.refresh(batch)
+    return _batch_response(db, batch)
+
+
+@batch_router.post("/archive", response_model=BatchResponse, status_code=status.HTTP_202_ACCEPTED)
+async def upload_archive(
+    file: UploadFile = File(...),
+    db: Session = Depends(deps.get_db),
+    context: deps.TenantContext = Depends(deps.RequireWorkspaceContributor),
+) -> BatchResponse:
+    """Upload a zip of documents (Final session 1, 2A). It is unpacked in the background; every document in it goes through
+    the ordinary intake path. Poll `GET /ingestion-batches/{id}` for progress, the skipped files and the plan-limit list.
+
+    Refused at once, with a sentence: a zip that is not a zip, password-protected, nested, too large, a compression bomb or
+    carrying an unsafe path; an ended trial; an allowance already used up.
+    """
+    chunks: list[bytes] = []
+    total = 0
+    limit = archive_intake.max_upload_bytes()
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > limit:
+            raise HTTPException(
+                status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                f"The zip is larger than {settings.ZIP_UPLOAD_MAX_MB} MB. Split it into smaller zips.",
+            )
+        chunks.append(chunk)
+    data = b"".join(chunks)
+    if not data:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The zip is empty.")
+
+    def accept() -> IngestionBatch:
+        try:
+            return archive_intake.accept_archive(
+                db,
+                organization_id=context.organization_id,
+                workspace_id=context.workspace_id,
+                user_id=context.user_id,
+                filename=file.filename or "archive.zip",
+                data=data,
+            )
+        except archive_intake.ArchiveNotAccepted as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, exc.message) from exc
+
+    batch = await run_in_threadpool(accept)
     db.commit()
     db.refresh(batch)
     return _batch_response(db, batch)

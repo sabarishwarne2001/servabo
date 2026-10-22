@@ -556,6 +556,10 @@ class Settings(BaseSettings):
     #: How long a generated DPA archive stays downloadable.
     COMPLIANCE_EXPORT_TTL_HOURS: int = 72
 
+    #: The largest zip one upload accepts, in MB (Final session 1, 2A). What it may unpack to is bounded separately
+    #: (`ingestion/archive.py`: 512 MB, 2,000 files, 100x compression, one level deep).
+    ZIP_UPLOAD_MAX_MB: int = 256
+
     #: Days after an organization or workspace is archived before its documents, conversations and settings are purged
     #: (`scripts/sweep_compliance.py --archived`). Until then "restore" still works. Money records stay.
     ARCHIVED_PURGE_GRACE_DAYS: int = 30

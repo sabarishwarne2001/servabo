@@ -37,7 +37,8 @@ import io
 import posixpath
 import zipfile
 from dataclasses import dataclass
-from typing import Final, Iterator, Optional
+import json
+from typing import Final, Iterator, Optional, Union
 
 #: Aggregate ceiling on what one archive may expand to.
 MAX_TOTAL_EXPANDED_BYTES: Final[int] = 512 * 1024 * 1024
@@ -132,6 +133,10 @@ REJECTION_CODES: Final[tuple[str, ...]] = (
     "ARCHIVE_MEMBER_NOT_ALLOWED",
     "ARCHIVE_EMPTY",
     "ARCHIVE_DIRECTORY_LIES",
+    # Final session 1 (2A): a password-protected zip cannot be read, and a symbolic link inside a zip names a path
+    # on the machine that unpacks it. Both refuse the whole archive.
+    "ARCHIVE_ENCRYPTED",
+    "ARCHIVE_SYMLINK",
 )
 
 
@@ -146,6 +151,32 @@ class ArchiveEntry:
     @property
     def size(self) -> int:
         return len(self.data)
+
+
+#: Why a member of a zip was not made into a document. Skipped members are listed for the person, never refused as a
+#: whole archive: one stray .txt in a folder of 40 invoices must not cost them the 40.
+SKIP_UNSUPPORTED: Final[str] = "UNSUPPORTED_TYPE"
+SKIP_GSTR2B: Final[str] = "GSTR2B"
+
+#: The exact words the person reads for a GSTR-2B JSON found in a zip (Final session 1, 2A).
+GSTR2B_SKIP_MESSAGE: Final[str] = "This looks like a GSTR-2B file: import it on the GST credit page."
+
+
+@dataclass(frozen=True)
+class SkippedEntry:
+    """One member that was not turned into a document, and why."""
+
+    name: str
+    code: str
+    message: str
+
+    def as_dict(self) -> dict[str, str]:
+        return {"name": self.name, "code": self.code, "message": self.message}
+
+
+#: Files a computer adds to a zip on its own. Skipped silently: they are not the person's documents and listing
+#: them would only worry someone who never saw them.
+_JUNK_NAMES: Final[frozenset[str]] = frozenset({".ds_store", "thumbs.db", "desktop.ini"})
 
 
 def is_archive_name(name: str) -> bool:
@@ -226,6 +257,35 @@ def _ratio(uncompressed: int, compressed: int) -> float:
     return uncompressed / compressed
 
 
+def is_junk(name: str) -> bool:
+    """`__MACOSX/` folders, `.DS_Store`, `Thumbs.db`, AppleDouble `._x` files: skipped without a word."""
+    segments = name.replace("\\", "/").split("/")
+    base = segments[-1].lower()
+    return "__MACOSX" in segments or base in _JUNK_NAMES or base.startswith("._")
+
+
+def looks_like_gstr2b(payload: bytes) -> bool:
+    """True when this JSON is a GSTR-2B download (the same reading the GST import uses), so a zip of a customer's month
+    can hold one without it being mistaken for a document or refused."""
+    if len(payload) > 25 * 1024 * 1024:
+        return False
+    try:
+        document = json.loads(payload)
+    except (ValueError, RecursionError):
+        return False
+    from app.services.gst import parse as gst_parse
+
+    try:
+        gst_parse._unwrap(document)  # noqa: SLF001 - the one place that knows the portal's wrappers
+    except gst_parse.ReturnFileError:
+        return False
+    return True
+
+
+def _is_symlink(info: zipfile.ZipInfo) -> bool:
+    return info.create_system == 3 and ((info.external_attr >> 16) & 0o170000) == 0o120000
+
+
 def inspect(
     data: bytes, *, depth: int = 1
 ) -> list[zipfile.ZipInfo]:
@@ -262,6 +322,19 @@ def inspect(
     compressed_total = 0
     for info in infos:
         name = safe_member_name(info.filename)
+
+        if info.flag_bits & 0x1:
+            raise ArchiveRejected(
+                "ARCHIVE_ENCRYPTED",
+                "The zip is password-protected, so it cannot be read. Remove the password and upload it again.",
+                entry=name,
+            )
+        if _is_symlink(info):
+            raise ArchiveRejected(
+                "ARCHIVE_SYMLINK",
+                "The zip contains a symbolic link, which is refused. Zip the files themselves.",
+                entry=name,
+            )
 
         if is_archive_name(name):
             raise ArchiveRejected(
@@ -375,7 +448,70 @@ def expand(data: bytes, *, depth: int = 1) -> Iterator[ArchiveEntry]:
             )
 
 
+def _read_member(archive_file: zipfile.ZipFile, info: zipfile.ZipInfo, name: str) -> bytes:
+    """One member's bytes, read against what the directory declared (a directory can lie)."""
+    with archive_file.open(info, "r") as member:
+        payload = member.read(MAX_ENTRY_BYTES + 1)
+    if len(payload) > MAX_ENTRY_BYTES:
+        raise ArchiveRejected("ARCHIVE_DIRECTORY_LIES", f"{name} delivered more bytes than its directory entry declared.", entry=name)
+    if len(payload) != info.file_size:
+        raise ArchiveRejected(
+            "ARCHIVE_DIRECTORY_LIES", f"{name} declared {info.file_size} bytes and delivered {len(payload)}.", entry=name
+        )
+    if looks_like_archive(payload[:8]):
+        raise ArchiveRejected("ARCHIVE_NESTED", "An entry is an archive under another extension.", entry=name)
+    return payload
+
+
+def expand_members(data: bytes, *, depth: int = 1) -> Iterator[Union[ArchiveEntry, SkippedEntry]]:
+    """Like `expand`, for a person's folder of documents: every limit still refuses the WHOLE archive, but a member that
+    is merely not a document is skipped and reported instead of ending the run (Final session 1, 2A).
+
+    * `__MACOSX/`, `.DS_Store` and friends: skipped silently (nothing is yielded).
+    * a GSTR-2B JSON: skipped with `GSTR2B_SKIP_MESSAGE` (it is imported on the GST credit page, not read as a document).
+    * any other type the product does not read: skipped with "not a supported file type".
+    * a supported document: yielded as an `ArchiveEntry`.
+    """
+    infos = inspect(data, depth=depth)
+
+    actual_total = 0
+    with zipfile.ZipFile(io.BytesIO(data)) as archive_file:
+        for info in infos:
+            name = safe_member_name(info.filename)
+            if is_junk(name):
+                continue
+            shown = posixpath.basename(name) or name
+            lowered = name.lower()
+            if lowered.endswith(".json"):
+                payload = _read_member(archive_file, info, name)
+                actual_total += len(payload)
+                if actual_total > MAX_TOTAL_EXPANDED_BYTES:
+                    raise ArchiveRejected("ARCHIVE_TOO_LARGE", f"The archive delivered more than {MAX_TOTAL_EXPANDED_BYTES} bytes.")
+                if looks_like_gstr2b(payload):
+                    yield SkippedEntry(shown, SKIP_GSTR2B, GSTR2B_SKIP_MESSAGE)
+                else:
+                    yield SkippedEntry(shown, SKIP_UNSUPPORTED, "Not a supported file type.")
+                continue
+            try:
+                mime = member_mime(name)
+            except ArchiveRejected:
+                yield SkippedEntry(shown, SKIP_UNSUPPORTED, "Not a supported file type.")
+                continue
+            payload = _read_member(archive_file, info, name)
+            actual_total += len(payload)
+            if actual_total > MAX_TOTAL_EXPANDED_BYTES:
+                raise ArchiveRejected("ARCHIVE_TOO_LARGE", f"The archive delivered more than {MAX_TOTAL_EXPANDED_BYTES} bytes.")
+            yield ArchiveEntry(name=shown, data=payload, mime_type=mime)
+
+
 __all__ = [
+    "GSTR2B_SKIP_MESSAGE",
+    "SKIP_GSTR2B",
+    "SKIP_UNSUPPORTED",
+    "SkippedEntry",
+    "expand_members",
+    "is_junk",
+    "looks_like_gstr2b",
     "ALLOWED_MEMBER_MIMES",
     "ArchiveEntry",
     "ArchiveRejected",

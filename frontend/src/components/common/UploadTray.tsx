@@ -23,6 +23,8 @@ import { AlertCircle, FileText, Loader2, RotateCw, UploadCloud, X } from "lucide
 import { toast } from "sonner";
 
 import { workItemApi } from "@/services/api/workItem";
+import { uploadArchive } from "@/services/api/ingestion";
+import ArchiveProgress from "@/components/upload/ArchiveProgress";
 import { ApiError } from "@/services/api/client";
 import { getDocumentSettings } from "@/services/api/document-settings";
 import { settingsKeys, usageKeys } from "@/services/api/queryKeys";
@@ -34,6 +36,13 @@ import { useActiveWorkspaceId } from "@/hooks/useActiveWorkspace";
 /** What the server accepts when a workspace has not narrowed it (file_validation_service). */
 const DEFAULT_EXTENSIONS = ["pdf", "png", "jpg", "jpeg"] as const;
 const DEFAULT_MAX_MB = 100;
+/**
+ * Final session 1 (2A): a zip of documents is accepted on every plan and workspace. The server unpacks it and adds each
+ * document through the ordinary intake path, so the workspace's file types and the plan's limits apply to every file in
+ * it; the zip itself is only bounded by ZIP_UPLOAD_MAX_MB on the server.
+ */
+const ZIP_MAX_MB = 256;
+const isZip = (file: File): boolean => file.name.toLowerCase().endsWith(".zip");
 
 const EXTENSION_ALIASES: Readonly<Record<string, readonly string[]>> = {
   jpg: ["jpg", "jpeg"],
@@ -53,6 +62,12 @@ interface QueuedFile {
   readonly file: File;
   readonly key: string;
   readonly error: string | null;
+}
+
+interface StartedArchive {
+  readonly key: string;
+  readonly batchId: string;
+  readonly fileName: string;
 }
 
 const fileKey = (file: File): string => `${file.name}:${file.size}:${file.lastModified}`;
@@ -81,6 +96,7 @@ export const UploadTray: React.FC<UploadTrayProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [current, setCurrent] = useState<string | null>(null);
   const [queue, setQueue] = useState<readonly QueuedFile[]>([]);
+  const [archives, setArchives] = useState<readonly StartedArchive[]>([]);
 
   const settings = useQuery({
     queryKey: settingsKeys.document(workspaceId ?? ""),
@@ -96,7 +112,7 @@ export const UploadTray: React.FC<UploadTrayProps> = ({
       .map((value) => value.trim().replace(/^\./, "").toLowerCase())
       .filter(Boolean);
     const base = configured.length > 0 ? configured : [...DEFAULT_EXTENSIONS];
-    return Array.from(new Set(base.flatMap((ext) => EXTENSION_ALIASES[ext] ?? [ext])));
+    return Array.from(new Set([...base.flatMap((ext) => EXTENSION_ALIASES[ext] ?? [ext]), "zip"]));
   }, [settings.data?.allowed_file_types]);
   // Campaign session 1: the plan's file size bounds the workspace setting (Free: 10 MB).
   const allowance = useQuery({
@@ -116,7 +132,7 @@ export const UploadTray: React.FC<UploadTrayProps> = ({
   const planBinds = planMb !== undefined && planMb < workspaceMb;
   const maxBytes = maxMb * 1024 * 1024;
   const typesLabel = useMemo(
-    () => Array.from(new Set(extensions.map((ext) => (ext === "jpeg" ? "jpg" : ext === "tif" ? "tiff" : ext))))
+    () => Array.from(new Set(extensions.filter((ext) => ext !== "zip").map((ext) => (ext === "jpeg" ? "jpg" : ext === "tif" ? "tiff" : ext))))
       .map((ext) => ext.toUpperCase())
       .join(", "),
     [extensions],
@@ -125,6 +141,13 @@ export const UploadTray: React.FC<UploadTrayProps> = ({
   const validateFile = (file: File): string | null => {
     if (!extensions.includes(extensionOf(file.name))) {
       return `"${file.name}" is not a supported file type. This workspace accepts ${typesLabel}.`;
+    }
+    if (isZip(file)) {
+      return file.size > ZIP_MAX_MB * 1024 * 1024
+        ? `"${file.name}" is larger than ${ZIP_MAX_MB} MB. Split it into smaller zips.`
+        : file.size === 0
+          ? `"${file.name}" is empty.`
+          : null;
     }
     if (file.size > maxBytes) {
       return planBinds
@@ -212,9 +235,19 @@ export const UploadTray: React.FC<UploadTrayProps> = ({
     setIsUploading(true);
     const failed = new Map<string, string>();
     let uploaded = 0;
+    const startedArchives: StartedArchive[] = [];
     try {
       for (const entry of queue) {
         setCurrent(entry.key);
+        if (isZip(entry.file)) {
+          try {
+            const batch = await uploadArchive(workspaceId, entry.file);
+            startedArchives.push({ key: entry.key, batchId: batch.id, fileName: entry.file.name });
+          } catch (error) {
+            failed.set(entry.key, describeError(error, entry.file.name));
+          }
+          continue;
+        }
         try {
           const created = await workItemApi.uploadDocument(workspaceId, entry.file);
           uploaded += 1;
@@ -237,6 +270,14 @@ export const UploadTray: React.FC<UploadTrayProps> = ({
         .filter((entry) => failed.has(entry.key))
         .map((entry) => ({ ...entry, error: failed.get(entry.key) ?? null })),
     );
+    if (startedArchives.length > 0) {
+      setArchives((previous) => [...previous, ...startedArchives]);
+      toast.success(
+        startedArchives.length === 1
+          ? `"${startedArchives[0]?.fileName ?? "The zip"}" is uploaded. Its documents are being added.`
+          : `${startedArchives.length} zips are uploaded. Their documents are being added.`,
+      );
+    }
     if (uploaded > 0) {
       toast.success(
         uploaded === 1 ? "1 document uploaded. Processing has started." : `${uploaded} documents uploaded. Processing has started.`,
@@ -302,10 +343,24 @@ export const UploadTray: React.FC<UploadTrayProps> = ({
           <p className="text-xs text-muted-foreground" data-testid="upload-limits">
             {trialEnded
               ? "Everything already here can still be read, searched and exported."
-              : `${typesLabel} • Maximum ${maxMb} MB per file`}
+              : `${typesLabel}, or a ZIP of them • Maximum ${maxMb} MB per file`}
           </p>
         </div>
       </div>
+
+      {archives.length > 0 && workspaceId && (
+        <ul className="space-y-2" aria-label="Zip uploads">
+          {archives.map((archive) => (
+            <ArchiveProgress
+              key={archive.batchId}
+              workspaceId={workspaceId}
+              batchId={archive.batchId}
+              fileName={archive.fileName}
+              onFinished={() => onUploadSuccess?.()}
+            />
+          ))}
+        </ul>
+      )}
 
       {queue.length > 0 && (
         <div className="space-y-3 rounded-xl border border-border/60 bg-card p-4 dark:border-border/40">

@@ -40,6 +40,14 @@ class BatchItemResponse(BaseModel):
     upload_session_id: Optional[uuid.UUID] = None
 
 
+class SkippedFileResponse(BaseModel):
+    """A member of an unpacked zip that was not made into a document (Final session 1, 2A)."""
+
+    name: str
+    code: str
+    message: str
+
+
 class BatchResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -51,6 +59,7 @@ class BatchResponse(BaseModel):
     failed_items: int
     created_at: datetime
     completed_at: Optional[datetime] = None
+    skipped: list[SkippedFileResponse] = Field(default_factory=list)
     items: list[BatchItemResponse] = Field(default_factory=list)
 
 
