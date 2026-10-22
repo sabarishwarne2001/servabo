@@ -27,9 +27,7 @@ import { identityKeys } from "@/services/api/queryKeys";
 import { useResolvedOrganization } from "@/routes/OrganizationGuard";
 import { PlanLockBanner } from "@/components/billing/PlanLockBanner";
 import { CAPABILITY } from "@/constants/capabilities";
-import { AccessRestricted } from "@/components/common/AccessRestricted";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { organizationMembersPath } from "@/routes/tenantPaths";
 import { TabList, TabPanel, useUrlTab, type TabDefinition } from "@/components/ui/Tabs";
 import type { SecurityPolicyRead } from "@/types/identity";
 
@@ -51,16 +49,9 @@ export const IdentityAdminHub: React.FC = () => {
 
   const role = String(organizationRole).toUpperCase();
 
-  if (role !== "OWNER") {
-    return (
-      <AccessRestricted
-        allowedFor="organization owners (identity and directory settings decide who can sign in)"
-        askWho="an organization owner"
-        contacts={{ organizationId: organization.organization_id, roles: ["OWNER"] }}
-        backTo={{ path: organizationMembersPath(organization.organization_slug), label: "Back to members" }}
-      />
-    );
-  }
+  // An administrator reads every tab (decision N-006); every write is the owner's, on the server and in each panel.
+  // The whole hub used to be refused to administrators ("Access restricted") although the sidebar offered it (F-598).
+  const isOwner = role === "OWNER";
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
@@ -80,7 +71,7 @@ export const IdentityAdminHub: React.FC = () => {
           {tab === "sso" && <IdpConnectionBuilder />}
           {tab === "jit" && <JitPolicyPanel />}
           {tab === "scim" && <ScimTokenManager />}
-          {tab === "security" && <SecurityPolicyPanel />}
+          {tab === "security" && <SecurityPolicyPanel readOnly={!isOwner} />}
           {tab === "audit" && <AuditExplorer />}
         </TabPanel>
       </div>
@@ -226,7 +217,7 @@ const AllowedNetworks: React.FC<{
   );
 };
 
-const SecurityPolicyPanel: React.FC = () => {
+const SecurityPolicyPanel: React.FC<{ readonly readOnly: boolean }> = ({ readOnly }) => {
   const { organizationId } = useResolvedOrganization();
   const queryClient = useQueryClient();
   const [confirmBypassOff, setConfirmBypassOff] = useState(false);
@@ -277,6 +268,11 @@ const SecurityPolicyPanel: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      {readOnly ? (
+        <p className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          Only an organization owner can change the sign-in policy. You can read it here.
+        </p>
+      ) : null}
       <section className="rounded-lg border border-border bg-card p-4">
         <label className="flex items-start gap-3">
           <input
@@ -289,7 +285,7 @@ const SecurityPolicyPanel: React.FC = () => {
               }
               update.mutate({ require_sso: false });
             }}
-            disabled={update.isPending || (!policy.require_sso && !hasActiveIdp)}
+            disabled={readOnly || update.isPending || (!policy.require_sso && !hasActiveIdp)}
             className="mt-0.5 h-4 w-4 rounded border-border"
           />
           <span>
@@ -354,7 +350,7 @@ const SecurityPolicyPanel: React.FC = () => {
                 }
                 update.mutate({ sso_bypass_for_owners: true });
               }}
-              disabled={update.isPending}
+              disabled={readOnly || update.isPending}
               className="mt-0.5 h-4 w-4 rounded border-border"
             />
             <span>
@@ -428,12 +424,12 @@ const SecurityPolicyPanel: React.FC = () => {
 
       <AllowedNetworks
         policy={policy}
-        saving={update.isPending}
+        saving={update.isPending || readOnly}
         onSave={(networks) => update.mutate({ ip_allowlist: networks })}
       />
       <SessionLifetime
         policy={policy}
-        saving={update.isPending}
+        saving={update.isPending || readOnly}
         onChange={(seconds) => update.mutate({ max_session_age_s: seconds })}
       />
 
