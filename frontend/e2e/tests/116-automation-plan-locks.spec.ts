@@ -219,6 +219,14 @@ test.describe("What the plan locks in Workflows", () => {
       const dialog = await expectUpgradeDialog(page, label);
       await expect(dialog).toContainText(plans);
       await expect(dialog.getByRole("button", { name: "View plans" })).toBeVisible();
+      // Final session 1 (F-552): a Developer owner is also offered the add-on that unlocks a GST trigger, with its price;
+      // TruthMesh has no add-on, so its dialog offers none.
+      if (words === "GST") {
+        await expect(dialog).toContainText("you can also add GST Credit for $49 a month");
+        await expect(dialog.getByTestId("upgrade-addon-offer").getByRole("button", { name: /Add GST Credit — \$49 a month/ })).toBeVisible();
+      } else {
+        await expect(dialog.getByTestId("upgrade-addon-offer")).toHaveCount(0);
+      }
       await dialog.getByRole("button", { name: "Not now" }).click();
       await expect(dialog).toHaveCount(0);
       await expect(builder).toBeVisible();

@@ -247,6 +247,7 @@ def _locked(recipe: dict[str, Any], authoring: Any) -> Optional[dict[str, Option
             return {
                 "reason": "Needs the GST Credit add-on or a plan that includes GST Credit." if spec.addon else "Not included in your plan.",
                 "capability": spec.capability or spec.addon,
+                "addon": spec.addon,
                 "feature": spec.label,
             }
     for step in [*recipe["rule"]["actions"], *recipe["rule"]["else_actions"]]:
@@ -254,7 +255,7 @@ def _locked(recipe: dict[str, Any], authoring: Any) -> Optional[dict[str, Option
         if definition is not None and not flow_service.action_available(
                 definition, capabilities=authoring.granted_capabilities, addons=authoring.addons):
             return {"reason": "Not included in your plan.", "capability": definition.capability or definition.addon,
-                    "feature": definition.label}
+                    "addon": definition.addon, "feature": definition.label}
     return None
 
 
@@ -271,6 +272,8 @@ def build(authoring: Any) -> list[dict[str, Any]]:
             # What the upgrade dialog names when a locked recipe is chosen.
             "locked_capability": locked["capability"] if locked else None,
             "locked_feature": locked["feature"] if locked else None,
+            # Final session 1 (F-552): the add-on that also unlocks it, so the dialog can offer it beside the plans.
+            "locked_addon": locked.get("addon") if locked else None,
             "trigger_labels": triggers,
         })
     return out

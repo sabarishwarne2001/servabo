@@ -11,6 +11,8 @@ import { entitlementKeys } from "@/services/api/queryKeys";
 interface PendingPrompt {
   readonly capability: string;
   readonly name: string;
+  /** The add-on that also unlocks it (Final session 1, F-552): named in the dialog with its checkout. */
+  readonly addonKey?: string | undefined;
 }
 
 export interface UpgradePrompt {
@@ -19,7 +21,7 @@ export interface UpgradePrompt {
    * the `addon.*` key) is absent.
    */
   readonly isLocked: (capability: string | undefined) => boolean;
-  readonly prompt: (capability: string, name: string) => void;
+  readonly prompt: (capability: string, name: string, addonKey?: string) => void;
   readonly dialog: React.ReactElement;
 }
 
@@ -63,7 +65,10 @@ export function useUpgradePrompt(
     },
     [capabilities.isLoading, capabilities.isError, capabilities.granted, addonFor],
   );
-  const prompt = useCallback((capability: string, name: string) => setPending({ capability, name }), []);
+  const prompt = useCallback(
+    (capability: string, name: string, addonKey?: string) => setPending({ capability, name, addonKey }),
+    [],
+  );
 
   const dialog = (
     <UpgradePlanDialog
@@ -79,6 +84,8 @@ export function useUpgradePrompt(
       canChangePlan={role === "OWNER" || role === "BILLING"}
       billingPath={organizationBillingPath(organizationSlug)}
       onClose={() => setPending(null)}
+      addon={pending?.addonKey ? addonFor(pending.addonKey) : null}
+      organizationId={organizationId}
     />
   );
 
