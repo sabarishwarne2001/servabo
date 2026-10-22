@@ -396,6 +396,11 @@ class WorkspaceSchemaPreset(Base):
     enabled_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    #: Final session 1 (F-408). Keys of the suggested checks this workspace's administrator turned down, so the pack does
+    #: not propose them again (services/ingestion/pack_checks.py).
+    dismissed_checks: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
 
 
 class RetentionHold(Base):

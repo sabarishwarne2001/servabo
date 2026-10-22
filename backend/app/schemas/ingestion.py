@@ -160,6 +160,49 @@ class PresetEnableRequest(BaseModel):
     enabled: bool
 
 
+class PackCheckProposalResponse(BaseModel):
+    """One check a pack suggests that the workspace has neither added nor turned down (Final session 1, F-408)."""
+
+    key: str
+    preset_id: uuid.UUID
+    preset_label: str
+    document_type: str
+    sentence: str
+    severity: str
+    #: The confidence setting the severity implies, as a decimal string.
+    threshold: str
+    understood_as: str
+    #: True when the sentence is read by an AI model (billed as assistant use): accepting needs `acknowledge_llm`.
+    requires_acknowledgement: bool
+
+
+class PackCheckProposalsResponse(BaseModel):
+    #: False when the plan does not include Clause assertions: the checks cannot be added, so none is offered.
+    available: bool
+    proposals: list[PackCheckProposalResponse] = Field(default_factory=list)
+
+
+class PackCheckAcceptRequest(BaseModel):
+    key: str = Field(min_length=1, max_length=64)
+    acknowledge_llm: bool = False
+
+
+class PackCheckDismissRequest(BaseModel):
+    key: str = Field(min_length=1, max_length=64)
+
+
+class PackCheckAcceptedResponse(BaseModel):
+    rule_id: uuid.UUID
+    name: str
+    is_active: bool
+
+
+class RedactionSuggestionResponse(BaseModel):
+    profile: str
+    preset_label: str
+    document_type: str
+
+
 class RetentionHoldRequest(BaseModel):
     reason: str = Field(min_length=3, max_length=255)
     reference: Optional[str] = Field(default=None, max_length=128)
@@ -187,9 +230,15 @@ __all__ = [
     "BulkActionRequest",
     "BulkActionResponse",
     "BulkItemResult",
+    "PackCheckAcceptRequest",
+    "PackCheckAcceptedResponse",
+    "PackCheckDismissRequest",
+    "PackCheckProposalResponse",
+    "PackCheckProposalsResponse",
     "PresetApplyRequest",
     "PresetEnableRequest",
     "PresetResponse",
+    "RedactionSuggestionResponse",
     "RetentionHoldRequest",
     "RetentionHoldResponse",
     "TagListResponse",

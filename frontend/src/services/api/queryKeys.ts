@@ -26,6 +26,10 @@ export const ingestionKeys = {
     [...ingestionKeys.batches(workspaceId), batchId] as const,
   presets: (workspaceId: string) =>
     [...ingestionKeys.all(workspaceId), "presets"] as const,
+  packCheckProposals: (workspaceId: string) =>
+    [...ingestionKeys.all(workspaceId), "pack-check-proposals"] as const,
+  redactionSuggestion: (workspaceId: string, workItemId: string) =>
+    [...ingestionKeys.all(workspaceId), "redaction-suggestion", workItemId] as const,
   tags: (workspaceId: string) =>
     [...ingestionKeys.all(workspaceId), "tags"] as const,
   retentionHolds: (workspaceId: string) =>

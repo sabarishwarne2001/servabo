@@ -54,9 +54,15 @@ from app.schemas.ingestion import (
     BatchResponse,
     BulkActionRequest,
     BulkActionResponse,
+    PackCheckAcceptedResponse,
+    PackCheckAcceptRequest,
+    PackCheckDismissRequest,
+    PackCheckProposalResponse,
+    PackCheckProposalsResponse,
     PresetApplyRequest,
     PresetEnableRequest,
     PresetResponse,
+    RedactionSuggestionResponse,
     RetentionHoldRequest,
     RetentionHoldResponse,
     TagListResponse,
@@ -69,6 +75,7 @@ from app.services.ingestion import (
     archive_intake,
     batch_service,
     bulk_service,
+    pack_checks,
     preset_service,
     retention_service,
     upload_session_service,
@@ -675,6 +682,104 @@ def set_preset_enabled(
         )
     db.commit()
     return _preset_response(preset, applied)
+
+
+# ---------------------------------------------------------------------------
+# What an enabled pack does with its promises (Final session 1, F-408)
+# ---------------------------------------------------------------------------
+
+
+def _clause_checks_held(db: Session, context: deps.TenantContext) -> bool:
+    from app.api import capability_gate
+    from app.core import entitlements
+
+    return capability_gate.has_capability(
+        db, organization_id=context.organization_id, capability_key=entitlements.SEMANTIC_ASSERTIONS_CAPABILITY)
+
+
+@preset_router.get("/check-proposals", response_model=PackCheckProposalsResponse)
+def list_check_proposals(
+    db: Session = Depends(deps.get_db),
+    context: deps.TenantContext = Depends(deps.RequireWorkspaceAdmin),
+) -> PackCheckProposalsResponse:
+    """The suggested checks of the packs enabled in this workspace that are not yet added to Clause assertions.
+
+    Without the Clause assertions capability nothing can be added, so none is offered (`available: false`)."""
+    if not _clause_checks_held(db, context):
+        return PackCheckProposalsResponse(available=False, proposals=[])
+    found = pack_checks.proposals(db, organization_id=context.organization_id, workspace_id=context.workspace_id)
+    return PackCheckProposalsResponse(
+        available=True,
+        proposals=[PackCheckProposalResponse(
+            key=p.key, preset_id=p.preset_id, preset_label=p.preset_label, document_type=p.document_type,
+            sentence=p.sentence, severity=p.severity, threshold=p.threshold, understood_as=p.understood_as,
+            requires_acknowledgement=p.requires_acknowledgement) for p in found],
+    )
+
+
+@preset_router.post("/check-proposals/accept", response_model=PackCheckAcceptedResponse, status_code=status.HTTP_201_CREATED)
+def accept_check_proposal(
+    payload: PackCheckAcceptRequest,
+    db: Session = Depends(deps.get_db),
+    context: deps.TenantContext = Depends(deps.RequireWorkspaceAdmin),
+) -> PackCheckAcceptedResponse:
+    """One click: create the clause check, save its sentence and switch it on."""
+    from app.api import capability_gate
+    from app.core import entitlements
+
+    capability_gate.require_capability(
+        db, context=context, capability_key=entitlements.SEMANTIC_ASSERTIONS_CAPABILITY,
+        operation="document_preset.accept_check")
+    try:
+        check = pack_checks.accept(
+            db, organization_id=context.organization_id, workspace_id=context.workspace_id, user_id=context.user_id,
+            key=payload.key, acknowledge_llm=payload.acknowledge_llm)
+    except pack_checks.PackCheckError as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    audit_service.record(
+        db, organization_id=context.organization_id, workspace_id=context.workspace_id,
+        principal=get_current_principal(), resource_type=AuditResourceType.DOCUMENT_SCHEMA_PRESET,
+        resource_id=check.rule.id, action=AuditAction.CREATED, outcome=AuditOutcome.ALLOWED,
+        details={"suggested_check": True, "rule_id": str(check.rule.id)},
+    )
+    db.commit()
+    return PackCheckAcceptedResponse(rule_id=check.rule.id, name=check.rule.name, is_active=bool(check.rule.is_active))
+
+
+@preset_router.post("/check-proposals/dismiss", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+def dismiss_check_proposal(
+    payload: PackCheckDismissRequest,
+    db: Session = Depends(deps.get_db),
+    context: deps.TenantContext = Depends(deps.RequireWorkspaceAdmin),
+) -> Response:
+    """Turn a suggested check down: this workspace is not offered it again."""
+    try:
+        pack_checks.dismiss(db, organization_id=context.organization_id, workspace_id=context.workspace_id, key=payload.key)
+    except pack_checks.PackCheckError as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@preset_router.get("/redaction-suggestion", response_model=Optional[RedactionSuggestionResponse])
+def redaction_suggestion(
+    work_item_id: uuid.UUID,
+    db: Session = Depends(deps.get_db),
+    context: deps.TenantContext = Depends(deps.RequireWorkspaceContributor),
+) -> Optional[RedactionSuggestionResponse]:
+    """The redaction profile of the enabled pack that fits this document, or null (the Redact menu pre-selects it)."""
+    from app.models.work_item import WorkItem
+
+    item = db.execute(select(WorkItem).where(
+        WorkItem.id == work_item_id, WorkItem.workspace_id == context.workspace_id)).scalar_one_or_none()
+    if item is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found.")
+    found = pack_checks.redaction_suggestion(db, workspace_id=context.workspace_id, text=item.extracted_text or "")
+    if found is None:
+        return None
+    return RedactionSuggestionResponse(profile=found.profile, preset_label=found.preset_label, document_type=found.document_type)
 
 
 # ---------------------------------------------------------------------------

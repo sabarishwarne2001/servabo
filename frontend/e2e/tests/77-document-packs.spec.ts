@@ -85,11 +85,14 @@ test.describe("Document packs — every pack reviewed", () => {
       await expect(redaction).toContainText(profile.removes);
       await expect(redaction).not.toContainText(pack.redaction_profile ?? "");
 
-      // What it does and does not do, said plainly: matched by its phrases; checks and profile are
-      // recommendations nothing applies by itself.
+      // What it does, said plainly (F-408, Final session 1): matched by its phrases; its checks are proposed under
+      // Clause assertions for one-click adding (nothing is added until then); its profile is offered first when a
+      // matching document is redacted, and enabling the pack redacts nothing. Spec 134 proves each in the browser.
       await expect(card.getByTestId("pack-hints")).toContainText("at least");
-      await expect(card).toContainText("enabling the pack does not create them");
-      await expect(redaction).toContainText("enabling the pack does not redact anything");
+      await expect(card).toContainText("Enabling the pack proposes these under Clause assertions");
+      await expect(card).toContainText("Nothing is added until you do");
+      await expect(redaction).toContainText("offered first");
+      await expect(redaction).toContainText("Enabling the pack redacts nothing");
 
       if (pack.redaction_profile === "hipaa_safe_harbor") {
         expect(pack.safe_harbor_notice).toBeTruthy();
