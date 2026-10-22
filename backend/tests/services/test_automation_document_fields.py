@@ -173,5 +173,5 @@ def test_the_trace_names_every_condition() -> None:
     work_item = doc(total_amount="118000", currency="INR", vendor_bank_account="00112233445566")
     matched, entries = conditions.trace_node_config(config, work_item=work_item, event_payload=None, context=CTX)
     assert matched is False and len(entries) == 2
-    assert entries[0]["matched"] is False and "INR 118,000.00" in entries[0]["actual"]
+    assert entries[0]["matched"] is False and "INR 1,18,000.00" in entries[0]["actual"]
     assert "00112233445566" not in str(entries) and entries[1]["actual"].endswith("5566")
