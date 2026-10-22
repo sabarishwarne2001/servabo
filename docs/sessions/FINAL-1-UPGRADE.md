@@ -4,7 +4,7 @@
 | --- | --- |
 | **Where** | Claude Code on the web (the cloud), repository `servabo` |
 | **Model / effort** | **Opus 5.5, High** |
-| **Before you start** | PR #35 (Session J) and the PR that added this file are merged, and **CI is green on `main`** |
+| **Before you start** | PR #35 (Session J) and PR #36 (which added this file) are merged, and **CI is green on `main`** |
 | **After it** | Final session 2, on your own PC (`docs/sessions/FINAL-2-LIVE.md`) |
 | **Replaces** | The old "Session E" (product wins). The old "Session D" became Final session 2. |
 | **External cost** | Zero. Every outside service is played by a stand-in in this session; Final session 2 connects the real accounts. |
