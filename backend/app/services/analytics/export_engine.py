@@ -121,6 +121,9 @@ DATASET_SCHEMA_VERSIONS: dict[str, int] = {
     "DOCUMENT_METADATA": 1,
     "ASSISTANT_TURNS": 1,
     "AUTOMATION_RUNS": 1,
+    # Final session 1 (Phase 6): Enterprise datasets, see DATASET_CAPABILITY.
+    "GST_MATCHES": 1,
+    "HELM_LEDGER": 1,
 }
 
 #: Hard ceiling on rows pulled per dataset per run. A tenant with a 90-day
@@ -317,6 +320,75 @@ AUTOMATION_RUNS_SPEC = DatasetSpec(
     ),
 )
 
+GST_MATCHES_SPEC = DatasetSpec(
+    dataset="GST_MATCHES",
+    version=DATASET_SCHEMA_VERSIONS["GST_MATCHES"],
+    description=(
+        "One row per reconciled GST record or purchase invoice, across every workspace: how a supplier's GSTR-2B "
+        "record matched the invoice the books hold, and what the credit is worth. Identifiers and figures only: no "
+        "supplier names, no document text. Rows the engine recomputed in the window; the engine rebuilds a workspace's "
+        "matches when a return is imported, so each import writes its rows again. Enterprise."
+    ),
+    columns=(
+        ColumnSpec("match_id", "string", "Stable identifier for this match row."),
+        ColumnSpec("organization_id", "string", "Owning tenant."),
+        ColumnSpec("workspace_id", "string", "Owning workspace."),
+        ColumnSpec("gstin", "string", "The buyer's GSTIN the return belongs to."),
+        ColumnSpec("supplier_gstin", "string", "The supplier's GSTIN, NULL when the document names none."),
+        ColumnSpec("record_id", "string", "The GSTR-2B record, NULL when the supplier reported nothing."),
+        ColumnSpec("work_item_id", "string", "The purchase invoice document, NULL when the books hold none."),
+        ColumnSpec(
+            "status", "string",
+            "MATCHED, MATCHED_WITH_DIFFERENCES, WAITING_FOR_SUPPLIER, NOT_IN_BOOKS, NOT_ELIGIBLE and the others the "
+            "GST Credit page shows.",
+        ),
+        ColumnSpec("method", "string", "How it was matched (IRN, GSTIN and number, ...), NULL when unmatched."),
+        ColumnSpec("document_number", "string", "The invoice or note number as printed."),
+        ColumnSpec("document_date", "timestamp", "The document date, midnight UTC; NULL when unknown."),
+        ColumnSpec("value_micros", "int64", "Invoice value in INR micros."),
+        ColumnSpec("tax_micros", "int64", "Tax on the invoice in INR micros."),
+        ColumnSpec("claimable_micros", "int64", "Input credit the supplier reported as available, INR micros."),
+        ColumnSpec("difference_count", "int64", "How many amounts differ between record and books."),
+        ColumnSpec("ims_action", "string", "ACCEPT, PENDING or REJECT when an IMS action is recorded."),
+        ColumnSpec("decision", "string", "A person's decision (CONFIRM, NOT_OURS, LINK), NULL when none."),
+        ColumnSpec("reported_late", "bool", "Whether the supplier reported it after the period it belongs to."),
+        ColumnSpec("period_first_seen", "string", "YYYY-MM of the first statement that carried it."),
+        ColumnSpec("days_unpaid", "int64", "Days since the invoice date of an unpaid invoice, as of the end of the window; NULL when paid or not tracked."),
+        ColumnSpec("computed_at", "timestamp", "When the engine last computed this row, UTC."),
+    ),
+)
+
+HELM_LEDGER_SPEC = DatasetSpec(
+    dataset="HELM_LEDGER",
+    version=DATASET_SCHEMA_VERSIONS["HELM_LEDGER"],
+    description=(
+        "Helm's Promise ledger across every workspace: one row per promise found in the documents (a payment due, "
+        "a delivery, a price held) and whether it was kept. Identifiers, states and figures only: no counterparty "
+        "names, titles or evidence quotes. Rows updated in the window. The invented sample company is never exported. "
+        "Enterprise."
+    ),
+    columns=(
+        ColumnSpec("promise_id", "string", "Stable identifier for this promise."),
+        ColumnSpec("organization_id", "string", "Owning tenant."),
+        ColumnSpec("workspace_id", "string", "Owning workspace."),
+        ColumnSpec("work_item_id", "string", "The document the promise was found in, NULL when it has none."),
+        ColumnSpec("obligation_id", "string", "The obligation it belongs to, NULL when none."),
+        ColumnSpec("kind", "string", "The kind of promise, as the Promise ledger names it."),
+        ColumnSpec("direction", "string", "Whether it is owed to the company or by it."),
+        ColumnSpec("counterparty_key", "string", "A stable key for the other party; join to your own master data."),
+        ColumnSpec("currency", "string", "ISO currency, NULL when the promise has no amount."),
+        ColumnSpec("amount_micros", "int64", "Promised amount in micros of the currency, NULL when none."),
+        ColumnSpec("due_date", "timestamp", "When it falls due, midnight UTC; NULL when open-ended."),
+        ColumnSpec("window_end", "timestamp", "End of the window it may be kept in, midnight UTC; NULL when none."),
+        ColumnSpec("status", "string", "Open, kept, broken or the other states the ledger shows."),
+        ColumnSpec("confidence", "string", "How sure the reading is."),
+        ColumnSpec("fulfilment_count", "int64", "How many payments or events were matched against it."),
+        ColumnSpec("engine_version", "string", "The ledger engine that wrote the row."),
+        ColumnSpec("created_at", "timestamp", "When Helm first found it, UTC."),
+        ColumnSpec("updated_at", "timestamp", "When it last changed, UTC."),
+    ),
+)
+
 DATASET_SPECS: dict[str, DatasetSpec] = {
     spec.dataset: spec
     for spec in (
@@ -324,7 +396,17 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
         DOCUMENT_METADATA_SPEC,
         ASSISTANT_TURNS_SPEC,
         AUTOMATION_RUNS_SPEC,
+        GST_MATCHES_SPEC,
+        HELM_LEDGER_SPEC,
     )
+}
+
+#: Datasets that need a capability the organization's plan must hold (Final session 1, Phase 6). Both span every
+#: workspace of the organization, which is what the "all workspaces" capabilities sell (Enterprise). The other datasets
+#: need nothing beyond the warehouse add-on every export already needs.
+DATASET_CAPABILITY: dict[str, str] = {
+    "GST_MATCHES": "capability.gst_credit_all_workspaces",
+    "HELM_LEDGER": "capability.helm_all_workspaces",
 }
 
 
@@ -571,11 +653,123 @@ def extract_automation_runs(
     return rows
 
 
+def _day(value: Any) -> Optional[datetime]:
+    """A date as midnight UTC, the only way a DATE reaches a Parquet timestamp without a locale."""
+    if value is None:
+        return None
+    return datetime(value.year, value.month, value.day, tzinfo=timezone.utc)
+
+
+def extract_gst_matches(
+    db: Session,
+    *,
+    organization_id: uuid.UUID,
+    window_start: datetime,
+    window_end: datetime,
+    limit: int = MAX_ROWS_PER_DATASET,
+) -> list[dict[str, Any]]:
+    from app.models.gst import GstMatch
+    from app.services.gst import ims
+
+    stmt = (
+        select(GstMatch)
+        .join(Workspace, Workspace.id == GstMatch.workspace_id)
+        .where(GstMatch.organization_id == organization_id)
+        .where(Workspace.is_sample.is_(False))
+        .where(GstMatch.computed_at >= window_start)
+        .where(GstMatch.computed_at < window_end)
+        .order_by(GstMatch.computed_at.asc(), GstMatch.id.asc())
+        .limit(limit)
+    )
+    rows: list[dict[str, Any]] = []
+    for match in db.execute(stmt).scalars():
+        risk = match.risk if isinstance(match.risk, dict) else {}
+        # Unpaid age as of the end of the window, so a re-run of the same window writes the same figure.
+        age = None if risk.get("paid") else ims.age_days(risk, window_end.astimezone(timezone.utc).date())
+        rows.append(
+            {
+                "match_id": str(match.id),
+                "organization_id": str(match.organization_id),
+                "workspace_id": _s(match.workspace_id),
+                "gstin": match.gstin,
+                "supplier_gstin": match.supplier_gstin,
+                "record_id": _s(match.record_id),
+                "work_item_id": _s(match.work_item_id),
+                "status": match.status,
+                "method": match.method,
+                "document_number": match.doc_number,
+                "document_date": _day(match.doc_date),
+                "value_micros": match.value_micros,
+                "tax_micros": match.tax_micros,
+                "claimable_micros": match.itc_micros,
+                "difference_count": len(match.differences or []),
+                "ims_action": match.ims_action,
+                "decision": match.decision,
+                "reported_late": bool(match.reported_late),
+                "period_first_seen": match.period_first_seen,
+                "days_unpaid": age,
+                "computed_at": _iso(match.computed_at),
+                # supplier_name, ims_reason, differences and notes are deliberately absent. See the spec.
+            }
+        )
+    return rows
+
+
+def extract_helm_ledger(
+    db: Session,
+    *,
+    organization_id: uuid.UUID,
+    window_start: datetime,
+    window_end: datetime,
+    limit: int = MAX_ROWS_PER_DATASET,
+) -> list[dict[str, Any]]:
+    from app.models.helm import HelmPromise
+
+    stmt = (
+        select(HelmPromise)
+        .join(Workspace, Workspace.id == HelmPromise.workspace_id)
+        .where(HelmPromise.organization_id == organization_id)
+        .where(Workspace.is_sample.is_(False))
+        .where(HelmPromise.updated_at >= window_start)
+        .where(HelmPromise.updated_at < window_end)
+        .order_by(HelmPromise.updated_at.asc(), HelmPromise.id.asc())
+        .limit(limit)
+    )
+    rows: list[dict[str, Any]] = []
+    for promise in db.execute(stmt).scalars():
+        rows.append(
+            {
+                "promise_id": str(promise.id),
+                "organization_id": str(promise.organization_id),
+                "workspace_id": _s(promise.workspace_id),
+                "work_item_id": _s(promise.work_item_id),
+                "obligation_id": _s(promise.obligation_id),
+                "kind": promise.kind,
+                "direction": promise.direction,
+                "counterparty_key": promise.counterparty_key,
+                "currency": promise.currency,
+                "amount_micros": promise.amount_micros,
+                "due_date": _day(promise.due_date),
+                "window_end": _day(promise.window_end),
+                "status": promise.status,
+                "confidence": promise.confidence,
+                "fulfilment_count": len(promise.fulfilments or []),
+                "engine_version": promise.engine_version,
+                "created_at": _iso(promise.created_at),
+                "updated_at": _iso(promise.updated_at),
+                # counterparty_name, title, terms, evidence and details are deliberately absent. See the spec.
+            }
+        )
+    return rows
+
+
 EXTRACTORS: dict[str, Callable[..., list[dict[str, Any]]]] = {
     "USAGE_ROLLUPS": extract_usage_rollups,
     "DOCUMENT_METADATA": extract_document_metadata,
     "ASSISTANT_TURNS": extract_assistant_turns,
     "AUTOMATION_RUNS": extract_automation_runs,
+    "GST_MATCHES": extract_gst_matches,
+    "HELM_LEDGER": extract_helm_ledger,
 }
 
 
@@ -784,11 +978,14 @@ __all__ = [
     "DATASET_SPECS",
     "DOCUMENT_METADATA_SPEC",
     "DatasetSpec",
+    "DATASET_CAPABILITY",
     "EXTRACTORS",
     "ExportEngineError",
     "ExportPart",
     "FORBIDDEN_COLUMN_NAMES",
     "ForbiddenColumnError",
+    "GST_MATCHES_SPEC",
+    "HELM_LEDGER_SPEC",
     "MAX_ROWS_PER_DATASET",
     "ParquetUnavailableError",
     "USAGE_ROLLUPS_SPEC",
@@ -800,6 +997,8 @@ __all__ = [
     "extract_automation_runs",
     "extract_dataset",
     "extract_document_metadata",
+    "extract_gst_matches",
+    "extract_helm_ledger",
     "extract_usage_rollups",
     "write_parquet",
 ]
