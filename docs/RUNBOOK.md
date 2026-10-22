@@ -838,3 +838,58 @@ open('groq-2026-09.csv').read(), 'source_key': 'groq:2026-09'}}` (at least two d
 ends). The job's result in Platform admin, Jobs shows the drift; `alert_raised` is true when it is
 above `RECONCILE_ALERT_BPS` or something was generated but never metered.
 
+
+### 9.10 Email-in: documents forwarded to a workspace's own address (Final session 1)
+
+Customers forward invoices to an address that belongs to their workspace; Servabo adds each attachment as a document (a zip becomes all
+the documents inside it) through the same path as an upload, so plan limits, GST Credit, Helm and the value receipt all apply. Postmark
+receives the mail and calls Servabo's webhook. **Nothing here works until you do the steps below; until then the settings page says
+"Email-in is not switched on yet" and the webhook answers 404.**
+
+**One-time setup *(not run here; Final session 2 tries it with a tunnel)*.**
+1. In Postmark, create an **inbound** server (or use the one you have) and note its **inbound hash**: the part before the `@` in the
+   address Postmark shows (`<hash>@inbound.postmarkapp.com`).
+2. In `.env.production` set a long random credential and the hash (generate the password with `openssl rand -base64 36`):
+   ```
+   POSTMARK_INBOUND_WEBHOOK_USER=postmark
+   POSTMARK_INBOUND_WEBHOOK_PASSWORD=<the long random value>
+   POSTMARK_INBOUND_HASH=<the inbound hash>
+   ```
+   then `$COMPOSE up -d web`. (Optional: `POSTMARK_INBOUND_ALLOWED_IPS` with the addresses Postmark delivers from, if you want that check too.)
+3. In Postmark, the inbound server's settings, **Webhook** field:
+   `https://postmark:<the long random value>@app.servabo.app/api/v1/public/inbound/postmark`
+   (Postmark does not sign inbound messages; it documents HTTP basic auth in the URL, over HTTPS only. The route compares both parts in
+   constant time and never prints them.) Use Postmark's "Check" button: it must say the webhook answered 200 or 403, not 401 or 404.
+4. Open any workspace → Settings → Email-in: the address (`<hash>+<long token>@inbound.postmarkapp.com`) is shown with a copy button.
+   Allow the sender you will test with, forward an invoice to the address, and see it arrive.
+
+**Later, with your own domain.** Add an MX record `in.servabo.app` → `inbound.postmarkapp.com` (priority 10) in Cloudflare DNS, set the
+inbound domain on the Postmark server, then set `INBOUND_EMAIL_DOMAIN=in.servabo.app` and restart `web`. Addresses become
+`<long token>@in.servabo.app`. Old-form mail is still routed (the token is the same), so nothing breaks while customers change over.
+
+**How it behaves (so you can answer a customer).**
+- Only senders (addresses or domains) the workspace administrator allowed are added straight away. Anyone else's mail is **held** on the
+  Email-in page for an admin to Approve or Discard, and the admin gets a notice. Nothing is dropped silently.
+- A message the plan or an ended trial stops is held whole (nothing half-added) with the reason; approve it after upgrading.
+- "Change address" (an admin) replaces the token at once. Mail still sent to the old address gets a **403**, which Postmark treats as
+  permanent and stops retrying, so nobody's mail loops for hours.
+- Answers the webhook gives: 200 received (also for a message already seen), 401 bad credential, 403 unknown or retired address, 404 not
+  switched on, 413 over `INBOUND_EMAIL_MAX_BODY_MB` (50), 422 not a Postmark message, 429 rate limited, 5xx unexpected (Postmark retries).
+- Small inline pictures (signatures, logos under 30 KB) are ignored. A GSTR-2B JSON is never read as a document: it is set aside with
+  "import it on the GST credit page".
+- Held and discarded messages (with the attachments kept for them) are deleted after 30 days by the nightly
+  `servabo-sweep compliance --inbound` (installed with the other sweeps, section 9.6). Nothing logs a sender, a subject, an attachment or
+  an address's token.
+
+**If mail does not arrive.** Postmark's Activity page for the inbound server shows each message and the webhook's answer. 401: the
+password in the Postmark URL differs from `.env.production`. 404: `POSTMARK_INBOUND_WEBHOOK_*` are not set on `web`. 403: the customer is
+using an old address (ask them to copy the new one). 200 but nothing in the workspace: look at Settings → Email-in → Waiting for you.
+
+### 9.11 Deleted workspaces and organizations (Final session 1)
+
+Deleting a workspace or an organization archives it; its data is purged later by `servabo-sweep compliance --archived --apply` (nightly):
+30 days after archiving the documents, files, conversations and settings go (until then **Restore** works); the money records (GST
+books, the Helm ledger, invoices, usage) and the audit trail stay; an organization itself is deleted 72 months after archiving
+(`ARCHIVED_PURGE_GRACE_DAYS`, `ARCHIVED_FINAL_DELETE_MONTHS`; the CGST Act s.36 books period). Look first without changing anything:
+`$COMPOSE run --rm ... python scripts/sweep_compliance.py --archived` (a dry run prints what it would do). The final deletion refuses, and
+says so, while an audit entry is younger than 400 days: the audit trail is never shortened.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -180,6 +181,7 @@ def ingest_validated(
     principal: Optional[Principal] = None,
     enqueue_extraction: bool = True,
     meter_upload: bool = True,
+    source: Optional[dict[str, Any]] = None,
 ) -> IntakeResult:
     """Store a validated file and create its document, charged to the plan.
 
@@ -189,6 +191,10 @@ def ingest_validated(
     bytes are stored, then the authoritative check and charge under the usage
     pool's lock in this transaction. `meter_upload=False` only for documents carved
     out of one already charged (a packet's split children).
+
+    `source` says where the document came from when that is not "a person uploaded it" (Final
+    session 1, email-in): `{"kind": "EMAIL", "sender", "subject", "received_at", "inbound_message_id"}`.
+    It is stored beside the document and shown on it ("Arrived by email from ...").
     """
     from app.services import plan_admission
 
@@ -264,6 +270,18 @@ def ingest_validated(
         )
         db.add(work_item)
         db.flush([work_item])
+        if source:
+            from app.models.inbound_email import WorkItemSource
+
+            received = source.get("received_at")
+            db.add(WorkItemSource(
+                work_item_id=work_item.id, organization_id=organization_id, workspace_id=workspace_id,
+                kind=str(source.get("kind") or "EMAIL"), sender=(source.get("sender") or None) and str(source["sender"])[:320],
+                subject=(source.get("subject") or None) and str(source["subject"])[:500],
+                received_at=datetime.fromisoformat(received) if isinstance(received, str) and received else received,
+                inbound_message_id=uuid.UUID(str(source["inbound_message_id"])) if source.get("inbound_message_id") else None,
+            ))
+            db.flush()
 
         job: Optional[Job] = None
         if enqueue_extraction:

@@ -420,6 +420,16 @@ REGISTRY: dict[str, TableRule] = {
                        note="`erp.service.erase_for_work_items`: the ledger row stays (a posting that happened is a fact), its content goes."),
     "erp_posting_attempts": _r(Kind.MONEY, Erasure.SERVICE, Sweep.CASCADE, OrgPurge.CASCADE, why=_NO + "delivery history"),
 
+    # ----------------------------------------------------------------- email-in (Final session 1, 2B)
+    "inbound_email_addresses": _secret("The workspace's receiving address token; a rotated token is kept only to refuse mail sent to it."),
+    "inbound_email_senders": _config(export="inbound_email_senders", why=""),
+    "inbound_messages": _r(Kind.CONTENT, Erasure.DELETE, Sweep.DELETE, OrgPurge.DELETE, export="inbound_messages",
+                           links=(json_array("work_item_ids"),),
+                           note="Sender address and subject of a message that brought documents in: erased with those documents. "
+                                "Held and discarded messages (no document) are swept after 30 days by `inbound_email.sweep`."),
+    "work_item_sources": _r(Kind.CONTENT, Erasure.DELETE, Sweep.CASCADE, OrgPurge.CASCADE, export="work_item_sources", links=(_WI,),
+                            note="'Arrived by email from ...': the sender and subject belong to the document."),
+
     # ----------------------------------------------------------------- people, organizations, security
     "users": _r(Kind.PERSON, Erasure.SERVICE, Sweep.NONE, OrgPurge.NONE, export="members",
                 note="Anonymized in place on erasure (a user may belong to other organizations, so the row is never purged with one)."),

@@ -15,6 +15,9 @@ MAILTO=""
 # --purge runs the age-based purge, for organizations that turned auto-purge
 # on (Compliance → Retention) and never for documents under a legal hold.
 53 3 * * *  servabo  /srv/servabo/backend/deploy/bin/servabo-sweep compliance --all --purge --apply
+# Final session 1 (N-164): deleted workspaces and organizations 30 days after archiving (the organization itself after 72
+# months), and email-in's held messages after 30 days. Money records and the audit trail are kept until then.
+59 3 * * *  servabo  /srv/servabo/backend/deploy/bin/servabo-sweep compliance --archived --inbound --apply
 # ARCH41-S2:cron-extraction-memory
 29 4 * * *  servabo  /srv/servabo/backend/deploy/bin/servabo-sweep extraction_memory --apply
 # ARCH42-S1:cron-entities

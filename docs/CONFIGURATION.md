@@ -14,7 +14,7 @@ in the containers unless you add it to the service's `environment:` in `docker-c
 is not read by any code, is missing from this page, or is one production cannot run without and
 is missing from `.env.production.template` (or does not stop the app from starting when unset).
 
-302 settings. Columns: name, type, default, where it appears (`example` =
+310 settings. Columns: name, type, default, where it appears (`example` =
 `.env.example`, `production` = `.env.production.template`, `guard` = checked by the production
 guard), and the comment written above it in the code.
 
@@ -176,6 +176,14 @@ guard), and the comment written above it in the code.
 | `BRANDING_MAX_FAVICON_BYTES` | `int` | `512 * 1024` | — |  |
 | `BRANDING_MAX_IMAGE_DIMENSION` | `int` | `2048` | — |  |
 | `COMPLIANCE_EXPORT_TTL_HOURS` | `int` | `72` | — | How long a generated DPA archive stays downloadable. |
+| `POSTMARK_INBOUND_WEBHOOK_USER` | `str` | `''` | example, production | Postmark's inbound webhook is secured with HTTP basic auth in its URL (https://user:password@api.example.com/api/v1/public/inbound/postmark); Postmark does not sign inbound payloads. Both empty = email-in is off (the ro… |
+| `POSTMARK_INBOUND_WEBHOOK_PASSWORD` | `Optional[SecretStr]` | `None` | example, production |  |
+| `POSTMARK_INBOUND_HASH` | `str` | `''` | example, production | Your Postmark inbound server's hash: the part before the `+` in `<hash>+<workspace-token>@inbound.postmarkapp.com`. Used until you have a domain. |
+| `INBOUND_EMAIL_DOMAIN` | `str` | `''` | example, production | Once you own a domain (MX record for `in.<domain>` pointed at Postmark): the addresses become `<workspace-token>@<INBOUND_EMAIL_DOMAIN>`. Empty keeps the `inbound.postmarkapp.com` form. |
+| `POSTMARK_INBOUND_ALLOWED_IPS` | `str` | `''` | example, production | Optional allowlist of the addresses Postmark delivers from (comma-separated IPs or CIDRs); empty = not checked. |
+| `INBOUND_EMAIL_MAX_BODY_MB` | `int` | `50` | example, production | The largest webhook body accepted, in MB (Postmark's own limit for a message is 35 MB; attachments travel base64). |
+| `INBOUND_EMAIL_IGNORE_INLINE_IMAGES_KB` | `int` | `30` | example, production | Inline images smaller than this (signatures, logos) are ignored, not read as documents. |
+| `INBOUND_EMAIL_HELD_DAYS` | `int` | `30` | example, production | Days a held or discarded message is kept before `inbound_email.sweep` deletes it and its stored attachments. |
 | `ZIP_UPLOAD_MAX_MB` | `int` | `256` | example, production | The largest zip one upload accepts, in MB (Final session 1, 2A). What it may unpack to is bounded separately (`ingestion/archive.py`: 512 MB, 2,000 files, 100x compression, one level deep). |
 | `ARCHIVED_PURGE_GRACE_DAYS` | `int` | `30` | example, production | Days after an organization or workspace is archived before its documents, conversations and settings are purged (`scripts/sweep_compliance.py --archived`). Until then "restore" still works. Money records stay. |
 | `ARCHIVED_FINAL_DELETE_MONTHS` | `int` | `72` | example, production | Months after an organization is archived before the organization itself is deleted. 72 months because the CGST Act 2017 s.36 makes a registered person keep books of account until 72 months after the annual return's due … |

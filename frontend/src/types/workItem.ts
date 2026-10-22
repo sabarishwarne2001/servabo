@@ -63,6 +63,13 @@ export interface WorkItemResponse {
   readonly updated_at: string;
   /** F-158: the earlier document in this workspace with the same file, when this upload is a copy. */
   readonly duplicate_of?: WorkItemReference | null;
+  /** Final session 1 (2B): where the document came from when it was not uploaded by a person. */
+  readonly source?: {
+    readonly kind: string;
+    readonly sender?: string | null;
+    readonly subject?: string | null;
+    readonly received_at?: string | null;
+  } | null;
 }
 
 /**

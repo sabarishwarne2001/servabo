@@ -26,6 +26,7 @@ import {
   FileText,
   KeyRound,
   Mail,
+  MailPlus,
   MonitorSmartphone,
   Palette,
   UserRound,
@@ -35,6 +36,7 @@ import Workspace from "./Workspace";
 import EmailSettings from "./EmailSettings";
 import AISettings from "./AISettings";
 import DocumentSettings from "./DocumentSettings";
+import InboundEmailSettings from "./InboundEmailSettings";
 import SessionManagement from "./SessionManagement";
 import ProfileSettings from "./ProfileSettings";
 import NotificationPreferences from "./NotificationPreferences";
@@ -62,7 +64,7 @@ export const PermissionDenied: React.FC = () => {
   );
 };
 
-type SettingsSection = "profile" | "notifications" | "sessions" | "workspace" | "ai" | "email" | "document";
+type SettingsSection = "profile" | "notifications" | "sessions" | "workspace" | "ai" | "email" | "document" | "inbound";
 type SettingsScope = "account" | "workspace";
 
 interface SectionConfig {
@@ -71,6 +73,8 @@ interface SectionConfig {
   readonly label: string;
   readonly hint: string;
   readonly icon: React.ElementType;
+  /** Listed only for this workspace role or above (an administrators-only section is not listed-and-locked). */
+  readonly minimumRole?: "ADMIN";
 }
 
 const SECTIONS: readonly SectionConfig[] = [
@@ -81,6 +85,7 @@ const SECTIONS: readonly SectionConfig[] = [
   { id: "ai", scope: "workspace", label: "AI", hint: "What runs, and the defaults", icon: Cpu },
   { id: "email", scope: "workspace", label: "Email", hint: "Sender, relay and why", icon: Mail },
   { id: "document", scope: "workspace", label: "Documents", hint: "Extraction and schema presets", icon: FileText },
+  { id: "inbound", scope: "workspace", label: "Email-in", hint: "Forward invoices to this workspace", icon: MailPlus, minimumRole: "ADMIN" },
 ];
 
 interface OrgLink {
@@ -133,7 +138,10 @@ const Settings: React.FC = () => {
   const { workspace, workspaceRole, organization, organizationRole } = useResolvedTenant();
 
   const canSeeWorkspace = isAtLeast(workspaceRole, "CONTRIBUTOR");
-  const visible = SECTIONS.filter((section) => section.scope === "account" || canSeeWorkspace);
+  const visible = SECTIONS.filter(
+    (section) =>
+      section.scope === "account" || (canSeeWorkspace && (section.minimumRole === undefined || isAtLeast(workspaceRole, section.minimumRole))),
+  );
   const orgLinks = ORGANIZATION_LINKS.filter((link) => link.visible(organizationRole));
   const slug = organization.organization_slug;
 
@@ -157,6 +165,8 @@ const Settings: React.FC = () => {
         return <EmailSettings />;
       case "document":
         return <DocumentSettings />;
+      case "inbound":
+        return isAtLeast(workspaceRole, "ADMIN") ? <InboundEmailSettings /> : <PermissionDenied />;
       default:
         return null;
     }

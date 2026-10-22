@@ -118,6 +118,8 @@ def accept_archive(
     except Exception:
         driver.delete(key)
         raise
+    # Not a column: lets a caller that rolls the batch back (email-in holding a whole message) delete the stored zip too.
+    batch.archive_storage_key = key  # type: ignore[attr-defined]
     return batch
 
 

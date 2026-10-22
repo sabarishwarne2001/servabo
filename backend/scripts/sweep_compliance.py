@@ -303,6 +303,14 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--inbound",
+        action="store_true",
+        help=(
+            "delete email-in messages that were held or discarded more than INBOUND_EMAIL_HELD_DAYS (30) ago, with the "
+            "attachments kept for them. Never in --all."
+        ),
+    )
+    parser.add_argument(
         "--archived",
         action="store_true",
         help=(
@@ -319,7 +327,7 @@ def main() -> int:
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     args = parser.parse_args()
 
-    if not any([args.all, args.exports, args.files, args.report, args.purge, args.archived]):
+    if not any([args.all, args.exports, args.files, args.report, args.purge, args.archived, args.inbound]):
         parser.error("Nothing selected. Pass --all, --report, or a specific sweep.")
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -381,6 +389,28 @@ def main() -> int:
                     f"recorded; deletion is the ARCH-07 sweeper role's job "
                     f"(400-day floor is enforced by trigger, not by this script)"
                 )
+
+    if args.inbound:
+        from app.services.inbound_email import service as inbound_service
+
+        print("\nEmail-in: held and discarded messages past their keep period:")
+        with session_factory() as db:
+            if args.apply:
+                count = inbound_service.sweep(db)
+                db.commit()
+                print(f"  inbound_messages: {count} row(s) deleted")
+            else:
+                from datetime import datetime, timedelta, timezone
+
+                from sqlalchemy import text
+
+                from app.core.config import settings
+
+                cutoff = datetime.now(timezone.utc) - timedelta(days=int(settings.INBOUND_EMAIL_HELD_DAYS))
+                count = db.execute(
+                    text("SELECT count(*) FROM inbound_messages WHERE status IN ('HELD', 'DISCARDED') AND created_at < :c"), {"c": cutoff}
+                ).scalar_one()
+                print(f"  [DRY RUN] inbound_messages: {count} row(s) would be deleted")
 
     if args.archived:
         from app.services.compliance import purge_service

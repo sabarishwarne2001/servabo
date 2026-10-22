@@ -82,6 +82,9 @@ GENERIC_SECTIONS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "prompt_templates": ("prompt_templates", "org", ()),
     "erp_mappings": ("erp_mappings", "org", ()),
     "erp_lookup_tables": ("erp_lookup_tables", "org", ()),
+    "inbound_email_senders": ("inbound_email_senders", "org", ()),
+    "inbound_messages": ("inbound_messages", "org", ()),
+    "work_item_sources": ("work_item_sources", "org", ()),
 }
 
 #: Every name a registry entry's `export` may use: the sections of the bundle and its two top-level blocks.

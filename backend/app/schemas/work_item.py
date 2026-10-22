@@ -86,6 +86,17 @@ class WorkItemReference(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class WorkItemSourceInfo(BaseModel):
+    """Where a document came from when it was not uploaded by a person (Final session 1, email-in)."""
+
+    kind: str
+    sender: Union[str, None] = None
+    subject: Union[str, None] = None
+    received_at: Union[datetime, None] = None
+
+    model_config = {"from_attributes": True}
+
+
 class WorkItemResponse(WorkItemBase):
     """
     Serialization schema returning structured Work Item data to client layers.
@@ -100,6 +111,8 @@ class WorkItemResponse(WorkItemBase):
     updated_at: datetime
     # F-158: the earlier document in this workspace with the same file, when this is a copy.
     duplicate_of: Union[WorkItemReference, None] = None
+    # Final session 1 (2B): "Arrived by email from ...", on the document's own page.
+    source: Union[WorkItemSourceInfo, None] = None
 
     model_config = {
         "from_attributes": True  # Enables direct mapping from SQLAlchemy 2.0 ORM objects

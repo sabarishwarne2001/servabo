@@ -556,6 +556,27 @@ class Settings(BaseSettings):
     #: How long a generated DPA archive stays downloadable.
     COMPLIANCE_EXPORT_TTL_HOURS: int = 72
 
+    # ---- Email-in (Final session 1, 2B): documents forwarded to a workspace's own address ---------------------------
+    #: Postmark's inbound webhook is secured with HTTP basic auth in its URL
+    #: (https://user:password@api.example.com/api/v1/public/inbound/postmark); Postmark does not sign inbound payloads.
+    #: Both empty = email-in is off (the route answers 404 and the settings page says how to switch it on).
+    POSTMARK_INBOUND_WEBHOOK_USER: str = ""
+    POSTMARK_INBOUND_WEBHOOK_PASSWORD: Optional[SecretStr] = None
+    #: Your Postmark inbound server's hash: the part before the `+` in `<hash>+<workspace-token>@inbound.postmarkapp.com`.
+    #: Used until you have a domain.
+    POSTMARK_INBOUND_HASH: str = ""
+    #: Once you own a domain (MX record for `in.<domain>` pointed at Postmark): the addresses become
+    #: `<workspace-token>@<INBOUND_EMAIL_DOMAIN>`. Empty keeps the `inbound.postmarkapp.com` form.
+    INBOUND_EMAIL_DOMAIN: str = ""
+    #: Optional allowlist of the addresses Postmark delivers from (comma-separated IPs or CIDRs); empty = not checked.
+    POSTMARK_INBOUND_ALLOWED_IPS: str = ""
+    #: The largest webhook body accepted, in MB (Postmark's own limit for a message is 35 MB; attachments travel base64).
+    INBOUND_EMAIL_MAX_BODY_MB: int = 50
+    #: Inline images smaller than this (signatures, logos) are ignored, not read as documents.
+    INBOUND_EMAIL_IGNORE_INLINE_IMAGES_KB: int = 30
+    #: Days a held or discarded message is kept before `inbound_email.sweep` deletes it and its stored attachments.
+    INBOUND_EMAIL_HELD_DAYS: int = 30
+
     #: The largest zip one upload accepts, in MB (Final session 1, 2A). What it may unpack to is bounded separately
     #: (`ingestion/archive.py`: 512 MB, 2,000 files, 100x compression, one level deep).
     ZIP_UPLOAD_MAX_MB: int = 256

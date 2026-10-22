@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
+import { formatTimestamp } from "@/utils/displayTime";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -360,6 +361,18 @@ export const WorkItemDetails: React.FC = () => {
             </span>
           </div>
         </div>
+        {workItem.source?.kind === "EMAIL" && (
+          <p role="note" data-testid="document-source" className="mt-4 rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-[13px] leading-relaxed text-muted-foreground">
+            <span className="font-semibold text-foreground">Arrived by email</span>
+            {workItem.source.sender ? (
+              <>
+                {" "}from <span className="font-medium text-foreground">{workItem.source.sender}</span>
+              </>
+            ) : null}
+            {workItem.source.subject ? <>, subject &ldquo;{workItem.source.subject}&rdquo;</> : null}
+            {workItem.source.received_at ? <>, {formatTimestamp(workItem.source.received_at)}</> : null}.
+          </p>
+        )}
         {workItem.duplicate_of && (
           <p
             role="note"

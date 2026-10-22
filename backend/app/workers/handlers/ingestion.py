@@ -176,6 +176,7 @@ def handle_batch_expand_archive(payload: dict[str, Any]) -> dict[str, Any]:
                         workspace_id=workspace_id,
                         uploader_id=uploader,
                         enqueue_extraction=True,
+                        source=payload.get("source") or None,
                     )
             except (PlanLimitExceededError, SpendLimitExceededError) as exc:
                 # The files that fit are added; the rest are listed as not added, each whole or not at all.

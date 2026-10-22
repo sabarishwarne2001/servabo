@@ -561,12 +561,61 @@ def _calibration_history(args: argparse.Namespace) -> int:
     return 0
 
 
+def _inbound_email(args: argparse.Namespace) -> int:
+    """Play Postmark: deliver one inbound message to the running API's real webhook (Final session 1, 2B).
+
+    Used by browser spec 119 and by Final session 2 (with a throwaway organization) to try email-in without a Postmark
+    account. The message is addressed to the organization's first workspace's own address, signed in with the webhook's
+    basic-auth credential read from the same settings the API runs with. Prints the webhook's answer as one JSON line.
+    """
+    import base64
+    import mimetypes
+    import urllib.error
+    import urllib.request
+
+    from sqlalchemy import select
+
+    from app.core.config import settings
+    from app.models.workspace import Workspace
+    from app.services.inbound_email import service
+    from tests.fakes import fake_postmark_inbound as pm
+
+    with SessionLocal() as db, db.begin():
+        organization = _organization(db, args.org)
+        workspace = db.execute(select(Workspace).where(Workspace.organization_id == organization.id).order_by(Workspace.created_at)).scalars().first()
+        token = service.active_address(db, organization_id=organization.id, workspace_id=workspace.id).token
+        # The stand-in plays Postmark with the stand-in's own inbound hash and credential unless the environment names others
+        # (start-stack.sh gives the API the same values, so the two agree without any configuration).
+        address = args.address or service.address_for(token) or f"{pm.DEFAULT_HASH}+{token}@inbound.postmarkapp.com"
+    attachments = []
+    if args.file:
+        path = Path(args.file)
+        kind = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        attachments.append(pm.attachment(path.name, path.read_bytes(), kind))
+    payload = pm.for_address(address, sender=args.sender, subject=args.subject, attachments=attachments,
+                             **({"message_id": args.message_id} if args.message_id else {}))
+    user = settings.POSTMARK_INBOUND_WEBHOOK_USER or pm.DEFAULT_USER
+    password = settings.POSTMARK_INBOUND_WEBHOOK_PASSWORD.get_secret_value() if settings.POSTMARK_INBOUND_WEBHOOK_PASSWORD else pm.DEFAULT_PASSWORD
+    origin = os.environ.get("E2E_API_ORIGIN", "http://127.0.0.1:8000")
+    request = urllib.request.Request(
+        origin + pm.PATH, data=json.dumps(payload).encode(), method="POST",
+        headers={"Content-Type": "application/json", "Authorization": "Basic " + base64.b64encode(f"{user}:{password}".encode()).decode()},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310 - the local API
+            print(json.dumps({"http": response.status, **json.loads(response.read() or b"{}")}))
+    except urllib.error.HTTPError as error:
+        # A refusal is Postmark's answer too (a rotated address is a 403): the caller reads `http`.
+        print(json.dumps({"http": error.code, "detail": error.read().decode()[:300]}))
+    return 0
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="The browser journeys' clock and gateway stand-ins.")
     parser.add_argument("command", choices=[
         "subscribe", "seats", "change-plan", "cancel", "cancel-at-period-end", "renewal-fails", "payment-fails-again", "mark-unpaid",
         "card-fixed", "refund", "dodo-catalogue", "cancel-addon", "addon-grace-ends", "trial-ending", "trial-ends", "run-job", "dns-publish", "saml-idp",
-        "saml-response", "truthmesh-fill", "truthmesh-stick", "fail-document", "calibration-history"])
+        "saml-response", "truthmesh-fill", "truthmesh-stick", "fail-document", "calibration-history", "inbound-email"])
     parser.add_argument("--gateway", choices=["dodo", "stripe"], type=str.lower,
                         default=_gateway_from_argv([]), help="whose side to play (default: E2E_GATEWAY, else dodo)")
     parser.add_argument("--amount", type=int, help="refund: in cents (default: the whole payment)")
@@ -586,6 +635,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--saml-request", help="saml-response: the SAMLRequest Servabo sent (redirect binding)")
     parser.add_argument("--document", help="fail-document: the document (work item) id")
     parser.add_argument("--count", type=int, default=600, help="calibration-history: how many reviewed outcomes to add")
+    parser.add_argument("--file", help="inbound-email: a file to attach (a PDF, a zip, ...)")
+    parser.add_argument("--from", dest="sender", default="ap@supplier.example", help="inbound-email: the sender's address")
+    parser.add_argument("--subject", default="Invoice", help="inbound-email: the subject")
+    parser.add_argument("--message-id", help="inbound-email: Postmark's MessageID (repeat it to replay a delivery)")
+    parser.add_argument("--address", help="inbound-email: send to this address instead of the workspace's own")
     parser.add_argument("--conflicts", type=int, default=0, help="truthmesh-fill: how many open conflicts to add")
     parser.add_argument("--documents", type=int, default=0, help="truthmesh-fill: how many documents to add to the mesh")
     args = parser.parse_args(argv)
@@ -614,6 +668,9 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if args.command == "calibration-history":
         return _calibration_history(args)
+
+    if args.command == "inbound-email":
+        return _inbound_email(args)
 
     if args.command == "fail-document":
         # A worker that died on a document: the document reads FAILED, as the "Retry processing" button expects.

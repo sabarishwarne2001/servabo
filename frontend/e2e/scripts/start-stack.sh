@@ -120,6 +120,14 @@ else
   export BILLING_GATEWAY=STRIPE
 fi
 
+# Final session 1 (2B): email-in. The API accepts Postmark's inbound webhook with this basic-auth credential, and the
+# workspace addresses take the stand-in's inbound hash (tests/fakes/fake_postmark_inbound.py). `e2e_stand_in.py
+# inbound-email` plays Postmark against it.
+export POSTMARK_INBOUND_WEBHOOK_USER="$("$PY" -c 'from tests.fakes.fake_postmark_inbound import DEFAULT_USER; print(DEFAULT_USER)')"
+export POSTMARK_INBOUND_WEBHOOK_PASSWORD="$("$PY" -c 'from tests.fakes.fake_postmark_inbound import DEFAULT_PASSWORD; print(DEFAULT_PASSWORD)')"
+export POSTMARK_INBOUND_HASH="$("$PY" -c 'from tests.fakes.fake_postmark_inbound import DEFAULT_HASH; print(DEFAULT_HASH)')"
+export E2E_API_ORIGIN="http://127.0.0.1:$API_PORT"
+
 nohup "$PY" -m uvicorn app.main:app --host 127.0.0.1 --port "$API_PORT" >"$LOG_DIR/api.log" 2>&1 &
 echo $! >"$RUN_DIR/api.pid"
 
