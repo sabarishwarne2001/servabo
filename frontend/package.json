@@ -18,7 +18,7 @@
     "verify:contracts": "node scripts/verify-api-contracts.mjs",
     "verify:contracts:ci": "node scripts/verify-api-contracts.mjs --schema ../openapi.json",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
-    "clean": "rimraf dist",
+    "clean": "rimraf dist dist-e2e-*",
     "prepare": "cd .. && husky || exit 0"
   },
   "dependencies": {
