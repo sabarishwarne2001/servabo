@@ -388,9 +388,13 @@ export const OrganizationWebhooks: React.FC = () => {
   const remove = useMutation({
     mutationFn: (endpointId: string) =>
       deleteWebhookEndpoint(organizationId, endpointId),
-    onSuccess: () => {
+    onSuccess: (_result, endpointId) => {
       setActionError(null);
       setConfirmingDelete(null);
+      // Forget the endpoint's delivery log and close it: left open, it was refetched by the invalidation below,
+      // asked for the deleted endpoint's deliveries and met a 404 (F-594).
+      queryClient.removeQueries({ queryKey: [...webhookKeys.all(organizationId), "deliveries", endpointId] });
+      setOpenLog((open) => (open === endpointId ? null : open));
       void invalidate();
     },
     onError: (error) =>
