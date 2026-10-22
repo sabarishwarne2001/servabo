@@ -17,9 +17,9 @@ backend venv Python 3.12 and `npm ci` in the session scratchpad. The test enviro
 - [x] 1B. Outdated AI models: suggested models, price book, BigQuery map, default platform model, `google-generativeai` removed, retired-model message
 - [x] 1C. Libraries: Pillow 13 (or the blocker recorded), safe-now upgrades, pip-audit
 - [x] 1D. Session J's leftovers: GST trigger upgrade dialog, lakh grouping in run history, `{{trigger.local_date}}`, e2e `dist` folder per run
-- [ ] 2A. Zip upload (spec 118)
-- [ ] 2B. Email-in through Postmark inbound (spec 119)
-- [ ] 2C. Getting started: "first money found"
+- [x] 2A. Zip upload (spec 118)
+- [x] 2B. Email-in through Postmark inbound (spec 119)
+- [x] 2C. Getting started: "first money found"
 - [ ] 3A. GST notification category, in-app notices and the Monday digest
 - [ ] 3B. Upgrade moments: one test walks every locked surface; 80% usage email one-click
 - [ ] 3C. Zoho Books Connect (OAuth) and Tally Prime guided

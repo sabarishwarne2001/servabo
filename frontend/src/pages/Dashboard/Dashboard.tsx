@@ -22,7 +22,6 @@ import { dashboardKeys, invalidateWorkspace, keepPreviousWithinWorkspace } from 
 
 import { UploadTray } from "@/components/common/UploadTray";
 import { GettingStarted } from "@/components/onboarding/GettingStarted";
-import { canInviteMembers } from "@/permissions/organizationPermissions";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { HelmOverviewCard } from "@/components/helm/HelmOverviewCard";
@@ -35,7 +34,7 @@ import { SkeletonTable } from "@/components/common/skeletons/SkeletonTable";
 
 import { ApiError } from "@/services/api/client";
 import { useOptionalTenant } from "@/routes/TenantContext";
-import { canCreateContent } from "@/permissions/workspacePermissions";
+import { canCreateContent, isAtLeast } from "@/permissions/workspacePermissions";
 import { workItemDetailsPath, workItemsPath } from "@/routes/tenantPaths";
 import { formatDateTime } from "@/utils/formatters";
 import type { DashboardDocTypeDistribution, DashboardEventType } from "@/types/dashboard";
@@ -262,12 +261,10 @@ export const Dashboard: React.FC = () => {
       {resolvedTenant && workspaceId && metrics ? (
         <GettingStarted
           workspaceId={workspaceId}
-          organizationId={resolvedTenant.organization.organization_id}
           orgSlug={orgSlug}
           workspaceSlug={workspaceSlug}
-          totalDocuments={metrics.total_work_items}
           canUpload={canUpload}
-          canInvite={canInviteMembers(resolvedTenant.organizationRole)}
+          canAdmin={isAtLeast(resolvedTenant.workspaceRole, "ADMIN")}
         />
       ) : null}
 
