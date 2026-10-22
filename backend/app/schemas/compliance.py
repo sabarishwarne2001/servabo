@@ -54,6 +54,7 @@ class DataResidencyUpdate(BaseModel):
     region: DataResidencyRegion
     acknowledge_no_migration: bool = Field(
         default=False,
+        validate_default=True,  # leaving it out is "no", not "yes" (F-584)
         description=(
             "Must be true. Repinning is forward-looking: objects already "
             "written stay in the bucket they were written to. The flag exists "
