@@ -253,6 +253,12 @@ INTERNAL_ONLY_PREFIXES: Final[tuple[str, ...]] = (
 )
 
 
+#: The only names under a reserved prefix that are PUBLIC, listed one by one (Final session 1, Phase 6): a customer's own
+#: systems may hear that a workflow run failed or was held back. Payloads are ids and states only
+#: (services/automation/public_events.py). Anything else under `automation.` is still refused.
+PUBLIC_AUTOMATION_EVENTS: Final[frozenset[str]] = frozenset({"automation.run.failed", "automation.run.held"})
+
+
 def _assert_vocabularies_disjoint() -> None:
     """Refuse to import if an event type is in both vocabularies.
 
@@ -272,7 +278,7 @@ def _assert_vocabularies_disjoint() -> None:
     leaked = {
         event_type
         for event_type in WEBHOOK_EVENT_TYPES
-        if event_type.startswith(INTERNAL_ONLY_PREFIXES)
+        if event_type.startswith(INTERNAL_ONLY_PREFIXES) and event_type not in PUBLIC_AUTOMATION_EVENTS
     }
     if leaked:
         raise RuntimeError(

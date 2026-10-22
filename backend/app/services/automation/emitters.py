@@ -12,7 +12,8 @@ event through `outbox_service.emit_trigger`:
     what is already true, because their marks are only written when an event is.)
   * NOTHING SENSITIVE. A payload carries ids, figures (amounts as integer micros with their currency), dates, states and
     short names the rule's author could already see. Never document text, a bank account, an email address.
-  * NEVER A PUBLIC EVENT. The names are all `trigger.*`, which can never be in the webhook vocabulary.
+  * NEVER A PUBLIC EVENT. The names are all `trigger.*`, which can never be in the webhook vocabulary. The five GST and
+    run events customers can subscribe to are written beside them by `public_events.py`, under their own names.
 
 A failure to write an event is logged and dropped: an engine's own work never fails because a rule could not hear of it.
 """
@@ -27,6 +28,8 @@ from typing import Any, Optional
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
+
+from app.services.automation import public_events
 
 logger = logging.getLogger("app.services.automation.emitters")
 
@@ -135,19 +138,23 @@ def gst_return_imported(
             GstMatch.workspace_id == workspace.id, GstMatch.gstin == gstin,
             GstMatch.status == v.MATCHED_WITH_DIFFERENCES)
     ).scalar_one()
-    return emit_once(
+    payload = {"gstin": gstin, "period": period, "records": int(records), "waiting_count": int(waiting_count),
+               "waiting_micros": int(waiting_micros or 0), "currency": "INR", "differences": int(differences),
+               "replaced": bool(replaced), "return_id": str(return_id)}
+    public = public_events.gst_return_imported(db, workspace=workspace, payload=payload, return_id=return_id)
+    internal = emit_once(
         db, organization_id=workspace.organization_id, workspace_id=workspace.id, event_type=GST_RETURN_IMPORTED,
-        mark_key=f"gst.return:{return_id}",
-        payload={"gstin": gstin, "period": period, "records": int(records), "waiting_count": int(waiting_count),
-                 "waiting_micros": int(waiting_micros or 0), "currency": "INR", "differences": int(differences),
-                 "replaced": bool(replaced), "return_id": str(return_id)},
+        mark_key=f"gst.return:{return_id}", payload=payload,
     )
+    return internal if internal is not None else public
 
 
 def gst_waiting_for_supplier(
     db: Session, *, workspace: Any, row: Any, work_item_id: uuid.UUID, days_waiting: int, threshold_days: int,
 ) -> Optional[Any]:
-    return emit_once(
+    public = public_events.gst_supplier_not_reported(
+        db, workspace=workspace, row=row, work_item_id=work_item_id, days_waiting=days_waiting, threshold_days=threshold_days)
+    internal = emit_once(
         db, organization_id=workspace.organization_id, workspace_id=workspace.id, event_type=GST_WAITING,
         mark_key=f"gst.waiting:{row.gstin}:{work_item_id}:{threshold_days}", resource_id=work_item_id,
         payload={"work_item_id": str(work_item_id), "gstin": row.gstin, "supplier_name": row.supplier_name or "",
@@ -155,13 +162,17 @@ def gst_waiting_for_supplier(
                  "amount_micros": _micros(row.value_micros), "currency": "INR", "days_waiting": int(days_waiting),
                  "threshold_days": int(threshold_days)},
     )
+    return internal if internal is not None else public
 
 
 def gst_reversal_risk(
     db: Session, *, workspace: Any, row: Any, work_item_id: uuid.UUID, age_days: int, reversal_date: date,
     limit_days: int, warn_at_days: int,
 ) -> Optional[Any]:
-    return emit_once(
+    public = public_events.gst_invoice_at_risk(
+        db, workspace=workspace, row=row, work_item_id=work_item_id, age_days=age_days, reversal_date=reversal_date,
+        limit_days=limit_days, warn_at_days=warn_at_days)
+    internal = emit_once(
         db, organization_id=workspace.organization_id, workspace_id=workspace.id, event_type=GST_REVERSAL,
         mark_key=f"gst.reversal:{row.gstin}:{work_item_id}:{warn_at_days}", resource_id=work_item_id,
         payload={"work_item_id": str(work_item_id), "gstin": row.gstin, "supplier_name": row.supplier_name or "",
@@ -169,6 +180,7 @@ def gst_reversal_risk(
                  "amount_micros": _micros(row.tax_micros), "currency": "INR", "age_days": int(age_days),
                  "days_left": max(0, int(limit_days) - int(age_days)), "reversal_date": reversal_date.isoformat()},
     )
+    return internal if internal is not None else public
 
 
 # ------------------------------------------------------------------------------------------------ payment risk
