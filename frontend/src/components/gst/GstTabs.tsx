@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Mail } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import GstDrawer from "@/components/gst/GstDrawer";
@@ -207,8 +208,10 @@ const LineRow: React.FC<{ readonly line: GstLine; readonly onOpen: (line: GstLin
 export const InvoicesTab: React.FC<TabProps> = ({ workspaceId, gstin, period, canDecide }) => {
   const [chip, setChip] = useState(0);
   const [offset, setOffset] = useState(0);
-  const [supplier, setSupplier] = useState("");
-  const [number, setNumber] = useState("");
+  // A result of the global search opens this list already narrowed: ?supplier=<name or GSTIN> or ?number=<invoice number>.
+  const [params] = useSearchParams();
+  const [supplier, setSupplier] = useState(() => params.get("supplier") ?? "");
+  const [number, setNumber] = useState(() => params.get("number") ?? "");
   const [atRisk, setAtRisk] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const active = CHIPS[chip] ?? CHIPS[0]!;

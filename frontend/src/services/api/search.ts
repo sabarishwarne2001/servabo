@@ -2,14 +2,16 @@
  * PHASE 4 — global search (Ctrl+K).
  *
  * Documents (by file name or any extracted value, e.g. an invoice number),
- * entity records and cases, from every workspace of the organization the
- * caller may open - never another. Each hit names its workspace so the
+ * entity records, cases, GST suppliers (GSTIN or name), invoices in the GST books
+ * (by number) and automation rules (by name), from every workspace of the
+ * organization the caller may open - never another. A result the person's role or
+ * the plan would lock is not returned. Each hit names its workspace so the
  * palette can open it there.
  */
 import apiClient from "@/services/api/client";
 import { SEARCH_ENDPOINTS } from "@/services/api/endpoints";
 
-export type SearchHitKind = "DOCUMENT" | "ENTITY" | "CASE";
+export type SearchHitKind = "DOCUMENT" | "ENTITY" | "CASE" | "GST_SUPPLIER" | "GST_INVOICE" | "RULE";
 
 export interface SearchHit {
   kind: SearchHitKind;
@@ -19,6 +21,8 @@ export interface SearchHit {
   workspace_id: string;
   workspace_slug: string;
   workspace_name: string;
+  /** What to look the hit up by on its page: a GSTIN or an invoice number (GST hits); else null. */
+  reference: string | null;
 }
 
 export interface SearchResponse {
@@ -27,6 +31,9 @@ export interface SearchResponse {
   documents: SearchHit[];
   entities: SearchHit[];
   cases: SearchHit[];
+  suppliers: SearchHit[];
+  gst_invoices: SearchHit[];
+  rules: SearchHit[];
 }
 
 /** The server refuses shorter queries (422). */
