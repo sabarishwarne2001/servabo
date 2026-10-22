@@ -88,6 +88,10 @@ def validate_brand_text(value: Optional[str]) -> Optional[str]:
         raise ValueError(
             f"A brand name cannot exceed {MAX_BRAND_NAME_LENGTH} characters."
         )
+    # A line break or other control character would run into the page title and break the single-line email subject
+    # and sender name the brand name is used for (F-591).
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in candidate):
+        raise ValueError("A brand name must be one line of ordinary text, with no line breaks or control characters.")
     if BRAND_TEXT_FORBIDDEN_RE.search(candidate):
         raise ValueError(
             "A brand name cannot contain < > \" or \\. It is rendered into a "
