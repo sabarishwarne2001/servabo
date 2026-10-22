@@ -35,6 +35,9 @@ export const AuditExplorer: React.FC<AuditExplorerProps> = ({ asPage = false }) 
   const [exporting, setExporting] = useState(false);
   const [inspecting, setInspecting] = useState<AuditLogRead | null>(null);
 
+  // An end date before the start date can match nothing and the server refuses it; say so instead of asking (F-600).
+  const rangeReversed = Boolean(filters.date_from && filters.date_to && filters.date_to < filters.date_from);
+
   const query = useQuery({
     queryKey: auditKeys.list(organizationId, {
       ...filters,
@@ -46,7 +49,7 @@ export const AuditExplorer: React.FC<AuditExplorerProps> = ({ asPage = false }) 
         limit: PAGE_SIZE,
         ...(cursor ? { cursor } : {}),
       }),
-    enabled: Boolean(organizationId),
+    enabled: Boolean(organizationId) && !rangeReversed,
     staleTime: 30_000,
   });
 
@@ -260,7 +263,11 @@ export const AuditExplorer: React.FC<AuditExplorerProps> = ({ asPage = false }) 
         )}
       </div>
 
-      {query.isError ? (
+      {rangeReversed ? (
+        <p role="alert" className="rounded-md border border-border bg-card p-4 text-sm text-muted-foreground">
+          The end date is before the start date, so nothing can match. Change one of the dates.
+        </p>
+      ) : query.isError ? (
         <ErrorState
           title="Audit records could not be loaded"
           description={errorMessage(query.error, "The server did not return audit records. Check your connection and try again.")}
