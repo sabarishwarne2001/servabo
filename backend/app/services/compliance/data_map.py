@@ -416,6 +416,7 @@ REGISTRY: dict[str, TableRule] = {
 
     # ----------------------------------------------------------------- ERP
     "erp_targets": _secret("Holds the connection and its credentials."),
+    "erp_oauth_states": _config(why=_NO + "a short-lived sign-in state for connecting an accounting system"),
     "erp_mappings": _config(export="erp_mappings"), "erp_lookup_tables": _config(export="erp_lookup_tables"),
     "erp_postings": _r(Kind.MONEY, Erasure.SERVICE, Sweep.CASCADE, OrgPurge.KEEP, why=_NO + "the postings are in the customer's accounting system", links=(_WI,),
                        note="`erp.service.erase_for_work_items`: the ledger row stays (a posting that happened is a fact), its content goes."),

@@ -893,3 +893,17 @@ books, the Helm ledger, invoices, usage) and the audit trail stay; an organizati
 (`ARCHIVED_PURGE_GRACE_DAYS`, `ARCHIVED_FINAL_DELETE_MONTHS`; the CGST Act s.36 books period). Look first without changing anything:
 `$COMPOSE run --rm ... python scripts/sweep_compliance.py --archived` (a dry run prints what it would do). The final deletion refuses, and
 says so, while an audit entry is younger than 400 days: the audit trail is never shortened.
+
+### 9.12 GST credit notices, the Monday digest, and Zoho Books Connect (Final session 1)
+
+**GST notices and the Monday digest.** Two scheduled jobs (`gst.notices` every six hours, `gst.digest` hourly) tell owners, administrators and the billing role
+about their GST credit; each notice and each week's email is recorded in `gst_notice_sends` so it is said once. To see what a run would do for a
+test clock, in a development install: `python scripts/e2e_stand_in.py run-job --org <slug> --job gst.digest --now 2026-10-19T09:30:00+00:00` (the clock is
+ignored in production). A person turns the whole thing off under Notifications → "GST credit".
+
+**Zoho Books Connect.** In Zoho's API console (api-console.zoho.in) create a *Server-based Application*; set its authorized redirect URI to
+`<your API address>/api/v1/public/erp/zoho/callback`, and put the Client ID, Client Secret and that same URI in `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`,
+`ZOHO_REDIRECT_URI`. Restart the API. Until all three are set the Connect button says the sign-in is not set up. Customers then use ERP posting →
+Connect your books. If a customer reports "Reconnect Zoho Books", Zoho no longer accepts their saved sign-in (they removed the app, or changed their
+password policy): they press Reconnect and waiting postings are sent again by themselves. `ZOHO_ACCOUNTS_URL_OVERRIDE` and `ZOHO_API_URL_OVERRIDE` are for the
+test stand-in only and make the API refuse to start in production. The Zoho side has not been run against real Zoho yet (LIVE-VERIFICATION, Final session 2).

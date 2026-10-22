@@ -46,7 +46,9 @@ CONTRACTS = {
     v.OBJECT_VENDOR_BILL: Contract(
         header={"date": True, "voucher_number": False, "reference": False, "reference_date": False,
                 "party_ledger": True, "party_amount": True, "tax_ledger": False, "tax_amount": False,
-                "narration": False},
+                # Final session 1 (3C): Indian GST is booked to a ledger per head, not to one tax ledger.
+                "cgst_ledger": False, "cgst_amount": False, "sgst_ledger": False, "sgst_amount": False,
+                "igst_ledger": False, "igst_amount": False, "narration": False},
         lines={"ledger": True, "amount": True}, open=False, needs_lines=True),
     v.OBJECT_JOURNAL_ENTRY: Contract(
         header={"date": True, "voucher_number": False, "narration": False},
@@ -116,7 +118,19 @@ def render(record: Record, object_kind: str, *, remote_id: str, config: Mapping[
         entries.append((str(h["party_ledger"]), _dec(h["party_amount"], "party_amount")))
         for i, ln in enumerate(lines, start=1):
             entries.append((str(ln["ledger"]), -_dec(ln["amount"], f"line {i} amount")))
-        if h.get("tax_amount") not in (None, "") and _dec(h["tax_amount"], "tax_amount") != 0:
+        heads = [(name, h.get(f"{name}_ledger"), h.get(f"{name}_amount")) for name in ("cgst", "sgst", "igst")]
+        booked = [(name, ledger, amount) for name, ledger, amount in heads
+                  if amount not in (None, "") and _dec(amount, f"{name}_amount") != 0]
+        if booked:
+            # Indian GST: one ledger per head (CGST and SGST for a purchase in the buyer's state, IGST from another state).
+            # The heads replace the single tax entry, so the tax is never booked twice.
+            if {name for name, _l, _a in booked} & {"igst"} and {name for name, _l, _a in booked} & {"cgst", "sgst"}:
+                raise TallyError("a bill carries IGST or CGST and SGST, not both")
+            for name, ledger, amount in booked:
+                if not ledger:
+                    raise TallyError(f"{name.upper()} of {amount} needs {name}_ledger (the Input {name.upper()} ledger in Tally)")
+                entries.append((str(ledger), -_dec(amount, f"{name}_amount")))
+        elif h.get("tax_amount") not in (None, "") and _dec(h["tax_amount"], "tax_amount") != 0:
             if not h.get("tax_ledger"):
                 raise TallyError("a tax amount needs tax_ledger")
             entries.append((str(h["tax_ledger"]), -_dec(h["tax_amount"], "tax_amount")))

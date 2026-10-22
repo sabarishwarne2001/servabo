@@ -14,7 +14,7 @@ in the containers unless you add it to the service's `environment:` in `docker-c
 is not read by any code, is missing from this page, or is one production cannot run without and
 is missing from `.env.production.template` (or does not stop the app from starting when unset).
 
-310 settings. Columns: name, type, default, where it appears (`example` =
+315 settings. Columns: name, type, default, where it appears (`example` =
 `.env.example`, `production` = `.env.production.template`, `guard` = checked by the production
 guard), and the comment written above it in the code.
 
@@ -184,6 +184,11 @@ guard), and the comment written above it in the code.
 | `INBOUND_EMAIL_MAX_BODY_MB` | `int` | `50` | example, production | The largest webhook body accepted, in MB (Postmark's own limit for a message is 35 MB; attachments travel base64). |
 | `INBOUND_EMAIL_IGNORE_INLINE_IMAGES_KB` | `int` | `30` | example, production | Inline images smaller than this (signatures, logos) are ignored, not read as documents. |
 | `INBOUND_EMAIL_HELD_DAYS` | `int` | `30` | example, production | Days a held or discarded message is kept before `inbound_email.sweep` deletes it and its stored attachments. |
+| `ZOHO_CLIENT_ID` | `str` | `''` | example, production | Zoho Books "Connect" (Final session 1, 3C). Register ONE server-based application in Zoho's API console (api-console.zoho.in) and put its Client ID and Secret here; leave both empty and the "Connect Zoho Books" button s… |
+| `ZOHO_CLIENT_SECRET` | `Optional[SecretStr]` | `None` | example, production |  |
+| `ZOHO_REDIRECT_URI` | `str` | `''` | example, production |  |
+| `ZOHO_ACCOUNTS_URL_OVERRIDE` | `str` | `''` | — | For the end-to-end tests only (a stand-in Zoho). Replace Zoho's accounts and API addresses; refused when ENVIRONMENT=production. |
+| `ZOHO_API_URL_OVERRIDE` | `str` | `''` | — |  |
 | `ZIP_UPLOAD_MAX_MB` | `int` | `256` | example, production | The largest zip one upload accepts, in MB (Final session 1, 2A). What it may unpack to is bounded separately (`ingestion/archive.py`: 512 MB, 2,000 files, 100x compression, one level deep). |
 | `ARCHIVED_PURGE_GRACE_DAYS` | `int` | `30` | example, production | Days after an organization or workspace is archived before its documents, conversations and settings are purged (`scripts/sweep_compliance.py --archived`). Until then "restore" still works. Money records stay. |
 | `ARCHIVED_FINAL_DELETE_MONTHS` | `int` | `72` | example, production | Months after an organization is archived before the organization itself is deleted. 72 months because the CGST Act 2017 s.36 makes a registered person keep books of account until 72 months after the annual return's due … |

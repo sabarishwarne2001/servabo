@@ -817,6 +817,8 @@ class Result:
     retry_after: Optional[int] = None
     credential: Optional[dict] = None
     probe_first: bool = False
+    #: Zoho Books refused the saved sign-in (3C): the target is marked "Reconnect Zoho Books" and the posting is retried by itself then.
+    reconnect: bool = False
 
 
 def _claim(db: Session, posting_id: uuid.UUID, token: uuid.UUID) -> Optional[tuple[ErpPosting, ErpTarget, bool]]:
@@ -889,7 +891,16 @@ def deliver(db: Session, posting_id: uuid.UUID) -> dict:
     except Exception as exc:  # noqa: BLE001 - an unexpected error while talking: the send may have happened
         logger.exception("erp.deliver_unexpected", extra={"posting_id": str(posting_id)})
         result = Result(v.STATE_UNCERTAIN, f"unexpected error during delivery: {type(exc).__name__}: {exc}"[:500])
-    return _record(db, posting_id, token, result)
+    recorded = _record(db, posting_id, token, result)
+    if result.reconnect:
+        from app.services.erp import zoho
+
+        row = db.get(ErpPosting, posting_id)
+        target_row = db.get(ErpTarget, row.target_id) if row is not None else None
+        if target_row is not None:
+            zoho.mark_reconnect(db, target_row)
+            db.commit()
+    return recorded
 
 
 @dataclass(frozen=True)
@@ -980,6 +991,12 @@ def _talk_http(s: _Snapshot, credential: Optional[dict], probe_first: bool) -> R
     attempts.append({"kind": v.ATTEMPT_SEND, "outcome": r.kind, "http_status": r.status,
                      "message": r.message or f"{ep.method} {path.split('?')[0]}", "detail": {**r.recorded(),
                                                                                              "calls": sess.log[-4:]}})
+    if (s.preset == v.PRESET_ZOHO and r.kind == v.OUTCOME_PERMANENT and r.status is None
+            and ("token endpoint refused" in r.message or "returned no access_token" in r.message)):
+        from app.services.erp.zoho import RECONNECT_SENTENCE
+
+        return finish(Result(v.STATE_FAILED, f"{RECONNECT_SENTENCE} Reconnect it under ERP targets and this posting is sent again.",
+                             reconnect=True))
     if r.kind == v.OUTCOME_OK:
         response = r.json()
         location = r.headers.get("location")

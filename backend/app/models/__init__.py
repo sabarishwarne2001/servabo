@@ -689,6 +689,7 @@ from app.models.obligations import (  # noqa: E402,F401
 # ARCH47-S1:models-registry
 from app.models.erp import (  # noqa: E402,F401
     ErpLookupTable,
+    ErpOauthState,
     ErpMapping,
     ErpPosting,
     ErpPostingAttempt,

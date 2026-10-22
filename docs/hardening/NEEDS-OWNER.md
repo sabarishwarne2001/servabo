@@ -2324,3 +2324,49 @@ Vitest 5, Tailwind 4 (N-119), lucide 1, jsdom 29.
 lakh grouping everywhere the server writes an amount for a person ("INR 12,50,000.00"); other currencies keep thousands. (c) `{{trigger.<field>}}`
 is accepted as an alias of `{{event.<field>}}` (`{{trigger.label}}` stays the trigger's name). (d) Each browser-test run builds into
 `dist-e2e-<port>`.
+
+## N-169 — Getting started: "first money found" (DECIDED (Final 1))
+
+The checklist on the dashboard has six steps: add documents (upload, zip or email), see what was read, import a GSTR-2B, open Helm, turn on one recipe,
+invite a teammate. Every step ticks from real data; a person sees only the steps they can do (a member sees three); where a feature is a preview on the
+plan the step says what the plan or add-on unlocks. The line "Servabo has found INR … in your own documents" appears only for owners, administrators and
+the billing role, only from a figure the value receipt itself calls confirmed (or carries no honesty class), and never as zero.
+
+## N-170 — GST credit notices and the Monday digest (DECIDED (Final 1))
+
+One notification category, "GST credit", on by default, for owners, administrators and the billing role. In-app: a GSTR-2B imported; invoices reaching 150
+days unpaid (30 days left of the 180-day rule; also emailed); from the 14th, suppliers that have not reported invoices in a month whose GSTR-2B is
+imported (also emailed); from the 14th to the 20th, IMS actions waiting (only where the lists are open). Email: Mondays from 09:00 in the zone of the oldest
+workspace, once a week, only when there is something to report, rupees in lakh grouping; a plan that shows only the headline figures gets one line saying
+what the lists add and what they cost, taken from the add-on catalogue. Opt-out is the one switch. Nothing here changes a price or a plan.
+
+## N-171 — Only an owner is sent to buy (DECIDED (Final 1))
+
+The billing page has been owner-only for plan, payment method and seats since F-192, but the lock dialogs, banners and four Helm notes still offered "View
+plans" to the billing role, who could not buy there (F-577). Now every upgrade moment shows the upgrade to an owner and "Ask <owner> to …" to everyone else.
+If you want the billing role to be able to change the plan, that is a product decision to make in the permission model first; the lock surfaces will follow it
+from one function (`canManageBilling`).
+
+## N-172 — Usage and seat warnings go to the fix (DECIDED (Final 1))
+
+The 80% and 100% usage emails lead to the plan picker ("Choose a plan"), the 80% banner has "Upgrade" for the people who can change the plan. New: owners and
+administrators are told at four of five seats used (teams of five seats and up) and when every seat is taken (any team of two or more), with "Add seats" (or
+"Choose a plan" where seats come with the plan). A sole owner on a one-seat plan is never told the seat is taken.
+
+## N-173 — Zoho Books "Connect" (DECIDED (Final 1); the Zoho side UNVERIFIED)
+
+One Servabo application is registered in Zoho's API console by the person running Servabo (`ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REDIRECT_URI`); each
+customer signs in at Zoho and picks their organization. India is the default data centre; the US, Europe, Australia, Japan, Canada, Saudi Arabia and China
+are offered. One client secret is assumed to work in every data centre (Zoho says the secret can be shared or per data centre; if yours differs per
+data centre, say so and the settings will gain one per centre). Scopes ask to create and read bills, purchase orders, journals and vendor payments and to
+read contacts and settings; nothing that deletes. Bills carry the vendor's GSTIN, the GST treatment, the source and destination of supply, and per line the
+HSN or SAC code and a tax code looked up in the workspace's `taxes` table (`GST18`, `IGST18` and so on, to the id of the tax in the customer's books).
+**Zoho's pages could not be opened from the build sandbox**: data-centre hosts, scope names, the token and revoke paths and the bill's GST fields are from
+the documentation as it was known and a search summary on 2026-10-22. Final session 2 runs the connection against a real Zoho Books India trial.
+
+## N-174 — Tally Prime, guided (DECIDED (Final 1)); OPEN: should it come to Developer?
+
+A guided form (company and five ledger names) makes a download target in Tally's format with the shipped mapping: one balanced Purchase voucher per bill, CGST
+and SGST to their own Input ledgers for a supplier in the buyer's state, IGST to one ledger for another state. It is the ERP posting capability, so it is on
+Business and Enterprise like every posting target. **OPEN:** Tally is what many Indian small businesses use and a download file needs no live connection; if
+Developer should get it (alone, or as an add-on), that is a plan and price decision for the owner and nothing was changed.

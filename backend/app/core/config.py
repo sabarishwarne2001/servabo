@@ -577,6 +577,17 @@ class Settings(BaseSettings):
     #: Days a held or discarded message is kept before `inbound_email.sweep` deletes it and its stored attachments.
     INBOUND_EMAIL_HELD_DAYS: int = 30
 
+    #: Zoho Books "Connect" (Final session 1, 3C). Register ONE server-based application in Zoho's API console
+    #: (api-console.zoho.in) and put its Client ID and Secret here; leave both empty and the "Connect Zoho Books" button says it
+    #: is not set up on this deployment. `ZOHO_REDIRECT_URI` is the address Zoho sends the customer back to, registered in the
+    #: console exactly as written: `<API address>/api/v1/public/erp/zoho/callback`.
+    ZOHO_CLIENT_ID: str = ""
+    ZOHO_CLIENT_SECRET: Optional[SecretStr] = None
+    ZOHO_REDIRECT_URI: str = ""
+    #: For the end-to-end tests only (a stand-in Zoho). Replace Zoho's accounts and API addresses; refused when ENVIRONMENT=production.
+    ZOHO_ACCOUNTS_URL_OVERRIDE: str = ""
+    ZOHO_API_URL_OVERRIDE: str = ""
+
     #: The largest zip one upload accepts, in MB (Final session 1, 2A). What it may unpack to is bounded separately
     #: (`ingestion/archive.py`: 512 MB, 2,000 files, 100x compression, one level deep).
     ZIP_UPLOAD_MAX_MB: int = 256
@@ -1052,6 +1063,13 @@ class Settings(BaseSettings):
             example = "https://servabo.app" if info.field_name == "WEBSITE_URL" else "https://app.servabo.app"
             raise ValueError(f"{info.field_name} must include a scheme, e.g. {example}")
         return cleaned
+
+    @model_validator(mode="after")
+    def _refuse_zoho_overrides_in_production(self) -> "Settings":
+        if (self.ZOHO_ACCOUNTS_URL_OVERRIDE or self.ZOHO_API_URL_OVERRIDE) and (self.ENVIRONMENT or "").strip().lower() == "production":
+            raise ValueError("ZOHO_ACCOUNTS_URL_OVERRIDE and ZOHO_API_URL_OVERRIDE are for the test stand-in and are refused when "
+                             "ENVIRONMENT=production.")
+        return self
 
     @model_validator(mode="after")
     def _refuse_ml_stubs_in_production(self) -> "Settings":

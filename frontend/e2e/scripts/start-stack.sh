@@ -45,6 +45,7 @@ stop_all() {
   stop_one llm
   stop_one dns
   stop_one dodo
+  stop_one zoho
 }
 
 if [[ "${1:-}" == "stop" ]]; then
@@ -127,6 +128,19 @@ export POSTMARK_INBOUND_WEBHOOK_USER="$("$PY" -c 'from tests.fakes.fake_postmark
 export POSTMARK_INBOUND_WEBHOOK_PASSWORD="$("$PY" -c 'from tests.fakes.fake_postmark_inbound import DEFAULT_PASSWORD; print(DEFAULT_PASSWORD)')"
 export POSTMARK_INBOUND_HASH="$("$PY" -c 'from tests.fakes.fake_postmark_inbound import DEFAULT_HASH; print(DEFAULT_HASH)')"
 export E2E_API_ORIGIN="http://127.0.0.1:$API_PORT"
+
+# Final session 1 (3C): a stand-in Zoho (backend/tests/fakes/fake_zoho.py): its consent screen approves at once and sends the browser
+# back to the API's callback; its token, revoke and organizations endpoints answer as Zoho's do. The API is pointed at it by the
+# test-only overrides (refused when ENVIRONMENT=production).
+ZOHO_PORT="${E2E_ZOHO_PORT:-8791}"
+if ! port_busy "$ZOHO_PORT"; then
+  nohup "$PY" -m tests.fakes.fake_zoho --port "$ZOHO_PORT" >"$LOG_DIR/zoho.log" 2>&1 &
+  echo $! >"$RUN_DIR/zoho.pid"
+fi
+export E2E_ZOHO_URL="http://127.0.0.1:$ZOHO_PORT"
+export ZOHO_CLIENT_ID="1000.E2EAPPCLIENT" ZOHO_CLIENT_SECRET="e2e-zoho-secret-0123456789abcdef"
+export ZOHO_REDIRECT_URI="http://127.0.0.1:$API_PORT/api/v1/public/erp/zoho/callback"
+export ZOHO_ACCOUNTS_URL_OVERRIDE="$E2E_ZOHO_URL" ZOHO_API_URL_OVERRIDE="$E2E_ZOHO_URL"
 
 nohup "$PY" -m uvicorn app.main:app --host 127.0.0.1 --port "$API_PORT" >"$LOG_DIR/api.log" 2>&1 &
 echo $! >"$RUN_DIR/api.pid"

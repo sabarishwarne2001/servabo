@@ -32,6 +32,9 @@ export const GATEWAY: "dodo" | "stripe" = (process.env.E2E_GATEWAY ?? "dodo").to
 /** Where start-stack.sh serves the stand-in Dodo (its checkout page and customer portal). */
 export const DODO_ORIGIN = process.env.E2E_DODO_URL ?? `http://127.0.0.1:${process.env.E2E_DODO_PORT ?? 8790}`;
 
+/** Where start-stack.sh serves the stand-in Zoho (Final session 1, 3C): its consent screen, token, revoke and organizations endpoints. */
+export const ZOHO_ORIGIN = process.env.E2E_ZOHO_URL ?? `http://127.0.0.1:${process.env.E2E_ZOHO_PORT ?? 8791}`;
+
 export type UserKey =
   | "A.owner"
   | "A.admin"
