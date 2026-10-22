@@ -160,6 +160,9 @@ LIGHT = WorkerProfile(
             "usage.limit_alerts",
             # Session H (N-146): the monthly summary email. Queries, the value receipt's queries and SMTP only.
             "receipt.monthly",
+            # Final session 1 (3A): the GST credit digest and notices. Queries, the notification outbox and SMTP only.
+            "gst.digest",
+            "gst.notices",
             # Campaign session 4 (§C.4): alerts for the deployment's owner. Queries and SMTP only.
             "ops.alerts",
             # ARCH42-S1:entity-light-profile. Entity resolution: string

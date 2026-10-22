@@ -623,6 +623,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--plan", default="developer")
     parser.add_argument("--seats", type=int, default=1)
     parser.add_argument("--job", help="job type for run-job")
+    parser.add_argument("--now", help="run-job: the clock the job sees (ISO 8601 with an offset), for the jobs that read it "
+                                      "(gst.digest, gst.notices); ignored in production")
     parser.add_argument("--addon", default="addon.gst_credit", help="cancel-addon, addon-grace-ends: the add-on key")
     parser.add_argument("--backdate-days", type=int, default=0,
                         help="trial-ends: also move this organization's usage events that many days back, so the "
@@ -696,7 +698,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         from app.workers.handlers import register_all
 
         register_all()
-        payload: dict[str, Any] = {}
+        payload: dict[str, Any] = {"now": args.now} if args.now else {}
         organization_id = None
         if args.org:
             with SessionLocal() as db:
@@ -704,7 +706,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 organization_id = organization.id
                 workspace = db.execute(select(Workspace).where(Workspace.organization_id == organization.id)
                                        .order_by(Workspace.created_at).limit(1)).scalar_one()
-                payload = {"workspace_id": str(workspace.id)}
+                payload = {**payload, "workspace_id": str(workspace.id)}
         with SessionLocal() as db, db.begin():
             job_id = job_service.enqueue(db, job_type=args.job, payload=payload, organization_id=organization_id).id
         outcome: dict[str, Any] = {"queued": args.job, "job_id": str(job_id)}

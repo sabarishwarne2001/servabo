@@ -20,7 +20,7 @@ backend venv Python 3.12 and `npm ci` in the session scratchpad. The test enviro
 - [x] 2A. Zip upload (spec 118)
 - [x] 2B. Email-in through Postmark inbound (spec 119)
 - [x] 2C. Getting started: "first money found"
-- [ ] 3A. GST notification category, in-app notices and the Monday digest
+- [x] 3A. GST notification category, in-app notices and the Monday digest
 - [ ] 3B. Upgrade moments: one test walks every locked surface; 80% usage email one-click
 - [ ] 3C. Zoho Books Connect (OAuth) and Tally Prime guided
 - [ ] 3D. E-invoice QR badge and signature line

@@ -182,6 +182,22 @@ DEFAULT_SCHEDULE: tuple[ScheduledJob, ...] = (
         ),
     ),
     ScheduledJob(
+        job_type="gst.digest",
+        interval_seconds=3_600,
+        description=(
+            "On Mondays from 09:00 in the organization's zone, email owners, administrators and billing contacts where their GST "
+            "credit stands, once per week and only when there is something to report (Final session 1)."
+        ),
+    ),
+    ScheduledJob(
+        job_type="gst.notices",
+        interval_seconds=21_600,
+        description=(
+            "Tell owners in the app when invoices reach 150 days unpaid, when suppliers have not reported by the 14th, and when IMS "
+            "actions are waiting; each once (Final session 1)."
+        ),
+    ),
+    ScheduledJob(
         job_type="usage.limit_alerts",
         interval_seconds=3_600,
         description="Tell owners at 80% and at 100% of a monthly plan limit, once per period (N-062).",

@@ -80,6 +80,9 @@ def import_parsed(db: Session, *, workspace: Workspace, parsed: parse.ParsedRetu
 
     emitters.gst_return_imported(db, workspace=workspace, gstin=parsed.gstin, period=parsed.period,
                                  return_id=created.id, records=len(rows), replaced=supersedes is not None)
+    from app.services.gst import notices
+
+    notices.import_finished(db, workspace=workspace, return_id=created.id, gstin=parsed.gstin, period=parsed.period, records=len(rows))
     return {**result, "status": status, "return_id": str(created.id),
             "message": ("Replaced the earlier import of this period." if status == REPLACED else "Imported.")}
 

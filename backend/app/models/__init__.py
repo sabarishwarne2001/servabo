@@ -791,7 +791,7 @@ from app.models.helm import (  # noqa: E402,F401
 from app.models import helm_dirty  # noqa: E402,F401
 
 # Session F: GST Credit (docs/product/GST-CREDIT.md).
-from app.models.gst import GstDecision, GstMatch, GstReturn, GstReturnRecord, GstSettings  # noqa: E402,F401
+from app.models.gst import GstDecision, GstMatch, GstNoticeSend, GstReturn, GstReturnRecord, GstSettings  # noqa: E402,F401
 
 # Final session 1: email-in.
 from app.models.inbound_email import InboundEmailAddress, InboundEmailSender, InboundMessage, WorkItemSource  # noqa: E402,F401

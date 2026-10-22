@@ -23,6 +23,7 @@ import pytest
 
 from app.templates.emails.account_notice import render_account_notice
 from app.templates.emails.common import GrantLine
+from app.templates.emails.gst_digest import render_gst_digest
 from app.templates.emails.monthly_receipt import render_monthly_receipt
 from app.templates.emails.operator_alert import render_operator_alert
 from app.templates.emails.organization_invitation import render_organization_invitation
@@ -70,6 +71,13 @@ EMAILS = {
         headline="Last month Servabo read 132 documents and found ₹2,40,000 of GST credit waiting on 6 suppliers.",
         findings=[TrialFinding("GST credit waiting on 6 suppliers", "₹2,40,000", "https://app.example.com/acme/main/gst")],
         overview_url=LINK, preferences_url="https://app.example.com/settings?section=notifications"),
+    # Final session 1 (3A): the Monday GST credit digest, with the preview plan's one extra line.
+    "gst-digest": lambda: render_gst_digest(
+        organization_name="Acme", week_label="19 October 2026", brand_name="Servabo",
+        headline="INR 2,25,000.00 of GST credit is claimable now.",
+        findings=[TrialFinding("Waiting for suppliers to report: 3 invoices from 2 suppliers", "INR 1,80,000.00", LINK)],
+        gst_url=LINK, preferences_url="https://app.example.com/settings?section=notifications",
+        unlock_line="Unlock the lists: GST Credit add-on, $49 a month", unlock_url=LINK),
     "operator": lambda: render_operator_alert(subject="Dead jobs", body="3 jobs failed for good.", occurrences=3,
                                               first_seen_at=NOW, last_seen_at=NOW, console_url=LINK,
                                               brand_name="Servabo"),
