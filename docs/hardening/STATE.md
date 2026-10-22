@@ -2,7 +2,25 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-21 (Session J)_
+_Last updated: 2026-10-22 (plan change: the two final sessions)_
+
+## Current phase — Plan change: the two final sessions (2026-10-22)
+Branch `hardening/final-two-sessions`, based on `main` at `3b2a7e2` (PR #35 merged; `main` run #417 green, only the advisory
+`pip-audit` red, N-159). Docs only: no code, no migration, one Alembic head. Decision N-160 (next free N-161); no finding (next
+free F-546); browser specs continue at 118.
+
+**Session J is complete.** Every box below is ticked; PR #35's CI (run #415) was green on every job and the run on `main` after
+the merge (#417) succeeded. Open, by decision: a real Slack or Teams channel (N-158), the Wait step (N-154, not now).
+
+**Sessions D and E are replaced** by two final sessions (N-160; HANDOFF "Plan change: the two final sessions"; the owner's guide
+`docs/FINAL-SESSIONS.md`):
+- [ ] **Final session 1** (cloud, Opus 5.5 High): study, bring every part up to date, build the PRODUCT-NEXT items that earn money.
+  Prompt: `docs/sessions/FINAL-1-UPGRADE.md`.
+- [ ] **Final session 2** (the owner's PC, Sonnet 5.5 High): everything for real, results in `docs/hardening/LIVE-VERIFICATION.md`.
+  Prompt: `docs/sessions/FINAL-2-LIVE.md`. Needs the owner's preparation (`docs/FINAL-SESSIONS.md` §4).
+- [ ] The owner launch checklist (HANDOFF), from step 1.
+
+- **Next action:** the owner merges this PR once CI is green, then starts Final session 1.
 
 ## Current phase — Session J: Automation, end to end (2026-10-21)
 Branch `claude/new-session-otth8f` (the session's assigned branch; CLAUDE.md says `hardening/<topic>`, the brief says "use the assigned branch", so the
