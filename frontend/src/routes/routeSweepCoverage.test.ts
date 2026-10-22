@@ -19,7 +19,7 @@ function staticRoutes(): Array<{ key: string; value: string }> {
   const found: Array<{ key: string; value: string }> = [];
   for (const match of body.matchAll(/^\s{2}(\w+): ("[^"]*"|`[^`]*`),?\s*$/gm)) {
     const value = match[2]!.slice(1, -1);
-    if (!value.includes(":") && !value.includes("$")) found.push({ key: match[1]!, value });
+    if (!value.includes(":") && !value.includes("$")) {found.push({ key: match[1]!, value });}
   }
   return found;
 }
@@ -38,16 +38,16 @@ describe("the sweeps walk every page", () => {
   const catalogue = read("e2e/support/routes.ts");
   const spec132 = read("e2e/tests/132-new-pages-sweep.spec.ts");
   const covered = new Set<string>();
-  for (const match of catalogue.matchAll(/\bsub: "([^"]*)"/g)) covered.add(match[1]!);
-  for (const match of catalogue.matchAll(/\bpath: "\/admin\/([^"]*)"/g)) covered.add(match[1]!);
-  for (const match of spec132.matchAll(/ws\("C", "([^"]*)"\)/g)) covered.add(match[1]!);
-  for (const match of spec132.matchAll(/org\("C", "([^"]*)"\)/g)) covered.add(match[1]!);
-  for (const match of spec132.matchAll(/"\/admin\/([^"]*)"/g)) covered.add(match[1]!);
+  for (const match of catalogue.matchAll(/\bsub: "([^"]*)"/g)) {covered.add(match[1]!);}
+  for (const match of catalogue.matchAll(/\bpath: "\/admin\/([^"]*)"/g)) {covered.add(match[1]!);}
+  for (const match of spec132.matchAll(/ws\("C", "([^"]*)"\)/g)) {covered.add(match[1]!);}
+  for (const match of spec132.matchAll(/org\("C", "([^"]*)"\)/g)) {covered.add(match[1]!);}
+  for (const match of spec132.matchAll(/"\/admin\/([^"]*)"/g)) {covered.add(match[1]!);}
   const helmList = /HELM_PAGES = \[([^\]]*)\]/.exec(spec132)?.[1] ?? "";
-  for (const match of helmList.matchAll(/"([^"]*)"/g)) covered.add(match[1]!);
+  for (const match of helmList.matchAll(/"([^"]*)"/g)) {covered.add(match[1]!);}
 
   for (const { key, value } of staticRoutes()) {
-    if (key in NOT_WALKED) continue;
+    if (key in NOT_WALKED) {continue;}
     it(`${key} ("${value || "/"}") is walked by spec 72/74 or 132`, () => {
       const sub = value.replace(/^\/organizations\/\$\{P_ORG\}\//, "").replace(/^\//, "");
       const workspaceLike = key.startsWith("workspace") || key.startsWith("organization") || key.startsWith("helm") || key.startsWith("platform");
@@ -59,6 +59,6 @@ describe("the sweeps walk every page", () => {
   it("lists every NOT_WALKED key as a real route key", () => {
     const keys = new Set(staticRoutes().map((r) => r.key));
     const body = read("src/routes/tenantPaths.ts");
-    for (const key of Object.keys(NOT_WALKED)) expect(keys.has(key) || body.includes(`${key}:`), key).toBe(true);
+    for (const key of Object.keys(NOT_WALKED)) {expect(keys.has(key) || body.includes(`${key}:`), key).toBe(true);}
   });
 });
