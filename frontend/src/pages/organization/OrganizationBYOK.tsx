@@ -191,7 +191,7 @@ const KeyEditor: React.FC<{
               autoComplete="off"
               spellCheck={false}
               className={INPUT}
-              placeholder="e.g. gpt-4o"
+              placeholder="e.g. gpt-5.5"
               value={deployment}
               onChange={(e) => setDeployment(e.target.value)}
             />

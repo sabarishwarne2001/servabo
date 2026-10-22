@@ -32,6 +32,9 @@ AI_MODELS = {
         "gemini-2.5-flash",
         "gemini-2.5-pro",
         "gemini-3.5-flash",
+        # Final session 1 (F-564): generally available since September 2026; the current Flash. $0.75 / $3.75 per
+        # million tokens, an introductory rate that Google says changes at the end of the year (2026-10-22).
+        "gemini-3.8-flash",
     ],
 }
 

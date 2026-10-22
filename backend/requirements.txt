@@ -40,13 +40,8 @@ frozenlist==1.8.0
 fsspec==2026.6.0
 future==1.0.0
 git-filter-repo==2.47.0
-google-ai-generativelanguage==0.6.15
-google-api-core==2.31.0
-google-api-python-client==2.198.0
 google-auth==2.55.1
-google-auth-httplib2==0.4.0
 google-genai==1.46.0
-google-generativeai==0.8.6
 googleapis-common-protos==1.75.0
 greenlet==3.5.3
 groq==1.5.0
@@ -56,7 +51,6 @@ gunicorn==26.2.0
 h11==0.16.0
 hf-xet==1.5.1
 httpcore==1.0.9
-httplib2==0.32.0
 httptools==0.8.0
 httpx==0.28.1
 huggingface_hub==1.22.0
@@ -115,7 +109,6 @@ pillow==12.3.0
 pluggy==1.6.0
 prettytable==3.18.0
 propcache==0.5.2
-proto-plus==1.28.0
 protobuf==5.29.6
 psutil==7.2.2
 psycopg2-binary==2.9.9
@@ -183,7 +176,6 @@ typing-inspection==0.4.2
 typing_extensions==4.15.0
 tzdata==2026.2
 ujson==5.13.0
-uritemplate==4.2.0
 urllib3==2.8.0
 uvicorn==0.28.0
 watchfiles==1.2.0

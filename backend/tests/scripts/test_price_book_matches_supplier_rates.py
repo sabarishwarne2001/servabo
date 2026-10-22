@@ -32,6 +32,7 @@ SUPPLIER_RATES: dict[tuple[str, str], tuple[Decimal, Decimal]] = {
     ("gemini", "gemini-2.5-flash"): (Decimal("0.30"), Decimal("2.50")),
     ("gemini", "gemini-2.5-pro"): (Decimal("1.25"), Decimal("10.00")),
     ("gemini", "gemini-3.5-flash"): (Decimal("1.50"), Decimal("9.00")),
+    ("gemini", "gemini-3.8-flash"): (Decimal("0.75"), Decimal("3.75")),  # 2026-10-22; introductory, changes 2027-01-01
 }
 
 EVENTS = ("llm.input_token", "llm.output_token")

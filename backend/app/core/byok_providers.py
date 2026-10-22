@@ -62,7 +62,7 @@ outage. See `fallback_is_possible()` below.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 # ---------------------------------------------------------------------------
 # Providers
@@ -212,7 +212,7 @@ PROVIDER_REGISTRY: dict[str, ProviderSpec] = {
         suggested_models=(
             "openai/gpt-oss-120b",
             "openai/gpt-oss-20b",
-            "qwen/qwen3.6-27b",
+            "qwen/qwen3.8-27b",  # the name `ai_models.AI_MODELS` and the price book use (was qwen3.6 here: a mismatch)
         ),
         # Groq serves no embeddings API. Listing EMBEDDING here would let a
         # tenant save a routing policy that cannot execute.
@@ -225,10 +225,13 @@ PROVIDER_REGISTRY: dict[str, ProviderSpec] = {
         unroutable_reason=None,
         key_prefix="AIza",
         platform_setting="GEMINI_API_KEY",
+        # Final session 1 (F-564, checked 2026-10-22 against Google's deprecations page and release notes): gemini-1.5-*
+        # are retired and gemini-2.0-flash shut down on 2026-06-01. gemini-3.8-flash is generally available (September
+        # 2026); gemini-2.5-pro is "not deprecated, served until further notice"; gemini-3.1-pro-preview is a preview.
         suggested_models=(
-            "gemini-2.0-flash",
-            "gemini-1.5-pro",
-            "gemini-1.5-flash",
+            "gemini-3.8-flash",
+            "gemini-3.1-pro-preview",
+            "gemini-2.5-pro",
         ),
         supported_tasks=_GENERATIVE_AND_EMBEDDING,
     ),
@@ -239,7 +242,11 @@ PROVIDER_REGISTRY: dict[str, ProviderSpec] = {
         unroutable_reason=None,
         key_prefix="sk-",
         platform_setting=None,
-        suggested_models=("gpt-4o", "gpt-4o-mini", "o3-mini"),
+        # Final session 1 (F-564, 2026-10-22): OpenAI's deprecations page names gpt-5.5 as the replacement for the retiring
+        # gpt-5 and o3 snapshots (2026-12-11); gpt-5.6-sol is the newest flagship id seen in OpenAI's pricing notes.
+        # o3-mini snapshots shut down 2026-10-23. A suggestion is only a suggestion: a wrong one is answered plainly
+        # by `model_unavailable_message` (Final session 2 checks these against a real key).
+        suggested_models=("gpt-5.5", "gpt-5.6-sol", "text-embedding-3-large"),
         supported_tasks=_GENERATIVE_AND_EMBEDDING,
     ),
     PROVIDER_ANTHROPIC: ProviderSpec(
@@ -249,10 +256,12 @@ PROVIDER_REGISTRY: dict[str, ProviderSpec] = {
         unroutable_reason=None,
         key_prefix="sk-ant-",
         platform_setting=None,
+        # Final session 1 (F-564, 2026-10-22): the Claude 5 family's model ids.
         suggested_models=(
-            "claude-sonnet-4-6",
-            "claude-opus-4-1",
-            "claude-haiku-4-5",
+            "claude-fable-5-1",
+            "claude-opus-5-5",
+            "claude-sonnet-5-5",
+            "claude-haiku-5-5",
         ),
         # Anthropic exposes no embeddings endpoint.
         supported_tasks=_GENERATIVE_TASKS,
@@ -266,7 +275,8 @@ PROVIDER_REGISTRY: dict[str, ProviderSpec] = {
         # check does not apply. `assert_storable` handles a None prefix.
         key_prefix=None,
         platform_setting=None,
-        suggested_models=("gpt-4o", "gpt-4o-mini", "text-embedding-3-large"),
+        # Azure names a deployment, not a model; these are only starting points for the deployment's underlying model.
+        suggested_models=("gpt-5.5", "text-embedding-3-large"),
         requires_endpoint=True,
         endpoint_suffix=".openai.azure.com",
         supported_tasks=_GENERATIVE_AND_EMBEDDING,
@@ -286,6 +296,62 @@ PROVIDER_REGISTRY: dict[str, ProviderSpec] = {
         supported_tasks=_GENERATIVE_AND_EMBEDDING,
     ),
 }
+
+# ---------------------------------------------------------------------------------------------------------
+# Retired models (Final session 1, F-564)
+# ---------------------------------------------------------------------------------------------------------
+
+#: Models a provider has retired, so a routing policy saved earlier names something that no longer exists.
+#: Dated 2026-10-22; sources in the comments. A model missing here is still answered plainly at call time by
+#: `looks_like_model_not_found`.
+RETIRED_MODELS: dict[str, frozenset[str]] = {
+    # Google: the 1.5 family is retired; gemini-2.0-flash(-001/-lite) shut down 2026-06-01 and gemini-3-pro-preview on
+    # 2026-03-09 (ai.google.dev/gemini-api/docs/deprecations, 2026-10-22).
+    PROVIDER_GEMINI: frozenset({
+        "gemini-1.0-pro", "gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.5-flash-8b",
+        "gemini-2.0-flash", "gemini-2.0-flash-001", "gemini-2.0-flash-lite", "gemini-2.0-flash-lite-001", "gemini-3-pro-preview",
+    }),
+    # Anthropic: the Claude 2 family and Claude 3 Sonnet.
+    PROVIDER_ANTHROPIC: frozenset({"claude-2.0", "claude-2.1", "claude-instant-1.2", "claude-3-sonnet-20240229"}),
+    # Groq: mixtral (March 2025) and the Llama 3.x models (16 August 2026), as recorded for F-196.
+    PROVIDER_GROQ: frozenset({
+        "mixtral-8x7b-32768", "llama-3.1-70b-versatile", "llama-3.3-70b-versatile", "llama-3.1-8b-instant",
+    }),
+}
+
+_VENDOR_NAMES: dict[str, str] = {
+    PROVIDER_GROQ: "Groq", PROVIDER_GEMINI: "Google", PROVIDER_OPENAI: "OpenAI", PROVIDER_ANTHROPIC: "Anthropic",
+    PROVIDER_AZURE_OPENAI: "Azure OpenAI", PROVIDER_MISTRAL: "Mistral",
+}
+
+_NOT_FOUND_MARKERS: tuple[str, ...] = (
+    "model_not_found", "model_decommissioned", "not_found_error", "invalid model", "is not found for api version",
+    "does not exist or you do not have access", "has been decommissioned", "deploymentnotfound", "unknown model",
+)
+
+
+def looks_like_model_not_found(exc: BaseException) -> bool:
+    """True for a provider's "that model does not exist" answer (Google NOT_FOUND, OpenAI/Azure/Groq model_not_found,
+    Anthropic not_found_error, Mistral invalid_model), and for no other failure."""
+    status = (getattr(exc, "status_code", None) or getattr(exc, "status", None) or getattr(exc, "code", None)
+              or getattr(getattr(exc, "response", None), "status_code", None))
+    text = f"{type(exc).__name__} {exc}".lower()
+    if any(marker in text for marker in _NOT_FOUND_MARKERS):
+        return True
+    return status == 404 and "model" in text
+
+
+def model_unavailable_message(provider: Any, model: str, error: Optional[BaseException] = None) -> Optional[str]:
+    """A plain sentence for a retired or unknown model, or None when `model` is fine and `error` is something else."""
+    key = str(getattr(provider, "value", provider) or "").strip().upper()
+    vendor = _VENDOR_NAMES.get(key, key.title() or "The provider")
+    if model in RETIRED_MODELS.get(key, frozenset()):
+        return f"{vendor} retired {model}; choose another model in AI settings."
+    if error is not None and looks_like_model_not_found(error):
+        return (f"{vendor} does not offer {model} on this key (it may have been retired, or the key may not have access "
+                "to it); choose another model in AI settings.")
+    return None
+
 
 #: Ordered for stable CHECK constraints, stable OpenAPI enums and stable
 #: console ordering. This tuple is baked into a database CHECK constraint —
