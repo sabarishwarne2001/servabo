@@ -3,6 +3,8 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ChevronRight, Menu, X } from "lucide-react";
 
 import OrganizationSidebarNavigation from "@/components/layout/OrganizationSidebarNavigation";
+import { SidebarResizeHandle } from "@/components/layout/SidebarResizeHandle";
+import { SHELL_SIDEBAR, useSidebarWidth } from "@/components/layout/sidebarWidth";
 import ThemeToggle from "@/components/layout/ThemeToggle";
 import OrganizationNotificationBell from "@/components/notification/OrganizationNotificationBell";
 import { useResolvedOrganization } from "@/routes/OrganizationGuard";
@@ -36,6 +38,7 @@ export const OrganizationLayout: React.FC = () => {
   // so members do not generate a denied request on every navigation.
   const canSeeBilling = ["OWNER", "ADMIN", "BILLING"].includes(String(organizationRole).toUpperCase());
   const [mobileOpen, setMobileOpen] = useState(false);
+  const sidebarWidth = useSidebarWidth(SHELL_SIDEBAR);
 
   const navigate = useNavigate();
   const clearAuth = useAuthStore((state) => state.clearAuth);
@@ -69,17 +72,25 @@ export const OrganizationLayout: React.FC = () => {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground transition-colors duration-200">
-      <aside className="hidden h-screen w-[260px] min-h-0 flex-shrink-0 flex-col border-r border-border/80 bg-sidebar lg:flex">
+      <aside
+        className="relative z-20 hidden h-screen min-h-0 flex-shrink-0 flex-col border-r border-border/80 bg-sidebar lg:flex"
+        style={{ width: sidebarWidth, maxWidth: "50vw" }}
+      >
         <OrganizationSidebarNavigation onLogout={handleLogout} />
+        <SidebarResizeHandle spec={SHELL_SIDEBAR} label="Resize the sidebar" />
       </aside>
 
       {mobileOpen && (
         <div className="fixed inset-0 z-40 flex animate-fade-in lg:hidden">
-          <div className="flex h-full w-[280px] max-w-[85vw] min-h-0 flex-col border-r border-border bg-sidebar shadow-elevation-3">
+          <div
+            className="relative flex h-full max-w-[85vw] min-h-0 flex-col border-r border-border bg-sidebar shadow-elevation-3"
+            style={{ width: sidebarWidth }}
+          >
             <OrganizationSidebarNavigation
               onNavigate={() => setMobileOpen(false)}
               onLogout={handleLogout}
             />
+            <SidebarResizeHandle spec={SHELL_SIDEBAR} edge="inside" viewportShare={0.85} label="Resize the navigation menu" />
           </div>
           <div
             className="flex-1 bg-black/60 backdrop-blur-sm"

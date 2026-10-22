@@ -956,3 +956,15 @@
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.28) transparent;
 }
+
+/* While a sidebar divider is being dragged (SidebarResizeHandle): the page follows the pointer exactly, with no text
+   selection and no animation, and the column-resize cursor stays even when the pointer leaves the thin divider. */
+html[data-sidebar-dragging],
+html[data-sidebar-dragging] * {
+  cursor: col-resize !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+html[data-sidebar-dragging] * {
+  transition: none !important;
+}

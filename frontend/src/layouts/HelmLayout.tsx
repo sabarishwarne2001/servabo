@@ -38,6 +38,8 @@ import { useResolvedOrganization } from "@/routes/OrganizationGuard";
 import { helmPath, organizationBillingPath, workspaceDashboardPath, type HelmPage } from "@/routes/tenantPaths";
 import { getHelmOverview, helmKeys } from "@/services/api/helm";
 import "@/styles/helm.css";
+import { SidebarResizeHandle } from "@/components/layout/SidebarResizeHandle";
+import { SHELL_SIDEBAR, useSidebarWidth } from "@/components/layout/sidebarWidth";
 
 interface HelmNavItem {
   readonly page: HelmPage;
@@ -218,6 +220,7 @@ const HelmChrome: React.FC = () => {
   const { pathname } = useLocation();
   const { state } = useTenant();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const sidebarWidth = useSidebarWidth(SHELL_SIDEBAR);
   const shell = useRef<HTMLDivElement>(null);
   useSpotlight(shell);
   const page = pageOf(pathname, orgSlug);
@@ -236,14 +239,22 @@ const HelmChrome: React.FC = () => {
   return (
     <div ref={shell} className="helm helm-shell flex h-screen w-full overflow-hidden" data-testid="helm-shell">
       <div className="helm-grain" aria-hidden="true" />
-      <aside className="helm-rail helm-hairline hidden h-screen w-[256px] min-h-0 shrink-0 flex-col border-r lg:flex">
+      <aside
+        className="helm-rail helm-hairline relative z-20 hidden h-screen min-h-0 shrink-0 flex-col border-r lg:flex"
+        style={{ width: sidebarWidth, maxWidth: "50vw" }}
+      >
         <HelmSidebar />
+        <SidebarResizeHandle spec={SHELL_SIDEBAR} label="Resize the sidebar" />
       </aside>
 
       {mobileOpen ? (
         <div className="fixed inset-0 z-40 flex lg:hidden">
-          <div className="helm helm-rail helm-hairline flex h-full w-[280px] max-w-[85vw] min-h-0 flex-col border-r bg-[hsl(var(--helm-bg))]">
+          <div
+            className="helm helm-rail helm-hairline relative flex h-full max-w-[85vw] min-h-0 flex-col border-r bg-[hsl(var(--helm-bg))]"
+            style={{ width: sidebarWidth }}
+          >
             <HelmSidebar onNavigate={() => setMobileOpen(false)} />
+            <SidebarResizeHandle spec={SHELL_SIDEBAR} edge="inside" viewportShare={0.85} label="Resize the navigation menu" />
           </div>
           <div className="flex-1 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} aria-hidden="true" />
         </div>

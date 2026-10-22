@@ -44,6 +44,8 @@ import { isAtLeast } from "@/permissions/workspacePermissions";
 import { ADMINISTRATIVE_ROLES, canViewBilling } from "@/permissions/organizationPermissions";
 import { useResolvedTenant } from "@/routes/TenantContext";
 import { AccessRestricted } from "@/components/common/AccessRestricted";
+import { SidebarResizeHandle } from "@/components/layout/SidebarResizeHandle";
+import { SETTINGS_SIDEBAR, useSidebarWidth } from "@/components/layout/sidebarWidth";
 import {
   organizationBYOKPath,
   organizationBillingPath,
@@ -112,6 +114,7 @@ const isSection = (value: string | null): value is SettingsSection =>
   SECTIONS.some((section) => section.id === value);
 
 const Settings: React.FC = () => {
+  const sectionsWidth = useSidebarWidth(SETTINGS_SIDEBAR);
   // `?section=sessions` opens a section directly (the account menu links here). Choosing a
   // section writes it there too (F-322): saving a workspace's clock or date format re-renders the
   // workspace's pages under the new settings (N-064), and a reload does the same, so the page
@@ -181,8 +184,13 @@ const Settings: React.FC = () => {
         </p>
       </div>
 
-      <div className="flex flex-col lg:grid lg:grid-cols-12 gap-6">
-        <aside className="lg:col-span-3 space-y-5 h-fit" aria-label="Settings sections">
+      {/* On a computer the section list's width is the person's own: drag the divider between the columns. */}
+      <div
+        className="flex flex-col gap-6 lg:grid lg:grid-cols-[var(--settings-side)_minmax(0,1fr)]"
+        style={{ "--settings-side": `${sectionsWidth}px` } as React.CSSProperties}
+      >
+        <div className="relative">
+        <aside className="space-y-5 h-fit" aria-label="Settings sections">
           {(["account", "workspace"] as const).map((scope) => {
             const items = visible.filter((section) => section.scope === scope);
             if (items.length === 0) {
@@ -252,8 +260,15 @@ const Settings: React.FC = () => {
             </nav>
           )}
         </aside>
+        <SidebarResizeHandle
+          spec={SETTINGS_SIDEBAR}
+          label="Resize the settings sections"
+          viewportShare={0.4}
+          className="hidden !right-[-12px] !translate-x-0 lg:block"
+        />
+        </div>
 
-        <section className="lg:col-span-9 min-w-0">{panel()}</section>
+        <section className="min-w-0">{panel()}</section>
       </div>
     </div>
   );

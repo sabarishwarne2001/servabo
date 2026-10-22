@@ -1,5 +1,8 @@
 import React, { useEffect } from "react";
 
+import { SidebarResizeHandle } from "./SidebarResizeHandle";
+import { SHELL_SIDEBAR, useSidebarWidth } from "./sidebarWidth";
+
 interface MobileDrawerProps {
   readonly children: React.ReactNode;
   readonly open: boolean;
@@ -11,6 +14,7 @@ const MobileDrawer: React.FC<MobileDrawerProps> = ({
   open,
   onClose,
 }) => {
+  const width = useSidebarWidth(SHELL_SIDEBAR);
   // Lock body scrolling when drawer is open
   useEffect(() => {
     if (open) {
@@ -59,9 +63,10 @@ const MobileDrawer: React.FC<MobileDrawerProps> = ({
         aria-hidden={open ? undefined : "true"}
         inert={!open}
         aria-label="Navigation Menu"
+        style={{ width }}
         className={`
           fixed inset-y-0 left-0 z-50
-          w-[280px] max-w-[85vw]
+          max-w-[85vw]
           bg-sidebar
           border-r
           border-border
@@ -77,6 +82,8 @@ const MobileDrawer: React.FC<MobileDrawerProps> = ({
         `}
       >
         {children}
+        {/* The same width as on a computer, by finger: the divider on the drawer's edge. */}
+        <SidebarResizeHandle spec={SHELL_SIDEBAR} edge="inside" viewportShare={0.85} label="Resize the navigation menu" />
       </aside>
     </>
   );
