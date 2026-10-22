@@ -796,7 +796,8 @@ test.describe("Identity credentials: the SCIM token", () => {
     await signInAs(page, admin.email);
     await page.goto(owner.org("identity?tab=scim"));
     await settle(page);
-    await expect(page.getByRole("heading", { name: "Access restricted" })).toBeVisible();
+    // Decision N-006: an administrator reads the tab; only the owner has the buttons.
+    await expect(page.getByRole("heading", { name: "Access restricted" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Issue token" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Rotate", exact: true })).toHaveCount(0);
     const [key] = await keysOf();
