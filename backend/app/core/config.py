@@ -556,6 +556,13 @@ class Settings(BaseSettings):
     #: How long a generated DPA archive stays downloadable.
     COMPLIANCE_EXPORT_TTL_HOURS: int = 72
 
+    #: Days after an organization or workspace is archived before its documents, conversations and settings are purged
+    #: (`scripts/sweep_compliance.py --archived`). Until then "restore" still works. Money records stay.
+    ARCHIVED_PURGE_GRACE_DAYS: int = 30
+    #: Months after an organization is archived before the organization itself is deleted. 72 months because the CGST
+    #: Act 2017 s.36 makes a registered person keep books of account until 72 months after the annual return's due date.
+    ARCHIVED_FINAL_DELETE_MONTHS: int = 72
+
     STORAGE_SAMPLE_INTERVAL_MINUTES: int = 60
 
     MAX_DOCUMENT_PAGES: int = 500

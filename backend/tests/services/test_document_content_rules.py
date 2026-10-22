@@ -23,6 +23,7 @@ from app.models.automation_execution import (
 from app.models.gst import GstDecision, GstMatch, GstReturn, GstReturnRecord
 from app.models.helm import HelmAction, HelmBook, HelmSettlement, HelmTask, HelmValueEvent
 from app.models.notification import Notification
+from app.models.organization import Organization
 from app.models.outbox_event import OutboxEvent
 from app.models.webhook_delivery import WebhookDelivery
 from app.models.webhook_delivery_attempt import AttemptDisposition, WebhookDeliveryAttempt
@@ -263,3 +264,39 @@ def test_a_match_with_no_book_record_has_nothing_left_to_keep(db_session, tenant
 
 def test_the_engine_does_nothing_for_no_documents(db_session):
     assert document_content.destroy_copies(db_session, [], mode="erase") == {}
+
+
+# ---------------------------------------------------------------------------------------------- the export
+
+def test_the_export_carries_what_a_customer_owns_besides_documents(db_session, tenant, planted):
+    """UPGRADE-AUDIT F-549: a customer leaving took less than they put in."""
+    from app.models.automation import AutomationRule
+    from app.services.compliance import export_service
+
+    bundle = export_service.build_bundle(db_session, organization=tenant.organization)
+    sections = bundle["sections"]
+    assert len(sections["gst_returns"]) == 1 and len(sections["gst_book_records"]) == 1
+    assert len(sections["gst_matches"]) == 1 and sections["gst_matches"][0]["itc_micros"] == 22_576_271_186
+    assert sections["gst_decisions"][0]["decision"] == "CONFIRM"
+    assert sections["helm_settlements"][0]["paid_amount_micros"] == 148_000_000_000
+    assert len(sections["helm_actions"]) == 1 and len(sections["helm_value_events"]) == 1 and len(sections["helm_books"]) == 1
+    rules = sections["automation_rules"]
+    assert [r["name"] for r in rules] == ["r"] and "actions" in rules[0]["flow"] or "condition_groups" in rules[0]["flow"]
+    assert bundle["truncated_sections"] == []
+
+
+def test_the_export_never_includes_another_organizations_rows(db_session, tenant, planted):
+    from app.services.compliance import export_service
+
+    other_org = db_session.get(Organization, tenant.foreign_workspace.organization_id)
+    bundle = export_service.build_bundle(db_session, organization=other_org)
+    for name in ("gst_returns", "gst_matches", "helm_settlements", "helm_actions", "automation_rules"):
+        assert bundle["sections"][name] == [], name
+
+
+def test_a_section_cut_short_by_the_row_limit_says_so(db_session, tenant, planted, monkeypatch):
+    from app.services.compliance import export_service
+
+    monkeypatch.setattr(export_service, "MAX_ROWS_PER_SECTION", 1)
+    bundle = export_service.build_bundle(db_session, organization=tenant.organization)
+    assert "gst_returns" in bundle["truncated_sections"]

@@ -286,7 +286,7 @@ REGISTRY: dict[str, TableRule] = {
                                  links=(via("case_id", "procurement_cases", "id", col("invoice_work_item_id")),)),
     "procurement_tolerance_policies": _config(),
     "discrepancies": _r(Kind.CONTENT, Erasure.SERVICE, Sweep.CASCADE, OrgPurge.CASCADE, why=_DERIVED_WHY, note="Cascades from a corroboration run."),
-    "case_documents": _r(Kind.DERIVED, Erasure.DELETE, Sweep.CASCADE, OrgPurge.CASCADE, why=_NO + "the link is part of the exported case", links=(_WI,)),
+    "case_documents": _r(Kind.DERIVED, Erasure.DELETE, Sweep.CASCADE, OrgPurge.CASCADE, export="case_documents", links=(_WI,)),
     "case_rule_results": _r(Kind.CONTENT, Erasure.KEEP, Sweep.CASCADE, OrgPurge.CASCADE, why=_DERIVED_WHY,
                             note="Left and right values come from the case's documents"),
     "cases": _r(Kind.CONTENT, Erasure.KEEP, Sweep.KEEP, OrgPurge.DELETE, export="cases", note="A case is the customer's own folder; its documents are unlinked."),
@@ -368,8 +368,8 @@ REGISTRY: dict[str, TableRule] = {
     "helm_certificates": _r(Kind.AUDIT, Erasure.KEEP, Sweep.KEEP, OrgPurge.KEEP, why=_NO + "a signed record of a Guard check; proof, not content"),
     "helm_plans": _derived_cascade("Computed payment plans.", purge=OrgPurge.KEEP),
     "helm_mandates": _config(export="helm_mandates", purge=OrgPurge.KEEP),
-    "helm_mandate_versions": _config(export="helm_mandates", purge=OrgPurge.KEEP),
-    "helm_settings": _config(export="helm_books", purge=OrgPurge.KEEP),
+    "helm_mandate_versions": _config(export="helm_mandate_versions", purge=OrgPurge.KEEP),
+    "helm_settings": _config(export="helm_settings", purge=OrgPurge.KEEP),
     "helm_backtests": _derived_cascade("Backtest reports.", purge=OrgPurge.DELETE),
     "helm_ledger_dirty": _derived_cascade("Projector queue.", links=(_WI,), purge=OrgPurge.DELETE),
     "helm_ledger_state": _derived_cascade("Projector state.", purge=OrgPurge.DELETE),
@@ -412,7 +412,7 @@ REGISTRY: dict[str, TableRule] = {
 
     # ----------------------------------------------------------------- ERP
     "erp_targets": _secret("Holds the connection and its credentials."),
-    "erp_mappings": _config(export="erp_mappings"), "erp_lookup_tables": _config(export="erp_mappings"),
+    "erp_mappings": _config(export="erp_mappings"), "erp_lookup_tables": _config(export="erp_lookup_tables"),
     "erp_postings": _r(Kind.MONEY, Erasure.SERVICE, Sweep.CASCADE, OrgPurge.KEEP, why=_NO + "the postings are in the customer's accounting system", links=(_WI,),
                        note="`erp.service.erase_for_work_items`: the ledger row stays (a posting that happened is a fact), its content goes."),
     "erp_posting_attempts": _r(Kind.MONEY, Erasure.SERVICE, Sweep.CASCADE, OrgPurge.CASCADE, why=_NO + "delivery history"),

@@ -132,3 +132,18 @@ def test_gstin_is_kept_on_gst_rows():
 def test_link_helpers_are_the_only_way_to_name_a_document():
     assert data_map.col("work_item_id").kind == "col"
     assert data_map.json_key("payload", "work_item_id").key == "work_item_id"
+
+
+def test_every_export_the_registry_promises_is_a_section_of_the_bundle():
+    from app.services.compliance import export_service
+
+    promised = {name: rule.export for name, rule in REGISTRY.items() if rule.export}
+    unknown = {table: section for table, section in promised.items() if section not in export_service.EXPORT_NAMES}
+    assert not unknown, f"the registry names export sections the bundle does not build: {unknown}"
+    for section, (table, _scope, _drop) in export_service.GENERIC_SECTIONS.items():
+        assert table in REGISTRY and REGISTRY[table].export == section, (
+            f"{section}: the bundle exports {table}, but the registry says {REGISTRY[table].export!r}"
+        )
+    for _section, (table, scope, _drop) in export_service.GENERIC_SECTIONS.items():
+        cols = TABLES[table].c.keys()
+        assert ("organization_id" if scope == "org" else "workspace_id") in cols, (table, scope)
