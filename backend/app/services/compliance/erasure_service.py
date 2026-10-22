@@ -383,6 +383,13 @@ def _destroy_documents(
         _truthmesh.forget_documents(db, workspace_id=workspace_id, work_item_ids=ids_in_workspace, erase=True)
         for workspace_id, ids_in_workspace in by_workspace.items()
     )
+    # Final session 1 (1A, F-546): every other copy of the documents' content, found by the data map. Notices, event
+    # payloads and their deliveries, proposals and findings are deleted; money records (GST matches, Helm settlements
+    # and actions) stay and lose their free text; automation traces lose the values their conditions read.
+    from app.services.compliance import document_content as _document_content
+
+    for table, rows in _document_content.destroy_copies(db, work_item_ids, mode="erase").items():
+        counts[f"copies.{table}"] = rows
 
 
 def _destroy_conversations(

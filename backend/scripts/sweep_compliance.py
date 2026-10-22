@@ -194,6 +194,11 @@ def _purge_work_items(
             from app.models import helm_dirty
 
             helm_dirty.mark_deleted(db.connection(), ids, "retention purge")
+            # Final session 1 (1A, F-547): the copies a foreign key cannot reach go here, and the money records (GST
+            # matches, Helm settlements and actions) are DETACHED from the document so the cascade below leaves them be.
+            from app.services.compliance import document_content
+
+            document_content.destroy_copies(db, ids, mode="purge")
             db.execute(
                 text("DELETE FROM document_chunks WHERE work_item_id = ANY(:ids)"),
                 {"ids": ids},

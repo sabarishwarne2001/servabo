@@ -201,7 +201,8 @@ class HelmSettlement(Base):
     id: Mapped[uuid.UUID] = _uuid_pk()
     organization_id: Mapped[uuid.UUID] = _org()
     workspace_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), nullable=False)
-    work_item_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), nullable=False)
+    # NULL once the retention sweep has deleted the document: the settlement is a money record and stays (k1a1).
+    work_item_id: Mapped[Optional[uuid.UUID]] = mapped_column(PgUUID(as_uuid=True), nullable=True)
     state: Mapped[str] = mapped_column(String(10), nullable=False)
     run_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     paid_on: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
