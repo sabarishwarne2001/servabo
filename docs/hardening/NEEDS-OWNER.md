@@ -2245,3 +2245,82 @@ carried over, not dropped.
 Earlier entries that say "Session D" (N-129, N-138, N-140, N-158) now mean Final session 2. The other "Session E"
 (the UI-gaps pass of 2026-10-18, N-131 to N-134) is history and unaffected. `docs/PRODUCT-NEXT.md` said item 9 ("correct a field
 beside the page") was unbuilt; it was built earlier (`f53ccc8`) and the file now says so. Final session 1 rewrites the rest.
+
+
+## N-161 — One registry says what happens to every table's data, and a test keeps it complete (DECIDED (Final 1))
+
+Erasure, the retention sweep, deleting a workspace or an organization and the data export each had a hand-written list of tables, and
+sessions F, J and Helm added about forty tables to none of them (UPGRADE-AUDIT F-546 to F-551). `backend/app/services/compliance/data_map.py`
+now names **every one of the 234 tables** with its kind (document content, a person's data, a money record, settings, audit trail,
+rebuildable, or Servabo's own), what erasure, the sweep and an organization purge do with it, and which section of the export carries it.
+`backend/tests/services/test_data_map.py` compares it with the real tables: **a table added without a decision fails the build**, for
+every future session. Plain meaning for the owner: when you add a table, the build tells you to decide what happens to its data when a
+customer is erased, expires or leaves.
+
+## N-162 — Copies of a document's content go with it; money records stay and lose names and free text (DECIDED (Final 1))
+
+- **Destroyed with the document (erasure and sweep):** automation traces' values (the run itself stays), in-app notices, outbox and webhook
+  payloads and their delivery attempts, radar findings, agent proposals, verifications, fingerprints, packet splits, procurement cases, Helm
+  to-do notes, and the rest the data map lists.
+- **Kept, with names and free text blanked:** GST matches, GST decisions' notes, Helm settlements, actions and value events, bank lines. They
+  keep amounts, dates, statuses and the identifiers the books need. The names and sentences that came from the erased invoice go.
+- **The retention sweep used to destroy money records by accident**: deleting a document row made the database delete its GST matches and
+  Helm settlements, actions and value events. The sweep now *detaches* them first (the link to the document is cleared), so they stay.
+  Migration `k1a1` lets a Helm settlement exist without its document. A match with no book record at all (the invoice was missing from
+  GSTR-2B) has nothing left once its document goes and is deleted; a GST "confirm" decision is about one document (a database rule) and goes
+  with it. Helm's promises are rebuilt from documents and go with them.
+- Someone else's documents are never touched by a person's erasure (tested).
+
+## N-163 — GST rows keep the supplier's GSTIN and the books themselves; the legal basis is recorded (DECIDED (Final 1); a lawyer should confirm)
+
+A GSTIN embeds a PAN, so for a sole proprietor it is personal data. It is also the identifier the books must carry. **Decision: GST rows
+keep the supplier GSTIN, the document number and the amounts; the supplier's name (free text) goes.** The imported GSTR-2B rows (the books)
+come from the government portal, not from the erased invoice, and stay whole. Basis: Section 36 of the CGST Act 2017, books of account kept
+72 months from the due date of the annual return; the DPDP Act 2023 Sections 8(7) and 12(3) except retention required by another law (in force
+about May 2027). The text was read in practitioner copies, not on indiacode.nic.in (unreachable from the build environment). **Have your
+lawyer confirm this paragraph before a customer relies on it.** A retention policy shorter than 72 months for tax documents is the customer's
+own choice; the product does not stop it (a warning on the retention screen is a possible follow-up).
+
+## N-164 — Deleting a workspace or organization deletes its data 30 days later; the organization itself 72 months later (DECIDED (Final 1))
+
+"Delete" only archived (F-548): the documents, files and conversations stayed forever. `sweep_compliance.py --archived` (dry run unless
+`--apply`) now purges an archived workspace or organization **30 days** after archiving (`ARCHIVED_PURGE_GRACE_DAYS`; until then Restore
+works): documents through the sweep's path, conversations, settings, stored files. Money records and the audit trail stay. An organization is
+**deleted 72 months** after archiving (`ARCHIVED_FINAL_DELETE_MONTHS`, matching N-163). The owner must schedule the command (RUNBOOK).
+Not done: an email to the owner at day 1 and day 25 of the 30 ("your data will be deleted on ...").
+
+## N-165 — The final deletion never shortens the audit trail (DECIDED (Final 1))
+
+The audit log is append-only; only the audit sweeper may delete entries older than 400 days. The final organization deletion therefore
+deletes the organization's old audit entries through that sweeper path and, if any entry is younger than 400 days, **refuses and reports it**
+(`audit_blocked`) until it ages. It never weakens the trail's own rule.
+
+## N-166 — Model lists and the retired-model sentence (DECIDED (Final 1))
+
+Suggested models were checked on 2026-10-22 (the providers' own sites could not be opened from the build environment; search results and the
+providers' deprecation pages as quoted by search were used, and the ids that only secondary sources named are marked in the code):
+Gemini `gemini-3.8-flash` (generally available since September 2026, $0.75 / $3.75 per million tokens, an introductory rate Google says changes
+at the end of 2026), `gemini-3.1-pro-preview`, `gemini-2.5-pro` (not deprecated); `gemini-1.5-*` and `gemini-2.0-flash` (shut down 2026-06-01) are
+retired. OpenAI `gpt-5.5` (OpenAI's named replacement), `gpt-5.6-sol`; Anthropic the Claude 5 ids; Groq's `qwen/qwen3.8-27b` (the byok list
+said 3.6, a mismatch with the price book). **A call that a provider answers "model not found" now says "Google retired gemini-1.5-pro; choose
+another model in AI settings"** instead of the generic 400; a saved policy is not blocked at save time. The price book gains
+`gemini-3.8-flash` (cost $0.75/$3.75, price twice that); **re-check on 2027-01-01** (Google says it changes). No OpenAI or Anthropic price rows
+were added: the provider-default rows already apply and those models run on the customer's key. The default platform model
+`openai/gpt-oss-120b` is still on Groq at $0.15 / $0.60 per million tokens (search results, 2026-10-22). **Final session 2 checks every
+suggestion against a real key.** `google-generativeai` (deprecated, never imported) and the six packages only it needed are removed.
+
+## N-167 — Pillow 13 and the safe-now library upgrades (DECIDED (Final 1); N-159 closed)
+
+Pillow 13.0.0, pypdf 6.21.2 and certifi 2026.10.19 close all 30 advisories (`pip-audit` clean). paddleocr and paddlex do not cap Pillow, pip
+resolves the full set, and the image, PDF, QR, redaction, thumbnail, avatar and upload-attack tests (185) pass; **real OCR on scans is Final session
+2's job** (it cannot run here). SQLAlchemy 2.0.55, Alembic 1.20.1, pydantic 2.14.1 with pydantic-settings 2.16.1 (and `typing-inspection`,
+`typing_extensions` pinned beside it). Not done, recorded: SQLAlchemy 2.1, FastAPI 0.159 / Starlette 1.9 / uvicorn 0.54 (a family to try on its own
+with the browser suite), openai 3, anthropic 2, mistralai 3, google-genai 2, torch 2.14, Python 3.13; frontend Vite 8, TypeScript 7, ESLint 10,
+Vitest 5, Tailwind 4 (N-119), lucide 1, jsdom 29.
+
+## N-168 — Session J's leftovers (DECIDED (Final 1))
+
+(a) The upgrade dialog for a GST trigger or recipe names the GST Credit add-on, with its price and checkout for an owner. (b) Rupees are in
+lakh grouping everywhere the server writes an amount for a person ("INR 12,50,000.00"); other currencies keep thousands. (c) `{{trigger.<field>}}`
+is accepted as an alias of `{{event.<field>}}` (`{{trigger.label}}` stays the trigger's name). (d) Each browser-test run builds into
+`dist-e2e-<port>`.

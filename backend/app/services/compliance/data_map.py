@@ -30,9 +30,12 @@ THE DECISIONS (also N-161 to N-165 in NEEDS-OWNER.md)
 -----------------------------------------------------
 * Copies of a document's content go with the document: traces, notices, event payloads, proposals, findings.
 * Money records the law makes the customer keep stay. Indian GST law: Section 36 of the CGST Act, 2017 requires
-  books of account to be kept until 72 months after the due date of the annual return for their year (checked on
-  indiacode.nic.in, 2026-10-22). The DPDP Act 2023 does not override a retention duty set by another law
-  (Section 8(7) and Section 12(3), where erasure is subject to "retention necessary for compliance with any law").
+  books of account to be kept until 72 months after the due date of the annual return for their year (read on
+  2026-10-22 in practitioner copies of the text, taxguru.in and knowyourgst.com; indiacode.nic.in, the official
+  copy, could not be reached from the build environment). The DPDP Act 2023 does not override a retention duty set by
+  another law: Section 8(7) (erase unless retention is required by law) and Section 12(3) (an individual's erasure
+  request is subject to the same exception); both come into force in the eighteen-month tranche, about May 2027
+  (secondary sources, 2026-10-22). A lawyer should confirm both before a customer relies on them (N-163).
 * A kept money record loses every person's name and every free-text field that came from the erased content; it keeps
   amounts, dates, statuses and the identifiers the books need (document number, GSTIN).
 * A GSTIN embeds the holder's PAN. For a sole proprietor that is personal data, but it is also the identifier the books
