@@ -180,8 +180,8 @@ are matched against invoices; the rest are stored for the totals.
 ## What is unverified
 
 - **The file format is unverified against a real portal download.** The fixtures are invented (GSTINs with valid check
-  characters). Session D tries a real file (the owner's CA can supply one); anything unexpected is reported in words
-  on import and never silently dropped.
+  characters). Final session 2 (`docs/sessions/FINAL-2-LIVE.md`, Phase 5) tries a real file (the owner's CA can supply
+  one); anything unexpected is reported in words on import and never silently dropped.
 - **The official pages were not opened** from the build sandbox; the law links point at the official documents but the
   wording of 16(2)(aa), 16(4), the second proviso, Rule 37 and the IMS tutorial should be read once against them.
 - The IMS "Pending" limits from October 2025 are not stated (see above).

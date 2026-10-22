@@ -2225,3 +2225,23 @@ Nothing is blocked on this.
 The advisory-only check (`pip-audit`) lists several Pillow 12.3.0 advisories fixed in Pillow 13.0.0. It is advisory and the
 same on `main`; a major version of the image library can change how documents are read, so it was left for a session that can
 run the image and OCR tests with it. Decide whether to schedule that.
+
+## N-160 — Two final sessions replace Sessions D and E (DECIDED (owner, 2026-10-22))
+
+The owner asked for two last sessions instead of D and E: one that studies the whole product, brings every part up to date and
+builds what earns money, and one that tries everything for real on his PC. Sessions D and E were never run; their content is
+carried over, not dropped.
+
+- **Final session 1** (`docs/sessions/FINAL-1-UPGRADE.md`, cloud): the old Session E's error tracking, zip upload and email-in,
+  plus the data lifecycle (erasure, sweep, export of the GST, Helm, automation, outbox and notification stores), outdated model
+  lists and libraries (N-159), Session J's leftovers, "first money found", the GST digest, upgrade moments, Zoho Books Connect and
+  a guided Tally file, the QR badge (N-140), `preflight.py`, every screen (accessibility, phones, money formatting), and a true
+  `PRODUCT-NEXT.md`. No price, plan or trial changes: ideas that need one are recorded `OPEN`.
+- **Final session 2** (`docs/sessions/FINAL-2-LIVE.md`, the owner's PC): the old Session D (Dodo journeys A to H, a real GSTR-2B
+  and e-invoice, real AI and OCR, the receipt and emails in Gmail) and everything Final session 1 builds, for real; plus a real
+  Slack and Teams channel (N-158), run #400's report (N-148, before it expires on 2026-11-02), a production rehearsal and a live
+  smoke suite. Results in `docs/hardening/LIVE-VERIFICATION.md`.
+
+Earlier entries that say "Session D" (N-129, N-138, N-140, N-158) now mean Final session 2. The other "Session E"
+(the UI-gaps pass of 2026-10-18, N-131 to N-134) is history and unaffected. `docs/PRODUCT-NEXT.md` said item 9 ("correct a field
+beside the page") was unbuilt; it was built earlier (`f53ccc8`) and the file now says so. Final session 1 rewrites the rest.

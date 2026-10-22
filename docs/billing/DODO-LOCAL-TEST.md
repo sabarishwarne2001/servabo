@@ -3,7 +3,8 @@
 Everything Servabo does with Dodo Payments was written from Dodo's documentation and proven only
 against a stand-in (`backend/tests/fakes/fake_dodo.py`). The cloud sandbox cannot reach Dodo, so the
 real check has to run on your PC, in Dodo's **Test Mode** (no real money moves). This page is the whole
-walk-through. It is written for you and for the Claude session that runs it with you ("Session D").
+walk-through. It is written for you and for the Claude session that runs it with you (Final session 2,
+`docs/sessions/FINAL-2-LIVE.md`; earlier documents call it "Session D").
 
 You will end with the results table at the bottom filled in: for each of the ten points in
 [`DODO.md` §6](DODO.md), **Confirmed**, **Differs** or **Not checked**, with the date.

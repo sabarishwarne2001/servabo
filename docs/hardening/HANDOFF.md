@@ -558,7 +558,7 @@ the Guard asks a person before paying an invoice the supplier has not reported; 
 (4) The website has `/gst-credit`. (5) Enterprise: GST credit across every workspace (page, API, `gst:read` key scope).
 (6) Stretch: the e-invoice QR code is read during processing (IRN etc.).
 
-**Session D must also check, with the owner's help.** (a) **A real GST invoice through the new extraction schema**
+**Session D (now Final session 2) must also check, with the owner's help.** (a) **A real GST invoice through the new extraction schema**
 with the real model (F-524, N-138): every invoice field Helm and GST Credit read, in particular `vendor_gstin`,
 `buyer_gstin`, the tax heads and the IRN. (b) **A real GSTR-2B JSON** from the GST portal, if the owner or the CA can get
 one: the parser follows the documented layout and the fixtures are invented; anything unexpected is reported in words on
@@ -621,9 +621,9 @@ N-130; findings F-500 to F-517._
 - *The Dodo check kit (C2)* is built and proven against `fake_dodo.py`: `backend/scripts/dodo_probe.py`
   (read-only), `backend/scripts/dodo_relay.py`, `start_dev.ps1 -DodoWebhooks` / `start_dev.sh --dodo-webhooks`,
   and `docs/billing/DODO-LOCAL-TEST.md`. **It has never talked to Dodo.** Every Dodo point in DODO.md §6 stays
-  "not confirmed" until Session D (below).
+  "not confirmed" until Session D (below; now Final session 2, `docs/sessions/FINAL-2-LIVE.md`).
 
-**Session D: what to run, exactly** (needs the owner's PC, a Dodo *test-mode* account and its keys; never a
+**Session D (now Final session 2): what to run, exactly** (needs the owner's PC, a Dodo *test-mode* account and its keys; never a
 live key). Follow `docs/billing/DODO-LOCAL-TEST.md` from the top:
 1. Test mode on; put the test API key and webhook key in `backend/.env` (§1–2).
 2. `cd backend; .\.venv\Scripts\python.exe scripts\dodo_setup.py --create-test-products`, paste the eight
@@ -647,6 +647,11 @@ instead); the identifier merge through a GSTIN (the model stand-in never extract
 Only you can do these. Do them in this order; each step says what you need, where to click and how
 you know it worked. Nothing here needs code changes. Rewritten in the website and payments session
 (2026-10-17) for Servabo, the website and Dodo Payments. Tick them in a copy of this file.
+
+**Before you start these:** run the two final sessions (`docs/FINAL-SESSIONS.md`). Final session 2 proves on your PC
+what can be proven without a server: step 9's test-mode part, step 12's real-model spot checks, the CPU-only image build and a
+backup and restore rehearsal; it ticks them here. `backend/scripts/preflight.py` (from Final session 1) tells you, on the server,
+which settings are still missing.
 
 **Step 1 — Rotate every key that was ever pasted into a chat or committed.**
 SECURITY-REVIEW.md lists them. In each provider's dashboard create a new key and delete the old
@@ -725,7 +730,7 @@ again (step 8). Buy one seat of Developer with your own card, then refund it fro
 **Step 12 — Before the first customer.**
 - **Legal:** a lawyer reads the website's terms, privacy and refund pages (`servabo.app/terms`,
   `/privacy`, `/refunds`; N-029, N-073) and you publish their changes (edit `website/src/pages/`).
-- **Real-model spot checks** (sessions 2 and 3): a prompt-injection document, an invoice with many
+- **Real-model spot checks** (sessions 2 and 3; Final session 2 does them on your PC): a prompt-injection document, an invoice with many
   line items, an Indian GST invoice, a photographed page and a handwritten page; check the fields
   and the review queue. Real OCR (PaddleOCR) on scans was never run in the test sandbox.
 - **Enterprise identity on a staging domain:** claim and verify a real domain with a TXT record
@@ -763,7 +768,7 @@ confirmed / likely / potential never added, zero left out, the sample company ne
 in the zone of the oldest workspace. What it counts and the judgement calls are in N-141 (read them: the trial window, the month's
 zone, duplicates coming from the radar rather than payment-risk flags, the unaudited PDF).
 
-**For Session D / the owner.**
+**For Session D (now Final session 2) / the owner.**
 - Try the receipt on a **real account**: upload real invoices, import a real GSTR-2B, open the Overview. The browser test proves the
   wiring and the GST figures on invented invoices; the radar, procurement and Helm figures are proven on planted rows only.
 - The receipt reads the usage ledger for "documents read"; it counts what the plan meters count (uploads accepted), not documents that
@@ -786,7 +791,7 @@ ships and only reports build tools (`braces` under Tailwind 3, no fix exists, Ta
 Business and Enterprise include it; on lapse the page returns to the preview and the data is kept (N-145). (3) **The monthly
 summary email** to owners of paying organizations on the 1st (N-146).
 
-**For Session D / the owner.**
+**For Session D (now Final session 2) / the owner.**
 - **Create the eighth Dodo product.** `scripts/dodo_setup.py --create-test-products` now creates five plan products and **three**
   add-ons and prints **eight** lines (the new one: `DODO_ADDON_PRODUCT_GST_CREDIT`, $49, monthly, one per organization, tax not
   included). Paste it into `backend/.env`, run `dodo_setup.py` until all eight say OK, and later do the same in live mode and
@@ -870,10 +875,42 @@ builder**, a recipe gallery (16), rule cards with health and owner, Run history 
   on, cancelled when the rule is edited or off or the document deleted, idempotent through the run's own key.
 
 **For the next session / the owner.**
-- N-158 (a real Slack and Teams channel, Session D), N-159 (the Pillow 13 advisory).
+- N-158 (a real Slack and Teams channel, now Final session 2), N-159 (the Pillow 13 advisory, now Final session 1 with Final session 2's real OCR).
 - The upgrade dialog for a GST trigger names Business and Enterprise but not the GST Credit add-on, because the trigger passes its capability, not the add-on key
   (`TriggerCard` → `onUpgrade`). Small, cosmetic.
 - Run history reasons still use Western grouping ("INR 1,250,000.00") while the builder's sentences use lakh grouping; the evaluator's reason text is the place to change it.
 - The schedule trigger's field is `{{event.local_date}}` in a message; `{{trigger.local_date}}` is refused with "Unknown template variable(s)".
 - Browser specs run on a shared stack: two Playwright runs that share `frontend/dist` can wipe each other's bundle mid-run (give each its own `E2E_WEB_PORT`, or its own build).
 - `docs/automation/README.md` is the user guide; `docs/automation/AUDIT.md` the starting inventory.
+
+## Plan change: the two final sessions (2026-10-22)
+
+_Decision N-160. Docs-only change; no code, no migration._
+
+**What changed.** Sessions D and E were never run. They are replaced by two final sessions that cover the whole product,
+not one feature each. The owner's guide is `docs/FINAL-SESSIONS.md`; the prompts are in `docs/sessions/`.
+
+| Session | Where | What | Prompt |
+| --- | --- | --- | --- |
+| **Final session 1** | Claude Code on the web, Opus 5.5 High | Study the whole product (`docs/hardening/UPGRADE-AUDIT.md`), bring every part up to date (data lifecycle, outdated model lists and libraries, Session J's leftovers, every screen), and build the PRODUCT-NEXT items that earn money: zip upload, email-in, "first money found", the GST digest, upgrade moments, Zoho Books Connect and Tally, the QR badge, error tracking, `preflight.py` | `docs/sessions/FINAL-1-UPGRADE.md` |
+| **Final session 2** | Claude Code in VS Code on the owner's PC, Sonnet 5.5 High | Everything for real: every suite on Windows, real email, real OCR and AI, email-in through Postmark, a real GSTR-2B and e-invoice, Helm, Slack and Teams, Dodo journeys A to H, Zoho Books and Tally, the public API and webhooks, Sentry, the website, a new-customer walk-through, a production rehearsal, a live smoke suite; results in `docs/hardening/LIVE-VERIFICATION.md` | `docs/sessions/FINAL-2-LIVE.md` |
+
+**Where the earlier lists went.**
+- Old Session E (error tracking, zip upload, email-in, correct-a-field) → Final session 1, Phases 2 and 4. "Correct a field
+  beside the page" was already built (`f53ccc8`, `field_correction_service.py`); PRODUCT-NEXT now says so.
+- Old Session D (real Dodo, a real GSTR-2B and e-invoice, real AI and OCR, the receipt and emails in Gmail) → Final session 2,
+  Phases 3, 5 and 8, unchanged in substance. "Session D" in the sections above means Final session 2.
+- Open decisions: N-140 (QR provenance) → Final 1 Phase 3D shows it, Final 2 Phase 5 tries a real e-invoice; N-148 (run #400's
+  report) → Final 2 Phase 1 step 6, before the report expires on 2026-11-02; N-158 (a real Slack and Teams channel) → Final 2
+  Phase 7; N-159 (Pillow 13) → Final 1 Phase 1C, with Final 2 Phase 3 as the real-OCR proof.
+
+**What a read of the code found on 2026-10-22,** for Final session 1 to verify first (its §0 table has the files):
+erasure keeps the document row, so GST and Helm rows, automation traces, outbox and webhook payloads and notifications have no
+erasure rule of their own; the tenant export has no GST, Helm or automation data; BYOK suggests retired Gemini models and old
+OpenAI ones; `google-generativeai` (deprecated) is still installed; GST has no notification category; global search cannot find
+GST suppliers, GST invoices or automation rules; Getting started stops at "ask"; there is no `gst.*` or automation-run webhook
+event and no GST or Helm warehouse dataset; the zip handler is never queued and the upload screen refuses `.zip`; nothing receives
+email; there is no error tracker; ERP OAuth is "paste your tokens", with no Connect button; nothing on screen shows a value came
+from the e-invoice QR code; axe runs in 11 of 99 browser spec files.
+
+**Numbers.** N-160 is this decision; Final session 1 starts at N-161 and F-546; browser specs continue at 118.
