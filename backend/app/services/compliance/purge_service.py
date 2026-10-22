@@ -57,6 +57,7 @@ def purge_documents(db: Session, work_item_ids: list[uuid.UUID]) -> set[str]:
     Copies of the content are destroyed and money records detached (`document_content`, mode "purge") before the rows
     are deleted, so the foreign keys find nothing to cascade into them.
     """
+    from app.db import chunk_scope
     from app.models import helm_dirty
     from app.services import storage_cleanup
     from app.services.truthmesh import service as truthmesh_service
@@ -92,7 +93,9 @@ def purge_documents(db: Session, work_item_ids: list[uuid.UUID]) -> set[str]:
     # Helm's Promise ledger re-projects at the next update (a raw delete is not seen by the ORM).
     helm_dirty.mark_deleted(db.connection(), ids, "retention purge")
     document_content.destroy_copies(db, ids, mode="purge")
-    db.execute(text("DELETE FROM document_chunks WHERE work_item_id = ANY(:ids)"), {"ids": ids})
+    for workspace_id, in_workspace in by_workspace.items():
+        for item_id in in_workspace:
+            chunk_scope.delete_chunks_for_work_item(db, workspace_id=workspace_id, work_item_id=item_id)
     db.execute(text("DELETE FROM work_items WHERE id = ANY(:ids)"), {"ids": ids})
     return keys
 
