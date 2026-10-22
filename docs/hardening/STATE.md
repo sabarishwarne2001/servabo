@@ -2,7 +2,34 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-22 (plan change: the two final sessions)_
+_Last updated: 2026-10-22 (Final session 1 started)_
+
+## Current phase — Final session 1 (2026-10-22)
+Branch `claude/focused-planck-g9363e` (the session's assigned branch; CLAUDE.md says `hardening/<topic>`, the brief says "use the assigned branch", so the assigned
+branch is used), based on `main` at `7db95b1` (PR #36 merged), draft PR below. Founder authority: decisions in NEEDS-OWNER.md as `DECIDED (Final 1)` from **N-161**,
+findings from **F-546**, browser specs from **118**. **If cut off, type `continue`: carry on from the first unticked box. Never restart a ticked phase.**
+Local stack this session: Postgres 16 (apt) on :5434 with pgvector 0.8.0 (files from the PyPI wheel `pixeltable-pgserver==0.3.0`, data dir `/var/lib/pgtest`), Redis,
+backend venv Python 3.12 and `npm ci` in the session scratchpad. The test environment block is `testenv.sh` in the scratchpad (outside the repo).
+
+- [ ] 0. Start-up: docs and code read; stack; this checklist; draft PR
+- [ ] 0b. Phase 0: `docs/hardening/UPGRADE-AUDIT.md` (the study) and its ranked list
+- [ ] 1A. Data lifecycle: one registry (`data_map.py`) and a test that keeps it complete; erasure, sweep, deletion and the tenant export follow it
+- [ ] 1B. Outdated AI models: suggested models, price book, BigQuery map, default platform model, `google-generativeai` removed, retired-model message
+- [ ] 1C. Libraries: Pillow 13 (or the blocker recorded), safe-now upgrades, pip-audit
+- [ ] 1D. Session J's leftovers: GST trigger upgrade dialog, lakh grouping in run history, `{{trigger.local_date}}`, e2e `dist` folder per run
+- [ ] 2A. Zip upload (spec 118)
+- [ ] 2B. Email-in through Postmark inbound (spec 119)
+- [ ] 2C. Getting started: "first money found"
+- [ ] 3A. GST notification category, in-app notices and the Monday digest
+- [ ] 3B. Upgrade moments: one test walks every locked surface; 80% usage email one-click
+- [ ] 3C. Zoho Books Connect (OAuth) and Tally Prime guided
+- [ ] 3D. E-invoice QR badge and signature line
+- [ ] 4A. Error tracking (Sentry / GlitchTip)
+- [ ] 4B. `scripts/preflight.py`
+- [ ] 5. Screens: accessibility sweep, phone pass, money formatter guard, states, global search, website
+- [ ] 6. Public webhook events, warehouse datasets, document packs that do everything they promise
+- [ ] 7. `PRODUCT-NEXT.md` rewritten; HANDOFF "Final session 1 → Final session 2"; records
+- [ ] Finish: suites, `campaign_slices.py --check all`, one Alembic head (up/down/up), PR ready, CI green
 
 ## Current phase — Plan change: the two final sessions (2026-10-22)
 Branch `hardening/final-two-sessions`, based on `main` at `3b2a7e2` (PR #35 merged; `main` run #417 green, only the advisory
