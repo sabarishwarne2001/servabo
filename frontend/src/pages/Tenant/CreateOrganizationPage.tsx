@@ -202,7 +202,7 @@ export const CreateOrganizationPage: React.FC = () => {
   const busy = isSubmitting || isPending;
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-background px-6 py-12">
+    <main className="flex min-h-screen w-full items-center justify-center bg-background px-6 py-12">
       <div className="w-full max-w-md space-y-8">
         <header className="space-y-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
@@ -349,7 +349,7 @@ export const CreateOrganizationPage: React.FC = () => {
           </div>
         </form>
       </div>
-    </div>
+    </main>
   );
 };
 
