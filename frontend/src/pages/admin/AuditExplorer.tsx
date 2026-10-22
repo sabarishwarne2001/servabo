@@ -234,6 +234,16 @@ export const AuditExplorer: React.FC<AuditExplorerProps> = ({ asPage = false }) 
           aria-label="From date"
           className="rounded border border-border bg-background px-2 py-1 text-xs"
         />
+        {/* The API has always taken an end date (and the export follows the filters); the page only offered a start. */}
+        <input
+          type="date"
+          value={filters.date_to ? filters.date_to.slice(0, 10) : ""}
+          onChange={(e) =>
+            applyFilter({ date_to: e.target.value ? new Date(`${e.target.value}T23:59:59.999Z`).toISOString() : "" })
+          }
+          aria-label="To date"
+          className="rounded border border-border bg-background px-2 py-1 text-xs"
+        />
 
         {Object.keys(filters).length > 0 && (
           <button
