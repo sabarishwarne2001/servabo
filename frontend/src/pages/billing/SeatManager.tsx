@@ -111,7 +111,7 @@ export const SeatManager: React.FC<SeatManagerProps> = ({
   const overBy = capacity !== null ? Math.max(0, used - capacity) : 0;
 
   return (
-    <section className="rounded-lg border border-border bg-card p-4" aria-labelledby="seats-heading">
+    <section id="seats" className="scroll-mt-4 rounded-lg border border-border bg-card p-4" aria-labelledby="seats-heading">
       <div className="flex items-center gap-2">
         <Users className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
         <h2 id="seats-heading" className="text-sm font-medium">Seats</h2>

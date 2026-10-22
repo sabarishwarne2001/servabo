@@ -87,3 +87,14 @@ the router; its findings are appended below in "Phase 5 results".
 **Changes to the plan from the study.** Added to 1A (P0): the organization and workspace purge (F-548) and the keep-or-destroy decision for money
 records (F-547), because the study found the retention sweep *destroys* what the brief says must be kept. Added to 1C: pypdf and certifi.
 Nothing in the brief was found already done, except that `google-generativeai` is unused (F-566) and PRODUCT-NEXT #9 and #3 are built.
+
+## Found while building (Phase 2 onward)
+
+Bugs the walk-through tests found. Each has the failing test that proved it and the fix, in the same commit (evidence rule).
+
+| # | Sev | Finding | Proof (test that failed first) | Fixed in |
+| --- | --- | --- | --- | --- |
+| F-576 | P1 | **A plan lock reached from a button raised the "you are out of quota" banner.** The client let `ADDON_REQUIRED` through to the page but sent `CAPABILITY_REQUIRED` to the quota banner, so a customer who simply needed a higher plan was told they had run out of something. | `frontend/src/services/api/client402.test.ts` (`CAPABILITY_REQUIRED does not raise the quota banner`) | 3B |
+| F-577 | P1 | **A billing contact was offered "View plans" / "See plans" and "Add GST Credit" where only an owner can buy.** F-192 made the Billing page owner-only for plan, payment method and seats, but the lock dialog, the lock banner, the "View plans" action and four Helm banners still offered the upgrade to the BILLING role, who then arrived at a page that said "Only an organization owner can change the plan". The sale stalled with the person who cannot close it. | `frontend/src/components/billing/upgradeMoments.test.tsx` (role BILLING, 32 surfaces) | 3B |
+| F-578 | P2 | **The server's plan refusal did not name the plans.** `CAPABILITY_REQUIRED` said "is included on higher plans"; the body now carries `included_in` and the message names them ("the Business and Enterprise plans"). | `backend/tests/api/test_upgrade_moments.py::test_the_refusal_for_a_capability_names_the_plans_that_carry_it` (32 capabilities; `KeyError: 'included_in'` before) | 3B |
+| F-579 | P2 | **The 80% usage email led to the top of the Billing page, the 80% banner had no way out (only the 100% banner had "Upgrade"), and nobody was warned that seats were nearly used.** Now: the email goes to the plan picker; the banner has "Upgrade"; owners and administrators are told at four of five seats and when every seat is taken, with "Add seats" (or "Choose a plan" where seats come with the plan). | `backend/tests/services/test_usage_limit_alerts.py` (5 new), `upgradeMoments.test.tsx` (80% banner) | 3B |

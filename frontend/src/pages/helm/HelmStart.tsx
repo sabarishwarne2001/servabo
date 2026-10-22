@@ -19,6 +19,7 @@ import {
   requestHelmBacktest,
 } from "@/services/api/helm";
 import { formatCalendarDate } from "@/utils/displayTime";
+import AskPlanOwners from "@/components/billing/AskPlanOwners";
 
 /**
  * "Explore Helm with a sample company" (brief §10.3), on every plan: an invented Pune distributor
@@ -271,11 +272,13 @@ export const HelmStart: React.FC = () => {
                 Helm is included on the Business and Enterprise plans. On your plan you can explore Helm with a sample company
                 and run one backtest a week, of up to three months, on your own documents.
               </p>
-              {role === "OWNER" || role === "BILLING" ? (
+              {role === "OWNER" ? (
                 <Link to={organizationBillingPath(orgSlug)} className="helm-btn helm-btn-primary helm-btn-hero mt-4">
                   See plans
                 </Link>
-              ) : null}
+              ) : (
+                <AskPlanOwners organizationId={organizationId} toDo="upgrade the plan" className="helm-muted mt-4 block text-sm" />
+              )}
             </div>
           </div>
         </div>

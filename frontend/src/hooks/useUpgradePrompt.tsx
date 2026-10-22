@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import { UpgradePlanDialog } from "@/components/billing/UpgradePlanDialog";
 import { useGrantedCapabilities } from "@/hooks/useGrantedCapabilities";
+import { canManageBilling } from "@/permissions/organizationPermissions";
+import type { OrganizationRole } from "@/types/tenancy";
 import { organizationBillingPath } from "@/routes/tenantPaths";
 import { getOrganizationEntitlements } from "@/services/api/entitlements";
 import { entitlementKeys } from "@/services/api/queryKeys";
@@ -81,7 +83,7 @@ export function useUpgradePrompt(
             : capabilities.plansFor(pending.capability)
           : []
       }
-      canChangePlan={role === "OWNER" || role === "BILLING"}
+      canChangePlan={canManageBilling(role as OrganizationRole)}
       billingPath={organizationBillingPath(organizationSlug)}
       onClose={() => setPending(null)}
       addon={pending?.addonKey ? addonFor(pending.addonKey) : null}

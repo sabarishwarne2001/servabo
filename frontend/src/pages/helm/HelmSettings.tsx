@@ -21,6 +21,7 @@ import {
 } from "@/services/api/helm";
 import { formatCalendarDate, formatNumber } from "@/utils/displayTime";
 import type { ApprovalChainTier, HelmCounterparty, HelmRole, HelmSettings as Settings } from "@/types/helm";
+import AskPlanOwners from "@/components/billing/AskPlanOwners";
 
 const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -404,11 +405,13 @@ const ApprovalChain: React.FC<{ readonly settings: Settings; readonly writable: 
             </ul>
           </div>
         ) : null}
-        {role === "OWNER" || role === "BILLING" ? (
+        {role === "OWNER" ? (
           <Link to={organizationBillingPath(orgSlug)} className="helm-btn helm-btn-primary mt-3">
             See plans
           </Link>
-        ) : null}
+        ) : (
+          <AskPlanOwners organizationId={organizationId} toDo="upgrade the plan" className="helm-muted mt-3 block text-sm" />
+        )}
       </section>
     );
   }

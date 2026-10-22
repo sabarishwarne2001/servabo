@@ -7,6 +7,8 @@ import type { CapabilityKey } from "@/constants/capabilities";
 import { useGrantedCapabilities } from "@/hooks/useGrantedCapabilities";
 import { useOptionalResolvedOrganization } from "@/routes/OrganizationGuard";
 import { useTenant } from "@/hooks/useTenant";
+import { canManageBilling } from "@/permissions/organizationPermissions";
+import type { OrganizationRole } from "@/types/tenancy";
 import { organizationBillingPath } from "@/routes/tenantPaths";
 import AskPlanOwners from "@/components/billing/AskPlanOwners";
 
@@ -38,7 +40,8 @@ export const PlanLockBanner: React.FC<PlanLockBannerProps> = ({ capability, feat
     return null;
   }
   const role = String(organizationRole).toUpperCase();
-  const canChangePlan = role === "OWNER" || role === "BILLING";
+  // Only an owner can change the plan (F-192, F-577): a finance contact sent to the plans page could not buy anything there.
+  const canChangePlan = canManageBilling(role as OrganizationRole);
   return (
     <section
       role="status"

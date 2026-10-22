@@ -566,11 +566,14 @@ apiClient.interceptors.response.use(
     /* ---------------------------------------------------------------- 402 */
 
     if (status === 402) {
-      // ARCH-30 Tranche 3. Two 402s are about what the organization pays for,
+      // ARCH-30 Tranche 3. These 402s are about what the organization pays for,
       // not a usage ceiling. They carry their own message and details for the
       // page that asked, and must not raise the global quota banner.
+      // Final session 1 (3B, F-576): `CAPABILITY_REQUIRED` was missing, so a plan lock reached from a button
+      // (not from the sidebar) told the customer they had run out of quota.
       if (
         parsed.code === "ADDON_REQUIRED" ||
+        parsed.code === "CAPABILITY_REQUIRED" ||
         parsed.code === "BILLING_READ_ONLY" ||
         // Campaign session 2 (N-052): the trial banner and dialog explain it.
         parsed.code === "TRIAL_ENDED"

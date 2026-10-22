@@ -24,6 +24,7 @@ import { HelmMark } from "@/components/helm/ui/HelmMark";
 import { HelmSkeleton } from "@/components/helm/ui/HelmSkeleton";
 import { useSpotlight } from "@/components/helm/ui/useSpotlight";
 import ThemeToggle from "@/components/layout/ThemeToggle";
+import AskPlanOwners from "@/components/billing/AskPlanOwners";
 import OrganizationNotificationBell from "@/components/notification/OrganizationNotificationBell";
 import DunningBanner from "@/components/billing/DunningBanner";
 import TrialBanner from "@/components/billing/TrialBanner";
@@ -167,7 +168,7 @@ const HelmSidebar: React.FC<{ readonly onNavigate?: () => void }> = ({ onNavigat
 };
 
 const PreviewBanner: React.FC = () => {
-  const { access, orgSlug, role } = useHelm();
+  const { access, orgSlug, organizationId, role } = useHelm();
   if (!access.preview) {
     return null;
   }
@@ -178,11 +179,13 @@ const PreviewBanner: React.FC = () => {
         Helm is included on the Business and Enterprise plans. On yours you can explore the sample company and run one
         backtest a week on your own documents.
       </span>
-      {role === "OWNER" || role === "BILLING" ? (
+      {role === "OWNER" ? (
         <Link to={organizationBillingPath(orgSlug)} className="helm-accent font-semibold underline-offset-2 hover:underline">
           See plans
         </Link>
-      ) : null}
+      ) : (
+        <AskPlanOwners organizationId={organizationId} toDo="upgrade the plan" className="helm-muted" />
+      )}
     </div>
   );
 };
