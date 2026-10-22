@@ -198,9 +198,13 @@ export const formatNumber = (
 ): string => (value === null || value === undefined || !Number.isFinite(value) ? fallback : numberFormat(options).format(value));
 
 /**
- * An amount in its own currency, in the person's language: "₹1,234.50",
- * "1.234,50 €". Without a valid ISO currency it is a plain number with two
- * decimals: printing a guessed symbol is worse than printing none (F-172).
+ * An amount in its own currency: "₹12,34,567.50", "1.234,50 €", "$1,234.50". Rupees are always grouped the Indian way
+ * (lakh and crore) whatever the person's language, because that is how a rupee figure is read and said in India; every
+ * other currency is grouped in the person's language with its own symbol. Without a valid ISO currency it is a plain
+ * number with two decimals: printing a guessed symbol is worse than printing none (F-172).
+ *
+ * This is the one place money is formatted (the `check:self` guard "money, one way" refuses a hand-built "INR " + x or
+ * toLocaleString("en-US") anywhere else).
  */
 export const formatMoney = (
   amount: number | null | undefined,
@@ -212,10 +216,15 @@ export const formatMoney = (
     return fallback;
   }
   if (currency && /^[A-Za-z]{3}$/.test(currency)) {
+    const code = currency.toUpperCase();
     try {
-      return numberFormat({ style: "currency", currency: currency.toUpperCase(), ...options }).format(amount);
+      return new Intl.NumberFormat(code === "INR" ? "en-IN" : current.locale, {
+        style: "currency",
+        currency: code,
+        ...options,
+      }).format(amount);
     } catch {
-      // an ISO-shaped code the runtime does not know: a plain number below
+      // an ISO-shaped code the runtime does not know, or a language it refuses: a plain number below
     }
   }
   return numberFormat({ minimumFractionDigits: 2, maximumFractionDigits: 2, ...options }).format(amount);
@@ -305,6 +314,10 @@ export const runDisplayFormatSelfCheck = (): string[] => {
     expect("a number in the person's language", formatNumber(1234.5), "1.234,5");
     expect("money in its own currency", formatMoney(1234.5, "EUR"), /^1\.234,50\s€$/);
     expect("no guessed currency", formatMoney(12, null), "12,00");
+    expect("rupees in lakh and crore grouping, whatever the language", formatMoney(1234567.5, "INR"), "₹12,34,567.50");
+    expect("a crore", formatMoney(123456789, "inr"), "₹12,34,56,789.00");
+    expect("dollars in the person's language", formatMoney(1234567.5, "USD"), /^1\.234\.567,50\s\$$/);
+    expect("an unknown currency code is a plain number, not a guess", formatMoney(1234.5, "ZZZ"), /^1\.234,50/);
     expect("a calendar date in the workspace's format", formatCalendarDate("2026-12-05"), "05/12/2026");
     expect("the workspace's clock when the person has none", formatTimestampTime("2026-01-01T00:00:00Z", { hour: "2-digit", minute: "2-digit" }), "05:30");
     applyDisplayPreferences("Europe/Berlin", "de-DE");
