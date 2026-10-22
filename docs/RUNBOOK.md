@@ -887,7 +887,7 @@ using an old address (ask them to copy the new one). 200 but nothing in the work
 
 ### 9.11 Deleted workspaces and organizations (Final session 1)
 
-Deleting a workspace or an organization archives it; its data is purged later by `servabo-sweep compliance --archived --apply` (nightly):
+Deleting a workspace or an organization archives it; its data is purged later by the nightly `servabo-sweep compliance` line (its `--archived` flag):
 30 days after archiving the documents, files, conversations and settings go (until then **Restore** works); the money records (GST
 books, the Helm ledger, invoices, usage) and the audit trail stay; an organization itself is deleted 72 months after archiving
 (`ARCHIVED_PURGE_GRACE_DAYS`, `ARCHIVED_FINAL_DELETE_MONTHS`; the CGST Act s.36 books period). Look first without changing anything:
