@@ -140,7 +140,7 @@ FINDINGS.md), with these notes:
 - **F-557** (webhook events, warehouse datasets): done in Phase 6 (migration k1a6, docs/product/WEBHOOK-EVENTS.md, `GST_MATCHES` and `HELM_LEDGER`).
 - **F-558, F-559** (zip, email-in), **F-560, F-563** (error tracking, `preflight.py`), **F-561, F-562** (Zoho and Tally, the QR badge): done; each outside
   connection is unverified against the real service (HANDOFF "Final session 1 → Final session 2").
-- **F-564 to F-569** (models, libraries): done. **F-570 to F-572**: done.
+- **F-564 to F-569** (models, libraries): done. **Alembic stays at 1.13.1** (the study proposed 1.20.1): the newer Alembic renders 287 operations of the drift check differently, so moving needs its own session to regenerate `alembic/drift_baseline.txt` with intent. SQLAlchemy 2.0.55 stays; it renders five index lines of the baseline differently, and those five lines were updated (CI's "Migration head & drift" job was red from the library bump until then, F-568). **F-570 to F-572**: done.
 - **F-573** (axe in few specs): done. Specs 72 and 74 walk the page catalogue in light, dark and four widths; spec 132 walks the pages the catalogue
   predates; `routeSweepCoverage.test.ts` fails when a router page is in neither. **F-574** (money guard): done. **F-575** (PRODUCT-NEXT): done.
 - **F-580** (settings that never reached the containers): done.

@@ -2,7 +2,7 @@ aiohappyeyeballs==2.7.1
 aiohttp==3.14.4
 aiosignal==1.4.0
 aistudio-sdk==0.3.8
-alembic==1.20.1
+alembic==1.13.1
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anthropic==0.69.0

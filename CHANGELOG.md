@@ -19,7 +19,7 @@ Findings F-546 to F-605, decisions N-161 to N-184. The study is `docs/hardening/
   every lock names the plan that includes it, only an owner is sent to buy, the 80% usage and seat warnings go to the fix.
 - **Zoho Books Connect and a guided Tally Prime file** (F-561), **the e-invoice QR badge** (F-562), **error tracking** with Sentry or GlitchTip, scrubbed and off by default (F-560),
   and **`scripts/preflight.py`**: one command that says whether a setup is ready, with `--send-test-email` and `--send-test-error` (F-563).
-- **Models and libraries** (F-564 to F-569): current model lists and a plain sentence for a retired model, Pillow 13, pypdf, certifi, SQLAlchemy, Alembic, pydantic; `google-generativeai` removed.
+- **Models and libraries** (F-564 to F-569): current model lists and a plain sentence for a retired model, Pillow 13, pypdf, certifi, SQLAlchemy 2.0.55, pydantic (Alembic stays at 1.13.1: 1.20 changes the drift check's output); `google-generativeai` removed.
 - **Public webhook events** `gst.return.imported`, `gst.invoice.at_risk`, `gst.supplier.not_reported`, `automation.run.failed`, `automation.run.held` (F-557; migration k1a6; `docs/product/WEBHOOK-EVENTS.md`),
   **warehouse datasets** `GST_MATCHES` and `HELM_LEDGER` for Enterprise, and **document packs that do what they promise** (F-408; migration k1a7): enabling a pack proposes its checks under
   Clause assertions, one click each, and the Redact menu offers the pack's profile first.
