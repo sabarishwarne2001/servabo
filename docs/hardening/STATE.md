@@ -2,7 +2,7 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-22 (Final session 1 started)_
+_Last updated: 2026-10-22 (Final session 1, Phase 1 done)_
 
 ## Current phase — Final session 1 (2026-10-22)
 Branch `claude/focused-planck-g9363e` (the session's assigned branch; CLAUDE.md says `hardening/<topic>`, the brief says "use the assigned branch", so the assigned
@@ -11,12 +11,12 @@ findings from **F-546**, browser specs from **118**. **If cut off, type `continu
 Local stack this session: Postgres 16 (apt) on :5434 with pgvector 0.8.0 (files from the PyPI wheel `pixeltable-pgserver==0.3.0`, data dir `/var/lib/pgtest`), Redis,
 backend venv Python 3.12 and `npm ci` in the session scratchpad. The test environment block is `testenv.sh` in the scratchpad (outside the repo).
 
-- [ ] 0. Start-up: docs and code read; stack; this checklist; draft PR
-- [ ] 0b. Phase 0: `docs/hardening/UPGRADE-AUDIT.md` (the study) and its ranked list
-- [ ] 1A. Data lifecycle: one registry (`data_map.py`) and a test that keeps it complete; erasure, sweep, deletion and the tenant export follow it
-- [ ] 1B. Outdated AI models: suggested models, price book, BigQuery map, default platform model, `google-generativeai` removed, retired-model message
-- [ ] 1C. Libraries: Pillow 13 (or the blocker recorded), safe-now upgrades, pip-audit
-- [ ] 1D. Session J's leftovers: GST trigger upgrade dialog, lakh grouping in run history, `{{trigger.local_date}}`, e2e `dist` folder per run
+- [x] 0. Start-up: docs and code read; stack; this checklist; draft PR #37
+- [x] 0b. Phase 0: `docs/hardening/UPGRADE-AUDIT.md` (the study) and its ranked list
+- [x] 1A. Data lifecycle: one registry (`data_map.py`) and a test that keeps it complete; erasure, sweep, deletion and the tenant export follow it
+- [x] 1B. Outdated AI models: suggested models, price book, BigQuery map, default platform model, `google-generativeai` removed, retired-model message
+- [x] 1C. Libraries: Pillow 13 (or the blocker recorded), safe-now upgrades, pip-audit
+- [x] 1D. Session J's leftovers: GST trigger upgrade dialog, lakh grouping in run history, `{{trigger.local_date}}`, e2e `dist` folder per run
 - [ ] 2A. Zip upload (spec 118)
 - [ ] 2B. Email-in through Postmark inbound (spec 119)
 - [ ] 2C. Getting started: "first money found"
