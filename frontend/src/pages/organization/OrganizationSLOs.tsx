@@ -18,6 +18,7 @@ import {
   getOrganizationSLOs,
   setOrganizationSLO,
 } from "@/services/api/slos";
+import { ApiError } from "@/services/api/client";
 import { errorMessage } from "@/services/api/errors";
 import { sloKeys } from "@/services/api/queryKeys";
 import { useResolvedOrganization } from "@/routes/OrganizationGuard";
@@ -237,7 +238,11 @@ const SLORow: React.FC<{
 
           {save.isError ? (
             <p role="alert" className="w-full text-xs text-destructive">
-              That target was rejected. Ratios must be between 0 and 1.
+              {save.error instanceof ApiError && save.error.status === 422
+                ? entry.target.unit === "RATIO"
+                  ? "That target was not saved. Enter a proportion between 0 and 1: 99.9% is 0.999."
+                  : "That target was not saved. Enter a positive number of milliseconds."
+                : errorMessage(save.error, "That target was not saved.")}
             </p>
           ) : null}
         </div>
