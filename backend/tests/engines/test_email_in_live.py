@@ -28,6 +28,9 @@ from tests.fakes import fake_postmark_inbound as pm
 
 SENDER = "ap@supplier.example"
 
+#: The collections this module proves isolated with its own assertions (tests/isolation/test_structural_invariants.py).
+ISOLATION_PROVEN_HERE = ("inbound-email",)
+
 
 def _pdf(number: str = "INV-5001") -> bytes:
     return make_pdf([[f"TAX INVOICE {number}", "Vendor: Sahyadri Packaging", "Total Amount Due: 1000.00 INR"]])
@@ -398,3 +401,46 @@ def test_nothing_in_the_logs_names_the_sender_the_token_the_credential_or_the_at
     extras = " ".join(str(v) for r in caplog.records for k, v in r.__dict__.items() if k not in {"msg", "args", "message"})
     for secret in (SENDER, token, pm.DEFAULT_PASSWORD, "wrong-password-guess", "secret-invoice-name", "Private subject line"):
         assert secret not in text and secret not in extras, f"{secret!r} reached a log line"
+
+
+def test_a_workspace_sees_nothing_of_another_workspaces_email_in_not_in_its_organization_and_not_in_another_one(mail) -> None:
+    """Workspace A has an address, an allowed sender and a held message. A second workspace of the same organization (B), and a workspace
+    of another organization, see none of it, cannot act on it, and mail sent to B's own address lands in B alone."""
+    import uuid
+
+    mail.allow("allowed.example")
+    mail.send(pm.attachment("a.pdf", _pdf()), sender="stranger@elsewhere.example")
+    mine = mail.view()
+    assert mine["senders"] and mine["messages"], "workspace A has something to protect"
+    sender_id, message_id = mine["senders"][0]["id"], mine["messages"][0]["id"]
+    owner = mail.e.tenant.owner.headers
+
+    created = mail.e.post("/workspaces", {"workspace_name": f"Mail B {uuid.uuid4().hex[:6]}"}, org=True)
+    assert created.status_code == 201, created.text
+    b_id = created.json()["id"]
+    b_base = f"/api/v1/workspaces/{b_id}/inbound-email"
+    theirs = mail.e.client.get(b_base, headers=owner)
+    assert theirs.status_code == 200, theirs.text
+    body = theirs.json()
+    assert body["address"] != mine["address"], "every workspace has its own address"
+    assert body["senders"] == [] and body["messages"] == [], "B lists none of A's senders or messages"
+    assert sender_id not in theirs.text and message_id not in theirs.text
+
+    # A's objects through B's URLs, and through another organization's workspace: refused, and nothing changes.
+    foreign_base = f"/api/v1/workspaces/{mail.e.tenant.foreign_workspace.id}/inbound-email"
+    for base in (b_base, foreign_base):
+        assert mail.e.client.post(f"{base}/messages/{message_id}/approve", headers=owner).status_code in (403, 404), base
+        assert mail.e.client.post(f"{base}/messages/{message_id}/discard", headers=owner).status_code in (403, 404), base
+        assert mail.e.client.delete(f"{base}/senders/{sender_id}", headers=owner).status_code in (403, 404), base
+    assert mail.e.client.get(foreign_base, headers=owner).status_code in (403, 404), "another organization's workspace is not readable at all"
+    after = mail.view()
+    assert [m["id"] for m in after["messages"]] == [message_id] and [x["id"] for x in after["senders"]] == [sender_id]
+    assert after["messages"][0]["status"] == mine["messages"][0]["status"], "the held message was neither approved nor discarded"
+
+    # Mail to B's own address belongs to B alone.
+    mail.allow(SENDER)  # A allows SENDER; B does not
+    sent = mail.send(pm.attachment("b.pdf", _pdf("INV-B")), address=body["address"], sender=SENDER)
+    assert sent.status_code == 200, sent.text
+    b_after = mail.e.client.get(b_base, headers=owner).json()
+    assert len(b_after["messages"]) == 1, "the message arrived in B"
+    assert len(mail.view()["messages"]) == 1, "and A's list did not grow"
