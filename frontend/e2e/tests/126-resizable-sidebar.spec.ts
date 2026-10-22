@@ -161,7 +161,7 @@ test("on a phone the navigation drawer has the divider, and a finger can drag it
     if (!box) throw new Error("the divider has no box");
     const x = box.x + box.width / 2;
     const y = box.y + 200;
-    const touch = async (type: string, at: number) =>
+    const touch = async (type: "touchStart" | "touchMove" | "touchEnd", at: number) =>
       cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x: at, y }] });
     await touch("touchStart", x);
     await touch("touchMove", x + 40);

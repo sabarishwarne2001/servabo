@@ -155,7 +155,7 @@ test.describe("Service levels", () => {
     await expectHealthyPage(page);
   });
 
-  test("below Enterprise the levels are readable and the target cannot be changed; a member cannot open the tab", async ({ page, browser }) => {
+  test("below Enterprise the levels are readable and the target cannot be changed", async ({ page }) => {
     test.setTimeout(180_000);
     const customer = await newCustomer("orgslo2", "Slo Free Ltd");
     await signInAs(page, customer.email);
