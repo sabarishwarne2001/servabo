@@ -139,7 +139,7 @@ if ! port_busy "$ZOHO_PORT"; then
 fi
 export E2E_ZOHO_URL="http://127.0.0.1:$ZOHO_PORT"
 export ZOHO_CLIENT_ID="1000.E2EAPPCLIENT" ZOHO_CLIENT_SECRET="e2e-zoho-secret-0123456789abcdef"
-export ZOHO_REDIRECT_URI="http://127.0.0.1:$API_PORT/api/v1/public/erp/zoho/callback"
+export ZOHO_REDIRECT_URI="http://127.0.0.1:$API_PORT/api/v1/erp/zoho/callback"
 export ZOHO_ACCOUNTS_URL_OVERRIDE="$E2E_ZOHO_URL" ZOHO_API_URL_OVERRIDE="$E2E_ZOHO_URL"
 
 nohup "$PY" -m uvicorn app.main:app --host 127.0.0.1 --port "$API_PORT" >"$LOG_DIR/api.log" 2>&1 &

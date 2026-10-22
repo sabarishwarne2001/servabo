@@ -4620,7 +4620,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/public/inbound/postmark": {
+    "/api/v1/inbound/postmark": {
         parameters: {
             query?: never;
             header?: never;
@@ -4630,7 +4630,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Postmark Inbound */
-        post: operations["postmark_inbound_api_v1_public_inbound_postmark_post"];
+        post: operations["postmark_inbound_api_v1_inbound_postmark_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -37166,7 +37166,7 @@ export interface operations {
             };
         };
     };
-    postmark_inbound_api_v1_public_inbound_postmark_post: {
+    postmark_inbound_api_v1_inbound_postmark_post: {
         parameters: {
             query?: never;
             header?: never;

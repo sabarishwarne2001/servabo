@@ -41,7 +41,7 @@ def environment() -> dict[str, str]:
     values.update({
         "WEBSITE_URL": "https://servabo.app", "S3_ENDPOINT_URL": "https://acc123.eu.r2.cloudflarestorage.com", "STORAGE_BACKEND": "r2",
         "PLATFORM_SMTP_USERNAME": "postmark-user", "BILLING_GATEWAY": "DODO", "DODO_LIVEMODE": "false", "DODO_API_BASE": dodo_setup.TEST_HOST,
-        "ZOHO_CLIENT_ID": "1000.ABCDEFGHIJKLMN", "ZOHO_REDIRECT_URI": "https://app.example.com/api/v1/public/erp/zoho/callback",
+        "ZOHO_CLIENT_ID": "1000.ABCDEFGHIJKLMN", "ZOHO_REDIRECT_URI": "https://app.example.com/api/v1/erp/zoho/callback",
         "POSTMARK_INBOUND_WEBHOOK_USER": "pm", "POSTMARK_INBOUND_HASH": "abc123hash", "SENTRY_DSN": "https://publickey@o1.ingest.de.sentry.io/1",
     })
     for item in dodo_setup.wanted_products():

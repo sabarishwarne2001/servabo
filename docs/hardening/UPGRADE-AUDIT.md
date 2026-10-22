@@ -162,3 +162,11 @@ FINDINGS.md), with these notes:
   match; scoped to the person's workspaces and grants; a plan that does not open the GST lists shows no GST result.
 - **The website** says in one honest line each what zip upload, email-in, the GST Monday email and the Zoho Books and Tally connections do; all 44
   screenshots were retaken from the demo company (41 look different: new logo, resizable sidebar, rupee grouping).
+
+## Found by CI after the PR was ready
+
+| # | Sev | Finding | Proof | Fixed in |
+| --- | --- | --- | --- | --- |
+| F-606 | P1 | **The Postmark inbound webhook and Zoho's callback were mounted under `/api/v1/public/`**, the namespace of the API-key gateway (its own rate limit and scopes), which `test_no_gateway_route_is_registered_as_public` exists to keep clear. Moved to `/api/v1/inbound/postmark` and `/api/v1/erp/zoho/callback` (N-185). | pytest shard 1 on CI failed; passes after; browser specs 119 and 122 pass | this commit |
+| F-607 | P1 | **CI's "Migration head & drift" was red from the library bump** (my model for `erp_oauth_states` also lacked what its migration created). See "Status at the end of Final session 1". | `check_migration_drift.py` | `65c1cda` |
+

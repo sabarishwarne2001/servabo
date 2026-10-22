@@ -3,7 +3,7 @@ gates on the ERP posting capability, and turns the service's answers into status
 
     GET  /workspaces/{wid}/erp/zoho                                      what can be connected, and what is        [VIEWER]
     POST /workspaces/{wid}/erp/zoho/connect                               the address of Zoho's consent screen     [ADMIN]
-    GET  /public/erp/zoho/callback                                        Zoho sends the browser back here          [signed state]
+    GET  /erp/zoho/callback                                        Zoho sends the browser back here          [signed state]
     GET  /workspaces/{wid}/erp/targets/{tid}/zoho/organizations           the Zoho organizations to choose from    [ADMIN]
     POST /workspaces/{wid}/erp/targets/{tid}/zoho/organization            choose one                               [ADMIN]
     POST /workspaces/{wid}/erp/targets/{tid}/zoho/check                   does the saved sign-in still work?       [ADMIN]
@@ -115,7 +115,7 @@ def _back(db: Session, workspace_id: Optional[uuid.UUID], **params: str) -> Redi
     return RedirectResponse(f"{base}{path or '/'}?{urlencode({k: val for k, val in params.items() if val})}", status_code=302)
 
 
-@router.get("/public/erp/zoho/callback", include_in_schema=False)
+@router.get("/erp/zoho/callback", include_in_schema=False)
 def callback(code: Optional[str] = Query(default=None, max_length=2000), state: Optional[str] = Query(default=None, max_length=4000),
              location: Optional[str] = Query(default=None, max_length=16), error: Optional[str] = Query(default=None, max_length=100),
              db: Session = Depends(get_db)) -> RedirectResponse:

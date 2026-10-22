@@ -1,6 +1,6 @@
 """Postmark's inbound webhook (Final session 1, 2B). No account: the credential is HTTP basic auth, the way Postmark documents.
 
-    POST /api/v1/public/inbound/postmark
+    POST /api/v1/inbound/postmark
 
 Registered in `app/core/public_route_registry.PUBLIC_ROUTES`. Everything the service decides is in
 `app/services/inbound_email/service.py` (the answers and why are listed at the top of that file). This module only
@@ -64,7 +64,7 @@ def _process(db: Session, parsed: service.Parsed) -> dict[str, Any]:
     return {"status": outcome.status, "documents": outcome.documents, "hold": outcome.hold_code}
 
 
-@router.post("/public/inbound/postmark")
+@router.post("/inbound/postmark")
 async def postmark_inbound(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
     if not service.is_enabled():
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found.")

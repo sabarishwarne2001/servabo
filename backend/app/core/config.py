@@ -558,7 +558,7 @@ class Settings(BaseSettings):
 
     # ---- Email-in (Final session 1, 2B): documents forwarded to a workspace's own address ---------------------------
     #: Postmark's inbound webhook is secured with HTTP basic auth in its URL
-    #: (https://user:password@api.example.com/api/v1/public/inbound/postmark); Postmark does not sign inbound payloads.
+    #: (https://user:password@api.example.com/api/v1/inbound/postmark); Postmark does not sign inbound payloads.
     #: Both empty = email-in is off (the route answers 404 and the settings page says how to switch it on).
     POSTMARK_INBOUND_WEBHOOK_USER: str = ""
     POSTMARK_INBOUND_WEBHOOK_PASSWORD: Optional[SecretStr] = None
@@ -591,7 +591,7 @@ class Settings(BaseSettings):
     #: Zoho Books "Connect" (Final session 1, 3C). Register ONE server-based application in Zoho's API console
     #: (api-console.zoho.in) and put its Client ID and Secret here; leave both empty and the "Connect Zoho Books" button says it
     #: is not set up on this deployment. `ZOHO_REDIRECT_URI` is the address Zoho sends the customer back to, registered in the
-    #: console exactly as written: `<API address>/api/v1/public/erp/zoho/callback`.
+    #: console exactly as written: `<API address>/api/v1/erp/zoho/callback`.
     ZOHO_CLIENT_ID: str = ""
     ZOHO_CLIENT_SECRET: Optional[SecretStr] = None
     ZOHO_REDIRECT_URI: str = ""

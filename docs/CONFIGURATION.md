@@ -176,7 +176,7 @@ guard), and the comment written above it in the code.
 | `BRANDING_MAX_FAVICON_BYTES` | `int` | `512 * 1024` | — |  |
 | `BRANDING_MAX_IMAGE_DIMENSION` | `int` | `2048` | — |  |
 | `COMPLIANCE_EXPORT_TTL_HOURS` | `int` | `72` | — | How long a generated DPA archive stays downloadable. |
-| `POSTMARK_INBOUND_WEBHOOK_USER` | `str` | `''` | example, production | Postmark's inbound webhook is secured with HTTP basic auth in its URL (https://user:password@api.example.com/api/v1/public/inbound/postmark); Postmark does not sign inbound payloads. Both empty = email-in is off (the ro… |
+| `POSTMARK_INBOUND_WEBHOOK_USER` | `str` | `''` | example, production | Postmark's inbound webhook is secured with HTTP basic auth in its URL (https://user:password@api.example.com/api/v1/inbound/postmark); Postmark does not sign inbound payloads. Both empty = email-in is off (the route ans… |
 | `POSTMARK_INBOUND_WEBHOOK_PASSWORD` | `Optional[SecretStr]` | `None` | example, production |  |
 | `POSTMARK_INBOUND_HASH` | `str` | `''` | example, production | Your Postmark inbound server's hash: the part before the `+` in `<hash>+<workspace-token>@inbound.postmarkapp.com`. Used until you have a domain. |
 | `INBOUND_EMAIL_DOMAIN` | `str` | `''` | example, production | Once you own a domain (MX record for `in.<domain>` pointed at Postmark): the addresses become `<workspace-token>@<INBOUND_EMAIL_DOMAIN>`. Empty keeps the `inbound.postmarkapp.com` form. |

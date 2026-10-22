@@ -857,7 +857,7 @@ receives the mail and calls Servabo's webhook. **Nothing here works until you do
    ```
    then `$COMPOSE up -d web`. (Optional: `POSTMARK_INBOUND_ALLOWED_IPS` with the addresses Postmark delivers from, if you want that check too.)
 3. In Postmark, the inbound server's settings, **Webhook** field:
-   `https://postmark:<the long random value>@app.servabo.app/api/v1/public/inbound/postmark`
+   `https://postmark:<the long random value>@app.servabo.app/api/v1/inbound/postmark`
    (Postmark does not sign inbound messages; it documents HTTP basic auth in the URL, over HTTPS only. The route compares both parts in
    constant time and never prints them.) Use Postmark's "Check" button: it must say the webhook answered 200 or 403, not 401 or 404.
 4. Open any workspace → Settings → Email-in: the address (`<hash>+<long token>@inbound.postmarkapp.com`) is shown with a copy button.
@@ -902,7 +902,7 @@ test clock, in a development install: `python scripts/e2e_stand_in.py run-job --
 ignored in production). A person turns the whole thing off under Notifications → "GST credit".
 
 **Zoho Books Connect.** In Zoho's API console (api-console.zoho.in) create a *Server-based Application*; set its authorized redirect URI to
-`<your API address>/api/v1/public/erp/zoho/callback`, and put the Client ID, Client Secret and that same URI in `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`,
+`<your API address>/api/v1/erp/zoho/callback`, and put the Client ID, Client Secret and that same URI in `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`,
 `ZOHO_REDIRECT_URI`. Restart the API. Until all three are set the Connect button says the sign-in is not set up. Customers then use ERP posting →
 Connect your books. If a customer reports "Reconnect Zoho Books", Zoho no longer accepts their saved sign-in (they removed the app, or changed their
 password policy): they press Reconnect and waiting postings are sent again by themselves. `ZOHO_ACCOUNTS_URL_OVERRIDE` and `ZOHO_API_URL_OVERRIDE` are for the

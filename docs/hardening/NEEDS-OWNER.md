@@ -2443,3 +2443,9 @@ the contributor role or higher. Text is matched literally (a `%` finds nothing).
 
 A refusal (a 4xx) shows the server's own sentence; a fault (a 5xx) shows a plain fallback line (the details go to error tracking, not the screen); a validation
 failure becomes one sentence naming the field in words. No screen shows `error.message` raw; `check:self` fails a new one.
+
+## N-185 — Where the Postmark and Zoho addresses live (DECIDED (Final 1))
+
+The email-in webhook and Zoho's sign-in return address are **`/api/v1/inbound/postmark`** and **`/api/v1/erp/zoho/callback`**. They first sat under `/api/v1/public/`, which is reserved for the
+API-key gateway (its own rate limits and scopes) and which a test forbids anything else to use. Nothing had been set up at Postmark or Zoho yet, so no address needs changing for a customer: when you
+do the setup in Final session 2, use these paths (RUNBOOK 9.10 and 9.12, `.env.example`).

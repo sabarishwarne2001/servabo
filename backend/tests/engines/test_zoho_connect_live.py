@@ -26,7 +26,7 @@ from app.services.erp import zoho
 from tests.engines.conftest import Engines
 from tests.fakes.fake_zoho import FakeZoho
 
-CALLBACK = "http://testserver/api/v1/public/erp/zoho/callback"
+CALLBACK = "http://testserver/api/v1/erp/zoho/callback"
 
 
 @pytest.fixture()
@@ -65,7 +65,7 @@ def zo(engines: Engines, fake: FakeZoho, monkeypatch: pytest.MonkeyPatch):
             parts = urlsplit(redirect)
             query = {k: v[0] for k, v in parse_qs(parts.query).items()}
             query.update(override)
-            return engines.client.get("/api/v1/public/erp/zoho/callback", params=query, follow_redirects=False)
+            return engines.client.get("/api/v1/erp/zoho/callback", params=query, follow_redirects=False)
 
         @classmethod
         def sign_in(cls, dc: str = "IN"):
@@ -200,7 +200,7 @@ def zoho_past():
 def test_a_denied_consent_comes_back_with_a_short_reason(zo):
     location = zo.consent(zo.connect().json()["authorize_url"])
     state = parse_qs(urlsplit(location).query)["state"][0]
-    response = zo.e.client.get("/api/v1/public/erp/zoho/callback", params={"error": "access_denied", "state": state}, follow_redirects=False)
+    response = zo.e.client.get("/api/v1/erp/zoho/callback", params={"error": "access_denied", "state": state}, follow_redirects=False)
     assert _where(response)[0] == {"zoho": "error", "reason": "DENIED"}
     assert zo.targets() == []
 

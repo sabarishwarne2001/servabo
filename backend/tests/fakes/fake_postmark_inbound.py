@@ -17,7 +17,7 @@ from typing import Any, Mapping, Optional, Sequence
 DEFAULT_USER = "postmark-inbound"
 DEFAULT_PASSWORD = "e2e-inbound-password-0123456789abcdef"
 DEFAULT_HASH = "e2einboundhash0123456789abcdef"
-PATH = "/api/v1/public/inbound/postmark"
+PATH = "/api/v1/inbound/postmark"
 
 
 def attachment(name: str, data: bytes, content_type: str = "application/pdf", *, content_id: str = "") -> dict[str, Any]:

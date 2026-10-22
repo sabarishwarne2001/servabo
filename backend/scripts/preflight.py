@@ -326,9 +326,9 @@ def check_features(report: Report, s: Any, online: bool) -> None:
     if not any(zoho):
         report.add(g, "Zoho Books", SKIPPED, "off", "Optional. See RUNBOOK §9.12.")
     elif all(zoho):
-        uri_ok = s.ZOHO_REDIRECT_URI.endswith("/api/v1/public/erp/zoho/callback")
+        uri_ok = s.ZOHO_REDIRECT_URI.endswith("/api/v1/erp/zoho/callback")
         report.add(g, "Zoho Books", OK if uri_ok else WRONG, f"client {tail(s.ZOHO_CLIENT_ID)}",
-                   "" if uri_ok else "ZOHO_REDIRECT_URI must end /api/v1/public/erp/zoho/callback, exactly as registered at Zoho.", "api-console.zoho.in")
+                   "" if uri_ok else "ZOHO_REDIRECT_URI must end /api/v1/erp/zoho/callback, exactly as registered at Zoho.", "api-console.zoho.in")
     else:
         report.add(g, "Zoho Books", WRONG, "half set", "Set all of ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REDIRECT_URI, or none.", ".env")
     from app.core.error_tracking import ingest_host
