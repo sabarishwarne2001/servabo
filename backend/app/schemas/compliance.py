@@ -8,7 +8,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models.compliance import AUDIT_RETENTION_FLOOR_DAYS, MINIMUM_RETENTION_DAYS
+from app.models.compliance import AUDIT_RETENTION_FLOOR_DAYS, MAXIMUM_RETENTION_DAYS, MINIMUM_RETENTION_DAYS
 
 DataResidencyRegion = Literal["US", "EU", "APAC", "GLOBAL"]
 
@@ -94,11 +94,12 @@ class RetentionPolicyUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     work_item_retention_days: Optional[int] = Field(
-        default=None, ge=MINIMUM_RETENTION_DAYS
+        default=None, ge=MINIMUM_RETENTION_DAYS, le=MAXIMUM_RETENTION_DAYS
     )
     audit_retention_days: Optional[int] = Field(
         default=None,
         ge=AUDIT_RETENTION_FLOOR_DAYS,
+        le=MAXIMUM_RETENTION_DAYS,
         description=(
             f"Floored at {AUDIT_RETENTION_FLOOR_DAYS}. ARCH-07's audit "
             f"immutability trigger refuses DELETE below that age regardless "
@@ -107,7 +108,7 @@ class RetentionPolicyUpdate(BaseModel):
         ),
     )
     conversation_retention_days: Optional[int] = Field(
-        default=None, ge=MINIMUM_RETENTION_DAYS
+        default=None, ge=MINIMUM_RETENTION_DAYS, le=MAXIMUM_RETENTION_DAYS
     )
     auto_purge_enabled: bool = Field(
         default=False,

@@ -52,6 +52,9 @@ TERMINAL_EXPORT_STATUSES: frozenset[str] = frozenset(
 
 AUDIT_RETENTION_FLOOR_DAYS: int = 400
 MINIMUM_RETENTION_DAYS: int = 30
+#: One hundred years. A larger number was accepted by the form and then failed inside the database (an integer
+#: out of range, a server error); no retention policy means more than this.
+MAXIMUM_RETENTION_DAYS: int = 36_500
 ERASED_EMAIL_DOMAIN: str = "erased.invalid"
 
 _REGION_IN = ", ".join(f"'{v}'" for v in DATA_RESIDENCY_REGION_VALUES)
