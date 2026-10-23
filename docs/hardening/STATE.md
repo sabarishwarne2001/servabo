@@ -7,7 +7,7 @@ _Last updated: 2026-10-22 (Final session 1 finished; next: Final session 2 on th
 ## Current phase — Final session 2 on the owner's PC (next)
 **Next action: Final session 2 on the owner's PC** (`docs/sessions/FINAL-2-LIVE.md`; the owner's guide `docs/FINAL-SESSIONS.md`). It trusts the hand-over in `docs/hardening/HANDOFF.md`
 "Final session 1 → Final session 2" (a table of every outside connection to try for real, the commands, what was not reached, what is unverified). Before it starts: the owner merges
-PR #37 once CI is green, and prepares what `docs/FINAL-SESSIONS.md` §4 lists. Findings continue from **F-606**, decisions from **N-185**, browser specs from **135**.
+PR #37 once CI is green, and prepares what `docs/FINAL-SESSIONS.md` §4 lists. Findings continue from **F-619** (F-606 to F-618 are in `UPGRADE-AUDIT.md`; `FINDINGS.md` carries F-546 to F-605), decisions from **N-186**, browser specs from **135**.
 - [ ] Final session 2 (the owner's PC): everything for real; results in `docs/hardening/LIVE-VERIFICATION.md`
 - [ ] The owner launch checklist (HANDOFF), from step 1
 
@@ -37,7 +37,8 @@ backend venv Python 3.12 and `npm ci` in the session scratchpad. The test enviro
 - [x] 6. Public webhook events (migration k1a6), warehouse datasets (GST matches, Helm ledger), document packs that do everything they promise (migration k1a7)
 - [x] 7. `PRODUCT-NEXT.md` rewritten; HANDOFF "Final session 1 → Final session 2"; records (UPGRADE-AUDIT, FINDINGS F-546 to F-605, COVERAGE, NEEDS-OWNER N-176 to N-184, CHANGELOG, RUNBOOK, CONFIGURATION)
 - [x] 8. Added mid-session by the owner: Organization console tabs tested end to end (17 tabs, backend tests and specs 127 to 131, 19 defects fixed), resizable sidebars everywhere (spec 126), the new Servabo logo and a default workspace logo (spec 125)
-- [ ] Finish: all suites on the ready PR's CI, `campaign_slices.py --check all` (0 open rows: run locally), one Alembic head `k1a7_pack_check_dismissals` (up, down, up run locally for k1a6; CI runs all), PR ready, CI green (see the last line of this section)
+- [x] Finish: all suites on the ready PR's CI, `campaign_slices.py --check all` (0 open rows: run locally), one Alembic head `k1a7_pack_check_dismissals` (up, down, up run locally for k1a6; CI runs all), PR ready, CI green: **GitHub Actions run 39895654498 on head `2666ea0`, all 11 jobs green** (four backend shards, browser tests, Frontend, Website, migration head and drift, encoding, pip-audit)
+- CI took several rounds to get there; each red was a real cause, fixed and recorded as F-606 to F-618 in `UPGRADE-AUDIT.md`: two routes inside the API-key namespace, missing isolation proofs, migration drift, a second crontab line, rupee text and a label that specs still expected the old way, a purge deleting chunks without the workspace condition, two defects found by the browser suite (the autonomy confirmation, search results on an open Invoices tab), and three test races (midnight, an invitation revoke, the live-review websocket close) now made deterministic
 
 ## Current phase — Plan change: the two final sessions (2026-10-22)
 Branch `hardening/final-two-sessions`, based on `main` at `3b2a7e2` (PR #35 merged; `main` run #417 green, only the advisory
