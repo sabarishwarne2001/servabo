@@ -268,7 +268,11 @@ test.describe("Members", () => {
     expect(held).toBe(seatsBefore + 1);
     // The same address twice is refused, not duplicated.
     await panel.getByRole("textbox", { name: "Email address" }).fill(invitee);
+    // Wait for the server's answer to the second send before going on: the count below is already 1 before it arrives, and a
+    // revoke that reached the server first would let the second send create a new pending invitation.
+    const answered = page.waitForResponse((r) => r.request().method() === "POST" && /\/invitations(\?|$)/.test(r.url()));
     await panel.getByRole("button", { name: "Send invitation" }).click();
+    await answered;
     await expect(panel.getByRole("list", { name: "Pending invitations" }).getByRole("listitem").filter({ hasText: invitee })).toHaveCount(1);
     await pending.getByRole("button", { name: `Revoke the invitation to ${invitee}` }).click();
     await expect(pending).toHaveCount(0, { timeout: 15_000 });
