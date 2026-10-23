@@ -1,10 +1,14 @@
-# Final session 2: everything, for real, on your own PC
+# Final session 2B: everything, for real, on your own PC
+
+> **Do not run this yet.** Final session 2A (`docs/sessions/FINAL-2-UPGRADE.md`) runs first and **rewrites this prompt** so it
+> matches what exists after it: the rupee prices and Dodo products, the safety-job alerts, the prompt-injection documents, the
+> accuracy report and, if built, the Resolution layer. Its hand-over is HANDOFF "Final session 2A → Final session 2B".
 
 | | |
 | --- | --- |
 | **Where** | **Claude Code in VS Code on your own Windows PC**, in your `servabo` folder. Not the cloud: only your PC can reach Dodo, Postmark, Zoho, Sentry and Gmail, and run the real OCR and AI models. |
 | **Model / effort** | **Sonnet 5.5, High.** If one defect resists three attempts, switch to **Opus 5.5** for that defect (type `/model`), then switch back. |
-| **Before you start** | Final session 1 merged and **CI green on `main`** · `git pull` on `main` · Docker Desktop running · the preparation list in `docs/FINAL-SESSIONS.md` §4 done |
+| **Before you start** | Final sessions 1 and 2A merged and **CI green on `main`** · `git pull` on `main` · Docker Desktop running · the preparation list in `docs/FINAL-SESSIONS.md` §4 done |
 | **Replaces** | The old "Session D" (real Dodo, real GST files, real AI and OCR). It now covers the whole product. |
 | **You will be needed** | On and off, for about four to six hours in total. Block 1 is about 1 hour at the start (accounts and keys into `.env`). Then short moments: a click in a checkout, a photo, reading an email on your phone, a "yes" to a command. The session tells you each time exactly what to do. |
 | **External cost** | Zero. Free plans and Dodo **Test Mode** only. No real money moves. |
