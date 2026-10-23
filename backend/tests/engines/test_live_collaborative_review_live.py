@@ -19,6 +19,7 @@ an Enterprise workspace with two documents held for review:
 from __future__ import annotations
 
 import json
+import time
 from typing import Any, Callable
 
 import anyio
@@ -66,6 +67,24 @@ def _until(ws: Any, kind: str, match: Callable[[dict], bool] = lambda m: True, f
             return message
         seen.append(message["type"])
     raise AssertionError(f"no {kind} frame; saw {seen}")
+
+
+def _hub_has_let_go(engines: Engines, seconds: float = 10.0) -> None:
+    """Wait until the hub holds no connection of this workspace.
+
+    The test client cancels the server's handler the moment its `with` block ends. A handler that is still giving its leases
+    back and taking its avatar down at that moment is cancelled in the middle of it, and the cancellation comes out of the
+    `with` as a CancelledError, after every assertion has passed (CI, and here under CPU load, about one run in four).
+    Closing the channel and waiting for the hub to let go makes the end of the test the same on a slow machine as on a fast one.
+    """
+    from app.services.collab import hub as hub_module
+
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if not hub_module.get_hub().connections.get(str(engines.ws)):
+            return
+        time.sleep(0.05)
+    raise AssertionError(f"the hub still holds a connection of the workspace {seconds:.0f} seconds after the channel was closed")
 
 
 def _viewing(user_id: str, item_id: str | None) -> Callable[[dict], bool]:
@@ -153,3 +172,5 @@ def test_two_reviewers_share_one_queue_live(engines: Engines) -> None:
         assert taken["ok"] is True, taken
         # A workspace someone no longer belongs to reads as not found to them, as on every route.
         assert engines.get("/review/collab/state", as_user=contributor).status_code == 404
+        a.close(1000)
+        _hub_has_let_go(engines)
