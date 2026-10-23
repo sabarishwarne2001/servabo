@@ -145,8 +145,11 @@ def test_a_ledger_that_is_a_day_old_is_not_drift(db_session, tenant, book) -> No
     nightly = _Nightly(db, tenant)
     assert nightly.run() == {"rebuilt": 1}
     assert nightly.alerts() == []
-    assert nightly.state().as_of == TODAY
-    assert stored(db, tenant.workspace.id) == recomputed(db, tenant.workspace.id, TODAY)
+    # The nightly build uses the date it runs on. TODAY was fixed when this file was imported, so a run that crosses
+    # midnight (CI shards take about 40 minutes) would compare against yesterday.
+    tonight = date.today()
+    assert nightly.state().as_of == tonight
+    assert stored(db, tenant.workspace.id) == recomputed(db, tenant.workspace.id, tonight)
 
 
 def test_a_ledger_already_waiting_for_a_full_rebuild_is_not_drift(db_session, tenant, book) -> None:
