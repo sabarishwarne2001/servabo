@@ -74,4 +74,4 @@ Captured using synthetic seeded test accounts/documents. The before images use t
 - [x] No dependency, lockfile, migration, production secret or production-data change.
 - [ ] Live external AI-provider validation: not performed; deterministic test provider used.
 
-GitHub API publication is separate from validation: the running environment blocks CONNECT requests to `api.github.com` with HTTP 403. A network draft adding that hostname was saved for environment review; saving alone does not activate it or create a pull request.
+The implementation is available for review in [pull request #39](https://github.com/sabarishwarne2001/servabo/pull/39), targeting `main` from `feat/premium-documents-ai-assistant-ui`.
