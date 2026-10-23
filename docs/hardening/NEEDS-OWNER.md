@@ -2449,3 +2449,63 @@ failure becomes one sentence naming the field in words. No screen shows `error.m
 The email-in webhook and Zoho's sign-in return address are **`/api/v1/inbound/postmark`** and **`/api/v1/erp/zoho/callback`**. They first sat under `/api/v1/public/`, which is reserved for the
 API-key gateway (its own rate limits and scopes) and which a test forbids anything else to use. Nothing had been set up at Postmark or Zoho yet, so no address needs changing for a customer: when you
 do the setup in Final session 2, use these paths (RUNBOOK 9.10 and 9.12, `.env.example`).
+
+## N-186 — An upgrade session (2A) before the live session (2B); no new engines (DECIDED (owner, 2026-10-23))
+
+After Final session 1 the owner asked, before the live tests, whether Servabo can be sold and make money, and raised four issues:
+the custom-domain price that contradicts itself, safety jobs that depend on host cron, prompt injection through document text,
+and prices too high for Indian customers. He also proposed "Evidence-to-Resolution" (detect → evidence → coordinate → verified
+closure → measured outcome), to be built only if the product does not already do it and only if it earns money. He delegated
+full product and pricing authority for the plan.
+
+- **Final session 2A** (`docs/sessions/FINAL-2-UPGRADE.md`, cloud) does that work. It writes a commercial readiness page and an
+  assessment of Evidence-to-Resolution against today's engines; it builds a thin Resolution layer only if four stated tests pass
+  (no new detection engine, no new AI). It ends by rewriting `docs/sessions/FINAL-2-LIVE.md` to match what exists.
+- **Final session 2B** is the live session (`FINAL-2-LIVE.md`, the owner's PC). Older entries and HANDOFF sections that say
+  "Final session 2" mean 2B.
+- **The direction: no new engines.** The product has more engines than one founder can sell; the next milestone is proof: measured
+  accuracy on real invoices, real integrations, the first paid pilots and verified rupees. The focus is Indian distributors,
+  wholesalers and manufacturers and the CA firms that serve them: find the money leaking out of supplier invoices, get it fixed,
+  show the rupees that can be proven.
+
+## N-187 — Prices and packaging for India (DECIDED (owner, delegated, 2026-10-23); built by Final session 2A)
+
+**Why.** Every price was in dollars, per seat: Business at $299 a user is about ₹26,000 a user a month. Indian AP-automation
+platforms cost about ₹3 to ₹5 lakh a year, GST reconciliation tools ₹500 to ₹1,500 a month and Zoho Books ₹749 to ₹2,999 a
+month (vendors' and resellers' pages, read 2026-10-23). Servabo's cost to serve is about ₹0.10 of model tokens a document plus a
+share of one server, so lower rupee prices keep a healthy margin. Dodo can price a product natively in INR (domestic fee 4% + 15¢,
+plus 0.5% for subscriptions; read 2026-10-23).
+
+**India, per user per month, GST extra (Dodo charges it):**
+
+| | Free trial | Starter (key `developer`, shown as "Starter") | Business | Enterprise |
+| --- | --- | --- | --- | --- |
+| Monthly | ₹0, 14 days | ₹1,499 | ₹4,999 | ₹14,999 |
+| Yearly (two months free) | — | ₹14,990 | ₹49,990 | by agreement |
+| GST Credit | preview | add-on ₹1,499 a month or ₹14,990 a year | included | included |
+| Custom domains | — | not included | included | included |
+| Tally Prime import file | — | included (closes N-174) | included | included |
+| Automatic ERP posting (Zoho Books Connect, …) | — | — | included | included |
+| Warehouse sync | — | not sold in rupees | included | included |
+
+**International, in dollars:** the per-user prices do not change ($49, $299, $799; $490 and $2,990 a year). The GST Credit add-on
+gains $490 a year. Custom domains, the Tally file and the "Starter" name follow the table in every currency; warehouse sync stays a
+$300 add-on for Starter in dollars.
+
+**Rules.**
+1. One set of allowances for every currency, sized so the **lowest** price of each plan, in any currency, keeps the margin rules of
+   `test_plan_unit_economics.py` (60% at the ceilings, 50% on the dearest model) at a conservative ₹90 to the dollar and Dodo's India
+   fee. Lower allowances, not prices; a rupee price may rise at most 20% if reasonable allowances cannot meet the rule, with the reason
+   recorded.
+2. The OCR cost basis stays ESTIMATED at $0.002 a page until Final session 2B measures it; allowances may rise after a lower measured cost.
+3. The trial becomes **14 days with 100 documents and 200 OCR pages** (one GSTR-2B cycle fits); Free's acquisition-cost ceiling in the
+   unit-economics test rises from $0.25 to $1.00 a trial account, still backed by the $1.00 usage ceiling.
+4. **Custom domains** move to Business and Enterprise; the $199 add-on and its Dodo product are retired (it was bundled into every paid
+   plan, so nobody could buy it, while RUNBOOK still listed it).
+5. Rupees are shown by default to Indian organizations and on the website; anyone can switch.
+6. Indian payment rules: rupee checkouts offer UPI and RuPay; above ₹15,000 a month including GST the billing page explains that the
+   bank asks to approve each automatic payment and offers yearly; a seat change above the mandate is explained before it happens.
+7. A business buying in rupees gives its GSTIN at checkout; whether Dodo's invoice prints it (so the 18% GST is claimable as input
+   credit) is checked in Final session 2B, and recorded `OPEN` with options if Dodo cannot.
+8. N-181 (the cost of AI-read pack checks): kept as it is; each check is a short call on the default model, counted as assistant usage
+   and bounded by the token ceilings.

@@ -60,6 +60,9 @@ hold queue and tests. **Run:** the message fees above. **Do it after** customers
 
 ### 2.3 An annual price and a rupee price for the GST Credit add-on
 
+**Status (2026-10-23):** decided (N-187: ₹1,499 a month or ₹14,990 a year; $490 a year beside $49 a month) and scheduled
+in Final session 2A (`docs/sessions/FINAL-2-UPGRADE.md`), together with rupee prices for every plan.
+
 **What:** the add-on is a monthly dollar price today (Session H). Offer a yearly price (about two months free, as the plans have) and a price in rupees.
 
 **Earns money:** yearly payers pay up front and leave far less; an Indian owner-manager weighing a $49 line against a rupee bill often stops at the dollar sign.

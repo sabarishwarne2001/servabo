@@ -648,7 +648,7 @@ Only you can do these. Do them in this order; each step says what you need, wher
 you know it worked. Nothing here needs code changes. Rewritten in the website and payments session
 (2026-10-17) for Servabo, the website and Dodo Payments. Tick them in a copy of this file.
 
-**Before you start these:** run the two final sessions (`docs/FINAL-SESSIONS.md`). Final session 2 proves on your PC
+**Before you start these:** run the final sessions (`docs/FINAL-SESSIONS.md`). Final session 2B (live) proves on your PC
 what can be proven without a server: step 9's test-mode part, step 12's real-model spot checks, the CPU-only image build and a
 backup and restore rehearsal; it ticks them here. `backend/scripts/preflight.py` (from Final session 1) tells you, on the server,
 which settings are still missing.
@@ -990,3 +990,27 @@ All in `backend/`; development and test databases only (they refuse to run in pr
 - **Real webhook receivers and a real bucket** for the new events and datasets.
 - **The AI-read pack checks with a real model**: twelve of the fourteen shipped checks are read by an AI model (N-181).
 - **Whether any outside tool of yours expects rupees grouped in thousands**: the formatter now groups rupees the Indian way everywhere (N-182).
+
+## Plan change: the upgrade session before the live session (2026-10-23)
+
+_Decisions N-186 and N-187. Docs-only change; no code, no migration._
+
+**What changed.** Final session 1 is complete (PR #37; CI runs #462 and #464 green on every job). Before the live tests the owner
+asked whether Servabo can be sold and make money, raised four issues, and proposed "Evidence-to-Resolution". A new cloud session,
+**Final session 2A** (`docs/sessions/FINAL-2-UPGRADE.md`, Opus 5.5 High), now runs before the live session, which becomes **Final
+session 2B** (`docs/sessions/FINAL-2-LIVE.md`). Wherever a section above says "Final session 2", it means 2B. 2A reads "Final session
+1 → Final session 2" and ends by writing "Final session 2A → Final session 2B" and rewriting the live prompt.
+
+| The owner's question | Where 2A answers it |
+| --- | --- |
+| Is it worth investing in; can it make money? | Phase 0A: `docs/product/COMMERCIAL-READINESS.md` (buyers, competitors with today's prices, what is proven, the money model, risks); Phase 5: an accuracy report on real invoices and a pilot playbook |
+| Custom domains: $199 add-on or included? | Phase 1 (N-187): the code bundles it into every paid plan, so nobody can buy it, yet RUNBOOK lists $199 and `dodo_setup.py` creates its product. Decided: Business and Enterprise only; the add-on retired; every doc and the website agree |
+| Safety jobs depend on host cron | Phase 2: every safety job reports its runs into the app; the in-app scheduler alerts on a stale or never-run job without failing readiness; sweeps move into the scheduler where safe; an installer script for the host part; a preflight line; a rehearsal that stops cron on purpose |
+| Prompt injection through document text | Phase 3: a map of every path from outside text to an effect (`docs/hardening/PROMPT-INJECTION.md`), invariants with registry-walking tests (nothing approves or pays; recipients never come from a document; fenced prompts; autonomy unmoved by text; escaped templates), and new red-team documents |
+| Prices too high for India | Phase 1 (N-187): rupee prices per user (Starter ₹1,499, Business ₹4,999, Enterprise ₹14,999; yearly ten months), the GST add-on ₹1,499 or ₹14,990 a year, a 14-day trial, "Developer" shown as "Starter", allowances resized so every price keeps the margin rules |
+| Evidence-to-Resolution | Phase 0B assesses it against today's engines (most pieces exist in separate engines; nothing joins them, and only Helm's value ledger counts an outcome on evidence). Phase 6 builds a thin layer (one read model, closure only on evidence, one outcome ledger counted once, "Recovered, verified" beside "Found") **only if** four stated tests pass |
+
+**Final session 1's leftovers** (its hand-over §3) are 2A's Phase 4: warning emails after a deletion, a zip in the global upload
+tray, `k1a6`'s downgrade with rows present, and a check of the owner's lockfile commit `e51f736`.
+
+**Numbers.** N-186 and N-187 are this plan; 2A starts at N-188 and F-619; browser specs continue at 135.

@@ -55,8 +55,8 @@ The product was called FlowPilot AI until 2026-10-16. [CHANGELOG.md](CHANGELOG.m
 - [`FINDINGS.md`](docs/hardening/FINDINGS.md): every defect found, with its fix and evidence
 - [`NEEDS-OWNER.md`](docs/hardening/NEEDS-OWNER.md): the product decisions taken
 
-**What comes next:** the two final sessions, explained for the owner in
-[`docs/FINAL-SESSIONS.md`](docs/FINAL-SESSIONS.md) (prompts in [`docs/sessions/`](docs/sessions/)).
+**What comes next:** Final session 2A (the upgrade, in the cloud), then 2B (everything for real, on the owner's PC),
+explained for the owner in [`docs/FINAL-SESSIONS.md`](docs/FINAL-SESSIONS.md) (prompts in [`docs/sessions/`](docs/sessions/)).
 
 Deploying to production (a Linux server with Docker Compose): [`docs/RUNBOOK.md`](docs/RUNBOOK.md)
 section 9.

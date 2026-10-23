@@ -1,88 +1,81 @@
-# The two final sessions: what they are, and how to run them
+# The final sessions: what they are, and how to run them
 
-_Written 2026-10-22 for the owner. Plain language, no prior DevOps knowledge assumed._
+_Written 2026-10-22 for the owner; updated 2026-10-23 when the upgrade session (2A) was added. Plain language, no prior DevOps
+knowledge assumed._
 
-## 1. Where things stand
+## 1. Where things stand (2026-10-23)
 
-- **Session J (Automation) is complete.** Every box in its checklist is ticked. Its pull request (#35) passed every CI job
-  (run #415), and the run on `main` after the merge (#417) passed too.
-  - The only red mark is the **advisory** `pip-audit` job. It warns about the image library Pillow, and it never blocks a
-    merge (N-159).
-  - Two things were honestly left open: a message to a **real** Slack or Teams channel (N-158), and the optional "Wait" step
-    (N-154, decided "not now").
-- **Sessions A to J are merged.** The product has Helm, GST Credit, the value receipt, the monthly summary, the GST Credit
-  add-on and the rebuilt Automation.
-- **What has never happened:**
-  - one session that goes back over the **whole** product to bring the older parts up to date;
-  - the product being tried **for real**: with real Dodo test payments, real AI and OCR, real GST files and real emails in a
-    real inbox.
+- **Sessions A to J are merged, and so is Final session 1** (PR #37). Every item on its checklist is done; its CI run (#462)
+  and the run on `main` after the merge (#464) were green on every job, the advisory `pip-audit` included.
+- **What Final session 1 left open is listed honestly** in `docs/hardening/HANDOFF.md`, "Final session 1 → Final session 2":
+  - nothing that talks to an outside service has been tried against the real service;
+  - a few small things were not reached, for example the warning emails after a customer deletes a workspace.
+- **You then asked four commercial questions before the live tests:**
+  - Are the prices right for India?
+  - Why does the custom-domain price contradict itself?
+  - What if the server's scheduled jobs stop?
+  - Can a malicious invoice steer the AI?
 
-The two final sessions do exactly those two things.
+  You also proposed an "Evidence-to-Resolution" idea, to be built only if it is truly needed and truly earns money.
+  **Session 2A answers these before the live tests.**
 
-## 2. The plan changed: two final sessions replace Sessions D and E
+## 2. The sessions, in order
 
-| | **Final session 1** | **Final session 2** |
-| --- | --- | --- |
-| **What** | Study the whole project; bring outdated parts up to date (backend and frontend); build the PRODUCT-NEXT items that earn money | Test **everything for real** on your PC: real AI and OCR, real GST files, real Dodo test payments, real emails, real Slack, Zoho Books, Tally, Sentry, a production rehearsal |
-| **Where** | Claude Code **on the web** (the cloud) | Claude Code **in VS Code on your PC** |
-| **Model** | Opus 5.5, High | Sonnet 5.5, High (Opus 5.5 for a stubborn defect) |
-| **You** | Mostly away; check in, type `continue` after a usage reset, merge at the end | **Present**: about 1 hour at the start, then short moments over the day |
-| **Prompt** | [`docs/sessions/FINAL-1-UPGRADE.md`](sessions/FINAL-1-UPGRADE.md) | [`docs/sessions/FINAL-2-LIVE.md`](sessions/FINAL-2-LIVE.md) |
-| **Replaces** | Old Session E (error tracking, zip upload, email-in), now with much more | Old Session D (real Dodo, GST files, AI and OCR), now for the whole product |
-| **Cost** | Zero | Zero (free plans; Dodo **Test Mode**, no real money) |
+| | **Final session 1** (done) | **Final session 2A: upgrade** (next) | **Final session 2B: live** |
+| --- | --- | --- | --- |
+| **What** | Study the whole project, bring it up to date, build the money features (email-in, zip upload, GST digest, Zoho/Tally, Sentry, `preflight.py`, …) | Prices for India in rupees; the custom-domain fix; safety jobs that cannot stop silently; a prompt-injection map and tests; Final 1's leftovers; an accuracy report and a pilot playbook; assess Evidence-to-Resolution and build a thin version only if it passes the test; **rewrite the live prompt to match reality** | Test **everything for real** on your PC: real AI and OCR, your real invoices (with the accuracy report), real GST files, Dodo test payments in rupees and dollars, real emails, Slack, Zoho Books, Tally, Sentry, a production rehearsal |
+| **Where** | Claude Code on the web | Claude Code **on the web** | Claude Code **in VS Code on your PC** |
+| **Model** | Opus 5.5, High | **Opus 5.5, High** | Sonnet 5.5, High (Opus 5.5 for a stubborn defect) |
+| **You** | — | Mostly away; type `continue` after a usage reset; merge at the end | **Present**: about 1 hour at the start, then short moments over the day |
+| **Prompt** | [`docs/sessions/FINAL-1-UPGRADE.md`](sessions/FINAL-1-UPGRADE.md) | [`docs/sessions/FINAL-2-UPGRADE.md`](sessions/FINAL-2-UPGRADE.md) | [`docs/sessions/FINAL-2-LIVE.md`](sessions/FINAL-2-LIVE.md) (2A rewrites it before you run it) |
+| **Cost** | Zero | Zero | Zero (free plans; Dodo **Test Mode**, no real money) |
 
-**Run them in this order:** Final 1 first. Final 2 tests what Final 1 builds.
+**Run them in this order:** 2A, then 2B. 2B tests what 2A changes, and 2A updates 2B's prompt and the preparation list below.
+Wherever older documents say "Final session 2", they mean 2B, the live session.
 
-### What Final session 1 builds, and why each part earns money
+### The decisions you delegated, now written down (N-186 and N-187)
 
-- **Email-in.** Each workspace gets an email address; forwarded invoices become documents. This is what turns a trial into
-  daily use.
-- **Zip upload.** A customer with a backlog uploads one file on day one.
-- **"First money found" in Getting started.** It leads a new customer to the first rupee Servabo finds in their documents.
-- **A GST weekly digest email** and GST notifications. They keep the GST Credit add-on, and its $49 a month, in front of the
-  owner every week.
-- **Upgrade moments.** Every locked feature names the right plan or add-on and opens the right checkout.
-- **"Connect Zoho Books" and a guided Tally Prime file.** "Invoice received → bill in my books" is the strongest reason to buy
-  Business.
-- **Error tracking (Sentry, EU region).** You see *which line failed, for whom* before the customer finishes typing.
-- **`preflight.py`.** One command that tells you whether a setup is ready to launch.
-- **Bringing things up to date:**
-  - what happens to data when it is erased, swept or exported (DPDP Act questions in enterprise deals);
-  - outdated AI model lists (some suggested Gemini models were retired by Google);
-  - libraries;
-  - Session J's small leftovers;
-  - accessibility and phone layouts on every page;
-  - search for GST.
-- **`docs/PRODUCT-NEXT.md` rewritten,** so it tells the truth and ranks what comes after launch.
+- **No new engines.** Servabo already has more engines than one person can sell. 2A makes the existing product cheaper to
+  buy, safer to run and provable.
+- **The focus:** Indian distributors, wholesalers and manufacturers, and the CA firms that serve them. Servabo finds money
+  leaking out of supplier invoices (GST credit at risk, overcharges, duplicates, missed deadlines), helps get each one fixed,
+  and shows the rupees it can prove.
+- **Prices in India, per user per month, GST extra:**
+  - Starter (today's "Developer") ₹1,499;
+  - Business ₹4,999;
+  - Enterprise ₹14,999;
+  - yearly is ten months' price;
+  - the GST Credit add-on for Starter is ₹1,499 a month or ₹14,990 a year;
+  - the dollar prices stay as they are.
+- **The free trial becomes 14 days** with 100 documents, so one monthly GSTR-2B fits inside it.
+- **Custom domains** are included on Business and Enterprise and no longer sold separately (the $199 price is retired).
+- **The Tally Prime file** comes to Starter.
 
-It will **not** change any price, plan or trial length. Ideas that need a price decision are written down for you.
+## 3. How to run Final session 2A (the upgrade)
 
-## 3. How to run Final session 1
-
-1. **Check that `main` is green:** open the repository on GitHub, then **Actions**, then the latest run on `main`. Every job
-   must have a green tick; `pip-audit (advisory)` may be red, and that is fine.
-2. Open **claude.ai/code** and start a new session on the `servabo` repository.
-3. Choose **Opus 5.5** and **High** effort.
+1. **Merge the pull request that added this guide's update,** once its CI is green.
+2. **Check that `main` is green:** on GitHub, open **Actions**, then the latest run on `main`. Every job needs a green tick.
+3. Open **claude.ai/code** and start a new session on the `servabo` repository. Choose **Opus 5.5** and **High** effort.
 4. Paste this one sentence:
 
-   > Read `docs/sessions/FINAL-1-UPGRADE.md` on `main` and carry it out from section 0. Never stop to ask me.
+   > Read `docs/sessions/FINAL-2-UPGRADE.md` on `main` and carry it out from section 0. Never stop to ask me.
 
-   Or paste everything below the line in that file. Both work.
-5. **Leave it running.** Check in every few hours. If it says your usage limit is reached, come back after the reset and type
-   `continue`. It picks up where it stopped.
+5. **Leave it running.** If it says your usage limit is reached, come back after the reset and type `continue`.
 6. **At the end** it marks its pull request "ready". Then:
-   - read the PR description (it is written for you);
+   - read the description (it is written for you);
    - wait until every CI job is green;
    - press **Merge**.
 
-   **Never merge while a CI job other than `pip-audit (advisory)` is red.** Ask a new session to fix it first, and give it the
-   link to the failed run.
+   **Never merge while a CI job other than `pip-audit (advisory)` is red.**
+7. **Read the two short pages it writes for you:**
+   - `docs/product/COMMERCIAL-READINESS.md`: can this be sold, to whom, against whom;
+   - `docs/product/PILOT-PLAYBOOK.md`: how to run your first paid pilot.
 
-**Tip:** Final 1 is large. Start it at the beginning of your weekly usage cycle.
+   Then re-read §4 below: 2A may have added something to prepare.
 
-## 4. Before Final session 2: what to prepare (about 1 to 2 hours, all free)
+## 4. Before Final session 2B (live): what to prepare (about 1 to 2 hours, all free)
 
-Do this before you start Final session 2. Anything you cannot get is simply skipped and marked "Not checked". **Nothing
+Do this before you start Final session 2B. Anything you cannot get is simply skipped and marked "Not checked". **Nothing
 blocks the session.**
 
 **Golden rule.** Keys and passwords go **only** into `backend\.env` (or `frontend\.env` where noted), typed by you. **Never paste
@@ -119,6 +112,9 @@ them into the chat.** If you do by accident, rotate that key afterwards.
 
 - **Five to ten real GST tax invoices** (PDF or scans). Your own online-shopping tax invoices (Amazon, Flipkart and the like)
   are real GST invoices and are fine. A friendly distributor's invoices are fine **with their permission**.
+- **If you can, 30 to 50 real purchase invoices with their truth sheet** (the template comes from session 2A: one row per
+  invoice, the correct invoice number, date, GSTINs, tax amounts and total). 2B turns them into a **measured accuracy
+  figure** you can show customers. It is the single most convincing number for a first sale.
 - **One printed page photographed at a slight angle**, and **one handwritten bill** (photos from your phone).
 - **One zip** of 20 or more invoices (copies are fine).
 - **Optional, from your CA** (worth asking for; it turns "unverified" into "confirmed"):
@@ -126,9 +122,9 @@ them into the chat.** If you do by accident, rotate that key afterwards.
   - **one real e-invoice PDF** (an invoice with an IRN and a signed QR code, usually from a large supplier);
   - **NIC's public key** for checking the QR signature, if the CA knows where to get it.
 
-## 5. How to run Final session 2
+## 5. How to run Final session 2B (live)
 
-1. Make sure Final session 1 is **merged** and `main` is green. Then run `git pull` on your PC.
+1. Make sure Final session 2A is **merged** and `main` is green. Then run `git pull` on your PC.
 2. Start Docker Desktop.
 3. Open VS Code in your `servabo` folder, then the **Claude Code** panel. Choose **Sonnet 5.5**, **High**.
 4. Paste:
@@ -151,9 +147,9 @@ them into the chat.** If you do by accident, rotate that key afterwards.
 - a ten-minute **live smoke suite** (`frontend/e2e-live/`) to repeat before every release;
 - a rehearsal of the production start-up, backup and restore on your PC.
 
-## 6. After both sessions: launch
+## 6. After the sessions: launch
 
-Open `docs/hardening/HANDOFF.md`, **"Owner launch checklist"**. Final session 2 will have ticked what your PC could prove
+Open `docs/hardening/HANDOFF.md`, **"Owner launch checklist"**. Final session 2B will have ticked what your PC could prove
 (Dodo test mode, the real-model checks, the production rehearsal). What remains needs money or a public address, so only you
 can do it:
 
@@ -176,7 +172,7 @@ can do it:
   find the cause and fix it test-first.
 - **You pasted a secret into a chat:** create a new key in that provider's dashboard, delete the old one, and put the new one
   in `.env`.
-- **The PC cannot start the stack:** in Final session 2, tell Claude what you see. It reads `.dev\logs` and fixes or explains.
+- **The PC cannot start the stack:** in Final session 2B, tell Claude what you see. It reads `.dev\logs` and fixes or explains.
 
 ## 8. One safety reminder
 
