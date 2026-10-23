@@ -405,6 +405,10 @@ def production_config_problems(settings: "Settings", environment: str) -> list[s
 
     problems += _billing_problems(settings, environment)
     problems += _platform_model_problems(settings)
+    dsn = _text_raw(settings.SENTRY_DSN)
+    if dsn and urlparse(dsn).scheme != "https":
+        problems.append("SENTRY_DSN: is not an https:// address. Error reports would travel unencrypted. Copy the DSN from the project's "
+                        "settings (Client Keys), or leave it empty to switch error tracking off.")
 
     # Campaign session 4 (§C.4): someone must be told when jobs die or the API starts failing.
     recipients = settings.operator_alert_recipients

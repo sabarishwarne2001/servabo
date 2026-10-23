@@ -58,6 +58,7 @@ export type NotificationCategoryKey =
   | "usage"
   | "workflow"
   | "monthly_summary"
+  | "gst_credit"
   | "helm"
   | "helm_briefing";
 

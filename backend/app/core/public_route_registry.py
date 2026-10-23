@@ -233,6 +233,24 @@ PUBLIC_ROUTES: tuple[PublicRoute, ...] = (
         credential="single-use expiring document-request token (path)",
         rate_limit_policy="POLICY_PUBLIC_READ",
     ),
+    # Final session 1 (2B): Postmark's inbound webhook. The credential is HTTP basic auth (POSTMARK_INBOUND_WEBHOOK_USER and
+    # _PASSWORD), compared in constant time; Postmark does not sign inbound payloads. The route answers 404 until configured.
+    PublicRoute(
+        path="/api/v1/inbound/postmark",
+        methods=("POST",),
+        phase="FINAL-1",
+        credential="HTTP basic auth (POSTMARK_INBOUND_WEBHOOK_USER and _PASSWORD)",
+        rate_limit_policy="POLICY_PUBLIC_READ",
+    ),
+    # Final session 1 (3C): Zoho's OAuth redirect back to Servabo. No session cookie reaches this path; the credential is the signed,
+    # single-use, ten-minute state that Servabo issued for one person and one workspace (app/services/erp/zoho.py).
+    PublicRoute(
+        path="/api/v1/erp/zoho/callback",
+        methods=("GET",),
+        phase="FINAL-1",
+        credential="signed single-use OAuth state (query)",
+        rate_limit_policy="POLICY_PUBLIC_READ",
+    ),
     # ARCH46-S1:public-calendar-feeds. A calendar app polling a member's
     # obligations feed has no session: the credential is the signed token in
     # the path (HMAC-verified, stored only as SHA-256, revocable; every refusal

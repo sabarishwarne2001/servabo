@@ -231,12 +231,23 @@ export const INGESTION_ENDPOINTS = {
     `${scoped(workspaceId)}/ingestion-batches`,
   batch: (workspaceId: string, batchId: string): string =>
     `${scoped(workspaceId)}/ingestion-batches/${seg(batchId)}`,
+  batchArchive: (workspaceId: string): string =>
+    `${scoped(workspaceId)}/ingestion-batches/archive`,
   presets: (workspaceId: string): string =>
     `${scoped(workspaceId)}/document-presets`,
   presetApply: (workspaceId: string): string =>
     `${scoped(workspaceId)}/document-presets/apply`,
   presetEnabled: (workspaceId: string, presetId: string): string =>
     `${scoped(workspaceId)}/document-presets/${seg(presetId)}/enabled`,
+  // Final session 1 (F-408): what an enabled pack does with its promises.
+  presetCheckProposals: (workspaceId: string): string =>
+    `${scoped(workspaceId)}/document-presets/check-proposals`,
+  presetCheckAccept: (workspaceId: string): string =>
+    `${scoped(workspaceId)}/document-presets/check-proposals/accept`,
+  presetCheckDismiss: (workspaceId: string): string =>
+    `${scoped(workspaceId)}/document-presets/check-proposals/dismiss`,
+  presetRedactionSuggestion: (workspaceId: string): string =>
+    `${scoped(workspaceId)}/document-presets/redaction-suggestion`,
 } as const;
 
 export const ASSISTANT_ENDPOINTS = {

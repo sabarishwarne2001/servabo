@@ -9,16 +9,20 @@ company and cannot drift:
 | `tailwind-preset.js` | Tailwind's semantic colours, radii, type and elevation, reading `tokens.css` | `frontend/tailwind.config.js`, `website/tailwind.config.mjs` |
 | `mark.ts` | The mark's and the wordmark's geometry (generated) | the app's `ServaboMark`, the website's logo |
 | `tokens.json` | The name, its meaning, the positioning line and the brand colours as hex | the asset builder, the website |
-| `assets/` | `servabo-mark.svg` (colour), `servabo-mark-mono.svg` (one colour, the S cut out), `servabo-logo-{light,dark,mono}.svg`, `servabo-wordmark.svg` | press, documents, anyone who needs the logo |
+| `assets/` | `servabo-mark.svg` (colour, on its tile), `servabo-mark-bare.svg` (colour, no tile, for a dark page), `servabo-mark-mono.svg` (one colour), `servabo-logo-{light,dark,mono}.svg`, `servabo-wordmark.svg` | press, documents, anyone who needs the logo |
 
-**The mark.** A document with its top-right corner folded, holding an "S" drawn as one stroke: a
-document, kept. Servabo is Latin for "I will keep", from *pacta sunt servanda*, agreements must be
-kept. Built on a 32-unit grid, it reads at 16 px, works in one colour, and the colour version's
-blue tile and white S read on light and dark backgrounds alike. In emails it is drawn in HTML (a
-blue tile with a white "S"), because mail clients hold remote images.
+**The mark.** A glossy ribbon "S" (cyan at the top, through brand blue, to violet) with a thin orbit
+ring and a glowing dot, on a deep navy rounded tile. Servabo is Latin for "I will keep", from
+*pacta sunt servanda*, agreements must be kept; the ring is the promise being kept in orbit around
+your documents. Built on a 32-unit grid, it reads at 16 px. It carries its own colours and tile, so
+it looks the same on a light or a dark page and under every tenant's colour scheme. In emails it is
+drawn in HTML (a navy tile with a bright blue "S"; mail clients hold remote images and cannot draw
+gradients). **It is also the default workspace logo**: a workspace that has not uploaded a logo of
+its own (every new workspace), or whose logo cannot be loaded, shows this mark, never initials.
 
-**The wordmark.** "Servabo" in Inter (SIL Open Font License, the app's own typeface) at weight
-640, as outlines, so it looks the same everywhere without loading a font.
+**The wordmark.** Lowercase "servabo" in Inter (SIL Open Font License, the app's own typeface) at
+weight 640, as outlines, so it looks the same everywhere without loading a font. The "o" carries a
+small blue leaf. The tagline is "AUTOMATE • EXTRACT • ACCELERATE".
 
 **Rebuilding.** The favicons, app icons and Open Graph cards in `frontend/public` and
 `website/public` are generated, and committed so neither build needs these tools:

@@ -75,6 +75,24 @@ def format_amount_micros(amount_micros: int, currency: Optional[str]) -> str:
     Its own currency as an ISO code, two decimals and thousands separators ("USD 1,234.50"):
     readable in every locale, never a guessed symbol (F-172). No currency, no code.
     """
+    code = currency.upper() if currency else None
     value = int(amount_micros) / 1_000_000
-    text = f"{value:,.2f}"
-    return f"{currency.upper()} {text}" if currency else text
+    text = _lakh_grouped(value) if code == "INR" else f"{value:,.2f}"
+    return f"{code} {text}" if code else text
+
+
+def _lakh_grouped(value: float) -> str:
+    """Rupees the way they are read in India: 12,50,000.00 (last three digits, then pairs). Final session 1 (F-570):
+    the builder already wrote "₹12,50,000"; run-history reasons, emails and notices wrote "INR 1,250,000.00"."""
+    sign = "-" if value < 0 else ""
+    whole, _, paise = f"{abs(value):.2f}".partition(".")
+    if len(whole) > 3:
+        head, tail = whole[:-3], whole[-3:]
+        groups: list[str] = []
+        while len(head) > 2:
+            groups.insert(0, head[-2:])
+            head = head[:-2]
+        if head:
+            groups.insert(0, head)
+        whole = ",".join(groups + [tail])
+    return f"{sign}{whole}.{paise}"

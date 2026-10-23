@@ -37,6 +37,13 @@ export interface BatchItem {
   readonly upload_session_id?: string | null;
 }
 
+/** A member of an unpacked zip that was not made into a document (Final session 1, 2A). */
+export interface SkippedFile {
+  readonly name: string;
+  readonly code: "UNSUPPORTED_TYPE" | "GSTR2B" | string;
+  readonly message: string;
+}
+
 export interface Batch {
   readonly id: string;
   readonly status: string;
@@ -46,6 +53,7 @@ export interface Batch {
   readonly failed_items: number;
   readonly created_at: string;
   readonly completed_at?: string | null;
+  readonly skipped?: readonly SkippedFile[];
   readonly items: readonly BatchItem[];
 }
 
@@ -124,6 +132,19 @@ export const getBatch = async (
     INGESTION_ENDPOINTS.batch(workspaceId, batchId),
     { headers: JSON_HEADERS },
   );
+  return response.data;
+};
+
+/**
+ * Upload a zip of documents. It is unpacked in the background; poll `getBatch` for progress. A zip the server refuses
+ * (password-protected, nested, too large, unsafe path, ...) rejects with its sentence in `ApiError.message`.
+ */
+export const uploadArchive = async (workspaceId: string, file: File): Promise<Batch> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await apiClient.post<Batch>(INGESTION_ENDPOINTS.batchArchive(workspaceId), formData, {
+    headers: { "Content-Type": "multipart/form-data", ...JSON_HEADERS },
+  });
   return response.data;
 };
 
@@ -355,6 +376,63 @@ export const setPresetEnabled = async (
   );
   return response.data;
 };
+
+/** One check a pack suggests that the workspace has neither added nor turned down. */
+export interface PackCheckProposal {
+  readonly key: string;
+  readonly preset_id: string;
+  readonly preset_label: string;
+  readonly document_type: string;
+  readonly sentence: string;
+  readonly severity: "LOW" | "MEDIUM" | "HIGH" | string;
+  readonly threshold: string;
+  readonly understood_as: string;
+  /** True when an AI model reads the check (billed as assistant use): accepting means confirming that. */
+  readonly requires_acknowledgement: boolean;
+}
+
+export interface PackCheckProposals {
+  /** False when the plan does not include Clause assertions: nothing can be added, so none is offered. */
+  readonly available: boolean;
+  readonly proposals: readonly PackCheckProposal[];
+}
+
+export const listPackCheckProposals = async (workspaceId: string): Promise<PackCheckProposals> =>
+  (await apiClient.get<PackCheckProposals>(INGESTION_ENDPOINTS.presetCheckProposals(workspaceId), { headers: JSON_HEADERS })).data;
+
+export const acceptPackCheck = async (
+  workspaceId: string,
+  proposal: Pick<PackCheckProposal, "key" | "requires_acknowledgement">,
+): Promise<{ rule_id: string; name: string; is_active: boolean }> =>
+  (
+    await apiClient.post<{ rule_id: string; name: string; is_active: boolean }>(
+      INGESTION_ENDPOINTS.presetCheckAccept(workspaceId),
+      { key: proposal.key, acknowledge_llm: proposal.requires_acknowledgement },
+      { headers: JSON_HEADERS },
+    )
+  ).data;
+
+export const dismissPackCheck = async (workspaceId: string, key: string): Promise<void> => {
+  await apiClient.post(INGESTION_ENDPOINTS.presetCheckDismiss(workspaceId), { key }, { headers: JSON_HEADERS });
+};
+
+export interface RedactionSuggestion {
+  readonly profile: string;
+  readonly preset_label: string;
+  readonly document_type: string;
+}
+
+/** The redaction profile of the enabled pack that fits this document, or null. */
+export const getRedactionSuggestion = async (
+  workspaceId: string,
+  workItemId: string,
+): Promise<RedactionSuggestion | null> =>
+  (
+    await apiClient.get<RedactionSuggestion | null>(INGESTION_ENDPOINTS.presetRedactionSuggestion(workspaceId), {
+      params: { work_item_id: workItemId },
+      headers: JSON_HEADERS,
+    })
+  ).data;
 
 export const listRetentionHolds = async (
   workspaceId: string,

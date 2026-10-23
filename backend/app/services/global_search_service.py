@@ -12,7 +12,12 @@ What matches:
   a vendor name, a PO reference);
 * entities - the display name of an active (not merged) entity record, when
   the plan includes the entity graph;
-* cases - the case title, when the plan includes case intelligence.
+* cases - the case title, when the plan includes case intelligence;
+* GST suppliers - by GSTIN or name, and GST invoices - by invoice number, from
+  the reconciliation of the workspaces whose plan (or GST Credit add-on) opens
+  the supplier and invoice lists; a workspace on the preview shows nothing here;
+* automation rules - by name, only in workspaces where the person may see
+  workflows (a contributor or more; a viewer is not shown them anywhere).
 
 The text is matched literally (ILIKE with %, _ and \\ escaped), so a query can
 never widen itself into a wildcard.
@@ -24,14 +29,16 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from sqlalchemy import String, cast, or_, select
+from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.models.automation import AutomationRule
 from app.models.cases import Case
 from app.models.entity_graph import Entity
-from app.models.organization import Organization, OrganizationRole
+from app.models.gst import GstMatch
+from app.models.organization import MembershipStatus, Organization, OrganizationRole
 from app.models.work_item import WorkItem
-from app.models.workspace import Workspace
+from app.models.workspace import Workspace, WorkspaceMember, WorkspaceRole
 from app.utils.like import contains_pattern
 
 MIN_QUERY_LENGTH = 2
@@ -46,13 +53,15 @@ class SearchQueryError(ValueError):
 
 @dataclass(frozen=True)
 class SearchHit:
-    kind: str  # DOCUMENT | ENTITY | CASE
+    kind: str  # DOCUMENT | ENTITY | CASE | GST_SUPPLIER | GST_INVOICE | RULE
     id: uuid.UUID
     title: str
     subtitle: Optional[str]
     workspace_id: uuid.UUID
     workspace_slug: str
     workspace_name: str
+    #: What to look the hit up by on its page: a GSTIN or an invoice number (GST hits), else None.
+    reference: Optional[str] = None
 
 
 @dataclass
@@ -62,6 +71,9 @@ class SearchResults:
     documents: list[SearchHit] = field(default_factory=list)
     entities: list[SearchHit] = field(default_factory=list)
     cases: list[SearchHit] = field(default_factory=list)
+    suppliers: list[SearchHit] = field(default_factory=list)
+    gst_invoices: list[SearchHit] = field(default_factory=list)
+    rules: list[SearchHit] = field(default_factory=list)
 
 
 def _pattern(query: str) -> str:
@@ -110,10 +122,11 @@ def search(
     allowed = list(workspaces)
     pattern = _pattern(text)
 
-    def hit(kind: str, row_id: uuid.UUID, title: str, subtitle: Optional[str], workspace_id: uuid.UUID) -> SearchHit:
+    def hit(kind: str, row_id: uuid.UUID, title: str, subtitle: Optional[str], workspace_id: uuid.UUID,
+            reference: Optional[str] = None) -> SearchHit:
         ws = workspaces[workspace_id]
         return SearchHit(kind=kind, id=row_id, title=title, subtitle=subtitle, workspace_id=ws.id,
-                         workspace_slug=ws.slug, workspace_name=ws.workspace_name)
+                         workspace_slug=ws.slug, workspace_name=ws.workspace_name, reference=reference)
 
     documents = db.execute(
         select(WorkItem.id, WorkItem.original_filename, WorkItem.extracted_entities, WorkItem.workspace_id)
@@ -161,7 +174,115 @@ def search(
         ).all()
         results.cases = [hit("CASE", row.id, row.title, row.status.title(), row.workspace_id) for row in cases]
 
+    results.suppliers, results.gst_invoices = _gst_hits(db, organization=organization, workspaces=workspaces,
+                                                       pattern=pattern, limit=limit, hit=hit)
+    results.rules = _rule_hits(db, organization=organization, user_id=user_id, organization_role=organization_role,
+                               workspaces=workspaces, pattern=pattern, limit=limit, hit=hit)
     return results
+
+
+def _gst_hits(db: Session, *, organization: Organization, workspaces: dict[uuid.UUID, Workspace], pattern: str,
+              limit: int, hit: Any) -> tuple[list[SearchHit], list[SearchHit]]:
+    """Suppliers and invoices from the GST reconciliation, only in workspaces whose plan opens the lists.
+
+    The same test as the supplier and invoice endpoints (`gst.gate.full_access`): the sample company and any workspace
+    of an organization with the plan's capability or the add-on. A workspace on the preview contributes nothing, so a
+    search never shows what the page itself would lock.
+    """
+    from app.services.gst import gate
+
+    open_workspaces = [wid for wid, ws in workspaces.items() if gate.full_access(db, ws)]
+    if not open_workspaces:
+        return [], []
+
+    supplier_rows = db.execute(
+        select(
+            GstMatch.workspace_id,
+            GstMatch.supplier_gstin,
+            func.max(GstMatch.supplier_name).label("supplier_name"),
+            func.count().label("documents"),
+        )
+        .where(
+            GstMatch.organization_id == organization.id,
+            GstMatch.workspace_id.in_(open_workspaces),
+            GstMatch.supplier_gstin.is_not(None),
+            or_(GstMatch.supplier_gstin.ilike(pattern, escape="\\"), GstMatch.supplier_name.ilike(pattern, escape="\\")),
+        )
+        .group_by(GstMatch.workspace_id, GstMatch.supplier_gstin)
+        .order_by(func.max(GstMatch.supplier_name), GstMatch.supplier_gstin)
+        .limit(limit)
+    ).all()
+    suppliers = [
+        hit(
+            "GST_SUPPLIER",
+            uuid.uuid5(row.workspace_id, f"gst-supplier:{row.supplier_gstin}"),
+            row.supplier_name or row.supplier_gstin,
+            f"GSTIN {row.supplier_gstin} \u00b7 {row.documents} {'document' if row.documents == 1 else 'documents'}",
+            row.workspace_id,
+            row.supplier_gstin,
+        )
+        for row in supplier_rows
+    ]
+
+    invoice_rows = db.execute(
+        select(GstMatch.id, GstMatch.workspace_id, GstMatch.doc_number, GstMatch.supplier_name, GstMatch.supplier_gstin,
+               GstMatch.status)
+        .where(
+            GstMatch.organization_id == organization.id,
+            GstMatch.workspace_id.in_(open_workspaces),
+            GstMatch.doc_number.is_not(None),
+            GstMatch.doc_number.ilike(pattern, escape="\\"),
+        )
+        .order_by(GstMatch.doc_date.desc().nulls_last(), GstMatch.doc_number)
+        .limit(limit)
+    ).all()
+    invoices = [
+        hit(
+            "GST_INVOICE",
+            row.id,
+            row.doc_number,
+            " \u00b7 ".join(part for part in (row.supplier_name or row.supplier_gstin, row.status.replace("_", " ").title()) if part),
+            row.workspace_id,
+            row.doc_number,
+        )
+        for row in invoice_rows
+    ]
+    return suppliers, invoices
+
+
+#: Seeing workflows is a contributor's right (N-019): a viewer is offered none, so search offers none either.
+_RULE_READERS = (WorkspaceRole.CONTRIBUTOR, WorkspaceRole.ADMIN)
+
+
+def _rule_hits(db: Session, *, organization: Organization, user_id: uuid.UUID, organization_role: OrganizationRole,
+               workspaces: dict[uuid.UUID, Workspace], pattern: str, limit: int, hit: Any) -> list[SearchHit]:
+    from app.core.organization_permissions import IMPLICIT_WORKSPACE_ADMIN_ROLES
+
+    if organization_role in IMPLICIT_WORKSPACE_ADMIN_ROLES:
+        readable = list(workspaces)
+    else:
+        granted = db.execute(
+            select(WorkspaceMember.workspace_id).where(
+                WorkspaceMember.user_id == user_id,
+                WorkspaceMember.workspace_id.in_(list(workspaces)),
+                WorkspaceMember.role.in_(_RULE_READERS),
+                WorkspaceMember.status == MembershipStatus.ACTIVE,
+            )
+        ).scalars().all()
+        readable = list(granted)
+    if not readable:
+        return []
+    rows = db.execute(
+        select(AutomationRule.id, AutomationRule.name, AutomationRule.is_active, AutomationRule.workspace_id)
+        .where(
+            AutomationRule.workspace_id.in_(readable),
+            AutomationRule.deleted_at.is_(None),
+            AutomationRule.name.ilike(pattern, escape="\\"),
+        )
+        .order_by(AutomationRule.name)
+        .limit(limit)
+    ).all()
+    return [hit("RULE", row.id, row.name, "Active" if row.is_active else "Paused", row.workspace_id) for row in rows]
 
 
 __all__ = ["SearchHit", "SearchQueryError", "SearchResults", "search"]

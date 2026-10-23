@@ -15,7 +15,8 @@ interface DesktopSidebarProps {
 }
 
 /**
- * The workspace sidebar: 260px expanded, a 68px icon rail collapsed.
+ * The workspace sidebar: as wide as the person has dragged it (260px to start), a 68px icon rail collapsed. The layout
+ * around it owns the width and the draggable divider.
  *
  * Top: the workspace identity, which is also the switcher. Middle: grouped
  * navigation. Bottom: the signed-in user's card and menu. The collapse toggle
@@ -52,8 +53,7 @@ const DesktopSidebarComponent: React.FC<DesktopSidebarProps> = ({
       className={`
         relative flex h-full min-h-0 flex-col
         fp-rail border-r border-border/80 bg-sidebar text-sidebar-foreground
-        transition-[width] duration-200 ease-out-expo
-        ${collapsed ? "w-[68px]" : "w-[260px]"}
+        w-full
         ${className}
       `}
     >

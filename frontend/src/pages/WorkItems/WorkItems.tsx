@@ -34,6 +34,7 @@ import { ApiError } from "@/services/api/client";
 import type { WorkItemStatus, WorkItemSortField } from "@/types/workItem";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { UploadTray } from "@/components/common/UploadTray";
+import { errorMessage } from "@/services/api/errors";
 
 const filterFormSchema = z.object({
   search: z.string().max(100, "Search query is too long.").optional(),
@@ -142,7 +143,7 @@ export const WorkItems: React.FC = () => {
     },
     onError: (error: unknown) => {
       if (error instanceof ApiError) {
-        toast.error(error.message ?? "Unable to reprocess document.");
+        toast.error(errorMessage(error, "Unable to reprocess document."));
         return;
       }
       toast.error("Unexpected network error.");
@@ -169,7 +170,7 @@ export const WorkItems: React.FC = () => {
     },
     onError: (error: unknown) => {
       if (error instanceof ApiError) {
-        toast.error(error.message ?? "Unable to delete document.");
+        toast.error(errorMessage(error, "Unable to delete document."));
         return;
       }
       toast.error("Unexpected network error.");

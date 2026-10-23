@@ -195,8 +195,8 @@ const PresetCard: React.FC<{
             <div>
               <h5 id={checksHeadingId} className="text-xs font-medium">Suggested checks</h5>
               <p className="mt-0.5 text-[11px] text-muted-foreground">
-                Recommendations: enabling the pack does not create them. Add the ones you want under
-                Clause assertions.
+                Enabling the pack proposes these under Clause assertions (Enterprise): add each with one click,
+                or turn it down. Nothing is added until you do.
               </p>
               <ul aria-labelledby={checksHeadingId} className="mt-1 space-y-1">
                 {preset.assertions.map((assertion, index) => (
@@ -221,7 +221,8 @@ const PresetCard: React.FC<{
                 <p className="text-xs text-muted-foreground">What it removes: {profile.hint}</p>
               ) : null}
               <p className="text-[11px] text-muted-foreground">
-                Choose it when you start a redaction; enabling the pack does not redact anything.
+                When you start a redaction on a document this pack recognises, this profile is offered first.
+                Enabling the pack redacts nothing; you review every region before anything is applied.
               </p>
               {preset.safe_harbor_notice && (
                 <p className="mt-1.5 flex items-start gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/5 px-2.5 py-2 text-xs">
@@ -277,8 +278,9 @@ export const PresetGallery: React.FC<PresetGalleryProps> = ({
         <h3 className="text-sm font-medium">Document packs</h3>
         <p className="mt-1 text-xs text-muted-foreground">
           A pack gives a document type its field list: once enabled, new documents that match it
-          are read with those fields. It also recommends checks and a redaction profile, which you
-          add yourself. Apply one, review it, then enable it.
+          are read with those fields. It also proposes its suggested checks under Clause assertions,
+          one click to add each, and offers its redaction profile first when you redact a matching
+          document. Apply one, review it, then enable it.
         </p>
       </div>
 

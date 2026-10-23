@@ -11,6 +11,10 @@ from app.api.v1 import (
     packet_splits,
     cases,
     public_document_requests,
+    public_inbound_email,
+    erp_zoho,
+    inbound_email,
+    getting_started,
     public_pricing,
     tables,
     corroboration,
@@ -172,6 +176,10 @@ api_router.include_router(packet_splits.router)
 # the public upload is authorised by its single-use token (PUBLIC_ROUTES).
 api_router.include_router(cases.router)
 api_router.include_router(public_document_requests.router)
+api_router.include_router(getting_started.router)  # Final session 1: first money found
+api_router.include_router(inbound_email.router)  # Final session 1: email-in settings
+api_router.include_router(public_inbound_email.router)  # Final session 1: Postmark inbound webhook
+api_router.include_router(erp_zoho.router)  # Final session 1 (3C): Zoho Books Connect
 # ARCH44-S1:tables-router. Every route is gated on capability.table_intelligence.
 api_router.include_router(tables.router)
 # Phase 1 batch engine. Every route is gated on capability.batch_dispatch.

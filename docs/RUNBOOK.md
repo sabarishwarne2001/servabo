@@ -838,3 +838,117 @@ open('groq-2026-09.csv').read(), 'source_key': 'groq:2026-09'}}` (at least two d
 ends). The job's result in Platform admin, Jobs shows the drift; `alert_raised` is true when it is
 above `RECONCILE_ALERT_BPS` or something was generated but never metered.
 
+
+### 9.10 Email-in: documents forwarded to a workspace's own address (Final session 1)
+
+Customers forward invoices to an address that belongs to their workspace; Servabo adds each attachment as a document (a zip becomes all
+the documents inside it) through the same path as an upload, so plan limits, GST Credit, Helm and the value receipt all apply. Postmark
+receives the mail and calls Servabo's webhook. **Nothing here works until you do the steps below; until then the settings page says
+"Email-in is not switched on yet" and the webhook answers 404.**
+
+**One-time setup *(not run here; Final session 2 tries it with a tunnel)*.**
+1. In Postmark, create an **inbound** server (or use the one you have) and note its **inbound hash**: the part before the `@` in the
+   address Postmark shows (`<hash>@inbound.postmarkapp.com`).
+2. In `.env.production` set a long random credential and the hash (generate the password with `openssl rand -base64 36`):
+   ```
+   POSTMARK_INBOUND_WEBHOOK_USER=postmark
+   POSTMARK_INBOUND_WEBHOOK_PASSWORD=<the long random value>
+   POSTMARK_INBOUND_HASH=<the inbound hash>
+   ```
+   then `$COMPOSE up -d web`. (Optional: `POSTMARK_INBOUND_ALLOWED_IPS` with the addresses Postmark delivers from, if you want that check too.)
+3. In Postmark, the inbound server's settings, **Webhook** field:
+   `https://postmark:<the long random value>@app.servabo.app/api/v1/inbound/postmark`
+   (Postmark does not sign inbound messages; it documents HTTP basic auth in the URL, over HTTPS only. The route compares both parts in
+   constant time and never prints them.) Use Postmark's "Check" button: it must say the webhook answered 200 or 403, not 401 or 404.
+4. Open any workspace → Settings → Email-in: the address (`<hash>+<long token>@inbound.postmarkapp.com`) is shown with a copy button.
+   Allow the sender you will test with, forward an invoice to the address, and see it arrive.
+
+**Later, with your own domain.** Add an MX record `in.servabo.app` → `inbound.postmarkapp.com` (priority 10) in Cloudflare DNS, set the
+inbound domain on the Postmark server, then set `INBOUND_EMAIL_DOMAIN=in.servabo.app` and restart `web`. Addresses become
+`<long token>@in.servabo.app`. Old-form mail is still routed (the token is the same), so nothing breaks while customers change over.
+
+**How it behaves (so you can answer a customer).**
+- Only senders (addresses or domains) the workspace administrator allowed are added straight away. Anyone else's mail is **held** on the
+  Email-in page for an admin to Approve or Discard, and the admin gets a notice. Nothing is dropped silently.
+- A message the plan or an ended trial stops is held whole (nothing half-added) with the reason; approve it after upgrading.
+- "Change address" (an admin) replaces the token at once. Mail still sent to the old address gets a **403**, which Postmark treats as
+  permanent and stops retrying, so nobody's mail loops for hours.
+- Answers the webhook gives: 200 received (also for a message already seen), 401 bad credential, 403 unknown or retired address, 404 not
+  switched on, 413 over `INBOUND_EMAIL_MAX_BODY_MB` (50), 422 not a Postmark message, 429 rate limited, 5xx unexpected (Postmark retries).
+- Small inline pictures (signatures, logos under 30 KB) are ignored. A GSTR-2B JSON is never read as a document: it is set aside with
+  "import it on the GST credit page".
+- Held and discarded messages (with the attachments kept for them) are deleted after 30 days by the nightly
+  `servabo-sweep compliance --inbound` (installed with the other sweeps, section 9.6). Nothing logs a sender, a subject, an attachment or
+  an address's token.
+
+**If mail does not arrive.** Postmark's Activity page for the inbound server shows each message and the webhook's answer. 401: the
+password in the Postmark URL differs from `.env.production`. 404: `POSTMARK_INBOUND_WEBHOOK_*` are not set on `web`. 403: the customer is
+using an old address (ask them to copy the new one). 200 but nothing in the workspace: look at Settings → Email-in → Waiting for you.
+
+### 9.11 Deleted workspaces and organizations (Final session 1)
+
+Deleting a workspace or an organization archives it; its data is purged later by the nightly `servabo-sweep compliance` line (its `--archived` flag):
+30 days after archiving the documents, files, conversations and settings go (until then **Restore** works); the money records (GST
+books, the Helm ledger, invoices, usage) and the audit trail stay; an organization itself is deleted 72 months after archiving
+(`ARCHIVED_PURGE_GRACE_DAYS`, `ARCHIVED_FINAL_DELETE_MONTHS`; the CGST Act s.36 books period). Look first without changing anything:
+`$COMPOSE run --rm ... python scripts/sweep_compliance.py --archived` (a dry run prints what it would do). The final deletion refuses, and
+says so, while an audit entry is younger than 400 days: the audit trail is never shortened.
+
+### 9.12 GST credit notices, the Monday digest, and Zoho Books Connect (Final session 1)
+
+**GST notices and the Monday digest.** Two scheduled jobs (`gst.notices` every six hours, `gst.digest` hourly) tell owners, administrators and the billing role
+about their GST credit; each notice and each week's email is recorded in `gst_notice_sends` so it is said once. To see what a run would do for a
+test clock, in a development install: `python scripts/e2e_stand_in.py run-job --org <slug> --job gst.digest --now 2026-10-19T09:30:00+00:00` (the clock is
+ignored in production). A person turns the whole thing off under Notifications → "GST credit".
+
+**Zoho Books Connect.** In Zoho's API console (api-console.zoho.in) create a *Server-based Application*; set its authorized redirect URI to
+`<your API address>/api/v1/erp/zoho/callback`, and put the Client ID, Client Secret and that same URI in `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`,
+`ZOHO_REDIRECT_URI`. Restart the API. Until all three are set the Connect button says the sign-in is not set up. Customers then use ERP posting →
+Connect your books. If a customer reports "Reconnect Zoho Books", Zoho no longer accepts their saved sign-in (they removed the app, or changed their
+password policy): they press Reconnect and waiting postings are sent again by themselves. `ZOHO_ACCOUNTS_URL_OVERRIDE` and `ZOHO_API_URL_OVERRIDE` are for the
+test stand-in only and make the API refuse to start in production. The Zoho side has not been run against real Zoho yet (LIVE-VERIFICATION, Final session 2).
+
+### 9.13 Error tracking (Final session 1)
+
+Off until you set `SENTRY_DSN`. To switch on: sign up at sentry.io and **choose the EU data region**, create two projects (one "Python" for the API
+and workers, one "Browser JavaScript" for the web app), and copy each project's DSN (Settings → Client Keys). Put the first in `.env` as `SENTRY_DSN`
+(it must be https; the app refuses to start otherwise). For the web app, put the second in `frontend/.env` as `VITE_SENTRY_DSN` **before building the
+frontend**, and set `SENTRY_INGEST_HOST` in `.env` to that DSN's host (the part after the `@`, e.g. `o4500000.ingest.de.sentry.io`; `python scripts/preflight.py`
+prints it) so the browser is allowed to reach it. Restart. Optional: `SENTRY_ENVIRONMENT`, `SENTRY_RELEASE` (defaults to the image tag),
+`SENTRY_TRACES_SAMPLE_RATE` (0). Only server errors and unhandled exceptions are sent; emails, tokens, document text, GSTINs, amounts, request bodies,
+cookies and the person are removed before they leave (`app/core/error_tracking.py`, `frontend/src/monitoring.ts`; both are tested). What you will see: which
+line failed, which job (`job_type`), which organization and workspace (opaque ids), how often. To switch off, empty the DSNs and restart (rebuild the
+frontend). GlitchTip: the same settings with your GlitchTip DSN.
+
+### 9.14 Is this setup ready? `scripts/preflight.py` (Final session 1)
+
+Run it before the first start, after every change of settings and before each launch step:
+`docker compose -f backend/docker-compose.prod.yml run --rm web python scripts/preflight.py`. It reads the settings exactly as the app does and prints a
+table: **OK**, **MISSING** (not set), **WRONG** (set to something that will not work) or **SKIPPED** (optional and off, or needs `--online`), each with a
+one-line fix and where to click. It never prints a secret (at most "set", or the last four characters of a public id). It exits 0 when ready, 1 when not;
+`--json` gives machine-readable output. `--online` adds read-only calls (database, Redis, storage bucket, SMTP login without sending, Groq's model list,
+Dodo's product list, Postmark's server record); against a **live** Dodo account it refuses unless you add `--i-mean-live` (it still only reads).
+`--send-test-email you@example.com` sends exactly one message. It checks: the environment and URLs, the production guard, database, Redis, storage (and R2's EU
+endpoint), the mail relay, the Groq, Gemini and encryption keys, Dodo (test or live agree, the webhook secret, all eight product ids), email-in, Zoho,
+error tracking, the NIC key, the backup key and folder, `ALERT_WEBHOOK`, `OPERATOR_ALERT_EMAILS` and the CPU-only image.
+
+### 9.15 Webhook events for GST and workflow runs, warehouse datasets, pack checks, and the logo (Final session 1)
+
+**Five more webhook events** (`gst.return.imported`, `gst.invoice.at_risk`, `gst.supplier.not_reported`, `automation.run.failed`, `automation.run.held`). A customer ticks them on an
+endpoint under Organization → Webhooks; payloads and behaviour are in `docs/product/WEBHOOK-EVENTS.md`. Nothing to configure. If a customer says "my endpoint got nothing": the endpoint
+must be Active and subscribed to that event; the GST clock events come from the hourly `automation.sweep` and need a workspace whose plan opens the GST lists; a held or failed run
+is announced when it is recorded. `webhook_deliveries` shows every attempt, as for every other event. Migration `k1a6_engine_webhook_events` widens the two database checks that pin the
+event names; downgrading it deletes the deliveries of these events and removes them from endpoints' subscriptions.
+
+**Two warehouse datasets for Enterprise** (`GST_MATCHES`, `HELM_LEDGER`). They appear on Organization → Analytics next to the others, tagged Enterprise, and need the same warehouse
+add-on every export needs plus the plan capabilities for GST credit and Helm "across every workspace". Their column lists are served by `GET …/analytics/datasets`. A schedule that
+was made on Enterprise keeps running after a downgrade without them (a warning `analytics.sync.datasets_not_included` is logged); a manual sync or a new schedule without the plan is
+refused with a 402 in plain words.
+
+**Document packs propose their checks.** Enabling a pack lists its suggested checks under Clause assertions (Enterprise) for an administrator to add with one click or turn down; a turned-down
+check is remembered per workspace (`workspace_schema_presets.dismissed_checks`, migration `k1a7`). Twelve of the fourteen shipped checks are read by an AI model and are billed as
+assistant usage on every document once added (N-181): if a customer is surprised by that usage line, this is the place to look (Clause assertions → Clause checks).
+
+**The logo.** Every brand file is generated from one place: `brand/scripts/build_brand_assets.py` writes `brand/assets/*`, `brand/mark.ts` and the app and website copies. To change the logo,
+edit the mark's drawing in that script (its geometry is described in `brand/README.md`) and run it (it needs `fonttools`, `brotli`, `cairosvg`, `pillow`, `shapely`, `svgpathtools`). The current artwork is a
+recreation of the supplied picture (N-176). A workspace with no logo of its own shows the Servabo mark.

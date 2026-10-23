@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useAskPlanOwners } from "@/components/billing/AskPlanOwners";
+import { PurchaseAction, formatAddonPrice } from "@/components/billing/AddOnLockCard";
+import type { AddonAccess } from "@/types/entitlements";
 
 /** "Business and Enterprise", "Developer, Business and Enterprise". */
 export const joinPlanNames = (names: readonly string[]): string => {
@@ -23,6 +25,13 @@ export interface UpgradePlanDialogProps {
   readonly canChangePlan: boolean;
   readonly billingPath: string;
   readonly onClose: () => void;
+  /**
+   * Final session 1 (1D, F-552): the add-on that also unlocks the feature, when one does and this organization can
+   * still buy it (Developer and GST Credit). The dialog then names it with its price and, for an owner, offers its
+   * checkout beside "View plans"; anyone else is told whom to ask.
+   */
+  readonly addon?: AddonAccess | null;
+  readonly organizationId?: string;
 }
 
 /**
@@ -39,18 +48,27 @@ export const UpgradePlanDialog: React.FC<UpgradePlanDialogProps> = ({
   canChangePlan,
   billingPath,
   onClose,
+  addon = null,
+  organizationId,
 }) => {
   const navigate = useNavigate();
   const plans = joinPlanNames(includedIn);
   const askOwners = useAskPlanOwners("upgrade");
+  const offerAddon =
+    addon !== null && organizationId !== undefined && (addon.state === "NOT_GRANTED" || addon.state === "LAPSED") && addon.purchasable;
+  const addonPrice = offerAddon && addon ? formatAddonPrice(addon.monthly_price_micros, addon.currency) : "";
+  const addonSentence =
+    offerAddon && addon
+      ? ` ${addon.sold_on.length > 0 ? `On ${addon.sold_on.join(" or ")}, ` : ""}you can also add ${addon.display_name} for ${addonPrice} a month for your organization.`
+      : "";
   return (
     <ConfirmDialog
       open={open}
       title={`${featureName} isn't included in your plan`}
       message={
         canChangePlan
-          ? `${featureName} is included on ${plans}. Upgrade to turn it on for your whole organization.`
-          : `${featureName} is included on ${plans}. ${askOwners}`
+          ? `${featureName} is included on ${plans}. Upgrade to turn it on for your whole organization.${addonSentence}`
+          : `${featureName} is included on ${plans}. ${askOwners}${addonSentence}`
       }
       confirmText={canChangePlan ? "View plans" : "Got it"}
       cancelText="Not now"
@@ -64,7 +82,18 @@ export const UpgradePlanDialog: React.FC<UpgradePlanDialogProps> = ({
         }
       }}
       onCancel={onClose}
-    />
+    >
+      {offerAddon && addon && organizationId ? (
+        <div className="mt-3" data-testid="upgrade-addon-offer">
+          <PurchaseAction
+            organizationId={organizationId}
+            addon={addon}
+            canPurchase={canChangePlan}
+            label={`Add ${addon.display_name} — ${addonPrice} a month`}
+          />
+        </div>
+      ) : null}
+    </ConfirmDialog>
   );
 };
 

@@ -12,7 +12,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Optional
 
-from sqlalchemy import (CHAR, Boolean, BigInteger, DateTime, ForeignKey, Integer, LargeBinary, Numeric, SmallInteger,
+from sqlalchemy import (CHAR, Boolean, BigInteger, DateTime, ForeignKey, ForeignKeyConstraint, Index, Integer, LargeBinary, Numeric, SmallInteger,
                         String, Text)
 from sqlalchemy import text as sa_text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID as PgUUID
@@ -167,3 +167,27 @@ class ErpPostingAttempt(Base):
 
 
 __all__ = ["ErpLookupTable", "ErpMapping", "ErpPosting", "ErpPostingAttempt", "ErpTarget"]
+
+
+class ErpOauthState(Base):
+    """A Zoho "Connect" sign-in in progress: the nonce of the signed state, who started it and for which workspace (3C).
+    Marked used by the callback with one conditional update, so the state works once."""
+
+    __tablename__ = "erp_oauth_states"
+    __table_args__ = (
+        ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="CASCADE",
+                             name="erp_oauth_states_organization_id_fkey"),
+        ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE", name="erp_oauth_states_user_id_fkey"),
+        Index("ix_erp_oauth_states_expires", "expires_at"),
+    )
+
+    nonce: Mapped[str] = mapped_column(String(64), primary_key=True)
+    organization_id: Mapped[uuid.UUID] = _uuid(nullable=False)
+    workspace_id: Mapped[uuid.UUID] = _uuid(nullable=False)
+    user_id: Mapped[uuid.UUID] = _uuid(nullable=False)
+    target_id: Mapped[Optional[uuid.UUID]] = _uuid(nullable=True)
+    provider: Mapped[str] = mapped_column(String(16), nullable=False, server_default=sa_text("'zoho'"))
+    data_centre: Mapped[str] = mapped_column(String(4), nullable=False)
+    created_at: Mapped[datetime] = _ts()
+    expires_at: Mapped[datetime] = _ts()
+    used_at: Mapped[Optional[datetime]] = _ts(nullable=True)

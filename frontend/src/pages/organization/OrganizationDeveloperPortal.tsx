@@ -1,4 +1,7 @@
 import { formatTimestamp, formatTimestampDate } from "@/utils/displayTime";
+import { PlanLockBanner } from "@/components/billing/PlanLockBanner";
+import { CAPABILITY } from "@/constants/capabilities";
+import { useCapabilityAccess } from "@/hooks/useCapabilityAccess";
 import React, { useId, useMemo, useRef, useState } from "react";
 import {
   useInfiniteQuery,
@@ -701,7 +704,9 @@ const statusTone = (statusCode: number | null, throttled: boolean): string => {
 const RequestLog: React.FC<{
   organizationId: string;
   keys: readonly DeveloperKeySummary[];
-}> = ({ organizationId, keys }) => {
+  /** The log is part of the developer API; below it the request is refused (402), so it is not made (F-597). */
+  enabled: boolean;
+}> = ({ organizationId, keys, enabled }) => {
   const [apiKeyId, setApiKeyId] = useState<string>("");
   const [outcome, setOutcome] = useState<RequestLogOutcome>("all");
   const [days, setDays] = useState(7);
@@ -718,9 +723,19 @@ const RequestLog: React.FC<{
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.next_cursor ?? undefined,
     staleTime: 15_000,
+    enabled,
+    retry: false,
   });
 
   const rows = log.data?.pages.flatMap((page) => page.items) ?? [];
+
+  if (!enabled) {
+    return (
+      <p className="text-sm text-muted-foreground" data-testid="developer-request-log">
+        The request log is part of the developer API, which is not included in your plan.
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-3" data-testid="developer-request-log">
@@ -944,6 +959,7 @@ const ApiExplorer: React.FC<{ organizationId: string }> = ({
 
 export const OrganizationDeveloperPortal: React.FC = () => {
   const { organization, organizationId } = useResolvedOrganization();
+  const developerApi = useCapabilityAccess(organizationId, CAPABILITY.developerApi);
   const queryClient = useQueryClient();
   const [windowDays, setWindowDays] = useState(30);
   const [issuing, setIssuing] = useState(false);
@@ -998,6 +1014,7 @@ export const OrganizationDeveloperPortal: React.FC = () => {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-5xl space-y-5">
+        <PlanLockBanner capability={CAPABILITY.developerApi} feature="The developer platform" />
         <PageHeader
           icon={TerminalSquare}
           eyebrow={organization.organization_name}
@@ -1122,7 +1139,7 @@ export const OrganizationDeveloperPortal: React.FC = () => {
             Every call your API keys made to the public gateway, newest first.
             Filter to failures to see exactly which request broke and when.
           </p>
-          <RequestLog organizationId={organizationId} keys={data.keys} />
+          <RequestLog organizationId={organizationId} keys={data.keys} enabled={developerApi.isLoading || developerApi.granted} />
         </section>
 
         <section className="rounded-lg border border-border p-4">

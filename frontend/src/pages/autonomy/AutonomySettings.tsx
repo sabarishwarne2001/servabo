@@ -131,8 +131,13 @@ export const AutonomySettings: React.FC = () => {
     }
     setAlphaTenths(Math.round((toNumber(entry.target_error_rate) ?? 0.05) * 1000));
     setAuditPercent(Math.round((toNumber(entry.audit_sample_rate) ?? 0.02) * 100));
-    setNotice(null);
   }, [entry]);
+
+  // The confirmation after a save belongs to the decision type that was saved. It must outlive the refetch that
+  // follows the save (a new `entry`), so it is cleared only when another decision type is selected.
+  useEffect(() => {
+    setNotice(null);
+  }, [selected]);
 
   const alpha = alphaTenths / 1000;
   const auditRate = auditPercent / 100;

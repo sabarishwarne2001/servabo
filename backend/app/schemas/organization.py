@@ -79,6 +79,20 @@ class UserSummary(BaseModel):
 # Request Schemas
 # ============================================================================
 
+def _clean_name(value: str | None, *, required: bool) -> str | None:
+    """A name is what is left after the spaces around it are removed, and a required one cannot be empty.
+
+    Without this an organization could be saved with a name of spaces (blank in the switcher, on invitations and
+    in the page heading) or with spaces around a real one (F-581).
+    """
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if required and not cleaned:
+        raise ValueError("The name cannot be empty or only spaces.")
+    return cleaned or None
+
+
 class OrganizationCreate(BaseModel):
     """
     Provisions a new tenant: an organization plus its first workspace.
@@ -117,6 +131,16 @@ class OrganizationCreate(BaseModel):
     currency: str = Field(default="USD", max_length=10)
     date_format: str = Field(default="YYYY-MM-DD", max_length=30)
 
+    @field_validator("organization_name")
+    @classmethod
+    def check_organization_name(cls, v: str) -> str:
+        return _clean_name(v, required=True) or ""
+
+    @field_validator("workspace_name", "legal_name")
+    @classmethod
+    def check_optional_names(cls, v: str | None) -> str | None:
+        return _clean_name(v, required=False)
+
     # F-320: only values the clocks, the matching engine and the renderer can use.
     @field_validator("timezone")
     @classmethod
@@ -151,6 +175,16 @@ class OrganizationUpdate(BaseModel):
     slug: str | None = Field(
         default=None, min_length=MIN_SLUG_LENGTH, max_length=MAX_SLUG_LENGTH
     )
+
+    @field_validator("name")
+    @classmethod
+    def check_name(cls, v: str | None) -> str | None:
+        return _clean_name(v, required=True)
+
+    @field_validator("legal_name")
+    @classmethod
+    def check_legal_name(cls, v: str | None) -> str | None:
+        return _clean_name(v, required=False)
 
 
 class OrganizationMemberRoleUpdate(BaseModel):

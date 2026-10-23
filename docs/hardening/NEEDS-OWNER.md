@@ -2245,3 +2245,207 @@ carried over, not dropped.
 Earlier entries that say "Session D" (N-129, N-138, N-140, N-158) now mean Final session 2. The other "Session E"
 (the UI-gaps pass of 2026-10-18, N-131 to N-134) is history and unaffected. `docs/PRODUCT-NEXT.md` said item 9 ("correct a field
 beside the page") was unbuilt; it was built earlier (`f53ccc8`) and the file now says so. Final session 1 rewrites the rest.
+
+
+## N-161 — One registry says what happens to every table's data, and a test keeps it complete (DECIDED (Final 1))
+
+Erasure, the retention sweep, deleting a workspace or an organization and the data export each had a hand-written list of tables, and
+sessions F, J and Helm added about forty tables to none of them (UPGRADE-AUDIT F-546 to F-551). `backend/app/services/compliance/data_map.py`
+now names **every one of the 234 tables** with its kind (document content, a person's data, a money record, settings, audit trail,
+rebuildable, or Servabo's own), what erasure, the sweep and an organization purge do with it, and which section of the export carries it.
+`backend/tests/services/test_data_map.py` compares it with the real tables: **a table added without a decision fails the build**, for
+every future session. Plain meaning for the owner: when you add a table, the build tells you to decide what happens to its data when a
+customer is erased, expires or leaves.
+
+## N-162 — Copies of a document's content go with it; money records stay and lose names and free text (DECIDED (Final 1))
+
+- **Destroyed with the document (erasure and sweep):** automation traces' values (the run itself stays), in-app notices, outbox and webhook
+  payloads and their delivery attempts, radar findings, agent proposals, verifications, fingerprints, packet splits, procurement cases, Helm
+  to-do notes, and the rest the data map lists.
+- **Kept, with names and free text blanked:** GST matches, GST decisions' notes, Helm settlements, actions and value events, bank lines. They
+  keep amounts, dates, statuses and the identifiers the books need. The names and sentences that came from the erased invoice go.
+- **The retention sweep used to destroy money records by accident**: deleting a document row made the database delete its GST matches and
+  Helm settlements, actions and value events. The sweep now *detaches* them first (the link to the document is cleared), so they stay.
+  Migration `k1a1` lets a Helm settlement exist without its document. A match with no book record at all (the invoice was missing from
+  GSTR-2B) has nothing left once its document goes and is deleted; a GST "confirm" decision is about one document (a database rule) and goes
+  with it. Helm's promises are rebuilt from documents and go with them.
+- Someone else's documents are never touched by a person's erasure (tested).
+
+## N-163 — GST rows keep the supplier's GSTIN and the books themselves; the legal basis is recorded (DECIDED (Final 1); a lawyer should confirm)
+
+A GSTIN embeds a PAN, so for a sole proprietor it is personal data. It is also the identifier the books must carry. **Decision: GST rows
+keep the supplier GSTIN, the document number and the amounts; the supplier's name (free text) goes.** The imported GSTR-2B rows (the books)
+come from the government portal, not from the erased invoice, and stay whole. Basis: Section 36 of the CGST Act 2017, books of account kept
+72 months from the due date of the annual return; the DPDP Act 2023 Sections 8(7) and 12(3) except retention required by another law (in force
+about May 2027). The text was read in practitioner copies, not on indiacode.nic.in (unreachable from the build environment). **Have your
+lawyer confirm this paragraph before a customer relies on it.** A retention policy shorter than 72 months for tax documents is the customer's
+own choice; the product does not stop it (a warning on the retention screen is a possible follow-up).
+
+## N-164 — Deleting a workspace or organization deletes its data 30 days later; the organization itself 72 months later (DECIDED (Final 1))
+
+"Delete" only archived (F-548): the documents, files and conversations stayed forever. `sweep_compliance.py --archived` (dry run unless
+`--apply`) now purges an archived workspace or organization **30 days** after archiving (`ARCHIVED_PURGE_GRACE_DAYS`; until then Restore
+works): documents through the sweep's path, conversations, settings, stored files. Money records and the audit trail stay. An organization is
+**deleted 72 months** after archiving (`ARCHIVED_FINAL_DELETE_MONTHS`, matching N-163). The owner must schedule the command (RUNBOOK).
+Not done: an email to the owner at day 1 and day 25 of the 30 ("your data will be deleted on ...").
+
+## N-165 — The final deletion never shortens the audit trail (DECIDED (Final 1))
+
+The audit log is append-only; only the audit sweeper may delete entries older than 400 days. The final organization deletion therefore
+deletes the organization's old audit entries through that sweeper path and, if any entry is younger than 400 days, **refuses and reports it**
+(`audit_blocked`) until it ages. It never weakens the trail's own rule.
+
+## N-166 — Model lists and the retired-model sentence (DECIDED (Final 1))
+
+Suggested models were checked on 2026-10-22 (the providers' own sites could not be opened from the build environment; search results and the
+providers' deprecation pages as quoted by search were used, and the ids that only secondary sources named are marked in the code):
+Gemini `gemini-3.8-flash` (generally available since September 2026, $0.75 / $3.75 per million tokens, an introductory rate Google says changes
+at the end of 2026), `gemini-3.1-pro-preview`, `gemini-2.5-pro` (not deprecated); `gemini-1.5-*` and `gemini-2.0-flash` (shut down 2026-06-01) are
+retired. OpenAI `gpt-5.5` (OpenAI's named replacement), `gpt-5.6-sol`; Anthropic the Claude 5 ids; Groq's `qwen/qwen3.8-27b` (the byok list
+said 3.6, a mismatch with the price book). **A call that a provider answers "model not found" now says "Google retired gemini-1.5-pro; choose
+another model in AI settings"** instead of the generic 400; a saved policy is not blocked at save time. The price book gains
+`gemini-3.8-flash` (cost $0.75/$3.75, price twice that); **re-check on 2027-01-01** (Google says it changes). No OpenAI or Anthropic price rows
+were added: the provider-default rows already apply and those models run on the customer's key. The default platform model
+`openai/gpt-oss-120b` is still on Groq at $0.15 / $0.60 per million tokens (search results, 2026-10-22). **Final session 2 checks every
+suggestion against a real key.** `google-generativeai` (deprecated, never imported) and the six packages only it needed are removed.
+
+## N-167 — Pillow 13 and the safe-now library upgrades (DECIDED (Final 1); N-159 closed)
+
+Pillow 13.0.0, pypdf 6.21.2 and certifi 2026.10.19 close all 30 advisories (`pip-audit` clean). paddleocr and paddlex do not cap Pillow, pip
+resolves the full set, and the image, PDF, QR, redaction, thumbnail, avatar and upload-attack tests (185) pass; **real OCR on scans is Final session
+2's job** (it cannot run here). SQLAlchemy 2.0.55, Alembic 1.20.1, pydantic 2.14.1 with pydantic-settings 2.16.1 (and `typing-inspection`,
+`typing_extensions` pinned beside it). Not done, recorded: SQLAlchemy 2.1, FastAPI 0.159 / Starlette 1.9 / uvicorn 0.54 (a family to try on its own
+with the browser suite), openai 3, anthropic 2, mistralai 3, google-genai 2, torch 2.14, Python 3.13; frontend Vite 8, TypeScript 7, ESLint 10,
+Vitest 5, Tailwind 4 (N-119), lucide 1, jsdom 29.
+
+## N-168 — Session J's leftovers (DECIDED (Final 1))
+
+(a) The upgrade dialog for a GST trigger or recipe names the GST Credit add-on, with its price and checkout for an owner. (b) Rupees are in
+lakh grouping everywhere the server writes an amount for a person ("INR 12,50,000.00"); other currencies keep thousands. (c) `{{trigger.<field>}}`
+is accepted as an alias of `{{event.<field>}}` (`{{trigger.label}}` stays the trigger's name). (d) Each browser-test run builds into
+`dist-e2e-<port>`.
+
+## N-169 — Getting started: "first money found" (DECIDED (Final 1))
+
+The checklist on the dashboard has six steps: add documents (upload, zip or email), see what was read, import a GSTR-2B, open Helm, turn on one recipe,
+invite a teammate. Every step ticks from real data; a person sees only the steps they can do (a member sees three); where a feature is a preview on the
+plan the step says what the plan or add-on unlocks. The line "Servabo has found INR … in your own documents" appears only for owners, administrators and
+the billing role, only from a figure the value receipt itself calls confirmed (or carries no honesty class), and never as zero.
+
+## N-170 — GST credit notices and the Monday digest (DECIDED (Final 1))
+
+One notification category, "GST credit", on by default, for owners, administrators and the billing role. In-app: a GSTR-2B imported; invoices reaching 150
+days unpaid (30 days left of the 180-day rule; also emailed); from the 14th, suppliers that have not reported invoices in a month whose GSTR-2B is
+imported (also emailed); from the 14th to the 20th, IMS actions waiting (only where the lists are open). Email: Mondays from 09:00 in the zone of the oldest
+workspace, once a week, only when there is something to report, rupees in lakh grouping; a plan that shows only the headline figures gets one line saying
+what the lists add and what they cost, taken from the add-on catalogue. Opt-out is the one switch. Nothing here changes a price or a plan.
+
+## N-171 — Only an owner is sent to buy (DECIDED (Final 1))
+
+The billing page has been owner-only for plan, payment method and seats since F-192, but the lock dialogs, banners and four Helm notes still offered "View
+plans" to the billing role, who could not buy there (F-577). Now every upgrade moment shows the upgrade to an owner and "Ask <owner> to …" to everyone else.
+If you want the billing role to be able to change the plan, that is a product decision to make in the permission model first; the lock surfaces will follow it
+from one function (`canManageBilling`).
+
+## N-172 — Usage and seat warnings go to the fix (DECIDED (Final 1))
+
+The 80% and 100% usage emails lead to the plan picker ("Choose a plan"), the 80% banner has "Upgrade" for the people who can change the plan. New: owners and
+administrators are told at four of five seats used (teams of five seats and up) and when every seat is taken (any team of two or more), with "Add seats" (or
+"Choose a plan" where seats come with the plan). A sole owner on a one-seat plan is never told the seat is taken.
+
+## N-173 — Zoho Books "Connect" (DECIDED (Final 1); the Zoho side UNVERIFIED)
+
+One Servabo application is registered in Zoho's API console by the person running Servabo (`ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REDIRECT_URI`); each
+customer signs in at Zoho and picks their organization. India is the default data centre; the US, Europe, Australia, Japan, Canada, Saudi Arabia and China
+are offered. One client secret is assumed to work in every data centre (Zoho says the secret can be shared or per data centre; if yours differs per
+data centre, say so and the settings will gain one per centre). Scopes ask to create and read bills, purchase orders, journals and vendor payments and to
+read contacts and settings; nothing that deletes. Bills carry the vendor's GSTIN, the GST treatment, the source and destination of supply, and per line the
+HSN or SAC code and a tax code looked up in the workspace's `taxes` table (`GST18`, `IGST18` and so on, to the id of the tax in the customer's books).
+**Zoho's pages could not be opened from the build sandbox**: data-centre hosts, scope names, the token and revoke paths and the bill's GST fields are from
+the documentation as it was known and a search summary on 2026-10-22. Final session 2 runs the connection against a real Zoho Books India trial.
+
+## N-174 — Tally Prime, guided (DECIDED (Final 1)); OPEN: should it come to Developer?
+
+A guided form (company and five ledger names) makes a download target in Tally's format with the shipped mapping: one balanced Purchase voucher per bill, CGST
+and SGST to their own Input ledgers for a supplier in the buyer's state, IGST to one ledger for another state. It is the ERP posting capability, so it is on
+Business and Enterprise like every posting target. **OPEN:** Tally is what many Indian small businesses use and a download file needs no live connection; if
+Developer should get it (alone, or as an add-on), that is a plan and price decision for the owner and nothing was changed.
+
+## N-175 — The e-invoice QR code on the document screen (DECIDED (Final 1), following Session F)
+
+Every field the QR code supplied or checked shows "From the e-invoice QR code"; the IRN has a copy button; one line says "signature not checked" (no NIC
+key configured, today), "signature checked" (the key verifies it) or "signature does not match" (a key is configured and fails; warning colour). Where the
+page's reading and the code differ both values are shown. **Which one is used follows Session F's rule, which was in the code but never written down:** the
+code's value wins only when its signature was checked; otherwise the page's reading stays and the difference is shown for a person to decide. A wrong key in
+`EINVOICE_QR_PUBLIC_KEY_PEM` makes every code read "does not match", so set it from NIC's published key (not shipped).
+
+## N-176 — The new Servabo logo is a vector recreation (DECIDED (Final 1); OWNER: drop in the original files if exact pixels matter)
+
+The new logo (a glossy cyan-to-violet ribbon "S" on a navy tile with an orbit ring and a glowing dot, and the lowercase "servabo" wordmark with its leaf) was
+given as a picture only, and the picture file was not in the session. The logo everywhere in the product, the website, the emails, the app icons and the
+social cards is a **vector recreation drawn from the picture**. It is close, not pixel-exact. If you have the original files (SVG, or a large PNG), copy them
+into `brand/assets/`, run `python brand/scripts/build_brand_assets.py` (it needs `fonttools`, `brotli`, `cairosvg`, `pillow`, `shapely`, `svgpathtools`) and
+commit; every place that shows the mark is generated from there. A workspace with no logo of its own, or whose logo will not load, now shows the Servabo mark
+(it used to show initials), so no workspace is ever blank.
+
+## N-177 — Sidebars can be resized (DECIDED (Final 1))
+
+Every sidebar has a draggable divider (mouse, finger, pen; arrows on the keyboard; double click resets). Widths: the workspace, organization and Helm
+sidebars share one width, 220 to 420 px (starts at 260); the assistant's conversation list 240 to 560 (340); the settings section list 220 to 420 (280). On a
+phone the drawer never exceeds 85% of the screen, on a computer no sidebar exceeds half the window. The width is remembered **in the browser** (not on the
+account), so another computer starts at the default.
+
+## N-178 — Organization console rules found by the test pass (DECIDED (Final 1))
+
+Found by testing every tab of the organization console (F-581 to F-600), each fixed with a test: names are one line of real text; a retention period is a whole
+number of days up to 36,500 (100 years) and a typo is explained, never saved as "keep forever"; moving a data region needs the written acknowledgement; a
+webhook address has no user name or password and a valid port; a domain claim must be a real domain that can be proved; an API key has a real name, each
+scope once and an expiry still ahead. **Administrators read Enterprise identity** (webhooks and the audit log too), as N-006 decided; every write there stays
+the owner's, on the server and on the page. Nothing here changes a price or a plan.
+
+## N-179 — Public webhook events for the engines (DECIDED (Final 1))
+
+Five events a customer's systems can subscribe to (any plan with webhooks): `gst.return.imported`, `gst.invoice.at_risk` (150 days unpaid, 30 left of the
+180), `gst.supplier.not_reported` (waited longer than the workspace's notice, 30 days unless changed), `automation.run.failed` (a run ended failed, timed out
+or ran out of budget) and `automation.run.held` (a run was held back: paused, throttled, cooldown). Once per occurrence, only when an endpoint listens; ids,
+GSTINs, micros, dates, counts and states only (no names, invoice numbers or error text). `automation.` stays a reserved internal prefix: only these two run
+events are public, listed one by one. Payloads are documented in `docs/product/WEBHOOK-EVENTS.md`. **OPEN:** whether the failed-run event should also say
+*why* (the error text can hold document content, so it does not today).
+
+## N-180 — Warehouse datasets for Enterprise (DECIDED (Final 1)); OPEN: should Business get them?
+
+`GST_MATCHES` (how each supplier record matched your invoices, with the credit) and `HELM_LEDGER` (every promise Helm found and whether it was kept), across
+every workspace; identifiers, states and figures only, no supplier or counterparty names, the sample company left out. They need the capabilities that sell
+"across every workspace" (GST credit across every workspace, Helm across every workspace: Enterprise). Creating a schedule or starting a sync without them is
+a 402 in words; a schedule made on Enterprise that later falls to a lower plan keeps running without them (and logs it) instead of breaking. **OPEN:** if
+Business should have them (alone, or with the GST Credit add-on), that is a plan decision for you; nothing was changed.
+
+## N-181 — Document packs propose their checks (DECIDED (Final 1)); OPEN: the cost of AI-read checks
+
+Enabling a pack proposes its suggested checks under Clause assertions (Enterprise); an administrator adds each with one click or turns it down; nothing is added
+by itself. A pack's severity sets the confidence the check is saved with (high 0.97, medium 0.95, low 0.90; higher sends more documents to a person). **Twelve
+of the fourteen checks the shipped packs suggest are read by an AI model** (the engine cannot make them a typed check), so each such check is billed as assistant
+usage on every document, and its button says so ("Add, read by an AI model"). If you would rather ship only typed checks in the packs, that is an edit of the
+packs' sentences, not of the code. The Redact menu offers the matching pack's profile first on a document the pack recognises.
+
+## N-182 — Money is shown one way (DECIDED (Final 1))
+
+Rupees are grouped the Indian way with the rupee sign (₹12,34,567.50) on every screen whatever the person's language; every other currency uses the person's
+language and its own symbol. One formatter, and `check:self` refuses a screen that builds its own money text.
+
+## N-183 — Global search finds GST suppliers, GST invoices and workflows (DECIDED (Final 1))
+
+Ctrl+K also finds a GST supplier (by name or GSTIN), a GST invoice (by number) and an automation rule (by name). A person sees only what they could open
+anyway: suppliers and invoices need a plan that opens the GST lists (or the add-on, or the sample company) and membership of the workspace; a workflow needs
+the contributor role or higher. Text is matched literally (a `%` finds nothing).
+
+## N-184 — What an error says to a person (DECIDED (Final 1))
+
+A refusal (a 4xx) shows the server's own sentence; a fault (a 5xx) shows a plain fallback line (the details go to error tracking, not the screen); a validation
+failure becomes one sentence naming the field in words. No screen shows `error.message` raw; `check:self` fails a new one.
+
+## N-185 — Where the Postmark and Zoho addresses live (DECIDED (Final 1))
+
+The email-in webhook and Zoho's sign-in return address are **`/api/v1/inbound/postmark`** and **`/api/v1/erp/zoho/callback`**. They first sat under `/api/v1/public/`, which is reserved for the
+API-key gateway (its own rate limits and scopes) and which a test forbids anything else to use. Nothing had been set up at Postmark or Zoho yet, so no address needs changing for a customer: when you
+do the setup in Final session 2, use these paths (RUNBOOK 9.10 and 9.12, `.env.example`).

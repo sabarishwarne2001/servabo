@@ -6,6 +6,8 @@ import { ChatPanel } from "@/components/assistant/ChatPanel";
 import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 import { isAtLeast } from "@/permissions/workspacePermissions";
 import { useResolvedTenant } from "@/routes/TenantContext";
+import { SidebarResizeHandle } from "@/components/layout/SidebarResizeHandle";
+import { ASSISTANT_SIDEBAR, useSidebarWidth } from "@/components/layout/sidebarWidth";
 import type { ConversationSession } from "@/types/assistantSuite";
 
 interface Draft {
@@ -32,6 +34,7 @@ interface Draft {
 export const Assistant: React.FC = () => {
   const workspace = useActiveWorkspace();
   const { workspaceRole } = useResolvedTenant();
+  const conversationsWidth = useSidebarWidth(ASSISTANT_SIDEBAR);
   const workspaceId = workspace?.workspaceId ?? "";
   const canWrite = isAtLeast(workspaceRole, "CONTRIBUTOR");
 
@@ -73,17 +76,27 @@ export const Assistant: React.FC = () => {
         </p>
       </header>
 
-      <section className="flex min-h-0 flex-1 flex-col gap-3 sm:gap-4 lg:grid lg:h-[calc(100vh-13rem)] lg:grid-cols-12">
-        <div className="max-h-72 shrink-0 lg:col-span-4 lg:h-full lg:max-h-none">
+      <section
+        className="flex min-h-0 flex-1 flex-col gap-3 sm:gap-4 lg:grid lg:h-[calc(100vh-13rem)] lg:grid-cols-[var(--conversations-side)_minmax(0,1fr)]"
+        style={{ "--conversations-side": `${conversationsWidth}px` } as React.CSSProperties}
+      >
+        <div className="relative max-h-72 shrink-0 lg:h-full lg:max-h-none">
           <ConversationSidebar
             workspaceId={workspaceId}
             selectedId={session?.id ?? null}
             onSelect={select}
             canWrite={canWrite}
           />
+          {/* On a computer the list's width is the person's own: drag the divider between the list and the chat. */}
+          <SidebarResizeHandle
+            spec={ASSISTANT_SIDEBAR}
+            label="Resize the conversation list"
+            viewportShare={0.5}
+            className="hidden !right-[-10px] !translate-x-0 lg:block"
+          />
         </div>
 
-        <div className="flex min-h-[480px] flex-1 flex-col lg:col-span-8 lg:h-full lg:min-h-0">
+        <div className="flex min-h-[480px] flex-1 flex-col lg:h-full lg:min-h-0">
           {session && (
             <ChatSessionBar
               workspaceId={workspaceId}

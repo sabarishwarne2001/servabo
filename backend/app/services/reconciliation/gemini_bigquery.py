@@ -31,6 +31,12 @@ GEMINI_SKU_MAP: dict[str, tuple[str, str]] = {
     "gemini 2.5 flash output": ("gemini-2.5-flash", "llm.output_token"),
     "gemini 2.5 pro input": ("gemini-2.5-pro", "llm.input_token"),
     "gemini 2.5 pro output": ("gemini-2.5-pro", "llm.output_token"),
+    # Final session 1 (F-565, 2026-10-22): the current models. The 1.5 and 2.0 rows above stay because history is still
+    # billed and reconciled under the names it was billed with.
+    "gemini 3.5 flash input": ("gemini-3.5-flash", "llm.input_token"),
+    "gemini 3.5 flash output": ("gemini-3.5-flash", "llm.output_token"),
+    "gemini 3.8 flash input": ("gemini-3.8-flash", "llm.input_token"),
+    "gemini 3.8 flash output": ("gemini-3.8-flash", "llm.output_token"),
 }
 
 _TOKEN_UNITS = {"tokens", "token", "characters", "character", "count"}

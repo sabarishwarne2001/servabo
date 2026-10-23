@@ -141,6 +141,14 @@ def template_variables(template: str) -> list[str]:
     return _VARIABLE.findall(template or "")
 
 
+def canonical_variable(name: str) -> str:
+    """`trigger.<field>` is another way to write `event.<field>` (Final session 1, F-571: a schedule's date was only
+    `{{event.local_date}}`). `trigger.label`, the trigger's name, is its own variable and is not an alias."""
+    if name.startswith("trigger.") and name != "trigger.label":
+        return "event." + name[len("trigger."):]
+    return name
+
+
 def invalid_variables(template: str, *, event_keys: set[str]) -> list[str]:
     """Variables a template may not use: not static, not the selected
     triggers' event fields, and not a well-formed document field path."""
@@ -148,7 +156,8 @@ def invalid_variables(template: str, *, event_keys: set[str]) -> list[str]:
     for name in template_variables(template):
         if name in STATIC_VARIABLES:
             continue
-        if _SAFE_EVENT.match(name) and name in event_keys:
+        canonical = canonical_variable(name)
+        if _SAFE_EVENT.match(canonical) and canonical in event_keys:
             continue
         if _SAFE_FIELD.match(name):
             continue
@@ -273,7 +282,9 @@ def _workspace_date_format(state: Any) -> Optional[str]:
 
 def render(template: str, values: Mapping[str, str]) -> str:
     return _VARIABLE.sub(
-        lambda m: values[m.group(1)] if isinstance(values, (TemplateValues, PlainValues)) else values.get(m.group(1), ""),
+        lambda m: values[canonical_variable(m.group(1))]
+        if isinstance(values, (TemplateValues, PlainValues))
+        else values.get(canonical_variable(m.group(1)), ""),
         template or "",
     )
 

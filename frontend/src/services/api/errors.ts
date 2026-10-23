@@ -154,22 +154,73 @@ const formatNestedDetail = (detail: NestedDetailEnvelope["detail"]): string => {
 };
 
 /**
+ * Pydantic's own sentences ("Input should be greater than or equal to 0", "String should have at most 150 characters",
+ * "Value error, ...") are written for developers. These are the common ones in plain words, so a person is never shown the
+ * library's wording (Final session 1, Phase 5: no raw error text reaches a person). A sentence not listed is kept as it is,
+ * with its "Value error, " prefix removed (the server's own validators write those for people).
+ */
+const PLAIN_VALIDATION: ReadonlyArray<readonly [RegExp, (match: RegExpMatchArray) => string]> = [
+  [/^Field required$/i, () => "is required"],
+  [/^Input should be greater than or equal to (.+)$/i, (m) => `must be at least ${m[1]}`],
+  [/^Input should be less than or equal to (.+)$/i, (m) => `must be at most ${m[1]}`],
+  [/^Input should be greater than (.+)$/i, (m) => `must be more than ${m[1]}`],
+  [/^Input should be less than (.+)$/i, (m) => `must be less than ${m[1]}`],
+  [/^String should have at least 1 character$/i, () => "cannot be empty"],
+  [/^String should have at least (\d+) characters?$/i, (m) => `must be at least ${m[1]} characters`],
+  [/^String should have at most (\d+) characters?$/i, (m) => `must be at most ${m[1]} characters`],
+  [/^List should have at least 1 item.*$/i, () => "needs at least one choice"],
+  [/^List should have at most (\d+) items?.*$/i, (m) => `can have at most ${m[1]} entries`],
+  [/^Input should be a valid integer.*$/i, () => "must be a whole number"],
+  [/^Input should be a valid (?:number|decimal).*$/i, () => "must be a number"],
+  [/^Input should be a valid (?:boolean|bool).*$/i, () => "must be yes or no"],
+  [/^Input should be a valid string$/i, () => "must be text"],
+  [/^Input should be a valid (?:email address|email).*$/i, () => "must be a valid email address"],
+  [/^Input should be a valid UUID.*$/i, () => "is not a valid identifier"],
+  [/^Input should be a valid (?:datetime|date).*$/i, () => "must be a valid date"],
+  [/^Input should be a valid list$/i, () => "must be a list"],
+  [/^Extra inputs are not permitted$/i, () => "is not an allowed field"],
+  [/^Input should be (.+)$/i, (m) => `must be ${m[1]!.replace(/'/g, "")}`],
+];
+
+const sentenceCase = (text: string): string => (text ? text.charAt(0).toUpperCase() + text.slice(1) : text);
+
+/** "target_value" -> "Target value"; a nested path joins with " › ". */
+const plainFieldName = (parts: readonly (string | number)[]): string =>
+  sentenceCase(
+    parts
+      .filter((part): part is string => typeof part === "string")
+      .map((part) => part.replace(/_/g, " "))
+      .join(" › "),
+  );
+
+const plainValidationMessage = (raw: string): { readonly text: string; readonly plain: boolean } => {
+  const cleaned = raw.replace(/^Value error,\s*/i, "").trim();
+  for (const [pattern, write] of PLAIN_VALIDATION) {
+    const match = cleaned.match(pattern);
+    if (match) {
+      return { text: write(match), plain: true };
+    }
+  }
+  return { text: cleaned, plain: false };
+};
+
+/**
  * Formats FastAPI's validation issues into a single readable line.
  *
- * The `loc` array begins with the request part ("body", "query", "path"),
- * which is noise to a user, so it is dropped and only the field path is kept.
+ * The `loc` array begins with the request part ("body", "query", "path"), which is noise to a user, so it is dropped and
+ * only the field path is kept, in words ("Target value must be at least 0").
  */
 const formatValidationIssues = (issues: ValidationIssue[]): string => {
   const formatted = issues
     .map((issue) => {
       const field = Array.isArray(issue.loc)
-        ? issue.loc
-            .slice(1)
-            .filter((part) => typeof part === "string" || typeof part === "number")
-            .join(".")
+        ? plainFieldName(issue.loc.slice(1).filter((part) => typeof part === "string" || typeof part === "number"))
         : "";
-      const msg = typeof issue.msg === "string" ? issue.msg : "is invalid";
-      return field ? `${field}: ${msg}` : msg;
+      const { text, plain } = plainValidationMessage(typeof issue.msg === "string" ? issue.msg : "is invalid");
+      if (!field) {
+        return sentenceCase(text);
+      }
+      return plain ? `${field} ${text.charAt(0).toLowerCase()}${text.slice(1)}` : `${field}: ${text}`;
     })
     .filter(Boolean);
 

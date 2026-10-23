@@ -305,12 +305,13 @@ QBO = Preset(
 # -- Zoho Books (API v3) ------------------------------------------------------------
 _ZOHO_LINE = {"type": "object", "required": ["account_id", "rate", "quantity"],
               "properties": {"account_id": {"type": "string", "minLength": 1}, "rate": _NUM, "quantity": _NUM,
-                             "description": _STR, "item_id": _STR}}
+                             "description": _STR, "item_id": _STR, "hsn_or_sac": _STR, "tax_id": _STR}}
 _ZOHO_BILL = {"type": "object", "required": ["vendor_id", "bill_number", "date", "line_items"],
               "properties": {"vendor_id": {"type": "string", "minLength": 1}, "bill_number": {"type": "string",
                                                                                                "minLength": 1},
                              "date": _DATE, "due_date": _DATE, "currency_id": _STR, "reference_number": _STR,
-                             "notes": _STR, "line_items": {"type": "array", "minItems": 1, "items": _ZOHO_LINE}}}
+                             "gst_treatment": _STR, "gst_no": _STR, "source_of_supply": _STR,
+                             "destination_of_supply": _STR, "notes": _STR, "line_items": {"type": "array", "minItems": 1, "items": _ZOHO_LINE}}}
 _ZOHO_PO = {"type": "object", "required": ["vendor_id", "line_items"],
             "properties": {"vendor_id": {"type": "string", "minLength": 1}, "purchaseorder_number": _STR,
                            "date": _DATE, "line_items": {"type": "array", "minItems": 1, "items": {

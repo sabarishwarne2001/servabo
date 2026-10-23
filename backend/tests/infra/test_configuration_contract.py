@@ -92,6 +92,7 @@ NOT_SETTINGS: dict[str, tuple[str, str]] = {
     # Docker Compose and Caddy
     "IMAGE_TAG": ("backend/docker-compose.prod.yml", "${IMAGE_TAG"),
     "APP_DOMAIN": ("backend/deploy/Caddyfile", "{$APP_DOMAIN}"),
+    "SENTRY_INGEST_HOST": ("backend/deploy/Caddyfile", "{$SENTRY_INGEST_HOST:}"),
     "REDIS_PASSWORD": ("backend/docker-compose.prod.yml", "${REDIS_PASSWORD"),
     # Read straight from the process environment
     "SERVICE_ROLE": ("backend/app/db/session.py", "SERVICE_ROLE"),
@@ -401,7 +402,12 @@ def test_the_frontend_template_names_only_what_the_web_app_reads() -> None:
     """F-010: the web app reads VITE_API_URL and (website session) VITE_WEBSITE_URL;
     VITE_APP_NAME, VITE_APP_VERSION and VITE_ENVIRONMENT were listed and never read."""
     names = _template_names(FRONTEND_EXAMPLE)
-    assert names == {"VITE_API_URL", "VITE_WEBSITE_URL"}, names
+    # Final session 1 (4A): error tracking reads four more, in src/monitoring.ts (checked below).
+    assert names == {"VITE_API_URL", "VITE_WEBSITE_URL", "VITE_SENTRY_DSN", "VITE_SENTRY_ENVIRONMENT", "VITE_RELEASE",
+                     "VITE_SENTRY_TRACES_SAMPLE_RATE"}, names
+    monitoring = (REPO / "frontend" / "src" / "monitoring.ts").read_text(encoding="utf-8")
+    for name in ("VITE_SENTRY_DSN", "VITE_SENTRY_ENVIRONMENT", "VITE_RELEASE", "VITE_SENTRY_TRACES_SAMPLE_RATE"):
+        assert f'"{name}"' in monitoring, f"src/monitoring.ts no longer reads {name}"
     client = (REPO / "frontend" / "src" / "services" / "api" / "client.ts").read_text(encoding="utf-8")
     assert "import.meta.env.VITE_API_URL" in client
     website = (REPO / "frontend" / "src" / "config" / "website.ts").read_text(encoding="utf-8")

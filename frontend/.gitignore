@@ -10,6 +10,7 @@ jspm_packages/
 # =====================================================
 
 dist/
+dist-e2e-*/
 dist-ssr/
 build/
 out/

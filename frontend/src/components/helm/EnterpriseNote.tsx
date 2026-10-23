@@ -21,7 +21,7 @@ export const EnterpriseNote: React.FC<{
     <p className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${className}`} data-testid="helm-upgrade-note">
       <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       <span>{what} part of the Enterprise plan.</span>
-      {role === "OWNER" || role === "BILLING" ? (
+      {role === "OWNER" ? (
         <Link to={organizationBillingPath(orgSlug)} className="helm-accent hover:underline">
           See plans
         </Link>

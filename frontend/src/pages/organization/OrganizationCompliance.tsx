@@ -231,29 +231,52 @@ const RetentionCard: React.FC<{
   const [autoPurge, setAutoPurge] = useState(policy.auto_purge_enabled);
   const [error, setError] = useState<string | null>(null);
 
-  const parse = (value: string): number | null => {
+  // Blank means "keep forever". Anything else must be a whole number of days: text that is not a number used to be read
+  // as blank and saved as "keep forever", so a typo quietly removed the policy (F-586).
+  const parse = (value: string): { readonly days: number | null; readonly invalid: boolean } => {
     const trimmed = value.trim();
     if (!trimmed) {
-      return null;
+      return { days: null, invalid: false };
     }
-    const parsed = Number.parseInt(trimmed, 10);
-    return Number.isFinite(parsed) ? parsed : null;
+    return /^\d+$/.test(trimmed) ? { days: Number(trimmed), invalid: false } : { days: null, invalid: true };
   };
+
+  const [saved, setSaved] = useState(false);
 
   const mutation = useMutation({
     mutationFn: () =>
       updateRetentionPolicy(organizationId, {
-        work_item_retention_days: parse(workItems),
-        conversation_retention_days: parse(conversations),
-        audit_retention_days: parse(audit),
+        work_item_retention_days: parse(workItems).days,
+        conversation_retention_days: parse(conversations).days,
+        audit_retention_days: parse(audit).days,
         auto_purge_enabled: autoPurge,
       }),
     onSuccess: () => {
       setError(null);
+      setSaved(true);
       onChanged();
     },
-    onError: (err) => setError(errorMessage(err)),
+    onError: (err) => {
+      setSaved(false);
+      setError(errorMessage(err));
+    },
   });
+
+  const submit = (): void => {
+    const fields: ReadonlyArray<readonly [string, string]> = [
+      ["Documents", workItems],
+      ["Conversations", conversations],
+      ["Audit log", audit],
+    ];
+    const wrong = fields.find(([, value]) => parse(value).invalid);
+    if (wrong) {
+      setSaved(false);
+      setError(`${wrong[0]} (days) must be a whole number of days, or left blank to keep it forever.`);
+      return;
+    }
+    setError(null);
+    mutation.mutate();
+  };
 
   return (
     <section className={CARD}>
@@ -281,7 +304,7 @@ const RetentionCard: React.FC<{
             disabled={!canWrite}
             onChange={(event) => setWorkItems(event.target.value)}
           />
-          <p className={`${HINT} mt-1`}>Minimum 30.</p>
+          <p className={`${HINT} mt-1`}>Minimum 30, maximum 36,500.</p>
         </div>
         <div>
           <label className={LABEL} htmlFor="retention-conversations">
@@ -296,7 +319,7 @@ const RetentionCard: React.FC<{
             disabled={!canWrite}
             onChange={(event) => setConversations(event.target.value)}
           />
-          <p className={`${HINT} mt-1`}>Counted from the last message, not from when the conversation began. Minimum 30.</p>
+          <p className={`${HINT} mt-1`}>Counted from the last message, not from when the conversation began. Minimum 30, maximum 36,500.</p>
         </div>
         <div>
           <label className={LABEL} htmlFor="retention-audit">
@@ -340,12 +363,18 @@ const RetentionCard: React.FC<{
         </p>
       ) : null}
 
+      {saved && !error ? (
+        <p className="mt-3 text-xs text-muted-foreground" role="status">
+          Retention policy saved.
+        </p>
+      ) : null}
+
       {canWrite ? (
         <button
           type="button"
           className="mt-4 inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
           disabled={mutation.isPending}
-          onClick={() => mutation.mutate()}
+          onClick={submit}
         >
           {mutation.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />

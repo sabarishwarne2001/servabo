@@ -34,6 +34,12 @@ export const WEBHOOK_EVENT_TYPES = [
   "helm.plan.ready",
   "helm.action.executed",
   "helm.mandate.breached",
+  // The engines (any plan with webhooks): ids and figures only, each sent once.
+  "gst.return.imported",
+  "gst.invoice.at_risk",
+  "gst.supplier.not_reported",
+  "automation.run.failed",
+  "automation.run.held",
 ] as const;
 
 export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number];

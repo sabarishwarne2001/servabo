@@ -1,38 +1,45 @@
 /**
- * The workspace's first-run checklist (campaign session 4, §A.4).
+ * The workspace's first-run checklist: a short path to the first money found (Final session 1, 2C).
  *
- * A new customer should reach a useful result within minutes: add a document (or try the built-in
- * sample invoice, an ordinary upload made by the server), see what Servabo read from it, ask the
- * assistant about it, and bring a colleague in. Each step ticks itself from the workspace's real
- * state, so the card is never out of step with what has been done; it disappears when all are done
- * or when the person hides it (remembered in this browser only).
+ * The steps come from the server, which ticks each one from real data (a document exists, one has been read, a GSTR-2B is
+ * imported, Helm is opened, a recipe exists, a teammate is invited), so the card is never out of step with what has been done.
+ * A person only sees the steps they can do. Where a feature is a preview on the plan, the step says what the plan or add-on
+ * unlocks. When the value receipt has its first confirmed figure, the card says so in one line. It can be hidden (remembered in
+ * this browser) and brought back from a link that stays on the page.
  */
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { CheckCircle2, Circle, Loader2, Sparkles, X } from "lucide-react";
+import { CheckCircle2, Circle, Copy, Loader2, Sparkles, X } from "lucide-react";
 
 import { workItemApi } from "@/services/api/workItem";
-import { getConversations } from "@/services/api/assistant";
-import { listOrganizationMembers } from "@/services/api/organization";
-import { assistantKeys, dashboardKeys, organizationKeys, workItemKeys } from "@/services/api/queryKeys";
-import { assistantPath, organizationMembersPath, workItemDetailsPath } from "@/routes/tenantPaths";
+import { dashboardKeys, workItemKeys } from "@/services/api/queryKeys";
+import { getGettingStarted, gettingStartedKeys, type GettingStartedKey } from "@/services/api/gettingStarted";
+import { getInboundEmail, inboundEmailKeys } from "@/services/api/inboundEmail";
+import {
+  automationPath,
+  gstPath,
+  helmPath,
+  organizationBillingPath,
+  organizationMembersPath,
+  workItemsPath,
+  workspaceSettingsPath,
+} from "@/routes/tenantPaths";
 import { ApiError } from "@/services/api/client";
 
 interface GettingStartedProps {
   readonly workspaceId: string;
-  readonly organizationId: string;
   readonly orgSlug: string;
   readonly workspaceSlug: string;
-  readonly totalDocuments: number;
   readonly canUpload: boolean;
-  readonly canInvite: boolean;
+  /** Workspace administrators can see the workspace's email-in address. */
+  readonly canAdmin: boolean;
 }
 
 const storageKey = (workspaceId: string): string => `fp.getting-started.hidden.${workspaceId}`;
 
-const isHidden = (workspaceId: string): boolean => {
+const readHidden = (workspaceId: string): boolean => {
   try {
     return window.localStorage.getItem(storageKey(workspaceId)) === "1";
   } catch {
@@ -40,33 +47,42 @@ const isHidden = (workspaceId: string): boolean => {
   }
 };
 
-export const GettingStarted: React.FC<GettingStartedProps> = ({
-  workspaceId,
-  organizationId,
-  orgSlug,
-  workspaceSlug,
-  totalDocuments,
-  canUpload,
-  canInvite,
-}) => {
-  const queryClient = useQueryClient();
-  const [hidden, setHidden] = useState(() => isHidden(workspaceId));
+const writeHidden = (workspaceId: string, hidden: boolean): void => {
+  try {
+    if (hidden) {
+      window.localStorage.setItem(storageKey(workspaceId), "1");
+    } else {
+      window.localStorage.removeItem(storageKey(workspaceId));
+    }
+  } catch {
+    /* private window: remembered for this visit only */
+  }
+};
 
-  const processed = useQuery({
-    queryKey: workItemKeys.list(workspaceId, { page: 1, pageSize: 1, status: "COMPLETED" }),
-    queryFn: () => workItemApi.getWorkItems(workspaceId, { page: 1, pageSize: 1, status: "COMPLETED" }),
-    enabled: !hidden && totalDocuments > 0,
-    refetchInterval: (query) => ((query.state.data?.items.length ?? 0) === 0 ? 5_000 : false),
+const linkClass = "text-xs font-medium text-primary hover:underline";
+
+export const GettingStarted: React.FC<GettingStartedProps> = ({ workspaceId, orgSlug, workspaceSlug, canUpload, canAdmin }) => {
+  const queryClient = useQueryClient();
+  const [hidden, setHidden] = useState(() => readHidden(workspaceId));
+
+  const view = useQuery({
+    queryKey: gettingStartedKeys.all(workspaceId),
+    queryFn: () => getGettingStarted(workspaceId),
+    // While a document is still being read the card checks again; once it is read the page's other queries refresh it.
+    refetchInterval: (query) => {
+      const steps = query.state.data?.steps ?? [];
+      const documents = steps.find((s) => s.key === "documents");
+      const read = steps.find((s) => s.key === "read");
+      return documents?.done && read && !read.done ? 5_000 : false;
+    },
+    retry: false,
   });
-  const conversations = useQuery({
-    queryKey: assistantKeys.conversations(workspaceId),
-    queryFn: () => getConversations(workspaceId),
-    enabled: !hidden,
-  });
-  const members = useQuery({
-    queryKey: organizationKeys.members(organizationId, false),
-    queryFn: () => listOrganizationMembers(organizationId),
-    enabled: !hidden && canInvite,
+  const documentsOpen = view.data?.steps.some((s) => s.key === "documents" && !s.done) ?? false;
+  const address = useQuery({
+    queryKey: inboundEmailKeys.all(workspaceId),
+    queryFn: () => getInboundEmail(workspaceId),
+    enabled: !hidden && canAdmin && documentsOpen,
+    retry: false,
   });
 
   const sample = useMutation({
@@ -76,6 +92,7 @@ export const GettingStarted: React.FC<GettingStartedProps> = ({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: dashboardKeys.all(workspaceId) }),
         queryClient.invalidateQueries({ queryKey: workItemKeys.all(workspaceId) }),
+        queryClient.invalidateQueries({ queryKey: gettingStartedKeys.all(workspaceId) }),
       ]);
     },
     onError: (error: unknown) => {
@@ -83,72 +100,112 @@ export const GettingStarted: React.FC<GettingStartedProps> = ({
     },
   });
 
-  const firstProcessed = processed.data?.items[0];
-  const steps = [
-    { key: "upload", done: totalDocuments > 0, title: "Add your first document" },
-    { key: "read", done: Boolean(firstProcessed), title: "See what Servabo read from it" },
-    { key: "ask", done: (conversations.data?.length ?? 0) > 0, title: "Ask the assistant about it" },
-    ...(canInvite
-      ? [{ key: "invite", done: (members.data?.seats_consumed ?? members.data?.total ?? 0) > 1, title: "Invite a colleague" }]
-      : []),
-  ];
-  const doneCount = steps.filter((step) => step.done).length;
+  const setHiddenAndRemember = (next: boolean): void => {
+    writeHidden(workspaceId, next);
+    setHidden(next);
+  };
 
-  if (hidden || doneCount === steps.length) {
+  const copyAddress = async (value: string): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success("Address copied.");
+    } catch {
+      toast.error("The address could not be copied. Select it and copy it by hand.");
+    }
+  };
+
+  if (!view.data || view.data.total === 0) {
+    return null;
+  }
+  const { steps, done, total, money } = view.data;
+  if (done === total) {
     return null;
   }
 
-  const hide = (): void => {
-    try {
-      window.localStorage.setItem(storageKey(workspaceId), "1");
-    } catch {
-      /* private window: hidden for this visit only */
-    }
-    setHidden(true);
-  };
+  if (hidden) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        <button type="button" onClick={() => setHiddenAndRemember(false)} className="font-medium text-primary hover:underline">
+          Show getting started ({done} of {total} done)
+        </button>
+      </p>
+    );
+  }
 
-  const action = (key: string): React.ReactNode => {
-    if (key === "upload" && canUpload) {
-      return (
-        <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          Drop a file above, or
-          <button
-            type="button"
-            onClick={() => sample.mutate()}
-            disabled={sample.isPending}
-            className="fp-btn fp-btn-secondary h-7 text-xs"
-          >
-            {sample.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
-            Try a sample invoice
-          </button>
-        </span>
-      );
+  const action = (key: GettingStartedKey): React.ReactNode => {
+    switch (key) {
+      case "documents":
+        return (
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            {canUpload ? <>Drop files or a zip above, or</> : null}
+            {canUpload ? (
+              <button
+                type="button"
+                onClick={() => sample.mutate()}
+                disabled={sample.isPending}
+                className="fp-btn fp-btn-secondary h-7 text-xs"
+              >
+                {sample.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
+                Try a sample invoice
+              </button>
+            ) : null}
+            {canAdmin ? (
+              address.data?.enabled && address.data.address ? (
+                <span className="flex flex-wrap items-center gap-1">
+                  or email them to
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-foreground" data-testid="getting-started-address">
+                    {address.data.address}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => void copyAddress(address.data?.address ?? "")}
+                    aria-label="Copy the email-in address"
+                    className="rounded-md p-1 hover:bg-muted"
+                  >
+                    <Copy className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                </span>
+              ) : (
+                <Link to={`${workspaceSettingsPath(orgSlug, workspaceSlug)}?section=inbound`} className={linkClass}>
+                  or set up email-in
+                </Link>
+              )
+            ) : null}
+          </span>
+        );
+      case "read":
+        return (
+          <Link to={workItemsPath(orgSlug, workspaceSlug)} className={linkClass}>
+            Open your documents
+          </Link>
+        );
+      case "gst":
+        return (
+          <Link to={gstPath(orgSlug, workspaceSlug)} className={linkClass}>
+            Open GST Credit
+          </Link>
+        );
+      case "helm":
+        return (
+          <Link to={helmPath(orgSlug)} className={linkClass}>
+            Open Helm
+          </Link>
+        );
+      case "recipe":
+        return (
+          <Link to={automationPath(orgSlug, workspaceSlug)} className={linkClass}>
+            Browse recipes
+          </Link>
+        );
+      case "invite":
+        return (
+          <Link to={organizationMembersPath(orgSlug)} className={linkClass}>
+            Go to members
+          </Link>
+        );
+      default:
+        return null;
     }
-    if (key === "read" && firstProcessed) {
-      return (
-        <Link to={workItemDetailsPath(orgSlug, workspaceSlug, firstProcessed.id)} className="text-xs font-medium text-primary hover:underline">
-          Open {firstProcessed.original_filename}
-        </Link>
-      );
-    }
-    if (key === "read" && totalDocuments > 0) {
-      return <span className="text-xs text-muted-foreground">Reading your document now…</span>;
-    }
-    if (key === "ask") {
-      return (
-        <Link to={assistantPath(orgSlug, workspaceSlug)} className="text-xs font-medium text-primary hover:underline">
-          Open the assistant
-        </Link>
-      );
-    }
-    if (key === "invite") {
-      return (
-        <Link to={organizationMembersPath(orgSlug)} className="text-xs font-medium text-primary hover:underline">
-          Go to members
-        </Link>
-      );
-    }
-    return null;
   };
 
   return (
@@ -160,27 +217,43 @@ export const GettingStarted: React.FC<GettingStartedProps> = ({
             Get started with Servabo
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {doneCount} of {steps.length} done. Each step ticks itself when you have done it.
+            {done} of {total} done. Each step ticks itself when you have done it.
           </p>
         </div>
-        <button type="button" onClick={hide} aria-label="Hide getting started" className="rounded-md p-1 text-muted-foreground hover:bg-muted">
+        <button
+          type="button"
+          onClick={() => setHiddenAndRemember(true)}
+          aria-label="Hide getting started"
+          className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+        >
           <X className="h-4 w-4" aria-hidden />
         </button>
       </div>
+      {money ? (
+        <p className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200" data-testid="getting-started-money">
+          {money.text}{" "}
+          <Link to={organizationBillingPath(orgSlug)} className="font-medium underline">
+            See the receipt
+          </Link>
+        </p>
+      ) : null}
       <ol className="mt-4 space-y-3" aria-label="Getting started steps">
         {steps.map((step) => (
-          <li key={step.key} className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            {step.done ? (
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
-            ) : (
-              <Circle className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-            )}
-            <span className={`text-sm ${step.done ? "text-muted-foreground line-through" : "text-foreground"}`}>
-              {step.title}
-              <span className="sr-only">{step.done ? " (done)" : " (to do)"}</span>
-            </span>
-            {/* A read document stays one click away: the step is done when it is read, not seen. */}
-            {step.done && step.key !== "read" ? null : action(step.key)}
+          <li key={step.key} className="space-y-1">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {step.done ? (
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+              ) : (
+                <Circle className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+              )}
+              <span className={`text-sm ${step.done ? "text-muted-foreground line-through" : "text-foreground"}`}>
+                {step.title}
+                <span className="sr-only">{step.done ? " (done)" : " (to do)"}</span>
+              </span>
+              {/* A finished step still links to the place: the work is done, not hidden. */}
+              {step.done && step.key === "documents" ? null : action(step.key)}
+            </div>
+            {step.note && !step.done ? <p className="pl-7 text-xs text-muted-foreground">{step.note}</p> : null}
           </li>
         ))}
       </ol>

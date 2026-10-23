@@ -1,10 +1,10 @@
 /**
- * FIRST RUN (campaign session 4, §A.4): a new customer reaches a useful result in minutes.
+ * FIRST RUN (campaign session 4, §A.4; rewritten in Final session 1, 2C): a new customer reaches a useful result in minutes.
  *
- * A new organization's dashboard shows "Get started with Servabo": add a document, see what was
- * read from it, ask the assistant, invite a colleague. With no document at hand the owner tries
- * the built-in sample invoice (an ordinary upload made by the server); each step ticks itself from
- * the workspace's real state, the read document opens from the card, and the card can be hidden.
+ * A new organization's dashboard shows "Get started with Servabo", a server-ticked path to the first money found. With no
+ * document at hand the owner tries the built-in sample invoice (an ordinary upload made by the server); each step ticks itself
+ * from the workspace's real state, the read step offers the documents, and the card can be hidden and brought back.
+ * (The steps for each role, the email-in address and the accessibility scan are in 120-getting-started.)
  */
 import { test, expect, expectHealthyPage } from "../support/fixtures";
 import { newCustomer, signInAs } from "../support/journey";
@@ -19,20 +19,18 @@ test.describe("First run", () => {
 
     const card = page.getByRole("region", { name: "Get started with Servabo" });
     await expect(card).toBeVisible({ timeout: 30_000 });
-    await expect(card).toContainText("0 of 4 done");
+    await expect(card).toContainText("0 of 6 done");
     const steps = card.getByRole("list", { name: "Getting started steps" });
-    await expect(steps.getByRole("listitem")).toHaveCount(4);
+    await expect(steps.getByRole("listitem")).toHaveCount(6);
 
     await card.getByRole("button", { name: "Try a sample invoice" }).click();
     await expect(page.getByText(/Sample invoice added/)).toBeVisible({ timeout: 15_000 });
     await expect(steps.getByRole("listitem").first()).toContainText("(done)", { timeout: 30_000 });
 
-    // Read by the worker like any upload; the step then offers the document itself.
-    const open = card.getByRole("link", { name: "Open sample-invoice-northwind.pdf" });
-    await expect(open).toBeVisible({ timeout: 180_000 });
-    await expect(card).toContainText("2 of 4 done");
-    await open.click();
-    await expect(page).toHaveURL(/\/work-items\/[0-9a-f-]{36}/);
+    // Read by the worker like any upload; the card then counts the second step and offers the documents.
+    await expect(card).toContainText("2 of 6 done", { timeout: 180_000 });
+    await card.getByRole("link", { name: "Open your documents" }).click();
+    await expect(page).toHaveURL(/\/work-items/);
     await expect(page.locator("main")).toContainText("sample-invoice-northwind.pdf", { timeout: 30_000 });
     await expectHealthyPage(page);
 
@@ -43,6 +41,8 @@ test.describe("First run", () => {
     await page.reload();
     await expect(page.locator("main")).toContainText(/Overview|Documents/, { timeout: 30_000 });
     await expect(page.getByRole("region", { name: "Get started with Servabo" })).toHaveCount(0);
+    await page.getByRole("button", { name: /Show getting started/ }).click();
+    await expect(page.getByRole("region", { name: "Get started with Servabo" })).toBeVisible();
     await expectHealthyPage(page);
   });
 });

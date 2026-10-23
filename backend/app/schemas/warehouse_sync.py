@@ -70,7 +70,12 @@ from app.models.warehouse_sync import (
 DestinationKind = Literal["SNOWFLAKE", "BIGQUERY", "DATABRICKS", "S3"]
 DestinationStatus = Literal["ACTIVE", "DISABLED"]
 ExportDataset = Literal[
-    "USAGE_ROLLUPS", "DOCUMENT_METADATA", "ASSISTANT_TURNS", "AUTOMATION_RUNS"
+    "USAGE_ROLLUPS",
+    "DOCUMENT_METADATA",
+    "ASSISTANT_TURNS",
+    "AUTOMATION_RUNS",
+    "GST_MATCHES",
+    "HELM_LEDGER",
 ]
 ScheduleCadence = Literal["DAILY", "WEEKLY", "MONTHLY"]
 SyncTrigger = Literal["SCHEDULED", "MANUAL"]

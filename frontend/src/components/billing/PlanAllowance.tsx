@@ -82,10 +82,23 @@ export const PlanAllowance: React.FC<PlanAllowanceProps> = ({ workspaceId, meter
       {blocked.length > 0 ? (
         <Reached data={data} meters={blocked} slug={slug} />
       ) : near.length > 0 ? (
-        <p className="mt-1 flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400">
-          <AlertTriangle className="h-3 w-3" aria-hidden />
-          {near.map((meter) => `${Math.round((meter.used / meter.limit) * 100)}% of this month's ${noun(meter.key, 2)} used`).join("; ")}.
-        </p>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <p className="flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400">
+            <AlertTriangle className="h-3 w-3" aria-hidden />
+            {near.map((meter) => `${Math.round((meter.used / meter.limit) * 100)}% of this month's ${noun(meter.key, 2)} used`).join("; ")}.
+          </p>
+          {/* Final session 1 (3B): the 80% warning offers the way out too, not only the refusal at 100%. */}
+          {data.can_upgrade && slug ? (
+            <Link
+              to={`${organizationBillingPath(slug)}#plans`}
+              data-testid="allowance-upgrade"
+              className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              Upgrade
+              <ArrowUpRight className="h-3 w-3" aria-hidden />
+            </Link>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

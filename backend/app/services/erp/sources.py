@@ -379,7 +379,8 @@ def _line_from_fields(n: int, row: Mapping[str, Any]) -> C.Line:
         unit=_text(_first(flat, ("unit", "uom", "unit_of_measure"))),
         unit_price=_decimal(_first(flat, ("unit_price", "rate", "price", "unit_cost"))),
         amount=_decimal(_first(flat, ("amount", "line_total", "total", "net_amount", "value", "line_amount"))),
-        tax_amount=_decimal(_first(flat, ("tax_amount", "tax", "gst", "vat"))))
+        tax_amount=_decimal(_first(flat, ("tax_amount", "tax", "gst", "vat"))),
+        hsn=_text(_first(flat, ("hsn_sac", "hsn", "hsn_code", "sac", "sac_code"))))
 
 
 def _table_lines(db: Session, work_item_id: uuid.UUID, *, reviewed_only: bool) -> tuple[list[C.Line], Optional[str]]:
@@ -500,6 +501,29 @@ def _parties(db: Session, obj: C.PostingObject, outcome: Outcome, doc: _Doc, wor
             obj.notes.append("buyer: this organization (the document names none)")
 
 
+def _gst(obj: C.PostingObject, doc: _Doc) -> None:
+    """Indian GST: the tax heads, the two states and a tax code on each line, when the document shows GST (else nothing)."""
+    from app.services.erp import gst_fields as G
+    from app.services.gst import fields as GF
+
+    flat = doc.flat
+    heads = {name: _decimal(_first(flat, keys)) for name, keys in (("cgst", GF.CGST_KEYS), ("sgst", GF.SGST_KEYS),
+                                                                   ("igst", GF.IGST_KEYS), ("cess", GF.CESS_KEYS))}
+    info = G.describe(vendor_gstin=obj.vendor.tax_id, buyer_gstin=obj.buyer.tax_id,
+                      place_of_supply=_first(flat, GF.PLACE_OF_SUPPLY_KEYS), **heads)
+    if not info:
+        return
+    obj.gst = info
+    raw = _raw_lines(doc.raw)
+    for index, line in enumerate(obj.lines):
+        if not line.hsn and len(raw) == len(obj.lines):
+            line.hsn = _text(_first(_flat(raw[index]), GF.LINE_HSN_KEYS))
+        line.gst_tax_key = G.line_key(info, line_amount=line.amount, line_tax=line.tax_amount, subtotal=obj.subtotal,
+                                      tax_total=obj.tax_total)
+    obj.notes.append("GST: " + ("CGST and SGST" if info.get("intra_state") else "IGST" if info.get("intra_state") is False
+                                else "the tax heads could not be told apart") + " (same state or not, from the GSTINs and heads)")
+
+
 def due_date(db: Session, workspace_id: uuid.UUID, start: Optional[date], days: Optional[int]) -> tuple[Optional[date], Optional[str]]:
     """start + days, rolled FOLLOWING to a business day on the workspace's default holiday calendar (ARCH-46)."""
     if start is None or days is None:
@@ -572,6 +596,8 @@ def build(db: Session, outcome: Outcome, object_kind: str, *, today: date) -> C.
                         quantity=Decimal(1), unit_price=amount, amount=amount)]
         obj.notes.append("lines: one line for the whole document (no line items were read)")
     obj.lines = lines
+    if base_kind in (v.OBJECT_VENDOR_BILL, v.OBJECT_PURCHASE_ORDER):
+        _gst(obj, doc)
     if base_kind == v.OBJECT_VENDOR_BILL:
         explicit = _date(_first(doc.flat, _KEYS["due_date"]), order)
         if explicit is not None:

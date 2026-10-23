@@ -117,29 +117,40 @@ def prompt_context(db: Session, *, workspace_id: uuid.UUID, text: str) -> Option
         return None
 
 
+def best_enabled_preset(
+    db: Session, *, workspace_id: uuid.UUID, text: str, redaction_only: bool = False
+) -> Optional[Any]:
+    """The pack ENABLED in the workspace whose phrases the text mentions best, or None.
+
+    Most phrases matched wins; then the pack whose phrases the text matches most completely (a specific pack over a
+    broad one); a true tie goes to the first document type alphabetically. The database's own order never decides.
+    `redaction_only` considers only the packs that name a redaction profile.
+    """
+    from app.models.ingestion import DocumentSchemaPreset
+
+    enabled = _enabled_ids(db, workspace_id)
+    if not enabled:
+        return None
+    best: Optional[tuple[tuple, Any]] = None
+    for preset in db.execute(select(DocumentSchemaPreset).where(DocumentSchemaPreset.id.in_(enabled))).scalars():
+        if redaction_only and not preset.redaction_profile:
+            continue
+        hints = list(preset.classifier_hints or [])
+        needed = min(MIN_HINTS, len(hints)) or 1
+        count = _hint_count(hints, text)
+        if not hints or count < needed:
+            continue
+        rank = (-count, -count / len(hints), preset.document_type, -(preset.version or 0), str(preset.id))
+        if best is None or rank < best[0]:
+            best = (rank, preset)
+    return best[1] if best else None
+
+
 def _prompt_context(db: Session, *, workspace_id: uuid.UUID, text: str) -> Optional[str]:
     if True:
-        from app.models.ingestion import DocumentSchemaPreset
-
-        enabled = _enabled_ids(db, workspace_id)
-        if not enabled:
+        preset = best_enabled_preset(db, workspace_id=workspace_id, text=text)
+        if preset is None:
             return None
-        # Most phrases matched wins; then the pack whose phrases the text matches most completely (a
-        # specific pack over a broad one); a true tie goes to the first document type alphabetically.
-        # The database's own order never decides.
-        best: Optional[tuple[tuple, Any]] = None
-        for preset in db.execute(select(DocumentSchemaPreset).where(DocumentSchemaPreset.id.in_(enabled))).scalars():
-            hints = list(preset.classifier_hints or [])
-            needed = min(MIN_HINTS, len(hints)) or 1
-            count = _hint_count(hints, text)
-            if not hints or count < needed:
-                continue
-            rank = (-count, -count / len(hints), preset.document_type, -(preset.version or 0), str(preset.id))
-            if best is None or rank < best[0]:
-                best = (rank, preset)
-        if best is None:
-            return None
-        preset = best[1]
         properties = (preset.schema or {}).get("properties") or {}
         lines = [
             f"This workspace also extracts {preset.label} documents with the fields below.",

@@ -54,7 +54,7 @@ TRANSFORMS ({"op": ..., parameters}):
     multiply    by (a decimal literal)
 
 FIELDS: {"to": <target field>, "value": <expr>, "required": bool, "default": <literal>}
-LINES: {"to": <target key>, "from": "lines" | "lines_with_tax", "fields": [<field>, ...]}
+LINES: {"to": <target key>, "from": "lines" | "lines_with_tax" | "lines_with_tax_codes", "fields": [<field>, ...]}
 "to" is a dotted path of identifiers (nested JSON for REST/OData targets; a
 numeric segment is an array index, "LinkedTxn.0.TxnId"); for a
 fixed format (X12, UBL, Tally) it must be one of that format's fields, and every
@@ -78,7 +78,7 @@ LANGUAGE = "fp-map/1"
 
 #: a dotted path of identifiers; a numeric segment (0-99) is an array index ("LinkedTxn.0.TxnId")
 _TARGET = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}(\.([A-Za-z_][A-Za-z0-9_]{0,63}|[0-9]{1,2})){0,6}$")
-LINE_SOURCES = ("lines", "lines_with_tax")
+LINE_SOURCES = ("lines", "lines_with_tax", "lines_with_tax_codes")
 _LOOKUP_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 #: A mapping never evaluates a template; a string that looks like one is a mistake (or an attempt).
 _TEMPLATE_MARKERS = ("{{", "{%", "${", "<%", "#{", "`", "%(", "{0", "{!")

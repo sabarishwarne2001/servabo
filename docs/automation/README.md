@@ -109,6 +109,13 @@ every recipe, so a stale one fails the build.
 Everything a rule did, grouped by what set it off. Filter by outcome (all, failed, skipped), rule and date. Open a run for its
 steps, and for each check the reason in words. **Retry this run**, and **Open the document**, are there too.
 
+## Telling your own systems (webhook events)
+
+A rule reacts *inside* Servabo. Your own systems can also subscribe, under Organization → Webhooks, to five things the engines notice (docs/product/WEBHOOK-EVENTS.md):
+`gst.return.imported`, `gst.invoice.at_risk`, `gst.supplier.not_reported`, `automation.run.failed` and `automation.run.held`. They are separate from the 37 triggers (a rule never
+hears them and a webhook never starts a rule), they carry ids and figures only, and each is sent once. `automation.run.failed` and `automation.run.held` are the two public names under the
+reserved internal `automation.` prefix; everything else under it stays internal.
+
 ## For administrators of the deployment
 
 - `AUTOMATION_DEFAULT_RUNS_PER_HOUR` (default 200; 0 = no default limit) and `CHAT_WEBHOOK_EXTRA_HOSTS`: see `docs/CONFIGURATION.md`.

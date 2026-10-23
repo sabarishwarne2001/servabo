@@ -57,6 +57,9 @@ def _run_once(state: _LoopState, shutdown: ShutdownFlag) -> None:
     except BaseException as exc:  # noqa: BLE001
         state.last_error = f"{type(exc).__name__}: {exc}"
         logger.exception("supervisor.loop_crashed", extra={"loop": name, "restarts": state.restarts})
+        from app.core import error_tracking
+
+        error_tracking.capture(exc, area="worker_loop", job_type=name)
         return
 
     state.retired = True

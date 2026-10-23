@@ -94,6 +94,8 @@ TRUTHMESH_JOB_TYPES: frozenset[str] = frozenset({"truthmesh.index_document", "tr
 TRIAL_JOB_TYPES: frozenset[str] = frozenset({"trial.reminders"})
 #: Session H (N-146): last month's value receipt, to the owners of a paying organization, on the 1st.
 MONTHLY_RECEIPT_JOB_TYPES: frozenset[str] = frozenset({"receipt.monthly"})
+#: Final session 1 (3A): the Monday GST credit digest and the daily GST notices (queries, the notification outbox and SMTP only).
+GST_NOTICE_JOB_TYPES: frozenset[str] = frozenset({"gst.digest", "gst.notices"})
 #: Campaign session 3 (N-062): owners are told at 80% and 100% of a monthly plan limit.
 USAGE_ALERT_JOB_TYPES: frozenset[str] = frozenset({"usage.limit_alerts"})
 #: Campaign session 4 (§C.4): the deployment's owner is emailed about dead jobs and error bursts.
@@ -150,6 +152,7 @@ ALL_PHASE_JOB_TYPES: frozenset[str] = (
     | TRIAL_JOB_TYPES
     | USAGE_ALERT_JOB_TYPES
     | MONTHLY_RECEIPT_JOB_TYPES
+    | GST_NOTICE_JOB_TYPES
     | OPS_ALERT_JOB_TYPES
     | HELM_JOB_TYPES
     | GST_JOB_TYPES
@@ -470,6 +473,16 @@ def _monthly_receipt(payload: dict[str, Any]) -> dict[str, Any]:
     return handle_monthly(payload)
 
 
+def _gst_digest(payload: dict[str, Any]) -> dict[str, Any]:
+    from app.services.gst.digest import handle_digest
+    return handle_digest(payload)
+
+
+def _gst_notices(payload: dict[str, Any]) -> dict[str, Any]:
+    from app.services.gst.notices import handle_notices
+    return handle_notices(payload)
+
+
 def _usage_limit_alerts(payload: dict[str, Any]) -> dict[str, Any]:
     from app.workers.handlers.usage_alerts import handle_limit_alerts
     return handle_limit_alerts(payload)
@@ -612,6 +625,8 @@ _HANDLERS = {
     "usage.limit_alerts": _usage_limit_alerts,
     # Session H (N-146). On the LIGHT profile; hourly in DEFAULT_SCHEDULE (it sends on the 1st, from 09:00 local).
     "receipt.monthly": _monthly_receipt,
+    "gst.digest": _gst_digest,
+    "gst.notices": _gst_notices,
     # Campaign session 4 (§C.4). On the LIGHT profile; every five minutes in DEFAULT_SCHEDULE.
     "ops.alerts": _operator_alerts,
     # Flagship session: Helm. On the LIGHT profile (app/workers/profiles.py).

@@ -103,7 +103,7 @@ test.describe("Automation: money and date conditions, tried on documents", () =>
     let reasons = preview.getByRole("list", { name: "What each condition decided" });
     await expect(reasons.getByRole("listitem")).toHaveCount(2);
     for (const item of await reasons.getByRole("listitem").all()) await expect(item).toContainText("✓");
-    await expect(reasons).toContainText("Total amount (INR 1,250,000.00) is greater than INR 1,000,000.00");
+    await expect(reasons).toContainText("Total amount (INR 12,50,000.00) is greater than INR 10,00,000.00");
     await expect(reasons).toContainText(/Invoice date \(.*\) is older than 150 days/);
     await expect(reasons).toContainText("200 days old");
     await expect(preview.getByRole("list", { name: "What each step would do" })).toBeVisible();
@@ -128,7 +128,7 @@ test.describe("Automation: money and date conditions, tried on documents", () =>
     reasons = preview.getByRole("list", { name: "What each condition decided" });
     const amountReason = reasons.getByRole("listitem").filter({ hasText: "Total amount" });
     await expect(amountReason).toContainText("✗");
-    await expect(amountReason).toContainText("INR 250,000.00");
+    await expect(amountReason).toContainText("INR 2,50,000.00");
     await expect(reasons.getByRole("listitem").filter({ hasText: "Invoice date" })).toContainText("✗");
 
     // Nothing was run, sent or saved by trying.

@@ -201,7 +201,8 @@ class HelmSettlement(Base):
     id: Mapped[uuid.UUID] = _uuid_pk()
     organization_id: Mapped[uuid.UUID] = _org()
     workspace_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), nullable=False)
-    work_item_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), nullable=False)
+    # NULL once the retention sweep has deleted the document: the settlement is a money record and stays (k1a1).
+    work_item_id: Mapped[Optional[uuid.UUID]] = mapped_column(PgUUID(as_uuid=True), nullable=True)
     state: Mapped[str] = mapped_column(String(10), nullable=False)
     run_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     paid_on: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
@@ -332,10 +333,10 @@ class HelmBankLine(Base):
         _workspace_fk("helm_bank_lines"),
         # The migration writes ON DELETE SET NULL (work_item_id) (Postgres 15 and later): deleting the matched
         # invoice clears only work_item_id, so workspace_id stays and the line stays masked to people who
-        # cannot read that workspace. SQLAlchemy can neither write nor read back the column list, so the
-        # model says SET NULL, which is also what the schema comparison reads from the database.
+        # cannot read that workspace. SQLAlchemy 2.0.55 reads the column list back from the database, so the
+        # model says it too (older SQLAlchemy could not, and said plain SET NULL).
         ForeignKeyConstraint(["work_item_id", "workspace_id"], ["work_items.id", "work_items.workspace_id"],
-                             name="fk_helm_bank_lines_work_item_workspace", ondelete="SET NULL"),
+                             name="fk_helm_bank_lines_work_item_workspace", ondelete="SET NULL (work_item_id)"),
         CheckConstraint(f"status IN ({v.sql_in(v.BANK_LINE_STATUSES)})", name="ck_helm_bank_lines_status"),
         CheckConstraint("amount_micros <> 0", name="ck_helm_bank_lines_amount"),
         Index("ix_helm_bank_lines_book_status", "book_id", "status", "on_date"),

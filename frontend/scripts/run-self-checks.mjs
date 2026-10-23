@@ -102,6 +102,85 @@ try {
     console.log(`FAIL  one display layer\n${bypasses.map((f) => `        - ${f}`).join("\n")}`);
   }
 
+  // Final session 1 (Phase 5): money, one way. Every amount goes through formatMoney (rupees in lakh and crore grouping
+  // with the rupee sign, other currencies with their own symbol). A hand-built "INR " + amount, a template that glues
+  // "INR" or "₹" to a number, or toLocaleString("en-US", ...) prints a number the way the browser or the developer felt
+  // like. Only the formatter itself and Helm's rupee module are allowed to build currency text.
+  const HAND_BUILT_MONEY = [
+    /["'`]\s*INR\s+["'`]\s*\+/,
+    /`\s*INR\s*\$\{/,
+    /["'`]\s*₹\s*["'`]\s*\+/,
+    /`\s*₹\s*\$\{/,
+    /\.toLocaleString\(\s*["'`]en-US/,
+  ];
+  const MONEY_ALLOWED = new Set([
+    path.join("src", "utils", "displayTime.ts"),
+    path.join("src", "components", "helm", "money.ts"),
+  ]);
+  const handBuiltMoney = [];
+  const scanMoney = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const full = path.join(dir, name);
+      if (statSync(full).isDirectory()) {
+        scanMoney(full);
+      } else if (/\.(ts|tsx)$/.test(name) && !name.endsWith(".d.ts") && !/\.test\.tsx?$/.test(name)) {
+        const relative = path.relative(ROOT, full);
+        if (MONEY_ALLOWED.has(relative)) continue;
+        readFileSync(full, "utf8").split("\n").forEach((line, index) => {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return;
+          const code = line.replace(/\/\/.*$/, "");
+          if (HAND_BUILT_MONEY.some((pattern) => pattern.test(code))) handBuiltMoney.push(`${relative}:${index + 1}: ${trimmed}`);
+        });
+      }
+    }
+  };
+  scanMoney(path.join(ROOT, "src"));
+  if (handBuiltMoney.length === 0) {
+    console.log("ok    money, one way");
+  } else {
+    failed += handBuiltMoney.length;
+    console.log(`FAIL  money, one way\n${handBuiltMoney.map((f) => `        - ${f}`).join("\n")}`);
+  }
+
+  // Final session 1 (Phase 5): no raw error text. A person is shown a sentence written for them: `errorMessage(error, fallback)`
+  // gives the server's own sentence for a refusal (4xx) and the caller's wording for a server fault (5xx, whose body is not
+  // written for people). A toast or paragraph that prints `error.message` itself shows "Request failed with status code 500"
+  // or "Internal Server Error". The crash screens' developer details are shown only in development and are allowed.
+  const RAW_ERROR = [
+    /toast\.(?:error|warning)\(\s*(?:[A-Za-z_$][\w$.?]*\.)?(?:error|err|e|failure|exception)\.message\b/,
+    /\{\s*[A-Za-z_$][\w$.?]*(?:error|err|failure)\.message\s*\}/,
+    /\{\s*String\(\s*(?:error|err)\s*\)\s*\}/,
+  ];
+  const RAW_ERROR_ALLOWED = new Set([
+    path.join("src", "components", "common", "ErrorBoundary.tsx"),   // developer details, development builds only
+    path.join("src", "components", "chat", "MessageStream.tsx"),     // the assistant's own stream error, written by the server for people
+  ]);
+  const rawErrors = [];
+  const scanErrors = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const full = path.join(dir, name);
+      if (statSync(full).isDirectory()) {
+        scanErrors(full);
+      } else if (/\.tsx?$/.test(name) && !name.endsWith(".d.ts") && !/\.test\.tsx?$/.test(name)) {
+        const relative = path.relative(ROOT, full);
+        if (RAW_ERROR_ALLOWED.has(relative)) continue;
+        readFileSync(full, "utf8").split("\n").forEach((line, index) => {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return;
+          if (RAW_ERROR.some((pattern) => pattern.test(line))) rawErrors.push(`${relative}:${index + 1}: ${trimmed}`);
+        });
+      }
+    }
+  };
+  scanErrors(path.join(ROOT, "src"));
+  if (rawErrors.length === 0) {
+    console.log("ok    no raw error text");
+  } else {
+    failed += rawErrors.length;
+    console.log(`FAIL  no raw error text\n${rawErrors.map((f) => `        - ${f}`).join("\n")}`);
+  }
+
   // Website and payments session (C10): Dodo Payments is the gateway customers see, so no screen
   // names Stripe (the dormant Stripe adapter's identifiers and comments are not shown to anyone).
   const stripeWords = [];

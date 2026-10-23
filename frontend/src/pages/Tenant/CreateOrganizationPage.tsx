@@ -29,6 +29,7 @@ import {
 } from "@/services/api/organization";
 import { authApi } from "@/services/api/auth";
 import { useAuthStore } from "@/store/useAuthStore";
+import { errorMessage } from "@/services/api/errors";
 
 const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
   const [debounced, setDebounced] = useState<T>(value);
@@ -147,11 +148,11 @@ export const CreateOrganizationPage: React.FC = () => {
           error.code === API_ERROR_CODES.SLUG_UNAVAILABLE ||
           error.code === API_ERROR_CODES.SLUG_RESERVED
         ) {
-          toast.error(error.message);
+          toast.error(errorMessage(error, "That identifier cannot be used. Choose another."));
           setSlugTouched(true);
           return;
         }
-        toast.error(error.message);
+        toast.error(errorMessage(error, "Unable to create your organization. Please try again."));
         return;
       }
       toast.error("Unable to create your organization. Please try again.");
@@ -201,7 +202,7 @@ export const CreateOrganizationPage: React.FC = () => {
   const busy = isSubmitting || isPending;
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-background px-6 py-12">
+    <main className="flex min-h-screen w-full items-center justify-center bg-background px-6 py-12">
       <div className="w-full max-w-md space-y-8">
         <header className="space-y-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
@@ -348,7 +349,7 @@ export const CreateOrganizationPage: React.FC = () => {
           </div>
         </form>
       </div>
-    </div>
+    </main>
   );
 };
 

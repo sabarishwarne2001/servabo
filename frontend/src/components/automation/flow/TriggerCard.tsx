@@ -20,7 +20,7 @@ interface TriggerCardProps {
   /** The builder shows the card inside its inspector, which already has a heading. */
   readonly bare?: boolean;
   /** A locked trigger offers "Upgrade", which opens the upgrade dialog naming what it needs. */
-  readonly onUpgrade?: ((capability: string, feature: string) => void) | undefined;
+  readonly onUpgrade?: ((capability: string, feature: string, addon?: string) => void) | undefined;
 }
 
 export const matchesTrigger = (trigger: FlowTrigger, query: string): boolean => {
@@ -133,7 +133,7 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({ catalog, selected, onC
                     <div className="border-t border-border/60 px-3 py-1.5">
                       <button
                         type="button"
-                        onClick={() => onUpgrade(trigger.capability ?? trigger.addon ?? "", trigger.label)}
+                        onClick={() => onUpgrade(trigger.capability ?? trigger.addon ?? "", trigger.label, trigger.addon ?? undefined)}
                         aria-label={`Upgrade to use the trigger: ${trigger.label}`}
                         className="text-[11px] font-semibold text-primary hover:underline"
                       >

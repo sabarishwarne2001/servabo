@@ -29,7 +29,8 @@ function productionCsp(): string | undefined {
   const caddyfile = fs.readFileSync(path.resolve(HERE, "..", "..", "backend", "deploy", "Caddyfile"), "utf8");
   const match = /Content-Security-Policy(?:-Report-Only)?\s+"([^"]+)"/.exec(caddyfile);
   if (!match) throw new Error("E2E_CSP=1 but no Content-Security-Policy header was found in backend/deploy/Caddyfile");
-  return match[1];
+  // Caddy fills {$NAME:default} from its environment; the suite has none of them set, so each becomes its (empty) default.
+  return match[1].replace(/\{\$[A-Z0-9_]+:([^}]*)\}/g, "$1").replace(/\s+;/g, ";");
 }
 const CSP = productionCsp();
 
@@ -40,10 +41,17 @@ const CSP = productionCsp();
 const WEBSITE = process.env.E2E_WEBSITE_URL ?? "http://localhost:4321";
 process.env.E2E_WEBSITE_URL = WEBSITE;
 
+/**
+ * Final session 1 (1D, F-572). Each run builds into its own folder, named for the port it serves, so two runs on the
+ * same machine (different E2E_WEB_PORT) never wipe each other's bundle mid-run: `vite build` empties its output
+ * folder first. Set E2E_DIST to choose the folder; it is git-ignored (`dist-e2e-*`) and safe to delete.
+ */
+const DIST = process.env.E2E_DIST ?? `dist-e2e-${WEB_PORT}`;
+
 const webCommand =
   MODE === "dev"
     ? `npx vite --port ${WEB_PORT} --strictPort`
-    : `npx vite build --logLevel error && npx vite preview --port ${WEB_PORT} --strictPort`;
+    : `npx vite build --outDir ${DIST} --logLevel error && npx vite preview --outDir ${DIST} --port ${WEB_PORT} --strictPort`;
 
 export default defineConfig({
   testDir: process.env.E2E_TEST_DIR ?? "./tests",

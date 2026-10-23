@@ -46,6 +46,9 @@ SCOPE_ALLOW_LIST = {
     # report (how many chunks were erased); the count and the delete go
     # through chunk_scope.count_chunks / delete_chunks_for_work_item.
     "app/services/compliance/erasure_service.py",
+    # Final session 1: the data-lifecycle registry names every table, document_chunks among them, as a dictionary
+    # key that says how the table is erased. It never reads or deletes a row.
+    "app/services/compliance/data_map.py",
 }
 
 

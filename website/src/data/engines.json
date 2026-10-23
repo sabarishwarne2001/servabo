@@ -9,7 +9,7 @@
           "id": "extraction",
           "name": "Document reading",
           "result": "Fields, line items and totals read from PDFs, scans and photos, each with the page it came from.",
-          "detail": "Upload by drag and drop, through the API, or from a supplier through a request link you send. Servabo reads the text (OCR for scans), classifies the document and extracts its fields. Anything it is unsure of goes to a person in the review queue, with the evidence highlighted on the page.",
+          "detail": "Upload by drag and drop (one file, many, or a zip of them), through the API, by forwarding an email to your workspace\u2019s own address, or from a supplier through a request link you send. Mail from people you list is read at once; anyone else\u2019s waits for an administrator to approve it. Servabo reads the text (OCR for scans), classifies the document and extracts its fields. Anything it is unsure of goes to a person in the review queue, with the evidence highlighted on the page.",
           "capability": null,
           "shot": "extraction"
         },
@@ -145,7 +145,7 @@
           "id": "erp",
           "name": "Posting to your ERP",
           "result": "Approved bills, orders, receipts and journals posted to your ERP exactly once, even when a connection drops.",
-          "detail": "QuickBooks, Zoho Books, Business Central, SAP, NetSuite, Tally, EDI X12, UBL and SFTP. Values are mapped to your ERP's codes, and a posting that cannot be confirmed is shown as such, never sent twice.",
+          "detail": "QuickBooks, Zoho Books (sign in with Zoho), Business Central, SAP, NetSuite, Tally Prime (a file you import into Tally), EDI X12, UBL and SFTP. Values are mapped to your ERP's codes, and a posting that cannot be confirmed is shown as such, never sent twice.",
           "capability": "capability.erp_posting"
         },
         {

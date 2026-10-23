@@ -556,6 +556,60 @@ class Settings(BaseSettings):
     #: How long a generated DPA archive stays downloadable.
     COMPLIANCE_EXPORT_TTL_HOURS: int = 72
 
+    # ---- Email-in (Final session 1, 2B): documents forwarded to a workspace's own address ---------------------------
+    #: Postmark's inbound webhook is secured with HTTP basic auth in its URL
+    #: (https://user:password@api.example.com/api/v1/inbound/postmark); Postmark does not sign inbound payloads.
+    #: Both empty = email-in is off (the route answers 404 and the settings page says how to switch it on).
+    POSTMARK_INBOUND_WEBHOOK_USER: str = ""
+    POSTMARK_INBOUND_WEBHOOK_PASSWORD: Optional[SecretStr] = None
+    #: Your Postmark inbound server's hash: the part before the `+` in `<hash>+<workspace-token>@inbound.postmarkapp.com`.
+    #: Used until you have a domain.
+    POSTMARK_INBOUND_HASH: str = ""
+    #: Once you own a domain (MX record for `in.<domain>` pointed at Postmark): the addresses become
+    #: `<workspace-token>@<INBOUND_EMAIL_DOMAIN>`. Empty keeps the `inbound.postmarkapp.com` form.
+    INBOUND_EMAIL_DOMAIN: str = ""
+    #: Optional allowlist of the addresses Postmark delivers from (comma-separated IPs or CIDRs); empty = not checked.
+    POSTMARK_INBOUND_ALLOWED_IPS: str = ""
+    #: The largest webhook body accepted, in MB (Postmark's own limit for a message is 35 MB; attachments travel base64).
+    INBOUND_EMAIL_MAX_BODY_MB: int = 50
+    #: Inline images smaller than this (signatures, logos) are ignored, not read as documents.
+    INBOUND_EMAIL_IGNORE_INLINE_IMAGES_KB: int = 30
+    #: Days a held or discarded message is kept before `inbound_email.sweep` deletes it and its stored attachments.
+    INBOUND_EMAIL_HELD_DAYS: int = 30
+
+    #: Error tracking (Final session 1, 4A). Empty = off, and nothing is sent. Sentry's free plan in its EU region, or a self-hosted
+    #: GlitchTip, speak the same protocol: switching is changing this one address. Only 5xx errors and unhandled exceptions are sent,
+    #: stripped of emails, tokens, cookies, request bodies, document text and field values (`app/core/error_tracking.py`).
+    SENTRY_DSN: str = ""
+    #: Shown beside each error. Empty = ENVIRONMENT.
+    SENTRY_ENVIRONMENT: str = ""
+    #: Which version failed (the image tag or git SHA). Empty = APP_VERSION.
+    SENTRY_RELEASE: str = ""
+    #: Performance traces. 0 = none (the default: it costs quota and sends request timings nobody needs yet).
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.0
+
+    #: Zoho Books "Connect" (Final session 1, 3C). Register ONE server-based application in Zoho's API console
+    #: (api-console.zoho.in) and put its Client ID and Secret here; leave both empty and the "Connect Zoho Books" button says it
+    #: is not set up on this deployment. `ZOHO_REDIRECT_URI` is the address Zoho sends the customer back to, registered in the
+    #: console exactly as written: `<API address>/api/v1/erp/zoho/callback`.
+    ZOHO_CLIENT_ID: str = ""
+    ZOHO_CLIENT_SECRET: Optional[SecretStr] = None
+    ZOHO_REDIRECT_URI: str = ""
+    #: For the end-to-end tests only (a stand-in Zoho). Replace Zoho's accounts and API addresses; refused when ENVIRONMENT=production.
+    ZOHO_ACCOUNTS_URL_OVERRIDE: str = ""
+    ZOHO_API_URL_OVERRIDE: str = ""
+
+    #: The largest zip one upload accepts, in MB (Final session 1, 2A). What it may unpack to is bounded separately
+    #: (`ingestion/archive.py`: 512 MB, 2,000 files, 100x compression, one level deep).
+    ZIP_UPLOAD_MAX_MB: int = 256
+
+    #: Days after an organization or workspace is archived before its documents, conversations and settings are purged
+    #: (`scripts/sweep_compliance.py --archived`). Until then "restore" still works. Money records stay.
+    ARCHIVED_PURGE_GRACE_DAYS: int = 30
+    #: Months after an organization is archived before the organization itself is deleted. 72 months because the CGST
+    #: Act 2017 s.36 makes a registered person keep books of account until 72 months after the annual return's due date.
+    ARCHIVED_FINAL_DELETE_MONTHS: int = 72
+
     STORAGE_SAMPLE_INTERVAL_MINUTES: int = 60
 
     MAX_DOCUMENT_PAGES: int = 500
@@ -1020,6 +1074,13 @@ class Settings(BaseSettings):
             example = "https://servabo.app" if info.field_name == "WEBSITE_URL" else "https://app.servabo.app"
             raise ValueError(f"{info.field_name} must include a scheme, e.g. {example}")
         return cleaned
+
+    @model_validator(mode="after")
+    def _refuse_zoho_overrides_in_production(self) -> "Settings":
+        if (self.ZOHO_ACCOUNTS_URL_OVERRIDE or self.ZOHO_API_URL_OVERRIDE) and (self.ENVIRONMENT or "").strip().lower() == "production":
+            raise ValueError("ZOHO_ACCOUNTS_URL_OVERRIDE and ZOHO_API_URL_OVERRIDE are for the test stand-in and are refused when "
+                             "ENVIRONMENT=production.")
+        return self
 
     @model_validator(mode="after")
     def _refuse_ml_stubs_in_production(self) -> "Settings":

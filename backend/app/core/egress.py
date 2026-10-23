@@ -298,6 +298,9 @@ def parse_pattern(raw: str, port: Optional[int] = None) -> HostPattern:
     for label in labels:
         if not label or len(label) > 63 or not set(label) <= _LABEL_OK or label.startswith("-") or label.endswith("-"):
             raise PatternError(f"{raw!r} is not a valid host name")
+    if all(label.isdigit() for label in labels):
+        # Digits and dots that are not an IP address (999.1.1.1) are a typo, never a host name (F-592).
+        raise PatternError(f"{raw!r} is not a valid IP address or host name")
     return HostPattern(raw=str(raw).strip(), kind=kind, value=text, port=port)
 
 

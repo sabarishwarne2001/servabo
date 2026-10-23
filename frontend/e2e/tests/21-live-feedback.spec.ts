@@ -245,7 +245,7 @@ test.describe("Images that cannot be shown (F-143)", () => {
 test.describe("Logos that cannot be shown (F-143)", () => {
   test.use({ user: "C.owner" });
 
-  test("a workspace logo that cannot be decoded shows the initials badge, in the header and in settings", async ({
+  test("a workspace logo that cannot be decoded shows the Servabo logo, in the header and in settings", async ({
     page,
   }) => {
     const owner = await loginAs("C.owner");
@@ -272,7 +272,9 @@ test.describe("Logos that cannot be shown (F-143)", () => {
       await expect(page.locator("main")).toBeVisible();
       await settle(page, 1_500);
       expect(await brokenImages(), "a broken-image icon is in the header").toBe(0);
-      await expect(page.getByText("LD", { exact: true }).first()).toBeVisible();
+      // The Servabo logo stands in (never initials, never a broken-image icon).
+      await expect(page.locator("svg[data-servabo-mark]").first()).toBeVisible();
+      await expect(page.getByText("LD", { exact: true })).toHaveCount(0);
 
       await page.goto(`/${TENANTS.C.org}/${created.body.slug}/settings`);
       await expect(async () => {

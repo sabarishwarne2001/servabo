@@ -55,7 +55,13 @@ class OrganizationEmailSettingsUpdate(BaseModel):
     @field_validator("smtp_host", "smtp_username", "sender_name")
     @classmethod
     def _strip(cls, value: str | None) -> str | None:
-        return value.strip() if value is not None else None
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            # Spaces alone passed the length check and were then stored as an empty value (F-583).
+            raise ValueError("This cannot be empty or only spaces.")
+        return cleaned
 
 
 # ============================================================================

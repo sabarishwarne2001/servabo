@@ -63,6 +63,29 @@ export interface WorkItemResponse {
   readonly updated_at: string;
   /** F-158: the earlier document in this workspace with the same file, when this upload is a copy. */
   readonly duplicate_of?: WorkItemReference | null;
+  /** Final session 1 (2B): where the document came from when it was not uploaded by a person. */
+  readonly source?: {
+    readonly kind: string;
+    readonly sender?: string | null;
+    readonly subject?: string | null;
+    readonly received_at?: string | null;
+  } | null;
+  /** Final session 1 (3D): what the e-invoice QR code supplied or checked, and the state of its signature. */
+  readonly einvoice_qr?: EinvoiceQr | null;
+}
+
+export type EinvoiceSignature = "not_checked" | "checked" | "does_not_match";
+
+export interface EinvoiceQr {
+  readonly source: string;
+  readonly irn: string;
+  readonly signature: EinvoiceSignature;
+  readonly filled: readonly string[];
+  readonly confirmed: readonly string[];
+  readonly overridden: readonly string[];
+  /** Fields where the model and the code differ: both values, and which one was used. */
+  readonly conflicts: readonly { readonly field: string; readonly model: unknown; readonly qr: unknown; readonly used: "qr" | "model" }[];
+  readonly note: string;
 }
 
 /**

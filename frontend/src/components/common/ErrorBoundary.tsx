@@ -47,6 +47,8 @@ export class ErrorBoundary extends Component<
     this.logError(error, errorInfo);
     if (isStaleBundleError(error)) {
       reloadOnceForStaleBundle();
+    } else {
+      void import("@/monitoring").then((monitoring) => monitoring.reportError(error));
     }
   }
 

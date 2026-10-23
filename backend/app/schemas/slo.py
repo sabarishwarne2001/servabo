@@ -72,7 +72,8 @@ class SLOSummaryResponse(BaseModel):
 
 
 class SLOTargetUpdate(BaseModel):
-    target_value: Decimal = Field(ge=0)
+    # The column holds 14 digits with 4 after the point; anything larger failed inside the database (a server error).
+    target_value: Decimal = Field(ge=0, lt=Decimal("1000000000"), allow_inf_nan=False)
     window_period: Optional[SLOWindow] = None
     is_contractual: bool = False
     notes: Optional[str] = Field(default=None, max_length=1000)

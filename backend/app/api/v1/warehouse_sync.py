@@ -599,6 +599,14 @@ def trigger_sync(
             detail="This destination is disabled. Enable it before syncing.",
         )
 
+    sync_service.require_datasets_held(
+        db,
+        organization_id=organization_id,
+        datasets=list(payload.datasets),
+        actor_id=context.user.id,
+        operation="trigger_sync",
+    )
+
     job = job_service.enqueue(
         db,
         job_type=sync_service.JOB_TYPE_EXPORT_SYNC,

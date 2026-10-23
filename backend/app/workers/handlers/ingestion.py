@@ -36,7 +36,10 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.core.storage import ObjectNotFoundError, get_storage_driver
 from app.db.session import SessionLocal
+from app.core.exceptions import SpendLimitExceededError
 from app.models.ingestion import IngestionBatch, IngestionBatchItem
+from app.services.plan_admission import PlanLimitExceededError
+from app.services.trial_service import TrialEndedError
 from app.services import document_intake_service, file_validation_service
 from app.services.ingestion import (
     archive,
@@ -46,6 +49,26 @@ from app.services.ingestion import (
 )
 
 logger = logging.getLogger("app.workers.handlers.ingestion")
+
+
+#: A zip's skipped files are listed, up to this many; the rest are counted in the summary line only.
+MAX_SKIPPED_LISTED = 200
+
+
+class MemberRefused(Exception):
+    """A member of a zip was refused for a reason the person can act on. `code` is stored on its batch item."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+def _drop_stored_archive(driver: Any, key: str) -> None:
+    """The zip was only the carrier: once its members are documents it is deleted (best effort; a failure is logged)."""
+    try:
+        driver.delete(key)
+    except Exception:  # noqa: BLE001 - a leftover object is housekeeping, never a failed upload
+        logger.warning("ingestion.archive_object_not_deleted", extra={"key": key})
 
 
 def handle_batch_expand_archive(payload: dict[str, Any]) -> dict[str, Any]:
@@ -84,7 +107,11 @@ def handle_batch_expand_archive(payload: dict[str, Any]) -> dict[str, Any]:
             return {"expanded": 0, "failed": 1}
 
         try:
-            entries = list(archive.expand(blob, depth=1))
+            members = list(archive.expand_members(blob, depth=1))
+            entries = [member for member in members if isinstance(member, archive.ArchiveEntry)]
+            skipped = [member for member in members if isinstance(member, archive.SkippedEntry)]
+            if not entries and not skipped:
+                raise archive.ArchiveRejected("ARCHIVE_EMPTY", "The archive contains no files.")
         except archive.ArchiveRejected as exc:
             # The whole archive is refused. Its single item fails with the
             # limit's own code, so the failures drawer says "compression ratio"
@@ -116,6 +143,8 @@ def handle_batch_expand_archive(payload: dict[str, Any]) -> dict[str, Any]:
             ],
         )
         batch_service.record_container_expanded(db, item=archive_item)
+        # Members that are not documents are listed for the person (the tray reads them), not failed (Final session 1, 2A).
+        batch.skipped = [entry.as_dict() for entry in skipped[:MAX_SKIPPED_LISTED]]
         db.commit()
 
         by_key = {item.client_key: item for item in created}
@@ -138,15 +167,22 @@ def handle_batch_expand_archive(payload: dict[str, Any]) -> dict[str, Any]:
                 max_pages=settings.MAX_DOCUMENT_PAGES,
                 scrub_metadata=settings.SCRUB_UPLOAD_METADATA,
             )
-            with validated:
-                result = document_intake_service.ingest_validated(
-                    db,
-                    validated,
-                    organization_id=organization_id,
-                    workspace_id=workspace_id,
-                    uploader_id=uploader,
-                    enqueue_extraction=True,
-                )
+            try:
+                with validated:
+                    result = document_intake_service.ingest_validated(
+                        db,
+                        validated,
+                        organization_id=organization_id,
+                        workspace_id=workspace_id,
+                        uploader_id=uploader,
+                        enqueue_extraction=True,
+                        source=payload.get("source") or None,
+                    )
+            except (PlanLimitExceededError, SpendLimitExceededError) as exc:
+                # The files that fit are added; the rest are listed as not added, each whole or not at all.
+                raise MemberRefused("PLAN_LIMIT", str(exc)) from exc
+            except TrialEndedError as exc:
+                raise MemberRefused("TRIAL_ENDED", str(exc)) from exc
             return result.work_item.id
 
         outcome = batch_service.process_items(
@@ -156,7 +192,8 @@ def handle_batch_expand_archive(payload: dict[str, Any]) -> dict[str, Any]:
             organization_id=organization_id,
             handler=_ingest,
         )
-        return {"expanded": outcome["succeeded"], "failed": outcome["failed"]}
+        _drop_stored_archive(driver, storage_key)
+        return {"expanded": outcome["succeeded"], "failed": outcome["failed"], "skipped": len(skipped)}
     finally:
         db.close()
 

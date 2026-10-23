@@ -16,7 +16,7 @@ import {
   BUTTON_SECONDARY, HINT, SCROLL_X, SECTION_TITLE, SELECT, SURFACE, TABLE_HEAD, TABLE_ROW,
 } from "@/components/ui/primitives";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { TabList, useUrlTab, type TabDefinition } from "@/components/ui/Tabs";
+import { TabList, TabPanel, useUrlTab, type TabDefinition } from "@/components/ui/Tabs";
 import { errorMessage } from "@/services/api/errors";
 import { getDeadJobs, getJobsSummary, platformJobKeys, retryDeadJob } from "@/services/api/platformJobs";
 import { formatNumber, formatTimestamp } from "@/utils/displayTime";
@@ -91,6 +91,7 @@ const JobsConsole: React.FC = () => {
       />
       <TabList label="Background jobs" idBase="jobs" tabs={TABS} value={tab} onChange={setTab} />
 
+      <TabPanel idBase="jobs" id={tab} className="space-y-6">
       {summary.isLoading ? <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading…</div> : null}
       {summary.isError ? <p role="alert" className="text-sm text-destructive">{errorMessage(summary.error, "The job summary could not be loaded.")}</p> : null}
 
@@ -103,7 +104,7 @@ const JobsConsole: React.FC = () => {
             <Stat label="Dead" value={s.totals.dead} hint="Failed every attempt" alert />
             <Stat label="Expired leases" value={s.totals.expired_leases} hint="A worker stopped answering; reclaimed shortly" alert />
           </section>
-          <section className={`${SURFACE} ${SCROLL_X} p-4`}>
+          <section className={`${SURFACE} ${SCROLL_X} p-4`} tabIndex={0} aria-label="Jobs by type">
             <h2 className={SECTION_TITLE}>By job type</h2>
             <p className={HINT}>Generated {formatTimestamp(s.generated_at)}.</p>
             {s.by_type.length === 0 ? (
@@ -137,7 +138,7 @@ const JobsConsole: React.FC = () => {
       ) : null}
 
       {tab === "dead" ? (
-        <section className={`${SURFACE} ${SCROLL_X} p-4`}>
+        <section className={`${SURFACE} ${SCROLL_X} p-4`} tabIndex={0} aria-label="Dead jobs">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className={SECTION_TITLE}>Dead jobs</h2>
@@ -196,6 +197,7 @@ const JobsConsole: React.FC = () => {
           ) : null}
         </section>
       ) : null}
+      </TabPanel>
     </div>
   );
 };

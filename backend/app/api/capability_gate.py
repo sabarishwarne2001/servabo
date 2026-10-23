@@ -174,6 +174,15 @@ def plans_including(db: Session) -> dict[str, list[str]]:
     return result
 
 
+def plans_phrase(names: list[str]) -> str:
+    """"the Business plan", "the Business and Enterprise plans"; "higher plans" only when no published plan carries it."""
+    if not names:
+        return "higher plans"
+    if len(names) == 1:
+        return f"the {names[0]} plan"
+    return f"the {', '.join(names[:-1])} and {names[-1]} plans"
+
+
 def require_capability(
     db: Session, *, context: Any, capability_key: str, operation: str
 ) -> None:
@@ -221,12 +230,15 @@ def require_capability_for_organization(
             },
         )
 
+    included_in = plans_including(db).get(capability_key, [])
     raise CapabilityRequiredError(
-        f"{display} is included on higher plans. Upgrade your plan to use it.",
+        f"{display} is included on {plans_phrase(included_in)}. Upgrade your plan to use it.",
         details={
             "code": CAPABILITY_REQUIRED_CODE,
             "capability_key": capability_key,
             "capability_name": display,
+            # Final session 1 (3B): the plans that include it, from the published tiers, so the refusal names the sale.
+            "included_in": included_in,
             "operation": operation,
             # No price and no purchase URL, deliberately. A capability has no
             # standalone price; inventing one here would be the first place a
@@ -241,6 +253,7 @@ __all__ = [
     "granted_capabilities",
     "has_capability",
     "plans_including",
+    "plans_phrase",
     "require_capability",
     "require_capability_for_organization",
 ]

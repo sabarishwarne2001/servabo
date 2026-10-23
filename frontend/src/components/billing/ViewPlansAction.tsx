@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
 
 import { useTenant } from "@/hooks/useTenant";
+import { canManageBilling } from "@/permissions/organizationPermissions";
+import type { OrganizationRole } from "@/types/tenancy";
 import { organizationBillingPath } from "@/routes/tenantPaths";
 import AskPlanOwners from "@/components/billing/AskPlanOwners";
 
@@ -19,7 +21,7 @@ interface ViewPlansActionProps {
  * A locked item clicked in the sidebar opens a dialog with "View plans"; the
  * same page opened by URL (a bookmark, a shared link) showed only a lock card
  * with no way forward. Every lock card now ends with this: a "View plans" link
- * to Billing for the roles that can change the plan (OWNER, BILLING), and the
+ * to Billing for the role that can change the plan (the OWNER; F-192, F-577), and the
  * name of who to ask for everyone else.
  */
 export const ViewPlansAction: React.FC<ViewPlansActionProps> = ({
@@ -37,7 +39,7 @@ export const ViewPlansAction: React.FC<ViewPlansActionProps> = ({
   if (!slug) {
     return null;
   }
-  if (role === "OWNER" || role === "BILLING") {
+  if (canManageBilling(role as OrganizationRole)) {
     return (
       <Link
         to={organizationBillingPath(slug)}

@@ -170,9 +170,9 @@ def test_the_trace_states_actual_expected_and_result() -> None:
     outcome = ev.evaluate("1,18,000.00", "GREATER_THAN", "1000000", field=MONEY, ctx=IST_DDMM, currency="INR")
     assert outcome.matched is False
     assert outcome.reason == (
-        "Total amount (INR 118,000.00) is not greater than INR 1,000,000.00 (no currency on the document; taken as INR)."
+        "Total amount (INR 1,18,000.00) is not greater than INR 10,00,000.00 (no currency on the document; taken as INR)."
     )
-    assert outcome.actual_text == "INR 118,000.00" and outcome.expected_text == "INR 1,000,000.00"
+    assert outcome.actual_text == "INR 1,18,000.00" and outcome.expected_text == "INR 10,00,000.00"
 
 
 def test_a_currency_mismatch_is_explained_and_never_converted() -> None:
@@ -213,7 +213,7 @@ def test_amounts_dates_and_words_are_shown_in_the_trace() -> None:
     outcome = ev.evaluate("Acme Supplies", "EQUALS", "Other Ltd", field=TEXT)
     assert "Acme Supplies" in outcome.reason
     money = ev.evaluate("118000", "GREATER_THAN", "5", field=MONEY, ctx=IST_DDMM, currency="INR")
-    assert "118,000.00" in money.reason
+    assert "1,18,000.00" in money.reason
 
 
 def test_parse_number_reads_every_form() -> None:

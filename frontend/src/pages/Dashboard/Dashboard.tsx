@@ -22,7 +22,6 @@ import { dashboardKeys, invalidateWorkspace, keepPreviousWithinWorkspace } from 
 
 import { UploadTray } from "@/components/common/UploadTray";
 import { GettingStarted } from "@/components/onboarding/GettingStarted";
-import { canInviteMembers } from "@/permissions/organizationPermissions";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { HelmOverviewCard } from "@/components/helm/HelmOverviewCard";
@@ -35,10 +34,11 @@ import { SkeletonTable } from "@/components/common/skeletons/SkeletonTable";
 
 import { ApiError } from "@/services/api/client";
 import { useOptionalTenant } from "@/routes/TenantContext";
-import { canCreateContent } from "@/permissions/workspacePermissions";
+import { canCreateContent, isAtLeast } from "@/permissions/workspacePermissions";
 import { workItemDetailsPath, workItemsPath } from "@/routes/tenantPaths";
 import { formatDateTime } from "@/utils/formatters";
 import type { DashboardDocTypeDistribution, DashboardEventType } from "@/types/dashboard";
+import { errorMessage } from "@/services/api/errors";
 
 // Each event wears a colour, an icon and its name, never the colour alone.
 const EVENTS: Readonly<Record<DashboardEventType, { readonly tone: string; readonly icon: React.ElementType; readonly label: string }>> = {
@@ -174,7 +174,7 @@ export const Dashboard: React.FC = () => {
     },
     onError: (error: unknown) => {
       if (error instanceof ApiError) {
-        toast.error(error.message ?? "Unable to reprocess the document.");
+        toast.error(errorMessage(error, "Unable to reprocess the document."));
         return;
       }
       toast.error("Unexpected network error.");
@@ -262,12 +262,10 @@ export const Dashboard: React.FC = () => {
       {resolvedTenant && workspaceId && metrics ? (
         <GettingStarted
           workspaceId={workspaceId}
-          organizationId={resolvedTenant.organization.organization_id}
           orgSlug={orgSlug}
           workspaceSlug={workspaceSlug}
-          totalDocuments={metrics.total_work_items}
           canUpload={canUpload}
-          canInvite={canInviteMembers(resolvedTenant.organizationRole)}
+          canAdmin={isAtLeast(resolvedTenant.workspaceRole, "ADMIN")}
         />
       ) : null}
 

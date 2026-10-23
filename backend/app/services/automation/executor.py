@@ -26,7 +26,7 @@ from app.models.automation_execution import (
 from app.models.outbox_event import OutboxEvent
 from app.models.work_item import WorkItem
 from app.services.automation import budget as budget_service
-from app.services.automation import cycle_detector, graph_service
+from app.services.automation import cycle_detector, graph_service, public_events
 from app.services.automation.contracts import (
     ActionNodeConfig,
     ActionSpec,
@@ -144,6 +144,8 @@ def create_execution(
             "outbox_event_id": str(outbox_event_id) if outbox_event_id else None,
         },
     )
+    if created and hold is not None:
+        public_events.run_held(db, execution=execution)
     return execution, created
 
 
@@ -383,6 +385,8 @@ def run_execution(
     execution.deadline_at = None
     execution.emitted_event_ids = list(state.emitted_event_ids)
     execution.actions_executed = state.actions_executed
+    if terminal.value in public_events.FAILED_STATUSES:
+        public_events.run_failed(db, execution=execution)
     db.commit()
 
     result = ExecutionResult(
@@ -723,6 +727,7 @@ def reap_stranded(db: Session, *, limit: int = 200) -> int:
         execution.completed_at = _now()
         execution.deadline_at = None
         execution.error = "Reaped: execution timed out before completion."
+        public_events.run_failed(db, execution=execution)
     if stranded:
         db.commit()
     return len(stranded)

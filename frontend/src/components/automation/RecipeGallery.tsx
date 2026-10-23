@@ -25,7 +25,7 @@ interface RecipeGalleryProps {
   readonly onClose: () => void;
   readonly onUse: (rule: AutomationRuleCreateRequest) => void;
   /** A locked recipe opens the upgrade dialog, which names the capability it needs. */
-  readonly onUpgrade: (capability: string, feature: string) => void;
+  readonly onUpgrade: (capability: string, feature: string, addon?: string) => void;
 }
 
 export const matchesRecipe = (recipe: Recipe, query: string, category: string): boolean => {
@@ -236,7 +236,7 @@ export const RecipeGallery: React.FC<RecipeGalleryProps> = ({ open, workspaceId,
                           {recipe.locked_capability && (
                             <button
                               type="button"
-                              onClick={() => onUpgrade(recipe.locked_capability ?? "", recipe.locked_feature ?? recipe.title)}
+                              onClick={() => onUpgrade(recipe.locked_capability ?? "", recipe.locked_feature ?? recipe.title, recipe.locked_addon ?? undefined)}
                               aria-label={`Upgrade to use the recipe: ${recipe.title}`}
                               className="rounded-lg border border-primary px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
                             >

@@ -39,7 +39,9 @@ export type ExportDataset =
   | "USAGE_ROLLUPS"
   | "DOCUMENT_METADATA"
   | "ASSISTANT_TURNS"
-  | "AUTOMATION_RUNS";
+  | "AUTOMATION_RUNS"
+  | "GST_MATCHES"
+  | "HELM_LEDGER";
 export type ScheduleCadence = "DAILY" | "WEEKLY" | "MONTHLY";
 export type SyncTrigger = "SCHEDULED" | "MANUAL";
 export type SyncStatus = "RUNNING" | "SUCCEEDED" | "PARTIAL" | "FAILED";
@@ -57,7 +59,15 @@ export const EXPORT_DATASETS: readonly ExportDataset[] = [
   "DOCUMENT_METADATA",
   "ASSISTANT_TURNS",
   "AUTOMATION_RUNS",
+  "GST_MATCHES",
+  "HELM_LEDGER",
 ] as const;
+
+/** Datasets that need a plan capability (Enterprise): the server answers 402 without it. */
+export const DATASET_CAPABILITY: Readonly<Partial<Record<ExportDataset, string>>> = {
+  GST_MATCHES: "capability.gst_credit_all_workspaces",
+  HELM_LEDGER: "capability.helm_all_workspaces",
+};
 
 export const SCHEDULE_CADENCES: readonly ScheduleCadence[] = [
   "DAILY",
@@ -77,6 +87,8 @@ export const DATASET_LABELS: Record<ExportDataset, string> = {
   DOCUMENT_METADATA: "Document metadata",
   ASSISTANT_TURNS: "Assistant turns",
   AUTOMATION_RUNS: "Automation runs",
+  GST_MATCHES: "GST matches",
+  HELM_LEDGER: "Helm promise ledger",
 };
 
 export const DATASET_HINTS: Record<ExportDataset, string> = {
@@ -88,6 +100,10 @@ export const DATASET_HINTS: Record<ExportDataset, string> = {
     "Message metadata only. Conversation text stays inside your configured residency boundary.",
   AUTOMATION_RUNS:
     "One row per automation execution, with node and action counters.",
+  GST_MATCHES:
+    "How each supplier record matched your invoices, with the credit it is worth, across every workspace. Ids and figures only, no supplier names.",
+  HELM_LEDGER:
+    "Every promise Helm found in your documents and whether it was kept, across every workspace. No names or document text.",
 };
 
 export const STATUS_LABELS: Record<SyncStatus, string> = {

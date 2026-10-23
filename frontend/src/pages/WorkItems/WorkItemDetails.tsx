@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
+import { formatTimestamp } from "@/utils/displayTime";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -50,6 +51,7 @@ import type { WorkspaceRole } from "@/types/tenancy";
 import { ApiError } from "@/services/api/client";
 import type { WorkItemStatus } from "@/types/workItem";
 import { formatNumber } from "@/utils/displayTime";
+import { errorMessage } from "@/services/api/errors";
 
 type DetailTab = "document" | "summary" | "entities" | "obligations" | "postings" | "automation" | "ocr" | "chat";
 
@@ -181,7 +183,7 @@ export const WorkItemDetails: React.FC = () => {
     },
     onError: (error: unknown) => {
       if (error instanceof ApiError) {
-        toast.error(error.message ?? "Unable to reprocess document.");
+        toast.error(errorMessage(error, "Unable to reprocess document."));
         return;
       }
       toast.error("Unexpected server error.");
@@ -360,6 +362,18 @@ export const WorkItemDetails: React.FC = () => {
             </span>
           </div>
         </div>
+        {workItem.source?.kind === "EMAIL" && (
+          <p role="note" data-testid="document-source" className="mt-4 rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-[13px] leading-relaxed text-muted-foreground">
+            <span className="font-semibold text-foreground">Arrived by email</span>
+            {workItem.source.sender ? (
+              <>
+                {" "}from <span className="font-medium text-foreground">{workItem.source.sender}</span>
+              </>
+            ) : null}
+            {workItem.source.subject ? <>, subject &ldquo;{workItem.source.subject}&rdquo;</> : null}
+            {workItem.source.received_at ? <>, {formatTimestamp(workItem.source.received_at)}</> : null}.
+          </p>
+        )}
         {workItem.duplicate_of && (
           <p
             role="note"
@@ -466,6 +480,7 @@ export const WorkItemDetails: React.FC = () => {
                         activeField={activeField}
                         onSelectField={selectField}
                         confidence={confidence.data}
+                        einvoiceQr={workItem.einvoice_qr ?? null}
                       />
                     )}
                   </div>

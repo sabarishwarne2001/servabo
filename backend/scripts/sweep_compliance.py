@@ -157,50 +157,12 @@ def _purge_work_items(
             ]
             if not ids:
                 break
-            files = db.execute(
-                text(
-                    """
-                    SELECT uf.id, uf.file_path, wi.stored_filename
-                    FROM work_items wi
-                    JOIN uploaded_files uf ON uf.id = wi.uploaded_file_id
-                    WHERE wi.id = ANY(:ids) AND uf.deleted_at IS NULL
-                    """
-                ),
-                {"ids": ids},
-            ).fetchall()
-            released = storage_cleanup.deletable_keys(db, [row.file_path for row in files])
-            keys = set(released)
-            for row in files:
-                if row.file_path in keys and row.stored_filename:
-                    keys.add(row.stored_filename)
-            if files:
-                db.execute(
-                    text("UPDATE uploaded_files SET deleted_at = now() WHERE id = ANY(:ids)"),
-                    {"ids": [row.id for row in files]},
-                )
-            # TruthMesh: the purged documents leave the mesh and their conflicts are resolved in the
-            # same transaction (conflicts name documents by id; no foreign key does it).
-            from app.services.truthmesh import service as truthmesh_service
+            # Final session 1 (1A): one purge path for the sweep and for archived workspaces and organizations. It
+            # releases the upload, forgets the documents in TruthMesh, tells Helm, destroys the copies of the content,
+            # detaches the money records and deletes the rows (compliance/purge_service.py).
+            from app.services.compliance import purge_service
 
-            by_workspace: dict = {}
-            for item_id, workspace_id in db.execute(
-                text("SELECT id, workspace_id FROM work_items WHERE id = ANY(:ids)"), {"ids": ids}
-            ).fetchall():
-                by_workspace.setdefault(workspace_id, []).append(item_id)
-            for workspace_id, workspace_ids in by_workspace.items():
-                truthmesh_service.forget_documents(db, workspace_id=workspace_id, work_item_ids=workspace_ids)
-            # Helm's Promise ledger: these documents, their obligations and the documents of their
-            # procurement cases are re-projected at the next update (a raw delete is not seen by the ORM).
-            from app.models import helm_dirty
-
-            helm_dirty.mark_deleted(db.connection(), ids, "retention purge")
-            db.execute(
-                text("DELETE FROM document_chunks WHERE work_item_id = ANY(:ids)"),
-                {"ids": ids},
-            )
-            db.execute(
-                text("DELETE FROM work_items WHERE id = ANY(:ids)"), {"ids": ids}
-            )
+            keys = purge_service.purge_documents(db, ids)
             db.commit()
         storage_cleanup.delete_stored_objects(keys)
         deleted += len(ids)
@@ -341,6 +303,23 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--inbound",
+        action="store_true",
+        help=(
+            "delete email-in messages that were held or discarded more than INBOUND_EMAIL_HELD_DAYS (30) ago, with the "
+            "attachments kept for them. Never in --all."
+        ),
+    )
+    parser.add_argument(
+        "--archived",
+        action="store_true",
+        help=(
+            "purge what archived workspaces and organizations left behind: documents, conversations and settings "
+            "30 days after archiving (ARCHIVED_PURGE_GRACE_DAYS), the organization itself 72 months after "
+            "(ARCHIVED_FINAL_DELETE_MONTHS). Money records and the audit trail are kept until then. Never in --all."
+        ),
+    )
+    parser.add_argument(
         "--apply",
         action="store_true",
         help="actually write. Without this every sweep is a dry run.",
@@ -348,7 +327,7 @@ def main() -> int:
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     args = parser.parse_args()
 
-    if not any([args.all, args.exports, args.files, args.report, args.purge]):
+    if not any([args.all, args.exports, args.files, args.report, args.purge, args.archived, args.inbound]):
         parser.error("Nothing selected. Pass --all, --report, or a specific sweep.")
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -410,6 +389,41 @@ def main() -> int:
                     f"recorded; deletion is the ARCH-07 sweeper role's job "
                     f"(400-day floor is enforced by trigger, not by this script)"
                 )
+
+    if args.inbound:
+        from app.services.inbound_email import service as inbound_service
+
+        print("\nEmail-in: held and discarded messages past their keep period:")
+        with session_factory() as db:
+            if args.apply:
+                count = inbound_service.sweep(db)
+                db.commit()
+                print(f"  inbound_messages: {count} row(s) deleted")
+            else:
+                from datetime import datetime, timedelta, timezone
+
+                from sqlalchemy import text
+
+                from app.core.config import settings
+
+                cutoff = datetime.now(timezone.utc) - timedelta(days=int(settings.INBOUND_EMAIL_HELD_DAYS))
+                count = db.execute(
+                    text("SELECT count(*) FROM inbound_messages WHERE status IN ('HELD', 'DISCARDED') AND created_at < :c"), {"c": cutoff}
+                ).scalar_one()
+                print(f"  [DRY RUN] inbound_messages: {count} row(s) would be deleted")
+
+    if args.archived:
+        from app.services.compliance import purge_service
+
+        print("\nArchived workspaces and organizations:")
+        report = purge_service.sweep_archived(session_factory, apply=args.apply)
+        print(f"  workspaces due for a content purge: {report.workspaces or 'none'}")
+        print(f"  organizations due for a content purge: {report.organizations or 'none'}")
+        print(f"  organizations due for final deletion (72 months): {report.finally_deleted or 'none'}")
+        for table, count in sorted(report.rows.items()):
+            print(f"    {table}: {count} row(s) deleted")
+        if report.kept_because_referenced:
+            print(f"  could not be emptied yet (still referenced): {report.kept_because_referenced}")
 
     if not args.apply:
         print("\nNothing was written. Re-run with --apply to act.")

@@ -262,3 +262,23 @@ class GstSettings(Base):
     waiting_notice_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("30"))
     updated_by_user_id: Mapped[Optional[uuid.UUID]] = _user()
     updated_at: Mapped[datetime] = _ts()
+
+
+class GstNoticeSend(Base):
+    """One row per GST notice or digest that has been handled, so a retried or doubled job never says a thing twice (Final 1, 3A).
+
+    `kind` is `import` (key: the return's id), `window` (key: the match's id: the invoice reached 150 days), `supplier` (key: the
+    month the 14th belongs to), `ims` (the same) or `digest` (key: the ISO week, "2026-W43"). The primary key IS the claim: an insert
+    that finds the row there did not win it.
+    """
+
+    __tablename__ = "gst_notice_sends"
+    __table_args__ = (CheckConstraint("kind IN ('import', 'window', 'supplier', 'ims', 'digest')", name="ck_gst_notice_sends_kind"),)
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), primary_key=True)
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    sent_at: Mapped[datetime] = _ts()
+    #: Digest only: how many emails the relay accepted. Other kinds: how many people were told in the app.
+    recipients: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))

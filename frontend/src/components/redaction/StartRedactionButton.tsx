@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { EyeOff, Loader2, Lock } from "lucide-react";
@@ -10,6 +10,8 @@ import { isAtLeast } from "@/permissions/workspacePermissions";
 import { useResolvedTenant } from "@/routes/TenantContext";
 import { redactionPath } from "@/routes/tenantPaths";
 import { ApiError } from "@/services/api/client";
+import { getRedactionSuggestion } from "@/services/api/ingestion";
+import { ingestionKeys } from "@/services/api/queryKeys";
 import { startRedaction } from "@/services/api/redaction";
 
 /**
@@ -95,6 +97,22 @@ const StartRedactionButton: React.FC<StartRedactionButtonProps> = ({
     };
   }, [open]);
 
+  // F-408: the profile of the enabled document pack that fits this document is offered first and focused.
+  const suggestion = useQuery({
+    queryKey: ingestionKeys.redactionSuggestion(workspaceId, workItemId),
+    queryFn: () => getRedactionSuggestion(workspaceId, workItemId),
+    enabled: open && capability.granted,
+    staleTime: 60_000,
+  });
+  const suggestedProfile =
+    suggestion.data && suggestion.data.profile in REDACTION_PROFILE_LABELS ? suggestion.data : null;
+  const suggestedRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (open && suggestedProfile) {
+      suggestedRef.current?.focus();
+    }
+  }, [open, suggestedProfile]);
+
   const start = useMutation({
     mutationFn: (profileKey: string) => startRedaction(workspaceId, workItemId, profileKey),
     onSuccess: (job) => {
@@ -158,18 +176,32 @@ const StartRedactionButton: React.FC<StartRedactionButtonProps> = ({
             Choose what to detect. You review every region before anything is
             applied.
           </p>
-          {Object.entries(REDACTION_PROFILE_LABELS).map(([key, profile]) => (
-            <button
-              key={key}
-              type="button"
-              role="menuitem"
-              onClick={() => start.mutate(key)}
-              className="flex w-full flex-col items-start rounded-lg px-3 py-2 text-left hover:bg-muted"
-            >
-              <span className="text-sm font-semibold">{profile.label}</span>
-              <span className="text-xs text-muted-foreground">{profile.hint}</span>
-            </button>
-          ))}
+          {Object.entries(REDACTION_PROFILE_LABELS)
+            .sort(([a], [b]) => Number(b === suggestedProfile?.profile) - Number(a === suggestedProfile?.profile))
+            .map(([key, profile]) => {
+              const suggested = key === suggestedProfile?.profile;
+              return (
+                <button
+                  key={key}
+                  ref={suggested ? suggestedRef : undefined}
+                  type="button"
+                  role="menuitem"
+                  data-suggested={suggested ? "true" : undefined}
+                  onClick={() => start.mutate(key)}
+                  className={`flex w-full flex-col items-start rounded-lg px-3 py-2 text-left hover:bg-muted ${
+                    suggested ? "bg-primary/5 ring-1 ring-primary/30" : ""
+                  }`}
+                >
+                  <span className="text-sm font-semibold">{profile.label}</span>
+                  <span className="text-xs text-muted-foreground">{profile.hint}</span>
+                  {suggested ? (
+                    <span className="mt-0.5 text-[11px] font-medium text-primary">
+                      Suggested by your {suggestedProfile?.preset_label} pack
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
         </div>
       )}
     </div>

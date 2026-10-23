@@ -6,11 +6,12 @@
  */
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { BookUp, Loader2, Plus } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 import { ErpLocked, PostingStateBadge, canAdminister, canContribute } from "@/components/erp/common";
+import { ConnectBooks } from "@/components/erp/ConnectBooks";
 import { LookupTables } from "@/components/erp/LookupTables";
 import { NewTarget } from "@/components/erp/NewTarget";
 import { PostingTable } from "@/components/erp/PostingTable";
@@ -27,7 +28,7 @@ import {
   type PostingState, type TargetDetail,
 } from "@/types/erp";
 
-type Tab = "postings" | "ready" | "targets" | "lookups";
+type Tab = "postings" | "ready" | "targets" | "connect" | "lookups";
 
 const STATE_FILTERS: readonly { readonly id: string; readonly label: string }[] = [
   { id: "FAILED,REJECTED,MISMATCH,UNCERTAIN", label: "Needs a decision" },
@@ -50,7 +51,9 @@ const ErpPosting: React.FC = () => {
   const canPost = canAdminister(workspace?.role);
   const canPreview = canContribute(workspace?.role);
   const isAdmin = canPost;
-  const [tab, setTab] = useState<Tab>("postings");
+  const [searchParams] = useSearchParams();
+  // Coming back from Zoho lands on the Connect tab with the outcome in the address.
+  const [tab, setTab] = useState<Tab>(searchParams.get("zoho") ? "connect" : "postings");
   const [state, setState] = useState("");
   const [targetId, setTargetId] = useState("");
   const [objectKind, setObjectKind] = useState("");
@@ -106,7 +109,7 @@ const ErpPosting: React.FC = () => {
       ) : null}
       {catalog.isError ? <p className="text-sm text-destructive">{errorMessage(catalog.error, "Could not load the catalog.")}</p> : null}
       <div className="flex flex-wrap gap-2 border-b border-border/60" role="tablist" aria-label="ERP posting views">
-        {([["postings", "Postings"], ["ready", "Ready to post"], ["targets", "Targets"], ["lookups", "Lookup tables"]] as const).map(([id, label]) => (
+        {([["postings", "Postings"], ["ready", "Ready to post"], ["targets", "Targets"], ["connect", "Connect your books"], ["lookups", "Lookup tables"]] as const).map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
             className={`border-b-2 px-3 py-2 text-sm font-semibold ${tab === id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
             {label}
@@ -224,6 +227,8 @@ const ErpPosting: React.FC = () => {
           ) : null}
         </div>
       ) : null}
+
+      {tab === "connect" ? <ConnectBooks workspaceId={workspaceId} orgSlug={orgSlug} workspaceSlug={workspaceSlug} isAdmin={isAdmin} /> : null}
 
       {tab === "lookups" ? <LookupTables workspaceId={workspaceId} isAdmin={isAdmin} /> : null}
     </div>

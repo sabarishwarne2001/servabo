@@ -174,7 +174,7 @@ test.describe("Automation: a recipe becomes a real hold", () => {
     await expect(decided).toBeVisible();
     await expect(decided).toContainText("✓");
     await expect(decided).toContainText("greater than");
-    await expect(decided.getByRole("listitem").filter({ hasText: "Total amount" })).toContainText("Total amount (INR 1,250,000.00) is greater than INR 1,000,000.00");
+    await expect(decided.getByRole("listitem").filter({ hasText: "Total amount" })).toContainText("Total amount (INR 12,50,000.00) is greater than INR 10,00,000.00");
     await expect(bigItem.getByRole("list", { name: "Steps of this run" })).toContainText("review.escalate");
     await expect(bigItem.getByRole("link", { name: "Open the document" })).toBeVisible();
 
@@ -187,7 +187,7 @@ test.describe("Automation: a recipe becomes a real hold", () => {
     await smallItem.getByRole("button", { name: "Show steps" }).click();
     const notMet = smallItem.getByRole("list", { name: "What each condition decided" });
     await expect(notMet).toContainText("✗");
-    await expect(notMet).toContainText("Total amount (INR 450,000.00)");
+    await expect(notMet).toContainText("Total amount (INR 4,50,000.00)");
 
     await expectAccessible(page, testInfo, "run history with steps");
   });

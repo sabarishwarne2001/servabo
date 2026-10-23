@@ -750,9 +750,13 @@ class LLMService:
         except LLMPermanentError as exc:
             if isinstance(exc.__cause__, egress.EgressDenied):
                 raise exc.__cause__  # 403 EGRESS_DENIED: the gate refused the provider, the request is fine
+            # F-564: a model the provider has retired (or never had) is a sentence, not a raw 404.
+            from app.core import byok_providers
+
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="The AI request could not be processed as sent.",
+                detail=byok_providers.model_unavailable_message(configured, ai_settings.model, exc.__cause__)
+                or "The AI request could not be processed as sent.",
             ) from exc
         except LLMUnavailable as exc:
             if local_llm.is_fallback() and allow_failover:

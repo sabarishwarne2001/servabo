@@ -14,7 +14,7 @@ in the containers unless you add it to the service's `environment:` in `docker-c
 is not read by any code, is missing from this page, or is one production cannot run without and
 is missing from `.env.production.template` (or does not stop the app from starting when unset).
 
-299 settings. Columns: name, type, default, where it appears (`example` =
+319 settings. Columns: name, type, default, where it appears (`example` =
 `.env.example`, `production` = `.env.production.template`, `guard` = checked by the production
 guard), and the comment written above it in the code.
 
@@ -126,7 +126,7 @@ guard), and the comment written above it in the code.
 | `SPEND_DEFAULT_MONTHLY_LLM_INPUT_TOKENS` | `Optional[int]` | `2000000` | — |  |
 | `SPEND_DEFAULT_MONTHLY_LLM_OUTPUT_TOKENS` | `Optional[int]` | `500000` | — |  |
 | `SPEND_DEFAULT_MONTHLY_EMBEDDING_TOKENS` | `Optional[int]` | `5000000` | — |  |
-| `EINVOICE_QR_PUBLIC_KEY_PEM` | `Optional[str]` | `None` | — | NIC's published public key (PEM) for the e-invoice QR code's signature. None ships: without it the QR code's values are read but marked "signature not verified" (app/services/gst/einvoice.py). |
+| `EINVOICE_QR_PUBLIC_KEY_PEM` | `Optional[str]` | `None` | production | NIC's published public key (PEM) for the e-invoice QR code's signature. None ships: without it the QR code's values are read but marked "signature not verified" (app/services/gst/einvoice.py). |
 | `S3_BUCKET` | `Optional[str]` | `None` | example, production, guard |  |
 | `S3_REGION` | `Optional[str]` | `'auto'` | production |  |
 | `S3_ENDPOINT_URL` | `Optional[str]` | `None` | example, production |  |
@@ -176,6 +176,26 @@ guard), and the comment written above it in the code.
 | `BRANDING_MAX_FAVICON_BYTES` | `int` | `512 * 1024` | — |  |
 | `BRANDING_MAX_IMAGE_DIMENSION` | `int` | `2048` | — |  |
 | `COMPLIANCE_EXPORT_TTL_HOURS` | `int` | `72` | — | How long a generated DPA archive stays downloadable. |
+| `POSTMARK_INBOUND_WEBHOOK_USER` | `str` | `''` | example, production | Postmark's inbound webhook is secured with HTTP basic auth in its URL (https://user:password@api.example.com/api/v1/inbound/postmark); Postmark does not sign inbound payloads. Both empty = email-in is off (the route ans… |
+| `POSTMARK_INBOUND_WEBHOOK_PASSWORD` | `Optional[SecretStr]` | `None` | example, production |  |
+| `POSTMARK_INBOUND_HASH` | `str` | `''` | example, production | Your Postmark inbound server's hash: the part before the `+` in `<hash>+<workspace-token>@inbound.postmarkapp.com`. Used until you have a domain. |
+| `INBOUND_EMAIL_DOMAIN` | `str` | `''` | example, production | Once you own a domain (MX record for `in.<domain>` pointed at Postmark): the addresses become `<workspace-token>@<INBOUND_EMAIL_DOMAIN>`. Empty keeps the `inbound.postmarkapp.com` form. |
+| `POSTMARK_INBOUND_ALLOWED_IPS` | `str` | `''` | example, production | Optional allowlist of the addresses Postmark delivers from (comma-separated IPs or CIDRs); empty = not checked. |
+| `INBOUND_EMAIL_MAX_BODY_MB` | `int` | `50` | example, production | The largest webhook body accepted, in MB (Postmark's own limit for a message is 35 MB; attachments travel base64). |
+| `INBOUND_EMAIL_IGNORE_INLINE_IMAGES_KB` | `int` | `30` | example, production | Inline images smaller than this (signatures, logos) are ignored, not read as documents. |
+| `INBOUND_EMAIL_HELD_DAYS` | `int` | `30` | example, production | Days a held or discarded message is kept before `inbound_email.sweep` deletes it and its stored attachments. |
+| `SENTRY_DSN` | `str` | `''` | example, production, guard | Error tracking (Final session 1, 4A). Empty = off, and nothing is sent. Sentry's free plan in its EU region, or a self-hosted GlitchTip, speak the same protocol: switching is changing this one address. Only 5xx errors a… |
+| `SENTRY_ENVIRONMENT` | `str` | `''` | example, production | Shown beside each error. Empty = ENVIRONMENT. |
+| `SENTRY_RELEASE` | `str` | `''` | example, production | Which version failed (the image tag or git SHA). Empty = APP_VERSION. |
+| `SENTRY_TRACES_SAMPLE_RATE` | `float` | `0.0` | example, production | Performance traces. 0 = none (the default: it costs quota and sends request timings nobody needs yet). |
+| `ZOHO_CLIENT_ID` | `str` | `''` | example, production | Zoho Books "Connect" (Final session 1, 3C). Register ONE server-based application in Zoho's API console (api-console.zoho.in) and put its Client ID and Secret here; leave both empty and the "Connect Zoho Books" button s… |
+| `ZOHO_CLIENT_SECRET` | `Optional[SecretStr]` | `None` | example, production |  |
+| `ZOHO_REDIRECT_URI` | `str` | `''` | example, production |  |
+| `ZOHO_ACCOUNTS_URL_OVERRIDE` | `str` | `''` | — | For the end-to-end tests only (a stand-in Zoho). Replace Zoho's accounts and API addresses; refused when ENVIRONMENT=production. |
+| `ZOHO_API_URL_OVERRIDE` | `str` | `''` | — |  |
+| `ZIP_UPLOAD_MAX_MB` | `int` | `256` | example, production | The largest zip one upload accepts, in MB (Final session 1, 2A). What it may unpack to is bounded separately (`ingestion/archive.py`: 512 MB, 2,000 files, 100x compression, one level deep). |
+| `ARCHIVED_PURGE_GRACE_DAYS` | `int` | `30` | example, production | Days after an organization or workspace is archived before its documents, conversations and settings are purged (`scripts/sweep_compliance.py --archived`). Until then "restore" still works. Money records stay. |
+| `ARCHIVED_FINAL_DELETE_MONTHS` | `int` | `72` | example, production | Months after an organization is archived before the organization itself is deleted. 72 months because the CGST Act 2017 s.36 makes a registered person keep books of account until 72 months after the annual return's due … |
 | `STORAGE_SAMPLE_INTERVAL_MINUTES` | `int` | `60` | — |  |
 | `MAX_DOCUMENT_PAGES` | `int` | `500` | example |  |
 | `SCRUB_UPLOAD_METADATA` | `bool` | `True` | example |  |

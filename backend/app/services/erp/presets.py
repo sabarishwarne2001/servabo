@@ -26,7 +26,7 @@ from app.services.erp.formats import jsonapi, tally, ubl, x12
 from app.services.erp.mapping import LANGUAGE, Contract
 
 #: ARCH47-S1:items-table. Item / material codes are looked up in their own table, never in the GL accounts.
-DEFAULT_LOOKUP_TABLES = ("vendors", "accounts", "items", "settings")
+DEFAULT_LOOKUP_TABLES = ("vendors", "accounts", "items", "settings", "taxes")
 
 
 def supported_objects(fmt: str, preset: str) -> tuple[str, ...]:
@@ -255,7 +255,13 @@ def _tally(kind: str) -> dict:
                            F("reference", P("document_number")), F("reference_date", P("document_date")),
                            F("party_ledger", PARTY_LEDGER, True), F("party_amount", P("total"), True),
                            F("tax_ledger", K("TAX", LK("accounts", "default", "Input Tax"))),
-                           F("tax_amount", P("tax_total")), F("narration", COAL(P("memo"), P("source.label")))],
+                           F("tax_amount", P("tax_total")),
+                           # GST (Final session 1, 3C): when the bill shows its heads, each is booked to its own Input ledger
+                           # (named in the `accounts` table under CGST, SGST, IGST) and the single tax entry is not written.
+                           F("cgst_ledger", K("CGST", LK("accounts", "default", "Input CGST"))), F("cgst_amount", P("gst.cgst")),
+                           F("sgst_ledger", K("SGST", LK("accounts", "default", "Input SGST"))), F("sgst_amount", P("gst.sgst")),
+                           F("igst_ledger", K("IGST", LK("accounts", "default", "Input IGST"))), F("igst_amount", P("gst.igst")),
+                           F("narration", COAL(P("memo"), P("source.label")))],
                     L("lines", [F("ledger", TALLY_LEDGER, True), F("amount", P("line.amount"), True)]))
     if kind == v.OBJECT_JOURNAL_ENTRY:
         return spec(kind, [F("date", P("document_date"), True), F("voucher_number", P("document_number")),
@@ -316,15 +322,25 @@ def _qbo(kind: str) -> dict:
 
 
 def _zoho(kind: str) -> dict:
+    # Final session 1 (3C). A bill from an Indian supplier carries the GST fields Zoho Books India expects: the vendor's GSTIN,
+    # the GST treatment, the vendor's state (source of supply) and the buyer's (destination of supply), and on every line the HSN
+    # or SAC code and a tax code looked up in the workspace's `taxes` table ("GST18" -> the id of that tax in the books). Each is
+    # left out when the document does not show it; a line whose tax code is not in the table stops the posting with the
+    # code's name rather than posting a bill without its tax.
     bill_line = [F("account_id", LINE_ACCOUNT, True), F("rate", P("line.amount", N(output="number")), True),
                  F("quantity", K(1), True),
-                 F("description", CAT(P("line.description"), P("line.quantity"), sep=" x "))]
+                 F("description", CAT(P("line.description"), P("line.quantity"), sep=" x ")),
+                 F("hsn_or_sac", P("line.hsn")),
+                 F("tax_id", P("line.gst_tax_key", LK("taxes")))]
     if kind == v.OBJECT_VENDOR_BILL:
         return spec(kind, [F("vendor_id", VENDOR_ID, True), F("bill_number", P("document_number"), True),
                            F("date", P("document_date", D()), True), F("due_date", P("due_date", D())),
                            F("reference_number", P("po_reference")),
+                           F("gst_treatment", P("gst.treatment")), F("gst_no", P("gst.vendor_gstin")),
+                           F("source_of_supply", P("gst.vendor_state_code")),
+                           F("destination_of_supply", P("gst.destination_state_code")),
                            F("notes", CAT(K("Servabo: "), P("source.label")))],
-                    L("line_items", bill_line, "lines_with_tax"))
+                    L("line_items", bill_line, "lines_with_tax_codes"))
     if kind == v.OBJECT_PURCHASE_ORDER:
         return spec(kind, [F("vendor_id", VENDOR_ID, True), F("purchaseorder_number", P("document_number")),
                            F("date", P("document_date", D()))],

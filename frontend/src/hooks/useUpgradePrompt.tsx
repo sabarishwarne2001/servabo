@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import { UpgradePlanDialog } from "@/components/billing/UpgradePlanDialog";
 import { useGrantedCapabilities } from "@/hooks/useGrantedCapabilities";
+import { canManageBilling } from "@/permissions/organizationPermissions";
+import type { OrganizationRole } from "@/types/tenancy";
 import { organizationBillingPath } from "@/routes/tenantPaths";
 import { getOrganizationEntitlements } from "@/services/api/entitlements";
 import { entitlementKeys } from "@/services/api/queryKeys";
@@ -11,6 +13,8 @@ import { entitlementKeys } from "@/services/api/queryKeys";
 interface PendingPrompt {
   readonly capability: string;
   readonly name: string;
+  /** The add-on that also unlocks it (Final session 1, F-552): named in the dialog with its checkout. */
+  readonly addonKey?: string | undefined;
 }
 
 export interface UpgradePrompt {
@@ -19,7 +23,7 @@ export interface UpgradePrompt {
    * the `addon.*` key) is absent.
    */
   readonly isLocked: (capability: string | undefined) => boolean;
-  readonly prompt: (capability: string, name: string) => void;
+  readonly prompt: (capability: string, name: string, addonKey?: string) => void;
   readonly dialog: React.ReactElement;
 }
 
@@ -63,7 +67,10 @@ export function useUpgradePrompt(
     },
     [capabilities.isLoading, capabilities.isError, capabilities.granted, addonFor],
   );
-  const prompt = useCallback((capability: string, name: string) => setPending({ capability, name }), []);
+  const prompt = useCallback(
+    (capability: string, name: string, addonKey?: string) => setPending({ capability, name, addonKey }),
+    [],
+  );
 
   const dialog = (
     <UpgradePlanDialog
@@ -76,9 +83,11 @@ export function useUpgradePrompt(
             : capabilities.plansFor(pending.capability)
           : []
       }
-      canChangePlan={role === "OWNER" || role === "BILLING"}
+      canChangePlan={canManageBilling(role as OrganizationRole)}
       billingPath={organizationBillingPath(organizationSlug)}
       onClose={() => setPending(null)}
+      addon={pending?.addonKey ? addonFor(pending.addonKey) : null}
+      organizationId={organizationId}
     />
   );
 

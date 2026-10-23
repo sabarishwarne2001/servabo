@@ -13,7 +13,7 @@
  * dry run, and requires single sign-on. A member then meets the "Single sign-on required" notice on a
  * password session and gets back in through the provider; the sign-in page sends the member's address
  * to the provider; the owner keeps working on a password (break-glass) until that is switched off, and
- * then is stopped too. Admins and members are refused by the server and shown "Access restricted".
+ * then is stopped too. Admins read the policy and the server refuses their changes; members are shown "Access restricted".
  */
 import type { Page } from "@playwright/test";
 
@@ -510,11 +510,13 @@ test.describe("Single sign-on enforcement", () => {
       { attributes: { groups: ["admin-grab", "member-grab"] } });
     expect(grabbed.body.resolved_role, "no refused mapping was kept").toBe("MEMBER");
 
-    // In the browser an admin is told the page is for owners, and no setting is offered.
+    // In the browser an admin reads the policy (decision N-006) and is told only an owner changes it:
+    // nothing can be switched on or saved.
     await signInAs(page, admin.email);
     await page.goto(identity("security"));
-    await expect(page.getByTestId("access-restricted")).toBeVisible();
-    await expect(page.getByRole("checkbox", { name: /Require single sign-on/ })).toHaveCount(0);
+    await expect(page.getByText("Only an organization owner can change the sign-in policy. You can read it here.")).toBeVisible();
+    await expect(page.getByTestId("access-restricted")).toHaveCount(0);
+    await expect(page.getByRole("checkbox", { name: /Require single sign-on/ })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Save mapping" })).toHaveCount(0);
   });
 

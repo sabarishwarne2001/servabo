@@ -123,8 +123,81 @@ def _notify(db: Any, *, organization: Any, meter: dict[str, Any], level: str) ->
         notification_type=NotificationType.SYSTEM,
         priority=priority,
         category=category,
-        action="billing",
+        action="plans",   # one click to the plan picker, where the limit is raised
     )
+
+
+#: Seats are told about only on a team (a sole owner on a one-seat plan is always "full").
+SEATS_NEAR_MIN_CAPACITY = 5
+
+
+def _seat_state(capacity: Any) -> Optional[str]:
+    """NEAR (four of five and up), REACHED (every seat held by someone), or None."""
+    if capacity.capacity is None:
+        return None
+    if capacity.used >= capacity.capacity and capacity.capacity >= 2 and capacity.members >= 2:
+        return "REACHED"
+    if capacity.capacity >= SEATS_NEAR_MIN_CAPACITY and capacity.used * 5 >= capacity.capacity * 4 and capacity.used < capacity.capacity:
+        return "NEAR"
+    return None
+
+
+def _notify_seats(db: Any, *, organization: Any, capacity: Any, level: str) -> None:
+    """Tell the people who can add seats (owners and administrators; owners only when seats cannot be bought on this plan)."""
+    from app.models.notification import NotificationPriority, NotificationType
+    from app.models.organization import OrganizationRole
+    from app.services import notification_preferences_service as email_choices
+    from app.services import organization_notification_service as notices
+
+    used, total = int(capacity.used), int(capacity.capacity)
+    buy = bool(capacity.can_purchase)
+    if level == "NEAR":
+        title = f"You have used {used} of your {total} seats"
+        message = f"{organization.name} has {total - used} seat{'s' if total - used != 1 else ''} left. "
+        category = email_choices.USAGE
+    else:
+        title = "Every seat is taken"
+        message = f"{organization.name} has used all {total} seats, including invitations that are waiting. New people cannot join until a seat is free. "
+        category = email_choices.BILLING
+    message += ("Add seats in one step; the price is shown before you confirm." if buy
+                else "Seats come with the plan: choose a plan with more seats.")
+    notices.emit_to_roles(
+        db,
+        organization_id=organization.id,
+        roles=(OrganizationRole.OWNER, OrganizationRole.ADMIN) if buy else (OrganizationRole.OWNER,),
+        title=title,
+        message=message,
+        notification_type=NotificationType.SYSTEM,
+        priority=NotificationPriority.WARNING,
+        category=category,
+        action="seats" if buy else "plans",
+    )
+
+
+def run_seat_alerts(db: Any, *, now: Optional[datetime] = None) -> int:
+    """Seats at four of five or every seat held: once per capacity and month (a change in seats re-arms it)."""
+    from app.models.organization import Organization, OrganizationStatus
+    from app.models.spend_limit import SpendLimitPeriod
+    from app.services import seat_capacity_service
+    from app.services import spend_control_service as spend
+
+    period_start = spend.period_start(SpendLimitPeriod.MONTH, now=now or datetime.now(timezone.utc))
+    sent = 0
+    for organization in db.execute(select(Organization).where(Organization.status == OrganizationStatus.ACTIVE)).scalars().all():
+        try:
+            capacity = seat_capacity_service.seat_capacity(db, organization_id=organization.id)
+            level = _seat_state(capacity)
+            if level is None:
+                continue
+            meter = {"key": "seats", "limit": capacity.capacity}
+            if _claim(db, organization_id=organization.id, meter=meter, level=level, period_start=period_start):
+                _notify_seats(db, organization=organization, capacity=capacity, level=level)
+                sent += 1
+            db.commit()
+        except Exception:  # noqa: BLE001 - one organization must not stop the sweep
+            db.rollback()
+            logger.exception("usage.seat_alerts_failed", extra={"organization_id": str(organization.id)})
+    return sent
 
 
 def run_limit_alerts(db: Any, *, now: Optional[datetime] = None) -> dict[str, int]:
@@ -163,9 +236,10 @@ def handle_limit_alerts(payload: dict[str, Any]) -> dict[str, Any]:
 
     with session_module.SessionLocal() as db:
         result = run_limit_alerts(db)
-    if result["sent"]:
+        result["seat_alerts"] = run_seat_alerts(db)
+    if result["sent"] or result["seat_alerts"]:
         logger.info("usage.limit_alerts_sent", extra=result)
     return result
 
 
-__all__ = ["JOB_TYPE", "handle_limit_alerts", "run_limit_alerts"]
+__all__ = ["JOB_TYPE", "handle_limit_alerts", "run_limit_alerts", "run_seat_alerts"]

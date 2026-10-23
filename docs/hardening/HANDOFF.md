@@ -694,7 +694,11 @@ Follow RUNBOOK §9.2 steps 1 to 7 exactly: the user and folders, the code, `.env
 template (secrets generated with the commands shown; Postmark, Groq, R2 from step 5;
 `OPERATOR_ALERT_EMAILS` = your own address; `FRONTEND_URL=https://app.servabo.app`,
 `WEBSITE_URL=https://servabo.app`; Dodo's **test** API key and `DODO_LIVEMODE=false`), the build, the
-migrations and the start. *Done when:* `https://app.servabo.app/api/v1/health/ready` says ready.
+migrations and the start. **Before the first start, and after every change of settings, run**
+`docker compose ... run --rm web python scripts/preflight.py` (RUNBOOK §9.14): it prints OK, MISSING, WRONG or SKIPPED for every setting with
+the one-line fix and where to click, never a secret, and says READY or NOT READY. Add `--online` for read-only checks of the database, Redis,
+the R2 bucket, the mail login, Groq and Dodo, and `--send-test-email you@yourcompany.com` to send exactly one message.
+*Done when:* preflight says READY and `https://app.servabo.app/api/v1/health/ready` says ready.
 
 **Step 8 — Create the plans in Dodo (test mode) and publish them.**
 RUNBOOK §9.2 step 8: `dodo_setup.py --create-test-products` creates the five plan products and three
@@ -914,3 +918,75 @@ email; there is no error tracker; ERP OAuth is "paste your tokens", with no Conn
 from the e-invoice QR code; axe runs in 11 of 99 browser spec files.
 
 **Numbers.** N-160 is this decision; Final session 1 starts at N-161 and F-546; browser specs continue at 118.
+
+## Final session 1 → Final session 2 (2026-10-22)
+
+Final session 2 runs on the owner's Windows PC, with the owner present, and connects the real accounts. Everything below was built and proven in the cloud
+sandbox against **stand-ins** (a stand-in Postmark, Zoho, Dodo, SMTP and DNS; `frontend/e2e/scripts/start-stack.sh` starts them). **Nothing that talks to an
+outside service has been run against the real service.** Read the tables; do not take "passed" to mean "tried for real". Findings F-546 to F-605 and decisions
+N-161 to N-184 are in FINDINGS.md and NEEDS-OWNER.md; the study is `docs/hardening/UPGRADE-AUDIT.md`.
+
+### 1. What Final session 2 must try for real
+
+Settings go in `backend/.env` (local) or `.env.production`; the web app's go in `frontend/.env` **before building the frontend**. Run `python scripts/preflight.py --online`
+after every change: it says what is missing or wrong without printing a secret.
+
+| Feature | Settings | Turn it on locally | The stand-in that proved it here | A real success looks like |
+| --- | --- | --- | --- | --- |
+| **Email-in** (RUNBOOK 9.10) | `POSTMARK_INBOUND_WEBHOOK_USER`, `POSTMARK_INBOUND_WEBHOOK_PASSWORD`, `POSTMARK_INBOUND_HASH` (later `INBOUND_EMAIL_DOMAIN`, `POSTMARK_INBOUND_ALLOWED_IPS`) | Create a Postmark **inbound** server; put its hash in `.env`; start a tunnel (cloudflared or ngrok) to the API; set the server's Webhook to `https://<user>:<password>@<tunnel>/api/v1/inbound/postmark`; in a workspace open Settings → Email-in, allow your address, forward an invoice to the address shown | `python scripts/e2e_stand_in.py inbound-email --org <slug> --file invoice.pdf --from you@example.com --subject Test --message-id m1` plays Postmark against the real webhook (browser spec 119, 26 live tests) | Postmark's Activity page shows the webhook answered **200**; the document appears in the workspace labelled "Arrived by email from you@example.com"; mail from an unlisted sender sits under "Waiting for you"; a zip attachment becomes all its documents |
+| **Error tracking** (RUNBOOK 9.13) | `SENTRY_DSN` (API and workers, https), `SENTRY_ENVIRONMENT`, `SENTRY_RELEASE`; `VITE_SENTRY_DSN` (web, baked in at build) and `SENTRY_INGEST_HOST` (the web DSN's host, for the Content-Security-Policy) | Create two Sentry projects in the **EU region** (Python, Browser JavaScript); set the DSNs; rebuild the frontend; restart | The scrubber is proven by unit tests (nothing sensitive leaves); no real receiver was reached | `python scripts/preflight.py --send-test-error` run **in the API container and again in the worker container** shows one "Servabo preflight test error (safe to ignore)" in the Python project, tag `area=preflight`, `service=preflight`; in the browser console on the app, `setTimeout(() => { throw new Error("web sentry test") })` shows one event in the JavaScript project; open an event and see **no email, token, GSTIN, amount or document text** |
+| **Zoho Books Connect** (RUNBOOK 9.12; N-173) | `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REDIRECT_URI` (`<API>/api/v1/erp/zoho/callback`) | In api-console.zoho.in create a **Server-based Application**; register that exact redirect URI; use a free Zoho Books organization in the **India data centre**; in a Business workspace: ERP posting → Connect your books | `ZOHO_ACCOUNTS_URL_OVERRIDE` / `ZOHO_API_URL_OVERRIDE` point at a stand-in Zoho (`E2E_ZOHO_URL`, started by `start-stack.sh`; the API refuses to start in production with them set); 15 live tests, browser spec 122 | Zoho's consent screen, then back in Servabo "Connected to <your organization>"; an approved bill posts once and appears in Zoho Books as a bill with the vendor's GSTIN, the GST treatment, source and destination of supply, and per line the HSN/SAC code and tax; posting it again does not duplicate it. **If Zoho rejects a scope, a host or a field, write down the exact message**: the docs could not be opened from the build sandbox |
+| **Tally Prime file** (N-174) | none | ERP posting → a Tally target (company and five ledger names) → download the file for an approved bill | The file's structure is tested (one balanced Purchase voucher per bill; CGST and SGST to their own Input ledgers for a same-state supplier, IGST to one for another state) | Import it into **Tally Prime** (the free Educational mode is enough). **The exact menu steps for importing are unverified**: write them down (RUNBOOK 9.12 gets them). The voucher must appear balanced, with the right ledgers, and the totals must agree with the bill |
+| **GST digest and notices** (RUNBOOK 9.12; N-170) | the mail relay (`PLATFORM_SMTP_*`) | A **throwaway** organization and workspace with a GSTR-2B imported and at least one invoice waiting for its supplier; set the workspace time zone; `python scripts/e2e_stand_in.py run-job --org <slug> --job gst.digest --now 2026-10-19T09:30:00+00:00` (a Monday) | The same command against the SMTP catcher; the job code is the production code; spec 121 | One email in a **real inbox** (Gmail and Outlook): the headline in lakh grouping, the list of what to do, the right button, and on a plan that shows only the headline figures one line about what the add-on adds. Run it twice: the second run sends nothing (once a week). Switching "GST credit" off under Notifications stops it |
+| **Pillow 13 with real PaddleOCR** (F-567) | `ML_STUBS=false` | Build the backend image (or the venv) as production does; upload a scanned PDF and a phone photo of an invoice | The suite runs with stubs; Pillow 13.0.0 imports; PaddleOCR 3.7.0 itself was **not** run | The scan is read (text and fields appear with the page evidence). If PaddleOCR fails on Pillow 13, pin `pillow` to the newest 12.x in `backend/requirements.txt`, record the error, and re-open F-567 |
+| **Updated model lists** (F-564 to F-566; RUNBOOK on BYOK) | `GROQ_API_KEY`; a Gemini key for BYOK | Organization → Enterprise BYOK & models: add each provider and use "Test connection" on every suggested model id; `python scripts/preflight.py --online` lists Groq's models | Model ids come from the providers' pages as read on 2026-10-22 and the lists' tests; **no real key was used** | Every suggested model answers; any that does not is **removed from the list** (`byok_providers.py`) and recorded; a retired model gives the plain sentence, never a raw 404 |
+| **`preflight.py --online`** (RUNBOOK 9.14) | all of the above | `python scripts/preflight.py --online` (then `--send-test-email you@example.com`); against a **live** Dodo account it refuses without `--i-mean-live` (it still only reads) | Probes run against `httpx.MockTransport` and fake SMTP/database/storage; 24 tests | Every line OK or an intended SKIPPED; no MISSING or WRONG; the output contains no secret (check by eye once) |
+| **E-invoice QR badge** (N-175) | `EINVOICE_QR_PUBLIC_KEY_PEM` (NIC's published public key, if you have it) | Upload a **real e-invoice PDF** that carries the QR code (from the GST portal or an invoicing tool) | `python scripts/e2e_stand_in.py einvoice-qr --org <slug> --document <id> --signature not_checked\|checked\|does_not_match` sets the three states on a document | Values read from the code show "From the e-invoice QR code"; the IRN has a copy button; with no key "signature not checked"; with the right key "signature checked". **A wrong key makes every code read "does not match"** |
+| **Public webhook events** (docs/product/WEBHOOK-EVENTS.md; N-179) | none (webhooks need a plan that includes them) | Webhooks tab: add an endpoint (webhook.site or your own) subscribed to `gst.return.imported`, `gst.invoice.at_risk`, `gst.supplier.not_reported`, `automation.run.failed`, `automation.run.held`; import a GSTR-2B; run `run-job --org <slug> --job automation.sweep --now <a day 31 days after an invoice entered the books>` for the two clock events; make a workflow fail (point a "send to webhook" step at a disabled endpoint) or pause (the workspace pause switch, or a rule's hourly limit of 1) | 13 live tests (`test_engine_public_webhooks_live.py`) | A signed POST per occurrence, once, with only ids, GSTINs, micros, dates, counts and states; the signature verifies with the endpoint's secret; the same GSTR-2B again sends nothing |
+| **Warehouse datasets** (N-180) | the warehouse add-on; a real bucket (S3 or R2) | An **Enterprise** organization: Analytics → Schedules, tick GST matches and Helm promise ledger, "Sync now" to a real bucket | A stub S3 connector (`test_warehouse_engine_datasets.py`, 13 tests, Parquet round trip) | Parquet files in the bucket open in DuckDB or Excel with the columns listed under Analytics → datasets; no supplier or counterparty name anywhere; a Business organization is refused with a plain sentence |
+| **Pack checks and the Redact suggestion** (N-181) | a real model key | An Enterprise workspace: enable the NDA and Master services agreement packs; Clause assertions → add "Add, read by an AI model" on "A governing law is named."; process a real NDA | Recorded model readings (`test_pack_checks_live.py`, spec 134) | The check runs on a real NDA with a sensible verdict and the usage shows as assistant usage; the Redact menu on the NDA offers the pack's profile first |
+| **The new logo** (N-176) | none | Look at the app, the website, a verification email and an invitation email in Gmail and Outlook, and the browser tab icon | Rendering tests; screenshots retaken | The mark looks right in all of them. **It is a recreation**: if it is not close enough, put the original files in `brand/assets/` and run `build_brand_assets.py` |
+| **Resizable sidebars on a phone** (N-177) | none | Open the app on a real phone (or a touch device), open the menu, drag its edge | Playwright touch events at 390 px (spec 126) | The drawer follows the finger, stops at 85% of the screen, and the width is remembered after a reload |
+
+### 2. Commands Final session 2 can use
+
+All in `backend/`; development and test databases only (they refuse to run in production).
+
+| Command | What it is for | Throwaway organization only? |
+| --- | --- | --- |
+| `python scripts/preflight.py [--online] [--json] [--send-test-email ADDR] [--send-test-error] [--i-mean-live]` | Is this setup ready. `--send-test-error` sends one safe test error to the tracker (needs `SENTRY_DSN`) | No (it only reads, apart from the one message or event you ask for) |
+| `python scripts/e2e_stand_in.py inbound-email --org SLUG --file F --from ADDR --subject S --message-id ID [--address A]` | Play Postmark against the real webhook; repeat a `--message-id` to replay a delivery | **Yes**: it adds documents to the organization's first workspace |
+| `python scripts/e2e_stand_in.py run-job --org SLUG --job JOB [--now ISO]` with `JOB` = `gst.digest`, `gst.notices`, `automation.sweep`, `trial.reminders`, `billing.hold_notices`, … | Queue a scheduled job now, with a clock you choose | **Yes**: `gst.digest` and `gst.notices` **send real email to the organization's owners** when a real relay is configured |
+| `python scripts/e2e_stand_in.py einvoice-qr --org SLUG --document ID --signature STATE` | Put a document's QR signature in one of the three states | **Yes**: it edits the document's extraction record |
+| `python scripts/e2e_stand_in.py fail-document --document ID` | Make a document read FAILED (to try "Retry processing") | **Yes** |
+| `python scripts/e2e_stand_in.py subscribe / seats / change-plan / cancel / trial-ending / trial-ends / …` | The billing steps (Session G/H); unchanged | **Yes** |
+| `python scripts/sweep_compliance.py --archived [--apply]` | What deleting a workspace or organization purges, and when (dry run by default; RUNBOOK 9.11) | **Yes** with `--apply` |
+| `python scripts/seed_website_demo.py` and `node website/scripts/capture-screenshots.mjs` | The demo company and the website's screenshots (needs the stack and a built bundle) | The demo organization only |
+| `bash frontend/e2e/scripts/start-stack.sh [stop]` | Start or stop the API, worker and the stand-ins | n/a |
+
+### 3. What was not reached, in the order to do it next
+
+1. **A full run of every suite on CI** is the last thing before the owner merges: this session ran each changed area locally and the whole browser regression of the
+   touched areas, and left the full backend and browser suites to the ready PR's CI (STATE says whether it was green).
+2. **The downgrade of migration `k1a6` with delivery rows present** was proven only on an empty database (up, down, up and one head). Try it once with a webhook endpoint
+   that listens to a new event.
+3. **Day-1 and day-25 emails after a customer deletes a workspace** ("it will be erased on…", "last chance to restore"): the purge runs, nothing warns.
+4. **The global upload tray accepts a zip** (the Documents page does).
+5. **A shared "could not be loaded, try again" block** for the organization console pages (polish; PRODUCT-NEXT 2.8).
+6. **The ranked list in PRODUCT-NEXT**: the annual and rupee price for the GST add-on first, then the CA-firms channel.
+
+### 4. What is unverified, in plain words
+
+- **The new logo is a recreation** drawn from a picture, not the original artwork (N-176).
+- **Real Postmark inbound**, the real header and basic-auth form, and the tunnel: only a stand-in has delivered mail to the webhook.
+- **Real Zoho Books**: the data-centre hosts, scope names, token and revoke paths and the bill's GST fields are from Zoho's documentation as known and a search summary; Zoho's pages
+  could not be opened from the build sandbox (N-173).
+- **Real Tally Prime**: how the file imports, and the exact menu steps.
+- **Real Sentry (EU region)**: no event has reached a real tracker; the scrubbing is proven by tests only.
+- **NIC's real QR signature**: the check uses a key you configure; no real e-invoice was verified.
+- **Model ids against real keys**, and **Pillow 13 with PaddleOCR 3.7.0** on real scans.
+- **Real email in Gmail and Outlook** (the GST digest and the new header).
+- **The legal paragraph in N-163** (the basis for keeping GST rows after erasure) was read in practitioner copies, not on indiacode.nic.in; a lawyer should confirm it.
+- **Real webhook receivers and a real bucket** for the new events and datasets.
+- **The AI-read pack checks with a real model**: twelve of the fourteen shipped checks are read by an AI model (N-181).
+- **Whether any outside tool of yours expects rupees grouped in thousands**: the formatter now groups rupees the Indian way everywhere (N-182).

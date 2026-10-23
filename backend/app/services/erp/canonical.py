@@ -97,9 +97,14 @@ class Line:
     #: A line whose account is fixed by its ROLE, never by a fallback: TAX (input tax), AP (the payable),
     #: BANK (the paying account). A mapping must map these explicitly (the default mappings refuse to guess).
     account_code: Optional[str] = None
+    #: Indian GST (Final session 1, 3C). The line's HSN or SAC code, and the tax code it carries
+    #: ("GST18" for CGST+SGST, "IGST18" for IGST): what Zoho Books asks for beside each line.
+    hsn: Optional[str] = None
+    gst_tax_key: Optional[str] = None
 
     def as_json(self) -> dict:
-        return {"number": self.number, "description": self.description, "code": self.code,
+        extra = {k: val for k, val in (("hsn", self.hsn), ("gst_tax_key", self.gst_tax_key)) if val}
+        return {**extra, "number": self.number, "description": self.description, "code": self.code,
                 "quantity": _dec(self.quantity), "unit": self.unit, "unit_price": _dec(self.unit_price),
                 "amount": _dec(self.amount), "tax_amount": _dec(self.tax_amount), "account": self.account,
                 "debit": _dec(self.debit), "credit": _dec(self.credit), "date": _iso(self.date),
@@ -128,6 +133,8 @@ class PostingObject:
     lines: list[Line] = field(default_factory=list)
     source: dict = field(default_factory=dict)       # kind, id, work_item_id, label, approved_at
     notes: list[str] = field(default_factory=list)   # how figures were derived (shown with the posting)
+    #: Indian GST (Final session 1, 3C): the tax heads, the two states and the treatment; empty when the document has none.
+    gst: dict = field(default_factory=dict)
 
     @property
     def total_debit(self) -> Decimal:
@@ -149,7 +156,16 @@ class PostingObject:
             "line_count": len(self.lines), "vendor": self.vendor.as_json(), "buyer": self.buyer.as_json(),
             "lines": [ln.as_json() for ln in self.lines], "lines_with_tax": self._lines_with_tax(),
             "source": dict(self.source), "notes": list(self.notes),
+            "lines_with_tax_codes": self._lines_with_tax_codes(),
+            **({"gst": dict(self.gst)} if self.gst else {}),
         }
+
+    def _lines_with_tax_codes(self) -> list[dict]:
+        """The lines when every one carries its own tax code (Indian GST: the books add the tax from the code, so a separate
+        tax line would count it twice); otherwise the lines plus one tax line, as `lines_with_tax`."""
+        if self.lines and all(ln.gst_tax_key for ln in self.lines):
+            return [ln.as_json() for ln in self.lines]
+        return self._lines_with_tax()
 
     def _lines_with_tax(self) -> list[dict]:
         """The lines, plus one line carrying the tax (code TAX) when there is tax: what an ERP whose bill total
@@ -193,6 +209,11 @@ HEADER_PATHS: dict[str, str] = {
     "vendor.address": "text",
     "buyer.name": "text", "buyer.entity_id": "text", "buyer.tax_id": "text", "buyer.email": "text",
     "buyer.address": "text",
+    #: Indian GST (Final session 1, 3C). `*_state` is the two-digit GST state code ("27"), `*_state_code` the two letters
+    #: Zoho Books uses ("MH"); `treatment` is business_gst (the vendor gave a GSTIN) or business_none.
+    "gst.treatment": "text", "gst.vendor_gstin": "text", "gst.vendor_state": "text", "gst.destination_state": "text",
+    "gst.vendor_state_code": "text", "gst.destination_state_code": "text", "gst.intra_state": "boolean",
+    "gst.cgst": "decimal", "gst.sgst": "decimal", "gst.igst": "decimal", "gst.cess": "decimal",
     "source.kind": "text", "source.id": "text", "source.work_item_id": "text", "source.label": "text",
     "source.approved_at": "text",
     "posting.id": "text", "posting.idempotency_key": "text", "posting.date": "date",
@@ -204,7 +225,7 @@ LINE_PATHS: dict[str, str] = {
     "line.unit": "text", "line.unit_price": "decimal", "line.amount": "decimal", "line.tax_amount": "decimal",
     "line.account": "text", "line.debit": "decimal", "line.credit": "decimal", "line.date": "date",
     "line.reference": "text", "line.po_line": "integer", "line.balancing": "boolean", "line.side": "text",
-    "line.account_code": "text",
+    "line.account_code": "text", "line.hsn": "text", "line.gst_tax_key": "text",
 }
 #: The header fields each kind fills (the others are None, and a mapping requiring one fails at render).
 KIND_HEADER: dict[str, tuple[str, ...]] = {

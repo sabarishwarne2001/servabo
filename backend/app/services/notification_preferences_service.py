@@ -35,6 +35,9 @@ HELM = "helm"
 HELM_BRIEFING = "helm_briefing"
 #: Session H: last month's value receipt, on the 1st, to the owners of a paying organization.
 MONTHLY_SUMMARY = "monthly_summary"
+#: Final session 1 (3A): GST credit notices (a GSTR-2B imported, invoices near the 180-day limit, suppliers that have not reported,
+#: IMS actions pending) and the Monday digest. On by default; owners, admins and the billing role.
+GST_CREDIT = "gst_credit"
 
 
 @dataclass(frozen=True)
@@ -54,6 +57,8 @@ OWNER_AUDIENCE_ROLES: tuple[str, ...] = ("OWNER",)
 
 #: Organization roles Helm notifies (brief §5.4).
 HELM_AUDIENCE_ROLES: tuple[str, ...] = ("OWNER", "ADMIN", "BILLING")
+#: Organization roles that get GST credit notices and the Monday digest (Final session 1, 3A): the people who act on it and who pay.
+GST_AUDIENCE_ROLES: tuple[str, ...] = ("OWNER", "ADMIN", "BILLING")
 
 
 CATEGORIES: tuple[Category, ...] = (
@@ -73,6 +78,10 @@ CATEGORIES: tuple[Category, ...] = (
              "On the 1st of each month: what Servabo found in your documents last month, for each paying "
              "organization you own. Not sent when there is nothing to report.",
              essential=False, audience="owners"),
+    Category(GST_CREDIT, "GST credit",
+             "A GSTR-2B imported, invoices near the 180-day limit, suppliers that have not reported your invoices, IMS actions "
+             "waiting, and a short email every Monday when there is something to report.",
+             essential=False, audience="gst"),
     Category(HELM, "Helm",
              "A mandate breached or drifting, a conflict in the plan, a payment action waiting for approval.",
              essential=False, audience="helm"),
@@ -125,6 +134,15 @@ def _sees_helm(db: Session, user_id: uuid.UUID) -> bool:
     return any(str(role).upper() in HELM_AUDIENCE_ROLES for role in roles)
 
 
+def _sees_gst(db: Session, user_id: uuid.UUID) -> bool:
+    from app.models.organization import MembershipStatus, OrganizationMember
+
+    roles = [getattr(r, "value", r) for (r,) in db.execute(
+        select(OrganizationMember.role).where(OrganizationMember.user_id == user_id,
+                                              OrganizationMember.status == MembershipStatus.ACTIVE)).all()]
+    return any(str(role).upper() in GST_AUDIENCE_ROLES for role in roles)
+
+
 def _is_owner(db: Session, user_id: uuid.UUID) -> bool:
     from app.models.organization import MembershipStatus, OrganizationMember
 
@@ -137,6 +155,7 @@ def _is_owner(db: Session, user_id: uuid.UUID) -> bool:
 def list_for_user(db: Session, *, user_id: uuid.UUID) -> list[dict[str, Any]]:
     helm = _sees_helm(db, user_id)
     owner = _is_owner(db, user_id)
+    gst = _sees_gst(db, user_id)
     rows = {
         row.category: row.email_enabled
         for row in db.execute(
@@ -153,6 +172,7 @@ def list_for_user(db: Session, *, user_id: uuid.UUID) -> list[dict[str, Any]]:
         }
         for c in CATEGORIES
         if c.audience == "everyone" or (c.audience == "helm" and helm) or (c.audience == "owners" and owner)
+        or (c.audience == "gst" and gst)
     ]
 
 
@@ -187,6 +207,7 @@ __all__ = [
     "SECURITY",
     "USAGE",
     "WORKFLOW",
+    "GST_CREDIT",
     "EMAILED_PRIORITIES",
     "category",
     "email_enabled",

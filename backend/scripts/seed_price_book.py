@@ -197,6 +197,24 @@ PLACEHOLDER_ENTRIES: list[dict[str, Any]] = [
         "cost_basis_source": "SUPPLIER_RATE_CARD",
         "notes": "Gemini 3.5 Flash output (customer key only, N-054): Google list price $9.00/M (2026-10-11).",
     },
+    {
+        "event_type": "llm.input_token",
+        "provider": "gemini",
+        "model": "gemini-3.8-flash",
+        "unit_price_micros": "1.500000000",
+        "cost_basis_micros": "0.750000000",
+        "cost_basis_source": "SUPPLIER_RATE_CARD",
+        "notes": "Gemini 3.8 Flash input (customer key only, N-054): Google list price $0.75/M (2026-10-22). Introductory: Google says it changes at the end of 2026, so re-check on 2027-01-01.",
+    },
+    {
+        "event_type": "llm.output_token",
+        "provider": "gemini",
+        "model": "gemini-3.8-flash",
+        "unit_price_micros": "7.500000000",
+        "cost_basis_micros": "3.750000000",
+        "cost_basis_source": "SUPPLIER_RATE_CARD",
+        "notes": "Gemini 3.8 Flash output (customer key only, N-054): Google list price $3.75/M (2026-10-22). Introductory, see the input row.",
+    },
     # --- OpenAI ---
     {
         "event_type": "llm.input_token",

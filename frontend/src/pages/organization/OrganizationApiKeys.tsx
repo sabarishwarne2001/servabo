@@ -1,3 +1,4 @@
+import { errorMessage } from "@/services/api/errors";
 import { formatTimestamp, formatTimestampDate } from "@/utils/displayTime";
 import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -69,6 +70,8 @@ export const OrganizationApiKeys: React.FC = () => {
   // The same for GST credit across every workspace (gst:read).
   const gstApi = useCapabilityAccess(organizationId, CAPABILITY.gstCreditAllWorkspaces);
   const [expiresAt, setExpiresAt] = useState("");
+  // A key that has already expired never works, so the earliest expiry offered is tomorrow.
+  const tomorrow = new Date(Date.now() + 24 * 3_600_000).toISOString().slice(0, 10);
 
   const [revealed, setRevealed] = useState<{ token: string; name: string } | null>(
     null,
@@ -109,10 +112,14 @@ export const OrganizationApiKeys: React.FC = () => {
       resetForm();
       void invalidate();
     },
-    onError: () =>
+    // The server's own reason (a name already in use, an expiry already past, a plan that does not include keys) is
+    // shown; the generic line used to be shown for all of them (F-593).
+    onError: (error: unknown) =>
       setActionError(
-        "That key couldn't be created. Check the name and that at least one " +
-          "permission is selected.",
+        errorMessage(
+          error,
+          "That key couldn't be created. Check the name and that at least one permission is selected.",
+        ),
       ),
   });
 
@@ -511,6 +518,7 @@ export const OrganizationApiKeys: React.FC = () => {
               <input
                 id="key-expiry"
                 type="date"
+                min={tomorrow}
                 value={expiresAt}
                 onChange={(event) => setExpiresAt(event.target.value)}
                 className="mt-1 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none"

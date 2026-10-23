@@ -2,9 +2,9 @@
 
     GET /organizations/{organization_id}/search?q=...&limit=...   [any member]
 
-Documents, entities and cases from every workspace of the organization the
-caller may open (app/services/global_search_service.py), each with the
-workspace it lives in so the console can open it there.
+Documents, entities, cases, GST suppliers and invoices, and automation rules from every workspace of the
+organization the caller may open (app/services/global_search_service.py), each with the workspace it lives in so the
+console can open it there. A result the person's role or the plan would lock is not returned.
 """
 
 from __future__ import annotations
@@ -29,6 +29,7 @@ class SearchHitOut(BaseModel):
     workspace_id: uuid.UUID
     workspace_slug: str
     workspace_name: str
+    reference: Optional[str] = None
 
 
 class SearchResponse(BaseModel):
@@ -37,12 +38,15 @@ class SearchResponse(BaseModel):
     documents: list[SearchHitOut]
     entities: list[SearchHitOut]
     cases: list[SearchHitOut]
+    suppliers: list[SearchHitOut] = []
+    gst_invoices: list[SearchHitOut] = []
+    rules: list[SearchHitOut] = []
 
 
 @router.get(
     "/organizations/{organization_id}/search",
     response_model=SearchResponse,
-    summary="Search documents, entities and cases across your workspaces",
+    summary="Search documents, entities, cases, GST suppliers and invoices and automation rules across your workspaces",
 )
 def global_search(
     organization_id: uuid.UUID,
@@ -70,4 +74,7 @@ def global_search(
         documents=[SearchHitOut(**vars(h)) for h in results.documents],
         entities=[SearchHitOut(**vars(h)) for h in results.entities],
         cases=[SearchHitOut(**vars(h)) for h in results.cases],
+        suppliers=[SearchHitOut(**vars(h)) for h in results.suppliers],
+        gst_invoices=[SearchHitOut(**vars(h)) for h in results.gst_invoices],
+        rules=[SearchHitOut(**vars(h)) for h in results.rules],
     )

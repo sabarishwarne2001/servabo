@@ -5,6 +5,8 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useUIStore } from "@/store/useUIStore";
 import { ROUTES } from "@/constants/routes";
 import DesktopSidebar from "@/components/layout/DesktopSidebar";
+import { SidebarResizeHandle } from "@/components/layout/SidebarResizeHandle";
+import { SHELL_SIDEBAR, useSidebarWidth } from "@/components/layout/sidebarWidth";
 import Sidebar from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { VerificationBanner } from "@/components/common/VerificationBanner";
@@ -38,6 +40,7 @@ export const DashboardLayout: React.FC = () => {
   const clearAuth = useAuthStore((state) => state.clearAuth);
   const beginSignOut = useAuthStore((state) => state.beginSignOut);
   const isSidebarCollapsed = useUIStore((state) => state.isSidebarCollapsed);
+  const sidebarWidth = useSidebarWidth(SHELL_SIDEBAR);
   const { state: tenantState } = useTenant();
   const billingOrganizationId =
     tenantState.status === "ready" &&
@@ -73,19 +76,13 @@ export const DashboardLayout: React.FC = () => {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground transition-colors duration-200">
+      {/* The width is the person's own (drag the divider; it is remembered). A collapsed sidebar is the fixed icon rail. */}
       <div
-        className={`
-          hidden
-          h-screen
-          shrink-0
-          transition-[width]
-          duration-200
-          ease-out-expo
-          lg:block
-          ${isSidebarCollapsed ? "w-[68px]" : "w-[260px]"}
-        `}
+        className="relative z-20 hidden h-screen shrink-0 transition-[width] duration-200 ease-out-expo lg:block"
+        style={{ width: isSidebarCollapsed ? 68 : sidebarWidth, maxWidth: "50vw" }}
       >
         <DesktopSidebar onLogout={handleLogout} />
+        {isSidebarCollapsed ? null : <SidebarResizeHandle spec={SHELL_SIDEBAR} label="Resize the sidebar" />}
       </div>
 
       <Sidebar onLogout={handleLogout} />

@@ -101,6 +101,7 @@ export interface Recipe {
   readonly unavailable_reason: string | null;
   /** What the upgrade dialog names when a locked recipe is chosen. */
   readonly locked_capability?: string | null;
+  readonly locked_addon?: string | null;
   readonly locked_feature?: string | null;
   readonly trigger_labels: readonly string[];
 }

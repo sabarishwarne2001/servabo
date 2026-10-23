@@ -64,6 +64,10 @@ BILLING_EMAIL_ROLES: tuple[OrganizationRole, ...] = (
 #: Where an email's button goes: a page of the organization console.
 ACTIONS: dict[str, tuple[str, str]] = {
     "billing": ("billing", "Open billing"),
+    "gst": ("gst", "Open GST Credit"),
+    # Final session 1 (3B): an 80% warning goes to the exact place that fixes it, not to the top of Billing.
+    "plans": ("billing#plans", "Choose a plan"),
+    "seats": ("billing#seats", "Add seats"),
     "identity": ("identity", "Review sign-in settings"),
     "settings": ("settings", "Open organization settings"),
 }

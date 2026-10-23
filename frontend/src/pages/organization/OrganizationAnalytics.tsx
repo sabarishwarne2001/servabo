@@ -31,6 +31,8 @@ import {
   triggerSync,
   updateSchedule,
 } from "@/services/api/analytics";
+import { CAPABILITY } from "@/constants/capabilities";
+import { useCapabilityAccess } from "@/hooks/useCapabilityAccess";
 import { analyticsKeys } from "@/services/api/queryKeys";
 // ARCH30-T4:ts-schedule-form-clock-import — A1.
 import { getMyWorkspaces } from "@/services/api/me";
@@ -44,6 +46,7 @@ import { AddOnGraceNotice, AddOnLockCard } from "@/components/billing/AddOnLockC
 import { useAddonAccess } from "@/hooks/useAddonAccess";
 import { errorMessage as apiErrorMessage } from "@/services/api/errors";
 import {
+  DATASET_CAPABILITY,
   DATASET_HINTS,
   DATASET_LABELS,
   DESTINATION_KINDS,
@@ -493,6 +496,18 @@ const ScheduleRow: React.FC<{
 // `addon_gate.require_addon(..., allow_grace=False)` on schedule
 // creation, so GRACE and LAPSED both refuse it. The console offered the
 // button anyway and the only way to find out was a 402.
+/** Whether the organization's plan includes each dataset (the two across-every-workspace ones are Enterprise). */
+const useDatasetAccess = (organizationId: string): ((dataset: ExportDataset) => boolean) => {
+  const gst = useCapabilityAccess(organizationId, CAPABILITY.gstCreditAllWorkspaces);
+  const helm = useCapabilityAccess(organizationId, CAPABILITY.helmAllWorkspaces);
+  return (dataset) => {
+    const needed = DATASET_CAPABILITY[dataset];
+    if (needed === CAPABILITY.gstCreditAllWorkspaces) {return gst.granted;}
+    if (needed === CAPABILITY.helmAllWorkspaces) {return helm.granted;}
+    return true;
+  };
+};
+
 const ScheduleForm: React.FC<{
   organizationId: string;
   destinations: WarehouseDestination[];
@@ -502,6 +517,7 @@ const ScheduleForm: React.FC<{
   const queryClient = useQueryClient();
   const [destinationId, setDestinationId] = useState("");
   const [datasets, setDatasets] = useState<ExportDataset[]>(["USAGE_ROLLUPS"]);
+  const included = useDatasetAccess(organizationId);
   const [cadence, setCadence] = useState<ScheduleCadence>("DAILY");
   // ARCH30-T4:ts-schedule-form-clock-state — A1. "" is UTC; any
   // other value is a workspace id, and the hour above is then read
@@ -712,17 +728,23 @@ const ScheduleForm: React.FC<{
           {EXPORT_DATASETS.map((dataset) => (
             <label
               key={dataset}
-              className="flex items-start gap-2 rounded-md border border-border p-3"
+              className={`flex items-start gap-2 rounded-md border border-border p-3 ${included(dataset) ? "" : "opacity-60"}`}
             >
               <input
                 type="checkbox"
                 className="mt-1"
                 checked={datasets.includes(dataset)}
+                disabled={!included(dataset)}
                 onChange={() => toggleDataset(dataset)}
               />
               <span>
                 <span className="text-sm font-medium">
                   {DATASET_LABELS[dataset]}
+                  {included(dataset) ? null : (
+                    <span className="ml-2 rounded border border-border px-1 text-[10px] text-muted-foreground">
+                      Enterprise
+                    </span>
+                  )}
                 </span>
                 <span className={`${HINT} block`}>{DATASET_HINTS[dataset]}</span>
               </span>
@@ -769,6 +791,7 @@ const ManualTrigger: React.FC<{
   const [destinationId, setDestinationId] = useState("");
   const [lookbackDays, setLookbackDays] = useState(1);
   const [datasets, setDatasets] = useState<ExportDataset[]>(["USAGE_ROLLUPS"]);
+  const included = useDatasetAccess(organizationId);
 
   const run = useMutation({
     mutationFn: () =>
@@ -847,11 +870,12 @@ const ManualTrigger: React.FC<{
         {EXPORT_DATASETS.map((dataset) => (
           <label
             key={dataset}
-            className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm"
+            className={`flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm ${included(dataset) ? "" : "opacity-60"}`}
           >
             <input
               type="checkbox"
               checked={datasets.includes(dataset)}
+              disabled={!included(dataset)}
               onChange={() =>
                 setDatasets((current) =>
                   current.includes(dataset)
@@ -861,6 +885,9 @@ const ManualTrigger: React.FC<{
               }
             />
             {DATASET_LABELS[dataset]}
+            {included(dataset) ? null : (
+              <span className="rounded border border-border px-1 text-[10px] text-muted-foreground">Enterprise</span>
+            )}
           </label>
         ))}
       </div>

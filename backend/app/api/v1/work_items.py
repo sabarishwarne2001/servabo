@@ -232,6 +232,14 @@ def get_work_item(
     )
     if work_item is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Work item not found.")
+    from app.models.inbound_email import WorkItemSource
+
+    # Final session 1 (2B): the document page says "Arrived by email from ..." when it did.
+    work_item.source = db.get(WorkItemSource, work_item.id)  # type: ignore[attr-defined]
+    from app.services.gst import einvoice
+
+    # Final session 1 (3D): "From the e-invoice QR code", the IRN and the signature line.
+    work_item.einvoice_qr = einvoice.provenance((work_item.extraction_metadata or {}).get("einvoice_qr"))  # type: ignore[attr-defined]
     return work_item
 
 

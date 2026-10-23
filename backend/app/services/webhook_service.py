@@ -79,6 +79,13 @@ def _preflight_check_url(url: str) -> None:
         raise InvalidURLError(f"Webhook URLs must be https://, got '{parsed.scheme}'.")
     if not parsed.hostname:
         raise InvalidURLError("Webhook URL has no hostname.")
+    # A user name and password in the address would be kept, shown in the console and written to logs (F-590).
+    if parsed.username is not None or parsed.password is not None:
+        raise InvalidURLError("A webhook URL must not carry a user name or password.")
+    try:
+        parsed.port
+    except ValueError as exc:
+        raise InvalidURLError("The webhook URL has an invalid port.") from exc
 
     hostname = parsed.hostname.lower()
     if hostname.endswith((

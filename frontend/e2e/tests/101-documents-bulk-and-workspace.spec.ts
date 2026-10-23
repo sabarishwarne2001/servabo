@@ -165,7 +165,7 @@ test.describe("Workspace: logo and archive", () => {
     await signInAs(page, customer.email);
     await page.goto(customer.ws("settings?section=workspace"));
     await settle(page);
-    await expect(page.getByText("No logo")).toBeVisible();
+    await expect(page.getByText("Default logo")).toBeVisible();
     const logo = samplePath("logoPng");
     const chooser = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: "Upload logo" }).click();
@@ -179,11 +179,11 @@ test.describe("Workspace: logo and archive", () => {
     await expect(page.getByAltText("Company logo preview")).toBeVisible();
 
     await page.getByRole("button", { name: "Remove logo" }).click();
-    await expect(page.getByText("No logo")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText("Default logo")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole("button", { name: "Remove logo" })).toHaveCount(0);
     await page.reload();
     await settle(page);
-    await expect(page.getByText("No logo")).toBeVisible();
+    await expect(page.getByText("Default logo")).toBeVisible();
     await expectHealthyPage(page);
   });
 

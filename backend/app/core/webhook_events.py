@@ -70,6 +70,14 @@ WEBHOOK_EVENT_TYPES: Final[FrozenSet[str]] = frozenset(
         "helm.plan.ready",
         "helm.action.executed",
         "helm.mandate.breached",
+        # Final session 1 (Phase 6; app/services/automation/public_events.py). PUBLIC: a tenant's own systems are the
+        # intended consumer. Ids and figures only (amounts in micros with their currency, dates, counts, states): never a
+        # supplier's name, an invoice number, an error message or a rule's name. Each is sent once per occurrence.
+        "gst.return.imported",
+        "gst.invoice.at_risk",
+        "gst.supplier.not_reported",
+        "automation.run.failed",
+        "automation.run.held",
     }
 )
 

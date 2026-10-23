@@ -61,7 +61,7 @@ def test_an_amount_in_any_written_form_is_compared_as_a_number(engines: Engines)
     usd = _condition_trace(engines, runs[dollars]["id"])[0]
     assert "never converted" in usd["reason"] and "USD" in usd["reason"]
     fired = _condition_trace(engines, runs[grouped]["id"])[0]
-    assert fired["matched"] is True and fired["actual"] == "INR 118,000.00" and fired["expected"] == "INR 100,000.00"
+    assert fired["matched"] is True and fired["actual"] == "INR 1,18,000.00" and fired["expected"] == "INR 1,00,000.00"
 
 
 def test_a_rule_on_vendor_gstin_reads_the_name_a_model_used(engines: Engines) -> None:
@@ -89,7 +89,7 @@ def test_a_correction_is_what_the_next_condition_reads(engines: Engines) -> None
 
     after = engines.post(f"/automation/rules/{rule['id']}/test", {"work_item_id": work_item})
     assert after.json()["matched"] is True
-    assert after.json()["conditions"][0]["actual"] == "INR 118,000.00"
+    assert after.json()["conditions"][0]["actual"] == "INR 1,18,000.00"
 
 
 def test_the_save_refuses_a_value_outside_the_fields_choices_in_words(engines: Engines) -> None:

@@ -1,154 +1,114 @@
-# What to build next (campaign session 4, §E)
+# What to build next
 
-A short list, best first, of ideas that build on what Servabo already has. Each says what it is
-worth, what it costs to build, and what it costs to run. It was written before the launch checklist
-(HANDOFF "Owner launch checklist"); some items have been built since.
+_Rewritten at the end of Final session 1 (2026-10-22), when most of the first list had been built. It is true today: every old item has a status, and
+the ranked list after it is for after the first paying customers._
 
-**Status on 2026-10-22** (Final session 1, `docs/sessions/FINAL-1-UPGRADE.md`, rewrites this file when it finishes):
+Billing is Dodo Payments (it was Stripe once; where an old note says Stripe, it means Dodo). Build cost is in focused engineering days for one person who
+knows the code: an estimate, not a promise. Running cost is what the idea adds to the monthly bill (`docs/hardening/COSTS.md` has the baseline).
+
+## 1. What happened to the first list
 
 | # | Idea | Status |
 | --- | --- | --- |
-| 1 | Email-in | Not built. Final session 1, Phase 2B (Postmark inbound) |
-| 2 | Final overage invoice | Not applicable while Dodo bills hard limits (N-118) |
-| 3 | Yearly billing switch | Built (the owner creates the yearly prices in Dodo) |
-| 4 | Error tracking | Not built. Final session 1, Phase 4A (Sentry, EU region) |
-| 5 | Accounting connections | Retargeted for India: Zoho Books "Connect" and a guided Tally Prime file, Final session 1, Phase 3C. Xero and QuickBooks Online later, for other markets (QuickBooks left India in 2023) |
-| 6 | Zip upload | Not built. Final session 1, Phase 2A |
-| 7 | Premium models as credits | Not started |
-| 8 | Industry benchmarks | Not started (needs many customers) |
-| 9 | Correct a field beside the page | **Built** (`f53ccc8`: `field_correction_service.py`, `PATCH …/work-items/{id}/fields`, `ExtractedFieldsPanel.tsx`) |
-| 10 | Packs that do everything | Not built (F-408). Final session 1, Phase 6, if time allows |
+| 1 | Email-in: forward invoices to a workspace address | **Done** (Final session 1). Postmark inbound; listed senders are read at once, anyone else's mail is held for an administrator. Not yet tried with a real Postmark server (HANDOFF) |
+| 2 | Final overage invoice on cancellation | **Not applicable** while Dodo bills hard limits (N-118): there is no overage to collect |
+| 3 | Yearly billing switch | **Done.** The owner creates the yearly prices in Dodo and sets their ids (RUNBOOK 9.3) |
+| 4 | Error tracking the owner can read | **Done** (Final session 1). Sentry (EU region) or GlitchTip; off until the DSN is set; scrubbed before sending. Not yet receiving from the real service (HANDOFF) |
+| 5 | Accounting-system connections | **Done for India** (Final session 1): Zoho Books "Connect" and a guided Tally Prime file. **Xero and QuickBooks Online later, for other markets** (QuickBooks left India in 2023). Zoho is untried against real Zoho; Tally untried in real Tally (HANDOFF) |
+| 6 | Archive (zip) upload | **Done** (Final session 1). One zip becomes its documents, through the ordinary intake path |
+| 7 | Premium models as credits | **Not started** (see 2.4) |
+| 8 | Industry benchmarks | **Not started** (see 2.6; needs many customers) |
+| 9 | Correct a field beside the page | **Done** earlier (`f53ccc8`: `field_correction_service.py`, `PATCH …/work-items/{id}/fields`, `ExtractedFieldsPanel.tsx`) |
+| 10 | Packs that do everything they recommend | **Done** (Final session 1, F-408): enabling a pack proposes its checks under Clause assertions, one click to add each; the Redact menu offers the pack's profile first. Twelve of the fourteen shipped checks are read by an AI model and billed as assistant usage (N-181) |
 
-Billing moved from Stripe to Dodo Payments; where an item below says Stripe, read Dodo.
+Also done in Final session 1, from the same ambition: the data lifecycle (what erasure, retention, deletion and the export do with every table), refreshed
+AI model lists and libraries, the GST Monday email and notices, upgrade moments that name the right plan, the e-invoice QR badge, `preflight.py`, public webhook
+events for GST and workflow runs (docs/product/WEBHOOK-EVENTS.md), warehouse datasets for GST matches and the Helm ledger (Enterprise), global search for GST and
+workflows, resizable sidebars, the new logo, and a sweep of every organization console tab.
 
-Build cost is in focused engineering days for one person who knows the code. Running cost is what
-it adds to the monthly bill (COSTS.md has the baseline).
+## 2. A new list, for after the first paying customers
 
-## 1. Email-in: forward invoices to a workspace address
+Best first. "Earns money" says how the idea turns into revenue or protects it. Nothing here changes a price, a plan or a trial until the owner decides it.
 
-**What:** each workspace gets an address (for example `ap-acme@in.servabo.app`). Suppliers'
-invoices forwarded there become documents, exactly as if uploaded, with the sender kept as their
-source.
+### 2.1 Chartered accountants as a channel (CA firms)
 
-**Why first:** accounts-payable teams live in a shared inbox. Today someone must download each
-attachment and upload it again; every competitor in invoice capture offers this, and it is the
-feature most likely to turn a trial into daily use. Nothing in Servabo receives mail yet.
+**What:** one chartered accountant files GST for 20 to 200 small clients. Give them one screen that shows the GST position of **every client** (claimable now,
+waiting for suppliers, near the 180 days) and let each client be an organization under the accountant. Servabo already has the tenancy for it: the partner
+portal and reseller tenancy (ARCH-27) read across a book of organizations, and the GST pages already total across workspaces.
 
-**Build:** about 5 days. Postmark's inbound webhook (Servabo already sends through Postmark,
-N-027) posts each message as JSON; a new public route checks Postmark's signature, finds the
-workspace by address, refuses senders the workspace has not allowed, and hands each attachment to
-the existing upload path (`document_intake_service`), so plan limits, file checks and processing
-all apply unchanged.
+**Earns money:** one relationship brings many organizations. A CA who sees 40 clients' GST credit in one place has a reason to put all 40 on Servabo, and to
+recommend it to the next firm. It is the only idea here that sells to many customers at once.
 
-**Run:** Postmark inbound is included in the same plan; documents cost what uploads cost.
+**Build:** about 10 days (a multi-client GST summary in the partner portal, an invitation flow for a client to join a CA's book, plan and billing per client).
+**Run:** nothing beyond compute. **Decide first (the owner):** the reseller margin or referral fee; nothing about it is in the product.
 
-## 2. Final overage invoice when a subscription is cancelled
+### 2.2 WhatsApp-in: invoices sent on WhatsApp
 
-**What:** overage is billed in arrears on the next renewal (N-071). A customer who cancels at the
-end of a month with overage has no next renewal, so that last month's overage is never charged.
-Close the period on cancellation and send one last invoice for it.
+**What:** Indian suppliers send invoices as photos and PDFs on WhatsApp. A workspace would get a WhatsApp number to forward to, as it has an email address.
 
-**Why:** revenue that is currently given away, in exactly the case (a heavy user leaving) where it
-is largest. Small and low risk: the period-close code (`period_close_service`) already exists.
+**What it takes** (written down so the owner can decide; check Meta's pages for today's rules and prices before committing):
+1. A **Meta Business account, verified** (company documents; days to weeks).
+2. A **phone number dedicated to the WhatsApp Business Platform** (not one already used in the ordinary WhatsApp app).
+3. A **Cloud API app**, a webhook that checks Meta's signature (`X-Hub-Signature-256`), and a token to download each attachment.
+4. A **list of allowed senders per workspace**, as email-in has: only a listed phone number is read at once; anyone else's message is held for an administrator.
+5. **Privacy:** a short notice to the sender that the message is processed, and a retention rule for the held messages (the DPDP Act applies).
+6. **Cost:** Meta prices messages by kind (the rules for a reply and for a message Servabo starts, such as "we could not read your photo", differ, and change), and a
+   solution provider, if used, adds a fee. Read Meta's current price list before deciding; expect a small monthly line, not a per-document line.
 
-**Build:** about 2 days: call the period close when the reconcile code applies a cancellation, with
-a one-off Stripe invoice instead of the renewal draft, plus tests with the fake gateway.
+**Earns money:** it removes the last manual step for the customers whose suppliers will never email. **Build:** about 8 days, most of it reusing email-in's intake,
+hold queue and tests. **Run:** the message fees above. **Do it after** customers ask; it is the largest outside dependency on this list.
 
-**Run:** none.
+### 2.3 An annual price and a rupee price for the GST Credit add-on
 
-## 3. Yearly billing switch on the plan cards
+**What:** the add-on is a monthly dollar price today (Session H). Offer a yearly price (about two months free, as the plans have) and a price in rupees.
 
-**What:** Developer $490 and Business $2,990 per seat per year, about two months free (N-051).
+**Earns money:** yearly payers pay up front and leave far less; an Indian owner-manager weighing a $49 line against a rupee bill often stops at the dollar sign.
+It is the cheapest experiment on the list.
 
-**Why:** yearly customers pay up front and churn far less. The price book, the checkout and the
-price-book interval selector already support a yearly price (`ARCH50-S1:checkout-interval`); only the
-Stripe prices and their ids are missing.
+**Build:** about 1 day in the code (the price book already carries an interval; the add-on catalogue gains the two prices) plus the Dodo products. **Check first:**
+whether Dodo collects rupees by UPI and cards for your account, and what it charges for it. **Run:** none. **Decide first (the owner):** the two prices.
 
-**Build:** half a day in the code (the owner creates two yearly prices in Stripe and sets their ids;
-RUNBOOK §9.3), then one browser test.
+### 2.4 Premium models inside the plans, counted as credits (old #7)
 
-**Run:** none.
+**What:** let plans include the dearer models by counting one of their tokens as several of the default model's (N-054, "reversible later").
 
-## 4. Error tracking the owner can read
+**Earns money:** a customer who wants the strongest model today must bring their own key. Credits let a Business customer use it without a second vendor account and
+let you price the dearer tokens at twice cost or more. **Build:** about 5 days (a credit unit, every usage screen and limit email in credits, migration of the
+allowances). **Run:** the dearer model's tokens. Do it after the model lists settle (they were just refreshed, F-564 to F-566).
 
-**What:** a self-hosted GlitchTip (Sentry-compatible, free) or Sentry's free tier, wired to the API,
-the workers and the web app.
+### 2.5 The automation Wait step (N-154)
 
-**Why:** the operator alerts (RUNBOOK §9.6) say *that* something failed; an error tracker shows
-*which line, for whom, how often*, and groups repeats. It shortens every support conversation.
+**What:** a step that pauses a run for some hours or days, or until a date, and then continues: "remind the supplier at day 7, and again at day 14 if nothing came".
 
-**Build:** about 1 day: the SDKs, scrubbing of personal data from what is sent, and a setting to
-turn it off. **Run:** free tier, or about 1 GB of memory if self-hosted on the same server.
+**Earns money:** it turns the GST reminder from one message into a follow-up that really recovers credit, and it is the first thing a power user of automation asks for.
+**Build:** about 6 days (a stored, resumable run state, a scheduled resume job, the run history showing "waiting until"). **Run:** none.
 
-## 5. Accounting-system connections that post bills for the customer
+### 2.6 Industry benchmarks (old #8)
 
-**What:** Servabo already prepares ERP postings and delivers them to a configured target
-(`erp.deliver_posting`, proven against the in-repo mock target). Ship ready-made connections for
-Xero and QuickBooks Online with their sign-in (OAuth) flow, so a small business clicks "Connect" instead
-of configuring an endpoint.
+**What:** "your supplier prices rose 8% this year; similar companies saw 3%", from anonymized, aggregated data of organizations that opt in.
 
-**Why:** closes the loop from "invoice received" to "bill entered", which is what customers pay
-for; a strong reason to choose Business over Developer.
+**Earns money:** a differentiator nobody with a single customer's data can copy. **Build:** about 15 days, most of it privacy work (opt-in, aggregation thresholds so no
+customer can be singled out, the owner's legal review). **Run:** a small nightly job. **Only worth doing** once there are enough customers for the numbers to mean something.
 
-**Build:** about 10 days for both (OAuth, token refresh, each system's bill format, sandbox tests).
-**Run:** none beyond API calls; both have free developer sandboxes.
+### 2.7 Tailwind 4 (removes N-119)
 
-## 6. Archive (zip) upload
+**What:** the styling tool is a major version behind (N-119 records why it stayed: the audit advisories sit in its build tooling, not in what ships).
 
-**What:** upload one `.zip` of scanned documents and get each file as its own document.
+**Earns money:** indirectly. It clears the build-tool advisories that make the front-end security job noisy, so a real advisory is easier to see. **Build:** about 3 days
+(the class names are mostly unchanged; the work is the configuration and a visual pass). **Run:** none.
 
-**Why:** the first-run experience for a customer with a backlog; the handler already exists
-(`batch.expand_archive`, dormant, with zip-bomb limits) and only the upload path and screen are
-missing.
+### 2.8 Smaller things worth doing when there is a quiet week
 
-**Build:** about 2 days. **Run:** none.
-
-## 7. Premium models inside the plans, counted as credits
-
-**What:** let plans include Gemini 2.5 Pro and other dearer models by counting one of their tokens as
-several of the default model's (N-054, "reversible later").
-
-**Why:** customers who want the strongest model today must bring their own key (BYOK). Credits let a
-Business customer use it without a second vendor account.
-
-**Build:** about 5 days: a credit unit, every usage screen and limit email in credits, migration of
-the allowances. **Run:** the dearer model's tokens; priced at twice cost or more like the rest.
-
-## 8. Industry benchmarks from many customers' documents
-
-**What:** "your supplier prices rose 8% this year; similar companies saw 3%", from anonymized,
-aggregated TruthMesh and extraction data across organizations that opt in.
-
-**Why:** a differentiator nobody with a single customer's data can copy.
-
-**Build:** about 15 days, most of it privacy work: opt-in, aggregation thresholds so no customer
-can be singled out, and the owner's legal review. **Run:** a nightly aggregation job, small.
-Only worth doing after there are enough customers for the numbers to mean something.
-
-## 9. Correct an extracted field beside the page
-
-**What:** click a value in the document viewer, see where it was read on the page, type the right
-value and save, without opening the review queue (N-020 item 7, dropped for launch).
-
-**Why:** the fastest fix for one wrong field. Today a correction goes through the review queue, which
-records who changed what; this would record the same, from the viewer.
-
-**Build:** about 4 days: the viewer already draws each field's box (F-092); the save reuses the
-review's resolve rules (who may change a value, the audit entry, re-running automations).
-
-## 10. Document packs that do everything they recommend
-
-**What:** enabling a pack proposes its suggested checks in Clause assertions (one click to accept
-each), and starting a redaction of that document type pre-selects the pack's redaction profile
-(N-075). Today only the field list is applied; the card says so (F-408).
-
-**Why:** the packs are the quickest way for a new HR, healthcare, legal, logistics or KYC customer to
-get value; a pack that also sets up the checks and the redaction is a one-click setup.
-
-**Build:** about 3 days: the checks map onto the existing clause-assertion model (sentence and
-severity), and the redaction dialog already takes a profile key.
+- **Xero and QuickBooks Online** connections, for a customer outside India (about 10 days for both; QuickBooks is not sold in India).
+- **Tally for Developer** (N-174, OPEN): it is a file, needs no live connection, and is what many small Indian businesses use. A plan decision.
+- **The GST and Helm warehouse datasets for Business** (N-180, OPEN): a plan decision.
+- **Day-1 and day-25 emails after a customer deletes a workspace** ("it will be erased on…", "last chance to restore"): the data is purged by the sweep, but nothing warns the customer.
+- **The global upload tray accepts a zip** (the Documents page does; the tray in the corner of every page does not take one yet).
+- **A shared "could not be loaded, try again" block** for the nine organization console pages (80 files in the app repeat it; it is consistent and tested, so it is polish).
+- **The failed-run webhook says why** (N-179, OPEN): today it carries ids and a state, not the error text, which can hold document content.
 
 ---
 
-**Recommendation (2026-10-22):** 2 does not apply on Dodo and 3 is built. Final session 1 builds 1, 4, 5 (for India) and 6,
-then 10 if time allows, and writes the next ranked list here.
+**Recommendation (2026-10-22, after launch):** do **2.3 first** (about a day, only the catalogue and two Dodo products, and it answers the objection Indian buyers raise most), then
+**2.1** (the only item that sells to many organizations through one relationship). Keep **2.2** until customers ask for it, because it is the biggest dependency on someone else's
+platform, and leave 2.4 to 2.7 until usage tells you which of them hurts.

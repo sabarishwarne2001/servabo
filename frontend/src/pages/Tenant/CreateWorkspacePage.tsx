@@ -171,7 +171,7 @@ export const CreateWorkspacePage: React.FC = () => {
   const busy = isSubmitting || isPending;
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-background px-6 py-12">
+    <main className="flex min-h-screen w-full items-center justify-center bg-background px-6 py-12">
       <div className="w-full max-w-md space-y-8">
         <button
           type="button"
@@ -273,7 +273,7 @@ export const CreateWorkspacePage: React.FC = () => {
           </button>
         </form>
       </div>
-    </div>
+    </main>
   );
 };
 

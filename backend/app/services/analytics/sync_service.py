@@ -652,6 +652,47 @@ def _validate_datasets(datasets: Sequence[str]) -> list[str]:
     return list(datasets)
 
 
+def datasets_not_held(
+    db: Session, *, organization_id: uuid.UUID, datasets: Sequence[str]
+) -> list[str]:
+    """The requested datasets the organization's plan does not include (Final session 1, Phase 6).
+
+    GST_MATCHES and HELM_LEDGER span every workspace, which is what the "all workspaces" capabilities sell, so they are
+    Enterprise (`export_engine.DATASET_CAPABILITY`). Every other dataset needs only the warehouse add-on.
+    """
+    from app.api import capability_gate
+
+    missing: list[str] = []
+    for dataset in datasets:
+        key = export_engine.DATASET_CAPABILITY.get(dataset)
+        if key is not None and not capability_gate.has_capability(
+            db, organization_id=organization_id, capability_key=key
+        ):
+            missing.append(dataset)
+    return missing
+
+
+def require_datasets_held(
+    db: Session,
+    *,
+    organization_id: uuid.UUID,
+    datasets: Sequence[str],
+    actor_id: Optional[uuid.UUID] = None,
+    operation: str,
+) -> None:
+    """402 (the plan does not include it) naming the plans that do, for the first dataset not held."""
+    from app.api import capability_gate
+
+    for dataset in datasets_not_held(db, organization_id=organization_id, datasets=datasets):
+        capability_gate.require_capability_for_organization(
+            db,
+            organization_id=organization_id,
+            actor_id=actor_id,
+            capability_key=export_engine.DATASET_CAPABILITY[dataset],
+            operation=operation,
+        )
+
+
 def create_schedule(
     db: Session,
     *,
@@ -688,6 +729,10 @@ def create_schedule(
         local_hour=local_hour,
     )
 
+    require_datasets_held(
+        db, organization_id=organization_id, datasets=_validate_datasets(datasets), actor_id=actor_id,
+        operation="create_export_schedule",
+    )
     schedule = ExportSchedule(
         organization_id=organization_id,
         destination_id=destination.id,
@@ -760,6 +805,10 @@ def update_schedule(
 
     changed: dict[str, Any] = {}
     if datasets is not None:
+        require_datasets_held(
+            db, organization_id=organization_id, datasets=_validate_datasets(datasets), actor_id=actor_id,
+            operation="update_export_schedule",
+        )
         schedule.datasets = _validate_datasets(datasets)
         changed["datasets"] = list(schedule.datasets)
     if cadence is not None:
@@ -991,7 +1040,20 @@ def execute_sync(
     destination = get_destination(
         db, organization_id=organization_id, destination_id=destination_id
     )
-    _validate_datasets(datasets)
+    datasets = _validate_datasets(datasets)
+    # A plan that was downgraded after a schedule was made must not break the schedule: the datasets it no longer
+    # includes are left out of the run (and said so in the log); a run left with none of them is refused in words.
+    not_held = datasets_not_held(db, organization_id=organization_id, datasets=datasets)
+    if not_held:
+        logger.warning(
+            "analytics.sync.datasets_not_included",
+            extra={"organization_id": str(organization_id), "datasets": not_held},
+        )
+        datasets = [dataset for dataset in datasets if dataset not in not_held]
+        if not datasets:
+            raise SyncServiceError(
+                f"The plan no longer includes {', '.join(not_held)}, so there is nothing to export in this run."
+            )
 
     window_end = _now()
     window_start = window_end - timedelta(days=max(1, int(lookback_days)))

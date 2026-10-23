@@ -23,7 +23,7 @@ from typing import Any, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.services.automation import emitters
+from app.services.automation import emitters, public_events
 
 logger = logging.getLogger("app.services.automation.sweeps")
 
@@ -48,6 +48,19 @@ def _listening_workspaces(db: Session, event_types: tuple[str, ...]) -> list[uui
         .where(AutomationRuleTrigger.event_type.in_(event_types), AutomationRule.is_active.is_(True),
                AutomationRule.deleted_at.is_(None))
         .distinct().order_by(AutomationRuleTrigger.workspace_id)
+    ).scalars())
+
+
+def _webhook_workspaces(db: Session, event_types: tuple[str, ...]) -> list[uuid.UUID]:
+    """Workspaces of an organization with an ACTIVE webhook endpoint subscribed to any of `event_types`."""
+    from app.models.webhook_endpoint import WebhookEndpoint, WebhookEndpointStatus
+    from app.models.workspace import Workspace
+
+    return list(db.execute(
+        select(Workspace.id)
+        .join(WebhookEndpoint, WebhookEndpoint.organization_id == Workspace.organization_id)
+        .where(WebhookEndpoint.status == WebhookEndpointStatus.ACTIVE, WebhookEndpoint.event_types.overlap(list(event_types)))
+        .distinct().order_by(Workspace.id)
     ).scalars())
 
 
@@ -89,6 +102,9 @@ def gst_clocks(db: Session, *, now: Optional[datetime] = None) -> dict[str, int]
     now = _now(now)
     out = {"waiting": 0, "reversal": 0}
     workspaces = _listening_workspaces(db, (emitters.GST_WAITING, emitters.GST_REVERSAL))
+    # Also the workspaces of an organization with a webhook endpoint subscribed to the public GST events.
+    workspaces = list(dict.fromkeys([*workspaces, *_webhook_workspaces(
+        db, (public_events.GST_SUPPLIER_NOT_REPORTED, public_events.GST_INVOICE_AT_RISK))]))
     for workspace_id in workspaces:
         workspace = db.get(Workspace, workspace_id)
         if workspace is None or workspace.is_sample or not gate.full_access(db, workspace):
@@ -96,7 +112,8 @@ def gst_clocks(db: Session, *, now: Optional[datetime] = None) -> dict[str, int]
         today, _hour = _local_today(workspace, now)
         settings = db.get(GstSettings, workspace_id)
         threshold = int(settings.waiting_notice_days) if settings is not None else DEFAULT_WAITING_DAYS
-        if emitters.listening(db, workspace_id, emitters.GST_WAITING):
+        if emitters.listening(db, workspace_id, emitters.GST_WAITING) or \
+                public_events.listening(db, workspace.organization_id, public_events.GST_SUPPLIER_NOT_REPORTED):
             rows = db.execute(
                 select(GstMatch, WorkItem.created_at)
                 .join(WorkItem, WorkItem.id == GstMatch.work_item_id)
@@ -116,7 +133,8 @@ def gst_clocks(db: Session, *, now: Optional[datetime] = None) -> dict[str, int]
                         db, workspace=workspace, row=row, work_item_id=row.work_item_id, days_waiting=days,
                         threshold_days=threshold) is not None:
                     out["waiting"] += 1
-        if emitters.listening(db, workspace_id, emitters.GST_REVERSAL):
+        if emitters.listening(db, workspace_id, emitters.GST_REVERSAL) or \
+                public_events.listening(db, workspace.organization_id, public_events.GST_INVOICE_AT_RISK):
             rows2 = db.execute(
                 select(GstMatch).where(
                     GstMatch.workspace_id == workspace_id, GstMatch.work_item_id.is_not(None),

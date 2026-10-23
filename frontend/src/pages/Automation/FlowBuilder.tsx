@@ -56,7 +56,7 @@ interface FlowBuilderProps {
   /** A recipe the person chose: the builder opens with it filled in. */
   readonly initialDraft?: FlowDraft | null;
   /** Opens the upgrade dialog for a locked trigger. */
-  readonly onUpgrade?: ((capability: string, feature: string) => void) | undefined;
+  readonly onUpgrade?: ((capability: string, feature: string, addon?: string) => void) | undefined;
 }
 
 export const FlowBuilder: React.FC<FlowBuilderProps> = ({

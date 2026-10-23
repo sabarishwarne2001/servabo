@@ -5,10 +5,13 @@ import {
   Briefcase,
   CornerDownLeft,
   FileText,
+  ListChecks,
   Loader2,
   Lock,
   Network,
+  ReceiptIndianRupee,
   Search,
+  Truck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -27,7 +30,7 @@ import { isAtLeast } from "@/permissions/workspacePermissions";
 import { useResolvedTenant } from "@/routes/TenantContext";
 import { useIsSuperAdmin } from "@/routes/SuperAdminGuard";
 import { OVERLAY, SURFACE_DIALOG } from "@/components/ui/primitives";
-import { casePath, entityPath, workItemDetailsPath } from "@/routes/tenantPaths";
+import { HIT_SECTION, allSearchHits, searchHitPath } from "./searchHits";
 import {
   MIN_SEARCH_LENGTH,
   searchOrganization,
@@ -54,11 +57,9 @@ const HIT_ICON: Record<SearchHit["kind"], LucideIcon> = {
   DOCUMENT: FileText,
   ENTITY: Network,
   CASE: Briefcase,
-};
-const HIT_SECTION: Record<SearchHit["kind"], string> = {
-  DOCUMENT: "Documents",
-  ENTITY: "Entities",
-  CASE: "Cases",
+  GST_SUPPLIER: Truck,
+  GST_INVOICE: ReceiptIndianRupee,
+  RULE: ListChecks,
 };
 
 /**
@@ -193,17 +194,11 @@ const CommandPalette: React.FC = () => {
     if (!searchEnabled || !dataSearch.data) {
       return [];
     }
-    const { documents, entities, cases } = dataSearch.data;
-    return [...documents, ...entities, ...cases].map((hit) => ({
+    return allSearchHits(dataSearch.data).map((hit) => ({
       key: `${hit.kind.toLowerCase()}:${hit.id}`,
       name: hit.title,
       section: HIT_SECTION[hit.kind],
-      path:
-        hit.kind === "DOCUMENT"
-          ? workItemDetailsPath(orgSlug, hit.workspace_slug, hit.id)
-          : hit.kind === "ENTITY"
-            ? entityPath(orgSlug, hit.workspace_slug, hit.id)
-            : casePath(orgSlug, hit.workspace_slug, hit.id),
+      path: searchHitPath(orgSlug, hit),
       description: [hit.subtitle, hit.workspace_name].filter(Boolean).join(" · "),
       haystack: "",
       locked: false,
@@ -352,7 +347,7 @@ const CommandPalette: React.FC = () => {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onInputKeyDown}
-            placeholder="Jump to a page, or find a document, entity or case…"
+            placeholder="Jump to a page, or find a document, case, GST supplier, invoice or workflow…"
             className="h-14 flex-1 border-0 bg-transparent text-[15px] text-foreground shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:shadow-none"
             role="combobox"
             aria-expanded="true"

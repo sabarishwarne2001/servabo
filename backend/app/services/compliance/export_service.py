@@ -13,6 +13,8 @@ from typing import Any, BinaryIO, Optional
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from app.db.base import Base
+
 from app.core.config import settings
 from app.models.audit_log import AuditAction, AuditResourceType
 from app.models.compliance import (
@@ -42,10 +44,56 @@ __all__ = [
     "request_export",
 ]
 
-BUNDLE_VERSION: str = "arch20.1"
+BUNDLE_VERSION: str = "final1.1"
 MAX_ROWS_PER_SECTION: int = 50_000
 DEFAULT_TTL_HOURS: int = 72
 DOWNLOAD_URL_TTL_SECONDS: int = 900
+
+
+#: Final session 1 (1A, F-549): what a customer owns besides documents and conversations. Each entry is
+#: section name -> (table, how the table is scoped to the organization, columns left out). A table here is named by
+#: `data_map.REGISTRY[table].export`, and `tests/services/test_data_map.py` keeps the two in step.
+#: "org" = the table has organization_id; "workspace" = it has workspace_id and is reached through `workspaces`.
+GENERIC_SECTIONS: dict[str, tuple[str, str, tuple[str, ...]]] = {
+    "gst_returns": ("gst_returns", "org", ()),
+    "gst_book_records": ("gst_return_records", "org", ()),
+    "gst_matches": ("gst_matches", "org", ()),
+    "gst_decisions": ("gst_decisions", "org", ()),
+    "gst_settings": ("gst_settings", "org", ()),
+    "helm_books": ("helm_books", "org", ()),
+    "helm_settings": ("helm_settings", "org", ()),
+    "helm_counterparties": ("helm_counterparties", "org", ()),
+    "helm_promises": ("helm_promises", "org", ()),
+    "helm_settlements": ("helm_settlements", "org", ()),
+    "helm_actions": ("helm_actions", "org", ()),
+    "helm_mandates": ("helm_mandates", "org", ()),
+    "helm_mandate_versions": ("helm_mandate_versions", "org", ()),
+    "helm_value_events": ("helm_value_events", "org", ()),
+    "helm_cash_positions": ("helm_cash_positions", "org", ()),
+    "helm_bank_accounts": ("helm_bank_accounts", "org", ()),
+    "helm_bank_lines": ("helm_bank_lines", "org", ()),
+    "field_corrections": ("work_item_field_corrections", "workspace", ()),
+    "entities": ("entities", "org", ()),
+    "cases": ("cases", "org", ()),
+    "case_documents": ("case_documents", "workspace", ()),
+    "case_templates": ("case_templates", "org", ()),
+    "obligations": ("obligations", "org", ()),
+    "assertion_definitions": ("assertion_definitions", "org", ()),
+    "prompt_templates": ("prompt_templates", "org", ()),
+    "erp_mappings": ("erp_mappings", "org", ()),
+    "erp_lookup_tables": ("erp_lookup_tables", "org", ()),
+    "inbound_email_senders": ("inbound_email_senders", "org", ()),
+    "inbound_messages": ("inbound_messages", "org", ()),
+    "work_item_sources": ("work_item_sources", "org", ()),
+}
+
+#: Every name a registry entry's `export` may use: the sections of the bundle and its two top-level blocks.
+EXPORT_NAMES: frozenset[str] = frozenset(
+    {
+        "organization", "retention_policy", "members", "workspaces", "work_items", "conversations", "conversation_messages",
+        "audit_logs", "invoices", "erased_subjects", "automation_rules", *GENERIC_SECTIONS,
+    }
+)
 
 
 class ExportError(RuntimeError):
@@ -79,6 +127,47 @@ def _rows(db: Session, sql: str, params: dict[str, Any]) -> list[dict[str, Any]]
 
 def _ttl_hours() -> int:
     return int(getattr(settings, "COMPLIANCE_EXPORT_TTL_HOURS", DEFAULT_TTL_HOURS))
+
+
+def _generic_section(db: Session, section: str, organization_id: uuid.UUID, limit: int) -> list[dict[str, Any]]:
+    table_name, scope, exclude = GENERIC_SECTIONS[section]
+    table = Base.metadata.tables[table_name]  # a KeyError here means the section names a table that does not exist
+    if scope == "org":
+        where = "t.organization_id = :org"
+    else:
+        where = "t.workspace_id IN (SELECT id FROM workspaces WHERE organization_id = :org)"
+    drop = "".join(f" - '{column}'" for column in exclude)
+    order = "t.created_at" if "created_at" in table.c else "1"
+    sql = f"SELECT to_jsonb(t){drop} AS row FROM {table.name} t WHERE {where} ORDER BY {order} LIMIT :lim"
+    return [_jsonable(row) for row in db.execute(text(sql), {"org": organization_id, "lim": limit}).scalars().all()]
+
+
+def _automation_rules(db: Session, organization_id: uuid.UUID, limit: int) -> list[dict[str, Any]]:
+    """Each live rule as the flow document the builder saves (the same shape a version snapshot holds), so a person
+    can read it, keep it, or paste it back into a builder. Deleted rules are not exported."""
+    from app.models.automation import AutomationRule
+    from app.models.workspace import Workspace
+    from app.services.automation import rule_triggers, versions
+
+    rules = db.execute(
+        select(AutomationRule)
+        .join(Workspace, Workspace.id == AutomationRule.workspace_id)
+        .where(Workspace.organization_id == organization_id, AutomationRule.deleted_at.is_(None))
+        .order_by(AutomationRule.created_at)
+        .limit(limit)
+    ).scalars().all()
+    events = rule_triggers.event_types_of(db, rule_ids=[rule.id for rule in rules]) if rules else {}
+    return [
+        {
+            "id": str(rule.id),
+            "workspace_id": str(rule.workspace_id),
+            "name": rule.name,
+            "is_active": bool(rule.is_active),
+            "created_at": rule.created_at.isoformat() if rule.created_at else None,
+            "flow": _jsonable(versions.snapshot_of(rule, events.get(rule.id, [rule.event] if rule.event else []))),
+        }
+        for rule in rules
+    ]
 
 
 def build_bundle(
@@ -241,6 +330,22 @@ def build_bundle(
         )
     ).scalar_one_or_none()
 
+    sections = {
+        "members": members,
+        "workspaces": workspaces,
+        "work_items": work_items,
+        "conversations": conversations,
+        "conversation_messages": messages,
+        "audit_logs": audit_logs,
+        "invoices": invoices,
+        "erased_subjects": erasures,
+    }
+    for section in GENERIC_SECTIONS:
+        sections[section] = _generic_section(db, section, organization_id, limit)
+    sections["automation_rules"] = _automation_rules(db, organization_id, limit)
+    # A section that hit the row limit is said to be cut short, never silently: a customer leaving must know.
+    truncated = sorted(name for name, rows in sections.items() if len(rows) >= limit)
+
     return {
         "bundle_version": BUNDLE_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -265,16 +370,8 @@ def build_bundle(
             else None
         ),
         "row_limit_per_section": MAX_ROWS_PER_SECTION,
-        "sections": {
-            "members": members,
-            "workspaces": workspaces,
-            "work_items": work_items,
-            "conversations": conversations,
-            "conversation_messages": messages,
-            "audit_logs": audit_logs,
-            "invoices": invoices,
-            "erased_subjects": erasures,
-        },
+        "truncated_sections": truncated,
+        "sections": sections,
     }
 
 
@@ -290,6 +387,7 @@ def _zip_bytes(bundle: dict[str, Any]) -> bytes:
                     "organization": bundle["organization"],
                     "retention_policy": bundle["retention_policy"],
                     "row_limit_per_section": bundle["row_limit_per_section"],
+                    "truncated_sections": bundle["truncated_sections"],
                     "section_counts": {
                         name: len(rows)
                         for name, rows in bundle["sections"].items()
