@@ -22,6 +22,9 @@ deletion, a zip in the global upload tray, `k1a6`'s downgrade with rows) and §4
   (rewritten by 2A).
 - [ ] The owner launch checklist (HANDOFF), from step 1.
 
+- **`main` run #465 (on the owner's lockfile commit) failed one job:** the GST speed test ("matching took 10.23s", budget 10 s),
+  in `pytest (shard 1/4)`. The commit touched only the frontend lockfile. The failed job was re-run to see if it is the shared CI
+  machine; either way, Final session 2A finds out first (its Phase 4 item 0) and the budget does not move.
 - **Next action:** the owner merges this PR once CI is green, then starts Final session 2A.
 
 ## Current phase — Final session 2 on the owner's PC (now 2B, after 2A; see above)

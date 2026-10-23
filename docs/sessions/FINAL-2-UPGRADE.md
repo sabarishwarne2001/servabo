@@ -68,6 +68,7 @@ This session makes the existing product cheaper to buy, safer to run, provable, 
 | Final 1 leftovers | (a) No warning emails on day 1 and day 25 after a customer deletes a workspace or organization. (b) The global upload tray does not accept a zip; the Documents page does. (c) Migration `k1a6`'s downgrade was proven only on an empty database. (d) PRODUCT-NEXT 2.3: a yearly and a rupee price for the GST add-on. | HANDOFF "Final session 1 → Final session 2" §3 |
 | Owner questions still open | N-174 (should the Tally file come to Developer?), N-180 (warehouse datasets for Business?), N-181 (the cost of AI-read pack checks). N-187 below answers N-174 and N-181. | `docs/hardening/NEEDS-OWNER.md` |
 | The owner's own commit | `e51f736` ("package_update") on `main` removed two optional peer entries (`ajv`, `fast-uri`) from `frontend/package-lock.json`. Harmless, but check that `npm ci` and the frontend job are still green. | `git show e51f736` |
+| **`main` went red on a speed test** | `main`'s CI run #465 (on `e51f736`, which changed only the frontend lockfile) failed one job: `pytest (shard 1/4)`, `tests/performance/test_gst_budgets.py::test_import_and_matching_stay_inside_their_budgets`, with "matching took 10.23s" against a 10 s budget (5 s × `PERF_BUDGET_MULTIPLIER` 2). Session H made matching 2.0 to 2.4 s on the build machine. Either the shared CI machine was slow that day, or Final session 1 added work to the GST recompute (notices, webhook events, the data map). **Find out which; do not move the budget.** | `docs/hardening/PERFORMANCE.md` ("the matching step on a shared CI machine"), `backend/app/services/gst/` |
 
 ## 1. Authority and rules
 
@@ -132,6 +133,7 @@ This session makes the existing product cheaper to buy, safer to run, provable, 
    `npm ci`, `frontend/e2e/scripts/start-stack.sh`). Keep the environment block in the scratchpad, outside the repo.
 4. **Open the draft PR.** Write this session's checklist at the top of `STATE.md`: a section "Current phase — Final session 2A
    (FINAL-2-UPGRADE)", one box per phase item below, and the next free numbers.
+5. **Look at `main`'s latest CI run.** If it is still red (§0, the speed test), do Phase 4 item 0 before Phase 1.
 
 ## 3. Phase 0: the commercial reality check and the resolution assessment (written first, at most one tenth of the session)
 
@@ -417,6 +419,12 @@ email our data out?" The answer must be "no, and here is the test that proves it
 
 ## 7. Phase 4 (P1): Final session 1's leftovers
 
+0. **Do this first, before Phase 1: `main`'s red speed test** (§0).
+   - Measure the GST recompute step by step, as Session H did: read, reconcile, write, and whatever Final session 1 added after it.
+   - If Final 1 made it slower, make it fast again, test-first, and keep `test_matching_equivalence.py` green.
+   - If it is only the CI machine, show that with timings from at least three CI runs, record it in PERFORMANCE.md, and make the
+     test report its step timings when it fails, so the next red run explains itself. The budget does not move.
+   - `main` must be green before this session's PR is ready.
 1. **Warning emails after deletion** (N-164). After a customer deletes a workspace or organization:
    - one email at once ("will be erased on <date>; restore until then");
    - one 5 days before the purge ("last chance to restore").
