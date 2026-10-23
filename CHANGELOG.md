@@ -6,6 +6,16 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Docs — Final session 2A, the upgrade before the live tests (2026-10-23)
+
+- **A new session runs before the live tests** (N-186): `docs/sessions/FINAL-2-UPGRADE.md`. It answers the owner's commercial
+  questions (a readiness page, an accuracy report, a pilot playbook), fixes the custom-domain price contradiction, makes the safety
+  jobs report into the app, maps and tests prompt injection, finishes Final session 1's leftovers, assesses Evidence-to-Resolution
+  (and builds a thin version only if it passes stated tests), and rewrites the live prompt, now Final session 2B.
+- **Prices for India decided** (N-187): rupee prices per user (Starter ₹1,499, Business ₹4,999, Enterprise ₹14,999; yearly ten
+  months), the GST Credit add-on in rupees and yearly, a 14-day trial, custom domains on Business and Enterprise only, the Tally file
+  on Starter. Built by session 2A; the dollar prices do not change.
+
 ### Added — Final session 1: bring every part up to date, build what earns money (2026-10-22)
 
 Findings F-546 to F-605, decisions N-161 to N-184. The study is `docs/hardening/UPGRADE-AUDIT.md`; the hand-over to Final session 2 is in `docs/hardening/HANDOFF.md`.

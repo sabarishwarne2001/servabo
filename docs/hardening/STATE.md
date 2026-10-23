@@ -2,9 +2,29 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-22 (Final session 1 finished; next: Final session 2 on the owner's PC)_
+_Last updated: 2026-10-23 (plan change: Final session 2A, the upgrade, comes before 2B, the live session)_
 
-## Current phase — Final session 2 on the owner's PC (next)
+## Current phase — Plan change: Final session 2A before the live session (2026-10-23)
+Branch `hardening/final-2-upgrade-plan`, based on `main` at `e51f736` (PR #37 merged; `main` run #464 green on every job, the advisory
+`pip-audit` included; `e51f736` is the owner's lockfile update, which removed two optional peer entries). Docs only: no code, no
+migration, one Alembic head `k1a7_pack_check_dismissals`. Decisions N-186 and N-187 (next free **N-188**); no finding (next free
+**F-619**); browser specs continue at **135**.
+
+**Final session 1 is complete.** Every box in its section below is ticked; PR #37's CI (run #462 on `2666ea0`) and `main` after the merge
+(run #464) were green on every job. What it left is listed in HANDOFF "Final session 1 → Final session 2" §3 (warning emails after a
+deletion, a zip in the global upload tray, `k1a6`'s downgrade with rows) and §4 (everything not yet tried against a real service).
+
+**Next, in order** (N-186; HANDOFF "Plan change: the upgrade session before the live session"; the owner's guide `docs/FINAL-SESSIONS.md`):
+- [ ] **Final session 2A** (cloud, Opus 5.5 High): India prices and packaging (N-187), the custom-domain contradiction, safety jobs that
+  cannot stop silently, a prompt-injection map and tests, Final 1's leftovers, an accuracy report and a pilot playbook, the
+  Evidence-to-Resolution assessment (and a thin build only if it passes), and a rewrite of the live prompt. Prompt: `docs/sessions/FINAL-2-UPGRADE.md`.
+- [ ] **Final session 2B** (the owner's PC): everything for real; results in `docs/hardening/LIVE-VERIFICATION.md`. Prompt: `docs/sessions/FINAL-2-LIVE.md`
+  (rewritten by 2A).
+- [ ] The owner launch checklist (HANDOFF), from step 1.
+
+- **Next action:** the owner merges this PR once CI is green, then starts Final session 2A.
+
+## Current phase — Final session 2 on the owner's PC (now 2B, after 2A; see above)
 **Next action: Final session 2 on the owner's PC** (`docs/sessions/FINAL-2-LIVE.md`; the owner's guide `docs/FINAL-SESSIONS.md`). It trusts the hand-over in `docs/hardening/HANDOFF.md`
 "Final session 1 → Final session 2" (a table of every outside connection to try for real, the commands, what was not reached, what is unverified). Before it starts: the owner merges
 PR #37 once CI is green, and prepares what `docs/FINAL-SESSIONS.md` §4 lists. Findings continue from **F-619** (F-606 to F-618 are in `UPGRADE-AUDIT.md`; `FINDINGS.md` carries F-546 to F-605), decisions from **N-186**, browser specs from **135**.
