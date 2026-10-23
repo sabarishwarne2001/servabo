@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { Link, useParams } from "react-router-dom";
 import { Check, ChevronLeft, ChevronRight, Copy, ExternalLink, FileText, Quote, X } from "lucide-react";
 
@@ -46,6 +48,8 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
   className = "",
 }) => {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+  useDialogFocus(drawerRef, onClose, { open: isOpen, autoFocus: false });
   const previousFocusedElement = useRef<HTMLElement | null>(null);
   const { orgSlug = "", workspaceSlug = "" } = useParams<{ orgSlug: string; workspaceSlug: string }>();
   const [copied, setCopied] = useState(false);
@@ -89,9 +93,7 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
       return undefined;
     }
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        onClose();
-      } else if (event.key === "ArrowLeft" || event.key === "[") {
+      if (event.key === "ArrowLeft" || event.key === "[") {
         go(-1);
       } else if (event.key === "ArrowRight" || event.key === "]") {
         go(1);
@@ -122,7 +124,7 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
   const documentHref =
     orgSlug && workspaceSlug ? workItemDetailsPath(orgSlug, workspaceSlug, citation.work_item_id) : null;
 
-  return (
+  return createPortal(
     <div
       className={`fixed inset-0 z-50 flex justify-end ${className}`}
       role="dialog"
@@ -139,6 +141,7 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
       />
 
       <aside
+        ref={drawerRef}
         className="relative flex h-full w-full min-w-0 flex-col border-l border-border/80 bg-card shadow-2xl sm:w-[30rem] sm:max-w-[100vw]"
         data-testid="citation-drawer"
       >
@@ -257,7 +260,8 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
           ) : null}
         </footer>
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

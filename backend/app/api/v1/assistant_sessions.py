@@ -78,6 +78,7 @@ def _summary(row: SessionRow) -> ConversationSessionSummary:
         message_count=row.message_count,
         created_at=conversation.created_at,
         last_message_at=conversation.last_message_at,
+        last_message_preview=row.last_message_preview,
     )
 
 

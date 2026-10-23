@@ -15,8 +15,15 @@ import {
   Filter,
   Upload,
   X,
+  Files,
+  CircleCheck,
+  CircleAlert,
+  Activity,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
+import { documentFormatLabel, readDocumentFilters } from "./documentFilters";
 import { workItemApi } from "@/services/api/workItem";
 import { useActiveWorkspaceId } from "@/hooks/useActiveWorkspace";
 import { useTenant } from "@/hooks/useTenant"; // Imported to resolve slug links
@@ -37,6 +44,9 @@ import { UploadTray } from "@/components/common/UploadTray";
 import { errorMessage } from "@/services/api/errors";
 
 const filterFormSchema = z.object({
+  format: z.enum(["ALL", "pdf", "docx", "xlsx", "csv", "image"]).optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
   search: z.string().max(100, "Search query is too long.").optional(),
   status: z
     .union([
@@ -47,13 +57,13 @@ const filterFormSchema = z.object({
       z.literal("FAILED"),
     ])
     .optional(),
-});
+}).refine((data) => !data.from || !data.to || data.from <= data.to, { message: "Start date must be on or before end date.", path: ["to"] });
 
 type FilterFormInput = z.infer<typeof filterFormSchema>;
 
 const STATUS_BADGE_MAP: Record<WorkItemStatus, string> = {
   QUEUED: "bg-primary/[0.08] text-primary border-primary/20 dark:text-[hsl(var(--primary-on-dark))]",
-  PROCESSING: "bg-amber-500/[0.08] text-amber-600 border-amber-500/25 dark:text-amber-400",
+  PROCESSING: "bg-sky-500/[0.08] text-sky-700 border-sky-500/25 dark:text-sky-300",
   COMPLETED: "bg-emerald-500/[0.08] text-emerald-600 border-emerald-500/25 dark:text-emerald-400",
   FAILED: "bg-destructive/[0.08] text-destructive border-destructive/25",
 };
@@ -74,38 +84,25 @@ export const WorkItems: React.FC = () => {
   const [reprocessDialogOpen, setReprocessDialogOpen] = useState(false);
   const [selectedReprocessWorkItemId, setSelectedReprocessWorkItemId] = useState<string | null>(null);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(10);
-  const [sortBy, setSortBy] = useState<WorkItemSortField>("created_at");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryFilters = useMemo(() => readDocumentFilters(searchParams), [searchParams]);
+  const { page: currentPage, pageSize, sortBy, sortOrder } = queryFilters;
+  const updateParams = useCallback((updates: Record<string, string | undefined>) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      for (const [key, value] of Object.entries(updates)) {
+        if (value) {next.set(key, value);} else {next.delete(key);}
+      }
+      return next;
+    });
+  }, [setSearchParams]);
 
-  // Phase 1: a link can open the list already filtered (the overview's "Failed" card uses ?status=FAILED).
-  const [searchParams] = useSearchParams();
-  const linkedStatus = useMemo((): WorkItemStatus | undefined => {
-    const value = searchParams.get("status");
-    return value === "QUEUED" || value === "PROCESSING" || value === "COMPLETED" || value === "FAILED" ? value : undefined;
-  }, [searchParams]);
-
-  const [activeFilters, setActiveFilters] = useState<{
-    search?: string;
-    status?: WorkItemStatus;
-  }>(() => (linkedStatus ? { status: linkedStatus } : {}));
-
-  const queryFilters = useMemo(
-    () => ({
-      page: currentPage,
-      pageSize,
-      sortBy,
-      sortOrder,
-      ...(activeFilters.search ? { search: activeFilters.search } : {}),
-      ...(activeFilters.status ? { status: activeFilters.status } : {}),
-    }),
-    [currentPage, pageSize, activeFilters, sortBy, sortOrder]
-  );
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [workspaceId]);
+  const counts = useQuery({
+    queryKey: workItemKeys.counts(workspaceId!),
+    queryFn: () => workItemApi.getDocumentCounts(workspaceId!),
+    enabled: Boolean(workspaceId),
+    refetchInterval: 10000,
+  });
 
   // A selection only ever covers rows on screen: changing page, filter, sort or workspace clears it.
   useEffect(() => {
@@ -116,6 +113,7 @@ export const WorkItems: React.FC = () => {
     data: response,
     isLoading,
     isFetching,
+    isPlaceholderData,
     error,
   } = useQuery({
     queryKey: workItemKeys.list(workspaceId!, queryFilters),
@@ -187,54 +185,36 @@ export const WorkItems: React.FC = () => {
     deleteMutation.mutate(selectedWorkItemId);
   };
 
-  const { register, handleSubmit } = useForm<FilterFormInput>({
+  const { register, handleSubmit, reset, formState: { errors: filterErrors } } = useForm<FilterFormInput>({
     resolver: zodResolver(filterFormSchema),
     defaultValues: {
       search: "",
-      status: linkedStatus ?? "ALL",
+      status: queryFilters.status ?? "ALL",
+      format: queryFilters.fileFormat ?? "ALL",
+      from: queryFilters.uploadedFrom ?? "",
+      to: queryFilters.uploadedTo ?? "",
     },
   });
 
-  const handleApplyFiltersSubmit = useCallback(
-    (data: FilterFormInput): void => {
-      setCurrentPage(1);
-      const nextFilters: { search?: string; status?: WorkItemStatus } = {};
-      const search = data.search?.trim();
+  useEffect(() => {
+    reset({ search: queryFilters.search ?? "", status: queryFilters.status ?? "ALL", format: queryFilters.fileFormat ?? "ALL", from: queryFilters.uploadedFrom ?? "", to: queryFilters.uploadedTo ?? "" });
+  }, [queryFilters, reset]);
 
-      if (search) {
-        nextFilters.search = search;
-      }
-      if (data.status && data.status !== "ALL") {
-        nextFilters.status = data.status;
-      }
-      setActiveFilters(nextFilters);
-    },
-    []
-  );
-
-  const handleSortToggle = useCallback(
-    (field: WorkItemSortField): void => {
-      if (sortBy === field) {
-        setSortOrder((previous) => (previous === "asc" ? "desc" : "asc"));
-      } else {
-        setSortBy(field);
-        setSortOrder("desc");
-      }
-      setCurrentPage(1);
-    },
-    [sortBy]
-  );
-
+  const handleApplyFiltersSubmit = (data: FilterFormInput): void => {
+    updateParams({ page: undefined, search: data.search?.trim(), status: data.status === "ALL" ? undefined : data.status, format: data.format === "ALL" ? undefined : data.format, from: data.from, to: data.to });
+  };
+  const handleSortToggle = (field: WorkItemSortField): void => {
+    updateParams({ page: undefined, sort: field, order: sortBy === field && sortOrder === "desc" ? "asc" : "desc" });
+  };
   const items = response?.items ?? [];
   const totalPages = response?.totalPages ?? 1;
+  const hasFilters = Boolean(queryFilters.search || queryFilters.status || queryFilters.fileFormat || queryFilters.uploadedFrom || queryFilters.uploadedTo);
+  useEffect(() => {
+    if (response && !isFetching && !isPlaceholderData && currentPage > totalPages) {
+      updateParams({ page: String(totalPages) });
+    }
+  }, [response, isFetching, isPlaceholderData, currentPage, totalPages, updateParams]);
 
-  const handlePreviousPage = useCallback((): void => {
-    setCurrentPage((previous) => Math.max(1, previous - 1));
-  }, []);
-
-  const handleNextPage = useCallback((): void => {
-    setCurrentPage((previous) => Math.min(totalPages, previous + 1));
-  }, [totalPages]);
 
   // Construct workspace-scoped details URLs dynamically using the active slugs
   const getDetailsPath = (itemId: string) => {
@@ -273,13 +253,14 @@ export const WorkItems: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1 select-none">
-          <h2 className="text-2xl font-semibold tracking-tight">Documents Database</h2>
+    <div className="intelligence-page documents-page space-y-5">
+      <div className="intelligence-header flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-4">
+          <span className="intelligence-mark" aria-hidden="true"><Files /></span>
+          <div className="space-y-1"><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Documents Database</h1>
           <p className="text-sm leading-relaxed text-muted-foreground">
             Monitor ingestion pipelines, search uploaded documents, inspect AI processing status, and navigate into detailed extraction results.
-          </p>
+          </p></div>
         </div>
         {canWrite && (
           <button
@@ -294,6 +275,21 @@ export const WorkItems: React.FC = () => {
         )}
       </div>
 
+      <section aria-label="Document statistics" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {[
+          { label: "Total documents", value: counts.data?.total, Icon: Files, tone: "blue", detail: "Across this workspace", status: undefined },
+          { label: "Processing", value: counts.data?.processing, Icon: Activity, tone: "cyan", detail: `${counts.data?.queued ?? "—"} queued for processing`, status: "PROCESSING" },
+          { label: "Completed", value: counts.data?.completed, Icon: CircleCheck, tone: "green", detail: "Processing completed", status: "COMPLETED" },
+          { label: "Failed", value: counts.data?.failed, Icon: CircleAlert, tone: "red", detail: "May need your attention", status: "FAILED" },
+        ].map(({ label, value, Icon, tone, detail, status }) => (
+          <button key={label} type="button" className={`document-stat document-stat-${tone}`} onClick={() => updateParams({ status, page: undefined })} aria-label={`Show ${label.toLowerCase()}`}>
+            <span className="document-stat-icon"><Icon className="h-6 w-6" aria-hidden="true" /></span>
+            <span className="min-w-0"><span className="block text-xs text-muted-foreground sm:text-sm">{label}</span><span className="my-1 block text-2xl font-semibold tracking-tight tabular-nums" aria-live="polite">{counts.isError ? "—" : value?.toLocaleString() ?? "…"}</span><span className="block text-[11px] text-muted-foreground">{detail}</span></span>
+          </button>
+        ))}
+      </section>
+      {counts.isError && <p role="status" className="text-xs text-muted-foreground">Document counts are unavailable. <button type="button" className="underline" onClick={() => void counts.refetch()}>Retry counts</button></p>}
+
       {canWrite && uploadOpen && (
         <UploadTray
           onUploadSuccess={() => {
@@ -307,19 +303,21 @@ export const WorkItems: React.FC = () => {
       <form
         onSubmit={handleSubmit(handleApplyFiltersSubmit)}
         noValidate
-        className="fp-card grid grid-cols-1 gap-3 p-3 sm:grid-cols-12"
+        className="documents-filters fp-card flex flex-wrap items-end gap-3 p-3"
       >
-        <div className="relative sm:col-span-6">
+        <div className="relative min-w-[180px] flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             {...register("search")}
             type="text"
             placeholder="Search documents..."
+            aria-label="Search documents by filename"
+            maxLength={100}
             className="fp-input h-9 pl-9 pr-4"
           />
         </div>
 
-        <div className="relative sm:col-span-4">
+        <div className="relative w-full sm:w-40">
           <select
             {...register("status")}
             aria-label="Filter by status"
@@ -334,16 +332,23 @@ export const WorkItems: React.FC = () => {
           <Filter className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         </div>
 
+        <select {...register("format")} aria-label="Filter by format" className="fp-input h-9 w-full sm:w-32">
+          <option value="ALL">All formats</option><option value="pdf">PDF</option><option value="docx">DOCX</option><option value="xlsx">XLSX</option><option value="csv">CSV</option><option value="image">Images</option>
+        </select>
+        <label className="flex-1 text-[11px] text-muted-foreground sm:max-w-40">Uploaded from<input {...register("from")} type="date" aria-label="Uploaded from" className="fp-input mt-1 h-9" /></label>
+        <label className="flex-1 text-[11px] text-muted-foreground sm:max-w-40">Uploaded through<input {...register("to")} type="date" aria-label="Uploaded through" aria-invalid={Boolean(filterErrors.to)} className="fp-input mt-1 h-9" /></label>
         <button
           type="submit"
-          className="fp-btn fp-btn-primary h-9 text-[13px] sm:col-span-2"
+          className="fp-btn fp-btn-secondary h-9 text-[13px]"
         >
           <Search className="h-3.5 w-3.5" />
           <span>Apply Filters</span>
         </button>
+        {hasFilters && <button type="button" className="fp-btn fp-btn-ghost h-9 text-xs" onClick={() => updateParams({ search: undefined, status: undefined, format: undefined, from: undefined, to: undefined, page: undefined })}><X className="h-3.5 w-3.5" />Reset</button>}
+        {filterErrors.to && <p role="alert" className="w-full text-xs text-destructive">{filterErrors.to.message}</p>}
       </form>
 
-      <div className="relative overflow-hidden fp-card">
+      <div className="documents-table relative overflow-hidden fp-card">
         {isFetching && (
           <div className="absolute inset-x-0 top-0 h-0.5 overflow-hidden bg-primary/20">
             <div className="h-full w-full animate-pulse bg-primary" />
@@ -401,7 +406,7 @@ export const WorkItems: React.FC = () => {
                           Duplicate
                         </Link>
                       )}
-                      <span className="font-mono text-[11px]">{item.file_type.split("/")[1]?.toUpperCase() ?? "UNKNOWN"}</span>
+                      <span className="font-mono text-[11px]">{documentFormatLabel(item.file_type)}</span>
                       <span>·</span>
                       <span className="font-mono text-[11px]">{formatBytes(item.file_size)}</span>
                       <span>·</span>
@@ -435,7 +440,7 @@ export const WorkItems: React.FC = () => {
                 </li>
               ))}
             </ul>
-            <table className="hidden w-full table-fixed border-collapse text-left md:table">
+            <table className="hidden w-full min-w-[800px] table-fixed border-collapse text-left md:table">
               <thead>
                 <tr className="sticky top-0 z-[1] border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground backdrop-blur">
                   {canWrite && (
@@ -550,12 +555,12 @@ export const WorkItems: React.FC = () => {
                     )}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-border bg-muted/50 text-muted-foreground group-hover:text-primary">
+                        <span className={`document-file-icon document-file-${documentFormatLabel(item.file_type).toLowerCase()}`}>
                           <FileText className="h-4 w-4" />
                         </span>
-                        <span className="truncate font-medium text-foreground" title={item.original_filename}>
+                        <Link to={getDetailsPath(item.id)} className="min-w-0 truncate font-medium text-foreground hover:text-primary" title={item.original_filename}>
                           {item.original_filename}
-                        </span>
+                        </Link>
                         {item.duplicate_of && (
                           <Link
                             to={getDetailsPath(item.duplicate_of.id)}
@@ -572,7 +577,7 @@ export const WorkItems: React.FC = () => {
                     </td>
                     <td className="px-4 py-3">
                       <span className="rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-                        {item.file_type.split("/")[1]?.toUpperCase() ?? "UNKNOWN"}
+                        {documentFormatLabel(item.file_type)}
                       </span>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
@@ -646,31 +651,15 @@ export const WorkItems: React.FC = () => {
         />
       )}
 
-      {totalPages > 1 && (
-        <footer className="flex items-center justify-between select-none">
-          <p className="fp-num text-xs text-muted-foreground">
-            Page {currentPage} of {totalPages}
-          </p>
-          <div className="flex items-center space-x-2">
-            <button
-              type="button"
-              onClick={handlePreviousPage}
-              disabled={currentPage === 1}
-              className="fp-btn fp-btn-secondary text-xs"
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              onClick={handleNextPage}
-              disabled={currentPage === totalPages}
-              className="fp-btn fp-btn-secondary text-xs"
-            >
-              Next
-            </button>
-          </div>
-        </footer>
-      )}
+      <footer className="documents-pagination flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+        <p className="tabular-nums" aria-live="polite">{response?.total ? `${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, response.total)} of ${response.total.toLocaleString()} documents` : "0 documents"}</p>
+        <nav aria-label="Document pagination" className="flex items-center gap-1.5">
+          <button type="button" aria-label="Previous page" className="fp-btn fp-btn-secondary h-8 px-2" disabled={currentPage === 1 || isFetching} onClick={() => updateParams({ page: String(currentPage - 1) })}><ChevronLeft className="h-4 w-4" /><span className="sr-only">Previous</span></button>
+          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => Math.max(1, Math.min(currentPage - 2, totalPages - 4)) + i).map((page) => <button type="button" key={page} aria-label={`Page ${page}`} aria-current={currentPage === page ? "page" : undefined} className={`fp-btn h-8 min-w-8 px-2 ${currentPage === page ? "fp-btn-primary" : "fp-btn-secondary"}`} disabled={isFetching} onClick={() => updateParams({ page: String(page) })}>{page}</button>)}
+          <button type="button" aria-label="Next page" className="fp-btn fp-btn-secondary h-8 px-2" disabled={currentPage >= totalPages || isFetching} onClick={() => updateParams({ page: String(currentPage + 1) })}><ChevronRight className="h-4 w-4" /><span className="sr-only">Next</span></button>
+        </nav>
+        <label className="flex items-center gap-2">Rows per page<select aria-label="Rows per page" value={pageSize} className="fp-input h-8 w-16" onChange={(event) => updateParams({ page: undefined, pageSize: event.target.value })}><option>10</option><option>25</option><option>50</option></select></label>
+      </footer>
 
       <ConfirmDialog
         open={reprocessDialogOpen}

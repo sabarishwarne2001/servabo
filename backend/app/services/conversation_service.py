@@ -94,6 +94,7 @@ class SessionRow:
     message_count: int
     document_title: Optional[str]
     scope_document_count: int
+    last_message_preview: Optional[str] = None
 
 
 def list_sessions(
@@ -123,8 +124,14 @@ def list_sessions(
         .scalar_subquery()
     )
 
+    preview = (
+        select(func.substr(ConversationMessage.content, 1, 180))
+        .where(ConversationMessage.conversation_id == Conversation.id, ConversationMessage.role == "user")
+        .order_by(ConversationMessage.created_at.desc(), ConversationMessage.id.desc())
+        .limit(1).correlate(Conversation).scalar_subquery()
+    )
     statement = (
-        select(Conversation, message_count, WorkItem.original_filename, scope_count)
+        select(Conversation, message_count, WorkItem.original_filename, scope_count, preview)
         .outerjoin(WorkItem, WorkItem.id == Conversation.work_item_id)
         .where(
             Conversation.workspace_id == workspace_id,
@@ -178,6 +185,7 @@ def list_sessions(
             message_count=int(row[1] or 0),
             document_title=row[2],
             scope_document_count=int(row[3] or 0),
+            last_message_preview=row[4],
         )
         for row in db.execute(statement).all()
     ]

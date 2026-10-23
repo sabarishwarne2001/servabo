@@ -6,13 +6,14 @@ import { z } from "zod";
 import { Send, Loader2, MessageSquare, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
+import AssistantWelcome from "./AssistantWelcome";
 import { assistantApi } from "@/services/api/assistant";
 import { ChatBubble } from "@/components/assistant/ChatBubble";
 import { CitationDrawer } from "@/components/assistant/CitationDrawer";
 import { SkeletonChat } from "@/components/common/skeletons/SkeletonChat";
 import { ApiError } from "@/services/api/client";
 import { useActiveWorkspaceId } from "@/hooks/useActiveWorkspace";
-import { assistantKeys, keepPreviousWithinWorkspace } from "@/services/api/queryKeys";
+import { assistantKeys } from "@/services/api/queryKeys";
 import type { ConversationMessage, SourceCitation } from "@/types/assistant";
 
 const messageFormSchema = z.object({
@@ -22,6 +23,10 @@ const messageFormSchema = z.object({
 type MessageFormInput = z.infer<typeof messageFormSchema>;
 
 interface ChatPanelProps {
+  readonly initialText?: string;
+  readonly onDraftChange?: (text: string) => void;
+  readonly onStart?: (prompt: string) => void;
+  readonly isStarting?: boolean;
   readonly mode: "global" | "document";
   readonly conversationId?: string;
   readonly workItemId?: string;
@@ -37,6 +42,10 @@ interface ChatPanelProps {
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
   mode,
+  onStart,
+  initialText = "",
+  onDraftChange,
+  isStarting = false,
   conversationId,
   workItemId: _workItemId,
   className = "",
@@ -45,7 +54,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 }) => {
   const queryClient = useQueryClient();
   const workspaceId = useActiveWorkspaceId();
-  const scrollAnchorRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeCitation, setActiveCitation] = useState<SourceCitation | null>(null);
@@ -73,7 +82,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     },
     enabled: Boolean(workspaceId && conversationId),
     staleTime: 1000 * 30,
-    placeholderData: keepPreviousWithinWorkspace(workspaceId!),
   });
 
   useEffect(() => {
@@ -84,17 +92,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   }, [historyData]);
 
   const scrollToBottom = useCallback((smooth = true): void => {
-    scrollAnchorRef.current?.scrollIntoView({
-      behavior: smooth ? "smooth" : "auto",
+    const panel = messagesRef.current;
+    if (!panel) {return;}
+    panel.scrollTo({
+      top: panel.scrollHeight,
+      behavior: smooth && !window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "auto",
     });
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
+    if (localMessages.length > 0) {scrollToBottom();}
   }, [localMessages, scrollToBottom]);
 
   const {
     register,
+    watch,
     handleSubmit,
     reset,
     setValue,
@@ -103,13 +115,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     resolver: zodResolver(messageFormSchema),
     shouldFocusError: true,
     defaultValues: {
-      message: "",
+      message: initialText,
     },
   });
 
   useEffect(() => {
+    const subscription = watch((value) => onDraftChange?.(value.message ?? ""));
+    return () => subscription.unsubscribe();
+  }, [watch, onDraftChange]);
+
+  useEffect(() => {
     if (draft) {
       setValue("message", draft.text, { shouldDirty: true });
+      window.setTimeout(() => document.getElementById(`assistant-input-${conversationId}`)?.focus(), 0);
     }
     // Re-applied per nonce, so choosing the same template twice works.
   }, [draft?.nonce, setValue]);
@@ -260,35 +278,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   }
 
   if (!conversationId) {
-    return (
-      <div className="flex min-h-[350px] sm:min-h-[450px] flex-col items-center justify-center p-6 text-center">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <MessageSquare className="h-6 w-6" />
-        </div>
-        <h2 className="mb-1 text-base sm:text-lg font-semibold">AI Assistant</h2>
-        <p className="max-w-md text-xs sm:text-sm leading-relaxed text-muted-foreground">
-          {readOnly
-            ? "Select a conversation to read it. Asking the assistant needs contributor access: ask a workspace administrator."
-            : mode === "global"
-              ? "Create or select a conversation to start chatting with your knowledge base."
-              : "Create a conversation to ask questions about this document."}
-        </p>
-      </div>
-    );
+    return <div className={`assistant-chat-surface flex h-full min-h-[380px] flex-col ${className}`}><AssistantWelcome readOnly={readOnly} disabled={isStarting || !onStart} onPrompt={(prompt) => onStart?.(prompt)} /></div>;
   }
 
   return (
-    <div className={`relative flex h-full min-h-[450px] w-full flex-col overflow-hidden rounded-xl border border-border/40 bg-card ${className}`}>
+    <div className={`assistant-chat-surface relative flex h-full min-h-[450px] w-full flex-col overflow-hidden rounded-xl border border-border/40 bg-card ${className}`}>
       {/* Session 4 (§A.3, axe): scrollable, so reachable by keyboard to scroll the conversation. */}
-      <div className="flex-1 space-y-3.5 overflow-y-auto bg-muted/10 p-3 sm:p-4 min-h-0" tabIndex={0} role="region"
+      <div ref={messagesRef} className="flex-1 space-y-3.5 overflow-y-auto bg-muted/10 p-3 sm:p-4 min-h-0" tabIndex={0} role="region"
         aria-label="Conversation messages">
         {localMessages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center text-center text-muted-foreground">
-            <MessageSquare className="mb-2 h-7 w-7 opacity-40" />
-            <p className="text-xs sm:text-sm font-medium">
-              Start the conversation by asking a question about your documents.
-            </p>
-          </div>
+          <AssistantWelcome readOnly={readOnly} onPrompt={(prompt) => { setValue("message", prompt, { shouldDirty: true }); document.getElementById(`assistant-input-${conversationId}`)?.focus(); }} />
         ) : (
           localMessages.map((message) => {
             const isTypingPlaceholder =
@@ -321,7 +320,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             );
           })
         )}
-        <div ref={scrollAnchorRef} />
       </div>
 
 {readOnly ? (
@@ -330,7 +328,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           access: ask a workspace administrator.
         </p>
       ) : (
-            <form onSubmit={handleSubmit(handleQuerySubmit)} noValidate className="border-t border-border/40 bg-card p-2.5 sm:p-3.5">
+            <form onSubmit={handleSubmit(handleQuerySubmit)} noValidate className="assistant-composer border-t border-border/40 bg-card p-2.5 sm:p-3.5">
         {sendFailure ? (
           <div
             role="alert"
@@ -352,9 +350,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         ) : null}
         <div className="flex items-end gap-2 sm:gap-3">
           <div className="flex-1">
-            <input
+            <textarea
               {...register("message")}
-              type="text"
+              id={`assistant-input-${conversationId}`}
+              aria-label="Message to the assistant"
+              rows={2}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  if (!isSubmitting && !isAssistantResponding) {void handleSubmit(handleQuerySubmit)();}
+                }
+              }}
               autoComplete="off"
               placeholder={
                 mode === "global"
@@ -363,7 +369,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               }
               disabled={isSubmitting || isAssistantResponding}
               aria-invalid={errors.message ? "true" : "false"}
-              className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 sm:py-3 text-xs sm:text-sm transition-colors placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+              className="max-h-48 w-full resize-y rounded-lg border border-border bg-background px-3.5 py-2.5 sm:py-3 text-xs sm:text-sm transition-colors placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
             />
             {errors.message && (
               <p role="alert" className="mt-1 text-xs font-medium text-destructive">
@@ -385,6 +391,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             )}
           </button>
         </div>
+        <p className="mt-2 text-[10px] text-muted-foreground">Enter to send · Shift + Enter for a new line</p>
       </form>
       )}
 

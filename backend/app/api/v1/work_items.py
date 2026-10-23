@@ -4,7 +4,7 @@ Work Items API router endpoints for Servabo.
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Iterator, Literal, Optional
 from urllib.parse import quote
 
@@ -185,12 +185,19 @@ def list_work_items(
     context: deps.TenantContext = Depends(deps.RequireWorkspaceViewer),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    search: Optional[str] = Query(None),
+    search: Optional[str] = Query(None, max_length=100),
     status_filter: Optional[WorkItemStatus] = Query(None, alias="status"),
     mine_only: bool = Query(False),
     sort_by: str = Query("created_at"),
     sort_order: str = Query("desc"),
+    file_format: Optional[Literal["pdf", "docx", "xlsx", "csv", "image"]] = Query(None),
+    uploaded_from: Optional[date] = Query(None),
+    uploaded_to: Optional[date] = Query(None),
 ) -> WorkItemListResponse:
+    if uploaded_from and uploaded_to and uploaded_from > uploaded_to:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Upload start date must be on or before end date.")
+    if uploaded_to == date.max:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Upload end date is out of range.")
     items = crud.list_work_items(
         db,
         workspace_id=context.workspace_id,
@@ -199,6 +206,9 @@ def list_work_items(
         search=search,
         status=status_filter,
         created_by_user_id=context.user_id if mine_only else None,
+        file_format=file_format,
+        uploaded_from=uploaded_from,
+        uploaded_to=uploaded_to,
         sort_by=sort_by,
         sort_order=sort_order,
     )
@@ -208,6 +218,9 @@ def list_work_items(
         search=search,
         status=status_filter,
         created_by_user_id=context.user_id if mine_only else None,
+        file_format=file_format,
+        uploaded_from=uploaded_from,
+        uploaded_to=uploaded_to,
     )
     page = (skip // limit) + 1
     total_pages = (total + limit - 1) // limit if total > 0 else 1
@@ -218,6 +231,34 @@ def list_work_items(
         pageSize=limit,
         totalItems=total,
         totalPages=total_pages,
+    )
+
+
+class DocumentCounts(BaseModel):
+    total: int
+    queued: int
+    processing: int
+    completed: int
+    failed: int
+
+
+@router.get("/counts", response_model=DocumentCounts)
+def document_counts(
+    db: Session = Depends(deps.get_db),
+    context: deps.TenantContext = Depends(deps.RequireWorkspaceViewer),
+) -> DocumentCounts:
+    """Workspace-wide counts, independent of list filters and pagination."""
+    counts = dict(db.execute(
+        select(WorkItem.status, func.count()).where(
+            WorkItem.workspace_id == context.workspace_id
+        ).group_by(WorkItem.status)
+    ).all())
+    return DocumentCounts(
+        total=sum(counts.values()),
+        queued=counts.get("QUEUED", 0),
+        processing=counts.get("PROCESSING", 0),
+        completed=counts.get("COMPLETED", 0),
+        failed=counts.get("FAILED", 0),
     )
 
 

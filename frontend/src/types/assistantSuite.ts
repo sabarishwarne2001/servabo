@@ -22,6 +22,7 @@ export interface ConversationSession {
   readonly message_count: number;
   readonly created_at: string;
   readonly last_message_at: string | null;
+  readonly last_message_preview?: string | null;
 }
 
 export interface ConversationSessionFilters {

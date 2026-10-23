@@ -1,4 +1,5 @@
 @import "../../../brand/tokens.css";
+@import "./intelligence.css";
 
 @tailwind base;
 @tailwind components;
