@@ -32,7 +32,7 @@ import { workItemKeys, invalidateWorkspace, keepPreviousWithinWorkspace } from "
 import { useOptionalTenant } from "@/routes/TenantContext";
 import { canCreateContent } from "@/permissions/workspacePermissions";
 import { BulkActionBar } from "@/components/workItems/BulkActionBar";
-import { formatTimestamp, formatTimestampDate } from "@/utils/displayTime";
+import { formatNumber, formatTimestamp, formatTimestampDate } from "@/utils/displayTime";
 import { SkeletonTable } from "@/components/common/skeletons/SkeletonTable";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
@@ -278,13 +278,13 @@ export const WorkItems: React.FC = () => {
       <section aria-label="Document statistics" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {[
           { label: "Total documents", value: counts.data?.total, Icon: Files, tone: "blue", detail: "Across this workspace", status: undefined },
-          { label: "Processing", value: counts.data?.processing, Icon: Activity, tone: "cyan", detail: `${counts.data?.queued ?? "—"} queued for processing`, status: "PROCESSING" },
+          { label: "Processing", value: counts.data?.processing, Icon: Activity, tone: "cyan", detail: `${formatNumber(counts.data?.queued)} queued for processing`, status: "PROCESSING" },
           { label: "Completed", value: counts.data?.completed, Icon: CircleCheck, tone: "green", detail: "Processing completed", status: "COMPLETED" },
           { label: "Failed", value: counts.data?.failed, Icon: CircleAlert, tone: "red", detail: "May need your attention", status: "FAILED" },
         ].map(({ label, value, Icon, tone, detail, status }) => (
           <button key={label} type="button" className={`document-stat document-stat-${tone}`} onClick={() => updateParams({ status, page: undefined })} aria-label={`Show ${label.toLowerCase()}`}>
             <span className="document-stat-icon"><Icon className="h-6 w-6" aria-hidden="true" /></span>
-            <span className="min-w-0"><span className="block text-xs text-muted-foreground sm:text-sm">{label}</span><span className="my-1 block text-2xl font-semibold tracking-tight tabular-nums" aria-live="polite">{counts.isError ? "—" : value?.toLocaleString() ?? "…"}</span><span className="block text-[11px] text-muted-foreground">{detail}</span></span>
+            <span className="min-w-0"><span className="block text-xs text-muted-foreground sm:text-sm">{label}</span><span className="my-1 block text-2xl font-semibold tracking-tight tabular-nums" aria-live="polite">{counts.isError ? "—" : formatNumber(value, undefined, "…")}</span><span className="block text-[11px] text-muted-foreground">{detail}</span></span>
           </button>
         ))}
       </section>
@@ -652,7 +652,7 @@ export const WorkItems: React.FC = () => {
       )}
 
       <footer className="documents-pagination flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-        <p className="tabular-nums" aria-live="polite">{response?.total ? `${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, response.total)} of ${response.total.toLocaleString()} documents` : "0 documents"}</p>
+        <p className="tabular-nums" aria-live="polite">{response?.total ? `${formatNumber((currentPage - 1) * pageSize + 1)}–${formatNumber(Math.min(currentPage * pageSize, response.total))} of ${formatNumber(response.total)} documents` : "0 documents"}</p>
         <nav aria-label="Document pagination" className="flex items-center gap-1.5">
           <button type="button" aria-label="Previous page" className="fp-btn fp-btn-secondary h-8 px-2" disabled={currentPage === 1 || isFetching} onClick={() => updateParams({ page: String(currentPage - 1) })}><ChevronLeft className="h-4 w-4" /><span className="sr-only">Previous</span></button>
           {Array.from({ length: Math.min(5, totalPages) }, (_, i) => Math.max(1, Math.min(currentPage - 2, totalPages - 4)) + i).map((page) => <button type="button" key={page} aria-label={`Page ${page}`} aria-current={currentPage === page ? "page" : undefined} className={`fp-btn h-8 min-w-8 px-2 ${currentPage === page ? "fp-btn-primary" : "fp-btn-secondary"}`} disabled={isFetching} onClick={() => updateParams({ page: String(page) })}>{page}</button>)}

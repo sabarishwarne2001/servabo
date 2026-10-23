@@ -52,6 +52,14 @@ npx playwright test --config e2e/playwright.config.ts \
 
 Pass the same database/test environment settings to the runner and stack script so the idempotent seed targets the test database. The setup run used `ENVIRONMENT=test POSTGRES_DB=servabo_ui_e2e ML_STUBS=true STORAGE_BACKEND=local RATE_LIMIT_ENABLED=false`, plus the local mail sink settings described in `frontend/e2e/README.md`. Never point test seeding at production data.
 
+## CI regression follow-up
+
+The CI self-check caught two document count displays bypassing the shared locale formatter. KPI counts, queued counts and pagination ranges now use `formatNumber` from the display-preferences layer. `npm run check:self` passes without relaxing its guard.
+
+Two existing browser checks assumed a named fixture would appear on the first unfiltered page. With server pagination active, newer uploads can move it onto a later page. The list test now explicitly searches for the purchase order and checks its completed status and exclusion of the invoice. The workspace-switch test searches for the invoice in Operations, then repeats that search in Finance and requires an empty result. These assertions exercise the whole filtered collection rather than treating absence from page one as an isolation guarantee.
+
+The two corrected browser checks passed locally against the production bundle with `E2E_CSP=1`; lint, both type checks and the 283 frontend unit tests were also rerun. The GitHub PR checks are the authority for the complete remote CI result.
+
 ## Screenshots
 
 Captured using synthetic seeded test accounts/documents. The before images use the unchanged frontend at `02063e4ad7ace92515cc79ab2aa90608405e8fe1`, built from an archive outside the checkout. After images use this implementation. Browser test output also includes tablet and light-theme captures.
