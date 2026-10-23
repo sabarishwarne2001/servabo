@@ -177,10 +177,14 @@ test.describe("Documents — list, viewer, search", () => {
     await page.getByRole("button", { name: "Apply Filters" }).click();
     await expect(page.locator("main")).toContainText("invoice-INV-E2E-1001.pdf");
     await expect(page.locator("main")).not.toContainText("purchase-order-PO-E2E-5001.pdf");
-    await page.getByPlaceholder("Search documents...").fill("");
-    await page.locator("main select").first().selectOption({ label: "Completed" });
+    // Pagination is server-side: the purchase order need not be on the first unfiltered page.
+    await page.getByPlaceholder("Search documents...").fill("purchase-order-PO-E2E-5001");
+    await page.getByRole("combobox", { name: "Filter by status" }).selectOption({ label: "Completed" });
     await page.getByRole("button", { name: "Apply Filters" }).click();
-    await expect(page.locator("main")).toContainText("purchase-order-PO-E2E-5001.pdf");
+    const purchaseOrder = page.locator("tbody tr").filter({ hasText: "purchase-order-PO-E2E-5001.pdf" });
+    await expect(purchaseOrder).toHaveCount(1);
+    await expect(purchaseOrder).toContainText("completed");
+    await expect(page.locator("main")).not.toContainText("invoice-INV-E2E-1001.pdf");
     await page.getByRole("button", { name: "Document Filename" }).click();
     await page.getByRole("button", { name: "File Size" }).click();
     await expectHealthyPage(page);

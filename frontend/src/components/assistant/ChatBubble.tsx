@@ -1,4 +1,5 @@
 import { formatTimestamp, formatTimestampTime } from "@/utils/displayTime";
+import MarkdownRenderer from "@/components/chat/MarkdownRenderer";
 import React, { useState } from "react";
 import { Bot, User, FileText } from "lucide-react";
 import { useOptionalTenant } from "@/routes/TenantContext";
@@ -24,76 +25,6 @@ interface ChatBubbleProps {
 /* ============================================================================
  * Constants
  * ========================================================================== */
-
-const INLINE_CITATION_REGEX = /\[(\d+)\]/g;
-
-/* ============================================================================
- * Helper Functions
- * ========================================================================== */
-
-/**
- * Parses assistant messages and converts
- * inline references like [1] into clickable
- * citation buttons.
- */
-function renderMessageContent(
-  message: ConversationMessage,
-  onCitationClick?: (citation: SourceCitation, sources: readonly SourceCitation[]) => void
-): React.ReactNode {
-  const content = message.content;
-  const sources = message.sources ?? [];
-
-  if (sources.length === 0) {
-    return (
-      <p className="whitespace-pre-wrap text-sm leading-7 [overflow-wrap:anywhere]">
-        {content}
-      </p>
-    );
-  }
-
-  const parts = content.split(INLINE_CITATION_REGEX);
-
-  return (
-    <p className="whitespace-pre-wrap text-sm leading-7 [overflow-wrap:anywhere]">
-      {parts.map((part, index) => {
-        if (index % 2 === 1) {
-          const citation = sources[Number(part) - 1];
-
-          if (!citation) {
-            return `[${part}]`;
-          }
-
-          return (
-            <button
-              key={`cite-${index}-${citationKey(citation)}`}
-              type="button"
-              onClick={() => onCitationClick?.(citation, sources)}
-              className="
-                  mx-0.5
-                  align-super
-                  rounded
-                  px-0.5
-                  text-[10px]
-                  font-semibold
-                  text-primary
-                  transition-colors
-                  hover:underline
-                  focus:outline-none
-                  focus:ring-1
-                  focus:ring-primary/30
-                "
-              aria-label={`Open citation ${part}`}
-            >
-              [{part}]
-            </button>
-          );
-        }
-
-        return <React.Fragment key={`text-${index}`}>{part}</React.Fragment>;
-      })}
-    </p>
-  );
-}
 
 /* ============================================================================
  * Component
@@ -206,7 +137,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = React.memo(
           ====================================================== */}
 
           <div className="text-foreground">
-            {renderMessageContent(message, onCitationClick)}
+            {isUser ? <p className="whitespace-pre-wrap text-sm leading-7 [overflow-wrap:anywhere]">{message.content}</p> : <MarkdownRenderer content={message.content} numericCitationCount={message.sources?.length ?? 0} onNumericCitationClick={(index) => { const source = message.sources?.[index]; if (source) {onCitationClick?.(source, message.sources);} }} />}
           </div>
           {/* ======================================================
               Future Agent Metadata

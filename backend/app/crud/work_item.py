@@ -30,6 +30,14 @@ from app.utils.like import LIKE_ESCAPE, contains_pattern
 #: name any attribute on the class. Harmless in practice today, but it is an
 #: unbounded surface reachable from an unauthenticated-shaped input, and this
 #: rewrite is the cheapest moment to close it.
+DOCUMENT_FORMATS = {
+    "pdf": ("application/pdf",),
+    "docx": ("application/vnd.openxmlformats-officedocument.wordprocessingml.document",),
+    "xlsx": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",),
+    "csv": ("text/csv", "application/csv"),
+    "image": ("image/png", "image/jpeg", "image/webp", "image/tiff", "image/gif", "image/bmp"),
+}
+
 SORTABLE_COLUMNS: frozenset[str] = frozenset({
     "created_at", "updated_at", "original_filename", "file_size", "status",
 })
@@ -73,11 +81,20 @@ def _filtered(
     search: str | None,
     status: WorkItemStatus | None,
     created_by_user_id: uuid.UUID | None,
+    file_format: str | None = None,
+    uploaded_from: date | None = None,
+    uploaded_to: date | None = None,
 ) -> Select[Any]:
     """The list's filters, shared by the page and its total so the two always agree (F-155).
 
     The search text is matched literally: `_` and `%` are not wildcards (F-156).
     """
+    if file_format:
+        statement = statement.where(WorkItem.file_type.in_(DOCUMENT_FORMATS[file_format]))
+    if uploaded_from:
+        statement = statement.where(WorkItem.created_at >= datetime.combine(uploaded_from, datetime.min.time(), tzinfo=timezone.utc))
+    if uploaded_to:
+        statement = statement.where(WorkItem.created_at < datetime.combine(uploaded_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc))
     if search:
         statement = statement.where(
             WorkItem.original_filename.ilike(contains_pattern(search), escape=LIKE_ESCAPE)
@@ -102,6 +119,9 @@ def list_work_items(
     created_by_user_id: uuid.UUID | None = None,
     sort_by: str = "created_at",
     sort_order: str = "desc",
+    file_format: str | None = None,
+    uploaded_from: date | None = None,
+    uploaded_to: date | None = None,
 ) -> list[WorkItem]:
     """
     Lists work items in a workspace.
@@ -118,6 +138,9 @@ def list_work_items(
         search=search,
         status=status,
         created_by_user_id=created_by_user_id,
+        file_format=file_format,
+        uploaded_from=uploaded_from,
+        uploaded_to=uploaded_to,
     )
 
     column = sort_by if sort_by in SORTABLE_COLUMNS else "created_at"
@@ -140,6 +163,9 @@ def count_work_items(
     search: str | None = None,
     status: WorkItemStatus | None = None,
     created_by_user_id: uuid.UUID | None = None,
+    file_format: str | None = None,
+    uploaded_from: date | None = None,
+    uploaded_to: date | None = None,
 ) -> int:
     statement = _filtered(
         select(func.count())
@@ -148,6 +174,9 @@ def count_work_items(
         search=search,
         status=status,
         created_by_user_id=created_by_user_id,
+        file_format=file_format,
+        uploaded_from=uploaded_from,
+        uploaded_to=uploaded_to,
     )
     return db.execute(statement).scalar_one()
 

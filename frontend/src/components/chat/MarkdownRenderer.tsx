@@ -104,7 +104,41 @@ const escapeAttribute = (value: string): string =>
     }
   });
 
+/** Insert native citation buttons only after sanitizing provider-authored HTML. */
+const addNumericCitations = (html: string, count: number): string => {
+  if (!count) {return html;}
+  const root = document.createElement("div");
+  root.innerHTML = html;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes: Text[] = [];
+  while (walker.nextNode()) {nodes.push(walker.currentNode as Text);}
+  for (const node of nodes) {
+    if (node.parentElement?.closest("code, pre, a")) {continue;}
+    const text = node.textContent ?? "";
+    const matches = [...text.matchAll(/\[(\d+)\]/g)].filter((match) => Number(match[1]) >= 1 && Number(match[1]) <= count);
+    if (!matches.length) {continue;}
+    const fragment = document.createDocumentFragment();
+    let offset = 0;
+    for (const match of matches) {
+      fragment.append(document.createTextNode(text.slice(offset, match.index)));
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "fp-source-citation mx-0.5 rounded border border-primary/30 bg-primary/10 px-1 text-xs font-semibold text-primary";
+      button.dataset.sourceIndex = match[1];
+      button.setAttribute("aria-label", `Open citation ${match[1]}`);
+      button.textContent = match[0];
+      fragment.append(button);
+      offset = match.index + match[0].length;
+    }
+    fragment.append(document.createTextNode(text.slice(offset)));
+    node.replaceWith(fragment);
+  }
+  return root.innerHTML;
+};
+
 export interface MarkdownRendererProps {
+  readonly numericCitationCount?: number;
+  readonly onNumericCitationClick?: (index: number) => void;
   readonly content: string;
   readonly claims?: readonly CitationClaim[];
   readonly onCitationClick?: (claimId: string) => void;
@@ -114,6 +148,8 @@ export interface MarkdownRendererProps {
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
+  numericCitationCount = 0,
+  onNumericCitationClick,
   claims = [],
   onCitationClick,
   activeClaimId = null,
@@ -132,8 +168,20 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       breaks: true,
     }) as string;
 
-    return DOMPurify.sanitize(raw, PURIFY_CONFIG) as unknown as string;
-  }, [content, claims]);
+    const sanitized = DOMPurify.sanitize(raw, PURIFY_CONFIG) as unknown as string;
+    return addNumericCitations(sanitized, numericCitationCount);
+  }, [content, claims, numericCitationCount]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !onNumericCitationClick) {return;}
+    const click = (event: MouseEvent) => {
+      const button = (event.target as HTMLElement)?.closest<HTMLElement>(".fp-source-citation");
+      if (button && container.contains(button)) {onNumericCitationClick(Number(button.dataset.sourceIndex) - 1);}
+    };
+    container.addEventListener("click", click);
+    return () => container.removeEventListener("click", click);
+  }, [html, onNumericCitationClick]);
 
   useEffect(() => {
     const container = containerRef.current;

@@ -10,6 +10,7 @@ export const workspaceScope = (workspaceId: string) =>
 
 export const workItemKeys = {
   all: (workspaceId: string) => [...workspaceScope(workspaceId), "work-items"] as const,
+  counts: (workspaceId: string) => [...workItemKeys.all(workspaceId), "counts"] as const,
   list: (workspaceId: string, filters: WorkItemQueryFilters) =>
     [...workItemKeys.all(workspaceId), "list", filters] as const,
   detail: (workspaceId: string, workItemId: string) =>

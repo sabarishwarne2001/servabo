@@ -23,6 +23,7 @@ class ConversationSessionSummary(BaseModel):
     message_count: int = 0
     created_at: datetime
     last_message_at: Optional[datetime] = None
+    last_message_preview: Optional[str] = None
 
 
 class ConversationSessionUpdate(BaseModel):

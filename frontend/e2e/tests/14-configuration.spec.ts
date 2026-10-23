@@ -125,12 +125,16 @@ test.describe("Global search (Ctrl+K)", () => {
 
 test.describe("Workspace switcher", () => {
   test("switch to Finance and back; each workspace only shows its own documents", async ({ page }) => {
-    await page.goto(ws("C", "work-items"));
+    // Search the entire collection: older fixture documents may be beyond page one.
+    await page.goto(ws("C", "work-items?search=INV-E2E-1001"));
     await expect(page.locator("main")).toContainText("invoice-INV-E2E-1001.pdf");
     await page.getByRole("button", { name: /Operations Caretakers Global Inc/ }).click();
     await page.getByRole("menuitem", { name: /Finance/ }).or(page.getByRole("option", { name: /Finance/ })).or(page.getByRole("button", { name: /^Finance/ })).first().click();
     await expect(page).toHaveURL(new RegExp(`/caretakers-global/${C_SECOND_WS}`));
     await page.getByRole("link", { name: "Documents", exact: true }).click();
+    await page.getByPlaceholder("Search documents...").fill("INV-E2E-1001");
+    await page.getByRole("button", { name: "Apply Filters" }).click();
+    await expect(page.getByText("No documents found", { exact: true })).toBeVisible();
     await expect(page.locator("main")).not.toContainText("invoice-INV-E2E-1001.pdf");
     await expectHealthyPage(page);
   });

@@ -59,6 +59,11 @@ const ChatSessionBar: React.FC<ChatSessionBarProps> = ({
   const [panel, setPanel] = useState<Panel>(null);
   const [picked, setPicked] = useState<readonly string[]>([]);
   const [docSearch, setDocSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(docSearch), 250);
+    return () => window.clearTimeout(timer);
+  }, [docSearch]);
   const [newName, setNewName] = useState("");
   const [newBody, setNewBody] = useState("");
   // The two pickers are popovers over the chat: Escape closes them and focus returns to the
@@ -103,9 +108,9 @@ const ChatSessionBar: React.FC<ChatSessionBarProps> = ({
       page: 1,
       pageSize: 50,
       status: "COMPLETED" as const,
-      ...(docSearch.trim() ? { search: docSearch.trim() } : {}),
+      ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
     }),
-    [docSearch],
+    [debouncedSearch],
   );
 
   const documents = useQuery({
@@ -197,7 +202,7 @@ const ChatSessionBar: React.FC<ChatSessionBarProps> = ({
     "inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-xs font-semibold hover:bg-muted";
 
   return (
-    <div className="relative mb-2 flex flex-wrap items-center gap-2">
+    <div className="assistant-session-bar relative flex flex-wrap items-center gap-2">
       {isDocument ? (
         <span
           className="inline-flex h-8 max-w-full items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 text-xs font-semibold text-amber-700 dark:text-amber-400"
@@ -210,6 +215,7 @@ const ChatSessionBar: React.FC<ChatSessionBarProps> = ({
         <button
           type="button"
           className={chip}
+          disabled={!canWriteTemplates || scope.isLoading || scope.isError}
           aria-expanded={panel === "scope"}
           onClick={() => setPanel(panel === "scope" ? null : "scope")}
         >
@@ -229,20 +235,22 @@ const ChatSessionBar: React.FC<ChatSessionBarProps> = ({
         <span className="sr-only">Model for this conversation</span>
         <select
           value={selectedModel}
-          disabled={models.isLoading || chooseModel.isPending}
+          disabled={!canWriteTemplates || models.isLoading || models.isError || chooseModel.isPending}
           onChange={(event) => chooseModel.mutate(event.target.value)}
-          className="max-w-[14rem] bg-slate-900 text-slate-100 text-xs font-semibold outline-none cursor-pointer rounded px-1.5 py-0.5 border border-slate-700"
+          className="max-w-[14rem] cursor-pointer rounded border border-border bg-background px-1.5 py-0.5 text-xs font-semibold text-foreground"
         >
-          <option value="" className="bg-slate-900 text-slate-100 py-1">Default{defaultModel ? ` (${defaultModel})` : ""}</option>
+          <option value="" className="bg-background text-foreground py-1">Default{defaultModel ? ` (${defaultModel})` : ""}</option>
           {(models.data ?? [])
             .filter((option) => !option.is_workspace_default)
             .map((option) => (
-              <option key={option.model} value={option.model} className="bg-slate-900 text-slate-100 py-1">
+              <option key={option.model} value={option.model} className="bg-background text-foreground py-1">
                 {option.model}
               </option>
             ))}
         </select>
       </label>
+      {models.isError && <span role="status" className="text-xs text-muted-foreground">Models unavailable. <button type="button" className="underline" onClick={() => void models.refetch()}>Retry models</button></span>}
+      {scope.isError && !isDocument && <span role="status" className="text-xs text-muted-foreground">Scope unavailable. <button type="button" className="underline" onClick={() => void scope.refetch()}>Retry scope</button></span>}
       {activePrice && (
         <span className="text-[10px] text-muted-foreground" title="Price book rate">
           {activePrice}
@@ -279,6 +287,7 @@ const ChatSessionBar: React.FC<ChatSessionBarProps> = ({
               value={docSearch}
               onChange={(event) => setDocSearch(event.target.value)}
               placeholder="Filter processed documents"
+              maxLength={100}
               className="h-8 w-full rounded-lg border border-border bg-background pl-7 pr-2 text-xs"
             />
           </label>
@@ -287,6 +296,8 @@ const ChatSessionBar: React.FC<ChatSessionBarProps> = ({
               <li className="flex items-center gap-2 p-2 text-xs text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> Loading documents…
               </li>
+            ) : documents.isError ? (
+              <li role="alert" className="p-2 text-xs text-destructive">Documents could not be loaded. <button type="button" className="underline" onClick={() => void documents.refetch()}>Retry</button></li>
             ) : (documents.data?.items ?? []).length === 0 ? (
               <li className="p-2 text-xs text-muted-foreground">No processed documents match.</li>
             ) : (
@@ -344,6 +355,8 @@ const ChatSessionBar: React.FC<ChatSessionBarProps> = ({
               <li className="flex items-center gap-2 p-2 text-xs text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> Loading…
               </li>
+            ) : templates.isError ? (
+              <li role="alert" className="p-2 text-xs text-destructive">Templates could not be loaded. <button type="button" className="underline" onClick={() => void templates.refetch()}>Retry</button></li>
             ) : (templates.data ?? []).length === 0 ? (
               <li className="p-2 text-xs text-muted-foreground">No templates yet.</li>
             ) : (
@@ -351,7 +364,8 @@ const ChatSessionBar: React.FC<ChatSessionBarProps> = ({
                 <li key={template.id} className="flex items-start gap-2 rounded px-2 py-1.5 hover:bg-muted">
                   <button
                     type="button"
-                    className="min-w-0 flex-1 text-left"
+                    className="min-w-0 flex-1 text-left disabled:opacity-60"
+                    disabled={!canWriteTemplates}
                     onClick={() => {
                       onInsertTemplate(template.body);
                       setPanel(null);

@@ -8,6 +8,7 @@ export default [
   {
     ignores: [
       "dist/**",
+      "dist-e2e-*/**",
       "build/**",
       "coverage/**",
       "node_modules/**",

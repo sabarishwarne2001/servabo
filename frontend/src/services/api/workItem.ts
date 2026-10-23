@@ -2,6 +2,7 @@ import type { AxiosProgressEvent, AxiosResponse } from "axios";
 import apiClient from "@/services/api/client";
 import { KNOWLEDGE_ENDPOINTS, WORK_ITEM_ENDPOINTS } from "@/services/api/endpoints";
 import type {
+  DocumentCounts,
   ReindexResult,
   ReindexStatus,
   UploadDocumentResponse,
@@ -14,13 +15,16 @@ const JSON_HEADERS = { Accept: "application/json" } as const;
 
 const buildQueryParams = (filters: WorkItemQueryFilters): URLSearchParams => {
   const params = new URLSearchParams({
-    page: String(filters.page),
-    pageSize: String(filters.pageSize),
+    skip: String((filters.page - 1) * filters.pageSize),
+    limit: String(filters.pageSize),
   });
   if (filters.search?.trim()) {params.set("search", filters.search.trim());}
   if (filters.status) {params.set("status", filters.status);}
-  if (filters.sortBy) {params.set("sortBy", filters.sortBy);}
-  if (filters.sortOrder) {params.set("sortOrder", filters.sortOrder);}
+  if (filters.sortBy) {params.set("sort_by", filters.sortBy);}
+  if (filters.sortOrder) {params.set("sort_order", filters.sortOrder);}
+  if (filters.fileFormat) {params.set("file_format", filters.fileFormat);}
+  if (filters.uploadedFrom) {params.set("uploaded_from", filters.uploadedFrom);}
+  if (filters.uploadedTo) {params.set("uploaded_to", filters.uploadedTo);}
   return params;
 };
 
@@ -53,11 +57,16 @@ export const getWorkItems = async (
   workspaceId: string,
   filters: WorkItemQueryFilters,
 ): Promise<WorkItemsListResponse> => {
-  const response = await apiClient.get<WorkItemsListResponse>(
+  const response = await apiClient.get<Omit<WorkItemsListResponse, "total"> & { totalItems: number }>(
     WORK_ITEM_ENDPOINTS.list(workspaceId),
     { params: buildQueryParams(filters), headers: JSON_HEADERS },
   );
-  return response.data;
+  return { ...response.data, total: response.data.totalItems };
+};
+
+export const getDocumentCounts = async (workspaceId: string): Promise<DocumentCounts> => {
+  const { data } = await apiClient.get<DocumentCounts>(`${WORK_ITEM_ENDPOINTS.list(workspaceId)}/counts`);
+  return data;
 };
 
 export const getWorkItemDetails = async (
@@ -113,6 +122,7 @@ export const getReindexStatus = async (
 };
 
 export const workItemApi = {
+  getDocumentCounts,
   uploadDocument,
   uploadSampleDocument,
   getWorkItems,

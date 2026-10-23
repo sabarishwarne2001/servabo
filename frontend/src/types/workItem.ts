@@ -96,11 +96,24 @@ export interface EinvoiceQr {
  */
 export type UploadDocumentResponse = WorkItemResponse;
 
+export type DocumentFormat = "pdf" | "docx" | "xlsx" | "csv" | "image";
+
+export interface DocumentCounts {
+  readonly total: number;
+  readonly queued: number;
+  readonly processing: number;
+  readonly completed: number;
+  readonly failed: number;
+}
+
 export interface WorkItemQueryFilters {
   readonly page: number;
   readonly pageSize: number;
   readonly search?: string;
   readonly status?: WorkItemStatus;
+  readonly fileFormat?: DocumentFormat;
+  readonly uploadedFrom?: string;
+  readonly uploadedTo?: string;
   readonly sortBy?: WorkItemSortField;
   readonly sortOrder?: "asc" | "desc";
 }

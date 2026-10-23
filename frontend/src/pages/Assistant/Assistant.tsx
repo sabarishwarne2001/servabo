@@ -1,5 +1,10 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
+import { Sparkles } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { assistantKeys } from "@/services/api/queryKeys";
+import { assistantApi } from "@/services/api/assistant";
 import ChatSessionBar from "@/components/assistant/ChatSessionBar";
 import ConversationSidebar from "@/components/assistant/ConversationSidebar";
 import { ChatPanel } from "@/components/assistant/ChatPanel";
@@ -32,10 +37,14 @@ interface Draft {
  * offers, and inserts organization prompt templates into the composer.
  */
 export const Assistant: React.FC = () => {
+  const queryClient = useQueryClient();
+  const drafts = useRef<Record<string, string>>({});
   const workspace = useActiveWorkspace();
   const { workspaceRole } = useResolvedTenant();
   const conversationsWidth = useSidebarWidth(ASSISTANT_SIDEBAR);
   const workspaceId = workspace?.workspaceId ?? "";
+  const activeWorkspace = useRef(workspaceId);
+  activeWorkspace.current = workspaceId;
   const canWrite = isAtLeast(workspaceRole, "CONTRIBUTOR");
 
   const [session, setSession] = useState<ConversationSession | null>(null);
@@ -44,9 +53,22 @@ export const Assistant: React.FC = () => {
   useEffect(() => {
     setSession(null);
     setDraft(null);
+    drafts.current = {};
   }, [workspaceId]);
 
+  const start = useMutation({
+    mutationFn: (prompt: string) => assistantApi.createConversation(workspaceId).then((created) => ({ created, prompt, startedWorkspace: workspaceId })),
+    onSuccess: ({ created, prompt, startedWorkspace }) => {
+      if (startedWorkspace !== activeWorkspace.current) {return;}
+      setSession({ id: created.id, title: created.title, kind: "workspace", scope_mode: "WORKSPACE", work_item_id: null, document_title: null, scope_document_count: 0, model_override: null, pinned: false, archived: false, message_count: 0, created_at: created.created_at, last_message_at: null });
+      setDraft({ text: prompt, nonce: Date.now() });
+      void queryClient.invalidateQueries({ queryKey: assistantKeys.sessionsRoot(workspaceId) });
+    },
+    onError: () => toast.error("The conversation could not be created. Please try again."),
+  });
+
   const select = useCallback((next: ConversationSession | null) => {
+    if (next?.id !== session?.id) {setDraft(null);}
     setSession((current) => {
       if (current === next) {
         return current;
@@ -56,7 +78,7 @@ export const Assistant: React.FC = () => {
       }
       return next;
     });
-  }, []);
+  }, [session?.id]);
 
   const insertTemplate = useCallback((text: string) => {
     setDraft({ text, nonce: Date.now() });
@@ -67,20 +89,21 @@ export const Assistant: React.FC = () => {
   }
 
   return (
-    <div className="flex h-full flex-col space-y-3">
-      <header className="shrink-0 space-y-0.5">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">AI Assistant</h1>
+    <div className="intelligence-page assistant-page flex h-full min-w-0 flex-col space-y-4">
+      <header className="intelligence-header flex shrink-0 items-center gap-4">
+        <span className="intelligence-mark" aria-hidden="true"><Sparkles /></span><div className="space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">AI Assistant</h1>
         <p className="text-xs text-muted-foreground sm:text-sm">
           Ask across the whole workspace, a chosen set of documents, or one document — every
           answer cites the passages it used.
         </p>
-      </header>
+      </div></header>
 
       <section
-        className="flex min-h-0 flex-1 flex-col gap-3 sm:gap-4 lg:grid lg:h-[calc(100vh-13rem)] lg:grid-cols-[var(--conversations-side)_minmax(0,1fr)]"
+        className="flex min-h-0 flex-1 flex-col gap-3 sm:gap-4 lg:grid lg:h-[calc(100vh-13rem)] lg:grid-rows-[minmax(0,1fr)] lg:grid-cols-[var(--conversations-side)_minmax(0,1fr)]"
         style={{ "--conversations-side": `${conversationsWidth}px` } as React.CSSProperties}
       >
-        <div className="relative max-h-72 shrink-0 lg:h-full lg:max-h-none">
+        <div className="relative min-h-0 max-h-72 shrink-0 lg:h-full lg:max-h-none">
           <ConversationSidebar
             workspaceId={workspaceId}
             selectedId={session?.id ?? null}
@@ -96,7 +119,7 @@ export const Assistant: React.FC = () => {
           />
         </div>
 
-        <div className="flex min-h-[480px] flex-1 flex-col lg:h-full lg:min-h-0">
+        <div className="assistant-workbench flex min-h-[480px] min-w-0 flex-1 flex-col lg:h-full lg:min-h-0">
           {session && (
             <ChatSessionBar
               workspaceId={workspaceId}
@@ -107,7 +130,12 @@ export const Assistant: React.FC = () => {
           )}
           <div className="relative min-h-0 w-full flex-1">
             <ChatPanel
+              key={`${workspaceId}:${session?.id ?? "welcome"}`}
               mode="global"
+              initialText={session ? drafts.current[session.id] ?? "" : ""}
+              onDraftChange={(text) => { if (session) {drafts.current[session.id] = text;} }}
+              onStart={(prompt) => start.mutate(prompt)}
+              isStarting={start.isPending}
               {...(session ? { conversationId: session.id } : {})}
               {...(draft ? { draft } : {})}
               readOnly={!canWrite}

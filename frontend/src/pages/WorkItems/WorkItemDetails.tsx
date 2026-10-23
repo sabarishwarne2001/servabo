@@ -621,6 +621,7 @@ export const WorkItemDetails: React.FC = () => {
                   </div>
                   {conversationId ? (
                     <ChatPanel
+                      key={`${workspaceId}:${conversationId}`}
                       mode="document"
                       conversationId={conversationId}
                       workItemId={workItem.id}
