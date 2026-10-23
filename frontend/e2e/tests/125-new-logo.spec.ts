@@ -16,8 +16,9 @@ test("a new workspace shows the Servabo logo until its own logo is uploaded", as
   // The sidebar's identity block: the Servabo mark, and no initials badge for "Fresh Start".
   const mark = page.locator("aside svg[data-servabo-mark], nav svg[data-servabo-mark], header svg[data-servabo-mark]").first();
   await expect(mark).toBeVisible();
-  const box = await mark.boundingBox();
-  expect(box?.width ?? 0).toBeGreaterThan(20);
+  // Measured again until it settles: the sidebar can re-render once the workspace has loaded, and a single measurement taken
+  // between the two renders finds no element.
+  await expect.poll(async () => (await mark.boundingBox())?.width ?? 0).toBeGreaterThan(20);
   await expect(page.getByText("FS", { exact: true })).toHaveCount(0);
 
   // The workspace settings say so too.
