@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Mail } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
@@ -212,6 +212,15 @@ export const InvoicesTab: React.FC<TabProps> = ({ workspaceId, gstin, period, ca
   const [params] = useSearchParams();
   const [supplier, setSupplier] = useState(() => params.get("supplier") ?? "");
   const [number, setNumber] = useState(() => params.get("number") ?? "");
+  // Opening another search result while this tab is already showing changes the address but does not remount the tab:
+  // follow the address whenever either of the two parameters changes (typing in the boxes does not touch the address).
+  const urlSupplier = params.get("supplier") ?? "";
+  const urlNumber = params.get("number") ?? "";
+  useEffect(() => {
+    setSupplier(urlSupplier);
+    setNumber(urlNumber);
+    setOffset(0);
+  }, [urlSupplier, urlNumber]);
   const [atRisk, setAtRisk] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const active = CHIPS[chip] ?? CHIPS[0]!;
