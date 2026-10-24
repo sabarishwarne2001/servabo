@@ -1,5 +1,43 @@
 # Hardening campaign — STATE
 
+## Current phase — Project TRINETRA (2026-10-24)
+
+Branch `hardening/trinetra`, based on `main` at
+`bf8f57f691aec7122d9ebaf4a4e13ae9d22ae19c`. Main has not been changed.
+
+The owner requested the complete TRINETRA implementation from the uploaded
+`SERVABO_TRINETRA_CODEX_MASTER_PROMPT.md`, with the supplied image as design
+direction and existing Servabo services reused. Work resumed after the owner's
+usage limit reset.
+
+- [x] Located the connected repository and read current project rules/state.
+- [x] Created the feature branch.
+- [x] Audited existing Helm, TruthMesh, GST, matching, collaboration, billing,
+  sample, frontend, website and test integration points. Results:
+  [TRINETRA audit](../trinetra/AUDIT.md).
+- [ ] Read the full uploaded specification and reconcile its requirements with
+  the audit.
+- [ ] Implement backend, frontend, migrations, workers, entitlements, sample
+  data, website and documentation.
+- [ ] Execute security, integration, financial correctness and UI validation.
+- [ ] Deliver the final reviewable pull request.
+
+**Current blocker:** the attached cloud execution environment reports
+`pending`/`offline`; commands fail with "No usable execution environment is
+available" and the attachment downloader requires a ready workspace. The
+environment wait has not completed. The owner has been asked to restart or
+reconnect it. GitHub connector access works, so this audit and checkpoint are
+saved on the feature branch.
+
+**Validation:** no TRINETRA tests, builds or migration checks have run.
+No implementation or validation success is claimed. No implementation PR has
+been opened.
+
+**Resume here:** obtain a usable workspace, download the original specification,
+clone/check out this existing feature branch, and continue with the first
+unticked item. Do not restart the completed audit or modify main.
+
+
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
 _Last updated: 2026-10-23 (plan change: Final session 2A, the upgrade, comes before 2B, the live session)_
