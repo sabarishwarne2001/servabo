@@ -1,41 +1,41 @@
 # Hardening campaign — STATE
 
-## Current phase — Project TRINETRA (2026-10-24)
+## Current phase — Project TRINETRA (2026-10-25)
 
 Branch `hardening/trinetra`, based on `main` at
-`bf8f57f691aec7122d9ebaf4a4e13ae9d22ae19c`. Main has not been changed.
+`bf8f57f691aec7122d9ebaf4a4e13ae9d22ae19c`. Main is unchanged.
+The original 22,988-byte Markdown specification has now been read completely.
+The execution workspace runs commands, reads the attachment, installs dependencies,
+and runs PostgreSQL/Redis/MinIO. The earlier environment blocker is resolved.
 
-The owner requested the complete TRINETRA implementation from the uploaded
-`SERVABO_TRINETRA_CODEX_MASTER_PROMPT.md`, with the supplied image as design
-direction and existing Servabo services reused. Work resumed after the owner's
-usage limit reset.
+Implementation is **in progress**, not complete. Backend, migration, worker,
+additive entitlements, lifecycle integration, typed APIs, React cockpit and
+organization view, evidence forms/exports and Astro product page are implemented.
+Canonical documents, Helm bank permissions, the transactional outbox and platform
+job infrastructure are reused. Main is unchanged; no PR or deployment yet.
 
-- [x] Located the connected repository and read current project rules/state.
-- [x] Created the feature branch.
-- [x] Audited existing Helm, TruthMesh, GST, matching, collaboration, billing,
-  sample, frontend, website and test integration points. Results:
-  [TRINETRA audit](../trinetra/AUDIT.md).
-- [ ] Read the full uploaded specification and reconcile its requirements with
-  the audit.
-- [ ] Implement backend, frontend, migrations, workers, entitlements, sample
-  data, website and documentation.
-- [ ] Execute security, integration, financial correctness and UI validation.
-- [ ] Deliver the final reviewable pull request.
+Latest validation: 62 focused backend tests passed, one new webhook test exposed
+missing database vocabulary constraints; after fixing them, the webhook and
+populated downgrade/upgrade tests both passed. A full backend run is in progress
+(`.dev/trinetra-backend-full.log`, completion `.exit`, JUnit `.xml`). Prior full runs
+were interrupted and are not passes. Frontend: 291 unit tests, build, lint, self-check
+and 12 contract checks passed (some before the latest formatting). Website HTML
+checks found missing column scopes, now corrected and awaiting rerun. Earlier
+production-CSP browser sample matrix: 6 tests passed; live workflows remain to run.
 
-**Current blocker:** the attached cloud execution environment reports
-`pending`/`offline`; commands fail with "No usable execution environment is
-available" and the attachment downloader requires a ready workspace. The
-environment wait has not completed. The owner has been asked to restart or
-reconnect it. GitHub connector access works, so this audit and checkpoint are
-saved on the feature branch.
+Official ITD/CBDT pages are now reachable (HTTP 200 on 25 October) and were read:
+commencement, TDS transition FAQs and annual-statement download instructions.
+The former network blocker is resolved. The pages do not verify exported file
+layouts; authorized samples, adviser sign-off and an authorized pilot remain open.
+Official-format parsers, TCS and external inquiry sending remain disabled;
+`TRINETRA_LIVE_ENABLED=false` remains the default. GitHub API requests still fail
+with a managed-network Forbidden response; git remote access works.
 
-**Validation:** no TRINETRA tests, builds or migration checks have run.
-No implementation or validation success is claimed. No implementation PR has
-been opened.
-
-**Resume here:** obtain a usable workspace, download the original specification,
-clone/check out this existing feature branch, and continue with the first
-unticked item. Do not restart the completed audit or modify main.
+**Resume:** preserve the same branch; inspect current logs/process ownership before
+starting another pytest (one process per test DB). Finish source/Helm projections,
+live browser workflow, broader regression and website checks; update docs and
+commit coherent milestones. Prepare a final reviewable PR with precise remaining
+gates. Do not treat the audit or these intermediate checks as full implementation.
 
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._

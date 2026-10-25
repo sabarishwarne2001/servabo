@@ -14,7 +14,7 @@ in the containers unless you add it to the service's `environment:` in `docker-c
 is not read by any code, is missing from this page, or is one production cannot run without and
 is missing from `.env.production.template` (or does not stop the app from starting when unset).
 
-319 settings. Columns: name, type, default, where it appears (`example` =
+320 settings. Columns: name, type, default, where it appears (`example` =
 `.env.example`, `production` = `.env.production.template`, `guard` = checked by the production
 guard), and the comment written above it in the code.
 
@@ -65,7 +65,8 @@ guard), and the comment written above it in the code.
 | `EMBEDDING_MODEL_NAME` | `str` | `'all-MiniLM-L6-v2'` | example |  |
 | `EMBEDDING_BATCH_SIZE` | `int` | `32` | example |  |
 | `OCR_LANGUAGE` | `str` | `'en'` | example |  |
-| `ML_STUBS` | `bool` | `False` | example | TEST STUBS, not models: hashed bag-of-words embeddings and labelled placeholder OCR text (app/services/ml_stubs.py). For environments that cannot download the PaddleOCR / SentenceTransformers weights. Refused when ENVIR… |
+| `TRINETRA_LIVE_ENABLED` | `bool` | `False` | example, production | TEST STUBS, not models: hashed bag-of-words embeddings and labelled placeholder OCR text (app/services/ml_stubs.py). For environments that cannot download the PaddleOCR / SentenceTransformers weights. Refused when ENVIR… |
+| `ML_STUBS` | `bool` | `False` | example |  |
 | `PLATFORM_SMTP_HOST` | `str` | `''` | example, production, guard |  |
 | `PLATFORM_SMTP_PORT` | `int` | `587` | example, production |  |
 | `PLATFORM_SMTP_USERNAME` | `str` | `''` | example, production |  |
