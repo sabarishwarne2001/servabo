@@ -1,0 +1,28 @@
+---
+import Base from "../layouts/Base.astro";
+import SectionHead from "../components/SectionHead.astro";
+import Shot from "../components/Shot.astro";
+import { APP } from "../config/site";
+import { PLANS, dollars } from "../lib/pricing";
+const stages = ["Invoice", "Bank receipt", "Deductor evidence", "Uploaded statement", "Reviewed resolution"];
+---
+<Base title="TRINETRA — Credit assurance" description="Trace withheld tax from invoice to uploaded statement. Explore Servabo's synthetic TDS evidence assurance preview." path="/trinetra">
+  <section class="page py-20">
+    <p class="eyebrow">TRINETRA · Synthetic preview</p>
+    <h1 class="h1 mt-5 max-w-4xl">Trace withheld tax from invoice to government statement.</h1>
+    <p class="lede mt-6 max-w-3xl">A customer says tax was deducted. Your records and the uploaded statement tell different stories. Bring the evidence together, review the difference and record what resolves it.</p>
+    <div class="mt-8 flex flex-wrap gap-4"><a class="btn-primary" href={APP.register}>Explore Servabo</a><a class="btn-secondary" href="/pricing">Compare plans</a></div>
+    <p class="mt-5 max-w-3xl text-sm">Live TRINETRA is not enabled at launch. Official statement formats, tax-year handling and the authorized pilot must pass source and tax-adviser review first. The preview uses clearly labelled synthetic data.</p>
+  </section>
+  <section class="page py-12"><Shot name="trinetra" eager alt="TRINETRA in Servabo's existing shell: synthetic expected withholding, uploaded postings, possible gap, evidence stages and a selected case. No real tax or customer data." /><p class="mt-3 text-sm text-muted-foreground">Actual application screenshot with synthetic arithmetic examples. Live processing remains disabled pending release validation.</p></section>
+  <section class="page py-12" aria-labelledby="trinetra-evidence">
+    <SectionHead id="trinetra-evidence" title="Five sources. One reviewable explanation." lede="Expected deduction, bank cash, deductor assertions and statement postings remain separate facts." />
+    <ol class="mt-8 grid gap-4 md:grid-cols-5">{stages.map((stage,i) => <li class="sheet-fold p-5"><span class="eyebrow">{i+1}</span><h3 class="mt-3 font-semibold">{stage}</h3></li>)}</ol>
+    <div class="mt-8 grid gap-6 md:grid-cols-3"><article class="sheet-fold p-6"><h3 class="h3">Investigate the gap</h3><p class="mt-3">A missing posting is an evidence question. It does not establish evasion, eligibility or a guaranteed recoverable amount.</p></article><article class="sheet-fold p-6"><h3 class="h3">Keep the review history</h3><p class="mt-3">Compare later snapshots without rewriting earlier decisions. Ambiguous allocations wait for a person.</p></article><article class="sheet-fold p-6"><h3 class="h3">Use the records you have</h3><p class="mt-3">Servabo's documents and Helm bank evidence remain their canonical records. TRINETRA does not move money or change payment history.</p></article></div>
+  </section>
+  <section class="page py-12" aria-labelledby="trinetra-plans">
+    <SectionHead id="trinetra-plans" title="Additive capability. Existing plan prices." lede="Every plan can explore synthetic examples. Live processing remains release gated, including on paid plans." />
+    <div class="mt-8 overflow-x-auto"><table class="w-full text-left"><caption class="sr-only">TRINETRA plan availability</caption><thead><tr><th class="p-3" scope="col">Plan</th><th class="p-3" scope="col">Monthly price</th><th class="p-3" scope="col">TRINETRA</th></tr></thead><tbody>{PLANS.map((plan) => <tr class="border-t" ><th class="p-3" scope="row">{plan.name}</th><td class="p-3">{dollars(plan.monthly)}{plan.perSeat ? " / seat" : ""}</td><td class="p-3">{plan.features.includes("capability.trinetra") ? "Synthetic preview; live capability subject to release gates" : "Read-only synthetic preview"}</td></tr>)}</tbody></table></div>
+  </section>
+  <section class="page py-12"><SectionHead title="Evidence assurance, with clear limits" lede="No tax portal credentials, automated portal access, return filing, tax advice, refund promises or autonomous inquiry sending. TCS and unverified statement formats are unsupported. A chartered accountant decides what a business may claim." /><a class="btn-secondary mt-6" href="/security">How Servabo protects your records</a></section>
+</Base>

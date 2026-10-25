@@ -57,6 +57,7 @@ export const FOOTER = {
   product: [
     { href: "/helm", label: "Helm" },
     { href: "/gst-credit", label: "GST credit" },
+    { href: "/trinetra", label: "TRINETRA preview" },
     { href: "/product", label: "Product tour" },
     { href: "/pricing", label: "Pricing" },
     { href: "/security", label: "Security" },
@@ -84,6 +85,7 @@ export const FOOTER = {
 export const NAV = [
   { href: "/helm", label: "Helm" },
   { href: "/gst-credit", label: "GST credit" },
+    { href: "/trinetra", label: "TRINETRA preview" },
   { href: "/product", label: "Product" },
   { href: "/solutions/accounts-payable", label: "Solutions", match: "/solutions" },
   { href: "/pricing", label: "Pricing" },

@@ -8,9 +8,9 @@ import { chromium } from "@playwright/test";
 import { serve } from "./serve-dist.mjs";
 
 const MIN = Number(process.env.LIGHTHOUSE_MIN ?? 95);
-const PAGES = ["/", "/pricing", "/helm", "/gst-credit"];
+const PAGES = ["/", "/pricing", "/helm", "/gst-credit", "/trinetra"];
 const server = await serve(Number(process.env.PORT ?? 4324));
-const chrome = await launch({ chromePath: chromium.executablePath(), chromeFlags: ["--headless=new", "--no-sandbox"] });
+const chrome = await launch({ chromePath: process.env.E2E_CHROMIUM_PATH || chromium.executablePath(), chromeFlags: ["--headless=new", "--no-sandbox"] });
 const failures = [];
 /** One Lighthouse run. A category without a score means the measurement itself failed (a cold
  *  first load can time out); that is retried, never counted as a low score or as a pass. */
