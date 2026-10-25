@@ -332,6 +332,8 @@ HELM_API_CAPABILITY: str = "capability.helm_api"
 #: Session F. GST Credit: the supplier list, the invoice list with IMS recommendations, decisions, the export
 #: and supplier reminders (Business, Enterprise). Importing a GSTR-2B and seeing the headline figures, and the
 #: whole reconciliation of the sample company, need no capability (the GST Credit preview, N-135).
+TRINETRA_CAPABILITY: str = "capability.trinetra"
+TRINETRA_ALL_WORKSPACES_CAPABILITY: str = "capability.trinetra_all_workspaces"
 GST_CREDIT_CAPABILITY: str = "capability.gst_credit"
 #: Session F. Enterprise: one reconciliation per GSTIN across every workspace, and `gst:read` API keys.
 GST_CREDIT_ALL_WORKSPACES_CAPABILITY: str = "capability.gst_credit_all_workspaces"
@@ -431,6 +433,8 @@ CAPABILITY_KEYS: tuple[str, ...] = (
     HELM_APPROVAL_CHAINS_CAPABILITY,
     HELM_ALL_WORKSPACES_CAPABILITY,
     HELM_API_CAPABILITY,
+    TRINETRA_CAPABILITY,
+    TRINETRA_ALL_WORKSPACES_CAPABILITY,
     GST_CREDIT_CAPABILITY,  # Session F
     GST_CREDIT_ALL_WORKSPACES_CAPABILITY,
 )
@@ -440,6 +444,8 @@ CAPABILITY_KEYS: tuple[str, ...] = (
 ADDON_KEYS: tuple[str, ...] = (CUSTOM_DOMAIN_ADDON, WAREHOUSE_SYNC_ADDON, GST_CREDIT_ADDON)
 
 _ENTITLEMENTS: tuple[Entitlement, ...] = (
+    Entitlement(name=TRINETRA_ALL_WORKSPACES_CAPABILITY, description="TRINETRA reports across authorized workspaces; release gated."),
+    Entitlement(name=TRINETRA_CAPABILITY, description="TRINETRA: reviewed TDS credit evidence assurance; subject to source-validation launch gate."),
     Entitlement(
         name=PLATFORM_KEY,
         description=(

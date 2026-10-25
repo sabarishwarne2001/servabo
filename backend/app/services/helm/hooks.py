@@ -24,8 +24,10 @@ def document_changed(db: Any, *, workspace_id: Optional[uuid.UUID], organization
     if workspace_id is None:
         return
     from app.services.gst import hooks as gst_hooks
+    from app.services.trinetra import hooks as trinetra_hooks
 
     gst_hooks.document_changed(db, workspace_id=workspace_id, organization_id=organization_id, reason=reason)
+    trinetra_hooks.document_changed(db, workspace_id=workspace_id, organization_id=organization_id, reason=reason)
     try:
         if organization_id is None:
             from app.models.workspace import Workspace

@@ -26,6 +26,7 @@ class ApiKeyScope(str, Enum):
     HELM_WRITE = "helm:write"
     # --- GST Credit across every workspace (Enterprise: capability.gst_credit_all_workspaces) ---
     GST_READ = "gst:read"
+    TRINETRA_READ = "trinetra:read"
     # --- ARCH-21 Public Gateway Scopes ---
     PUBLIC_DOCUMENTS_READ = "public_documents:read"
     PUBLIC_QUERY_WRITE = "public_query:write"
@@ -62,6 +63,7 @@ SCOPES_BY_ROLE: dict[OrganizationRole, frozenset[ApiKeyScope]] = {
         ApiKeyScope.HELM_READ,
         # ... and the organization's GST credit figures (the page's own roles: owners, admins and billing).
         ApiKeyScope.GST_READ,
+        ApiKeyScope.TRINETRA_READ,
     }),
 }
 
@@ -139,6 +141,7 @@ _GST_ORG = "/organizations/{organization_id}/gst"
 _GST_KEY_ROUTES: tuple[str, ...] = ("/summary", "/suppliers", "/records")
 
 ROUTE_SCOPE_MAP: dict[tuple[str, str], ApiKeyScope] = {
+    ("GET", "/organizations/{organization_id}/trinetra/summary"): ApiKeyScope.TRINETRA_READ,
     ("GET", "/organizations/{organization_id}"): ApiKeyScope.ORGANIZATIONS_READ,
     ("GET", "/organizations/{organization_id}/workspaces"): ApiKeyScope.WORKSPACES_READ,
     ("POST", "/organizations/{organization_id}/workspaces"): ApiKeyScope.WORKSPACES_WRITE,

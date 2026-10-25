@@ -58,7 +58,7 @@ class ApiKey(Base, UUIDMixin, TimestampMixin):
             "'members:read','work_items:read','work_items:write',"
             "'audit_logs:read','files:read','files:write',"
             "'webhooks:read','webhooks:write','webhooks:admin',"
-            "'billing:read','helm:read','helm:write','gst:read',"
+            "'billing:read','helm:read','helm:write','gst:read','trinetra:read',"
             "'public_documents:read','public_query:write',"
             "'public_workflows:read','public_workflows:write']::text[]",
             name="ck_api_keys_scopes_allowed",

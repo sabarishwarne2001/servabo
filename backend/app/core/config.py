@@ -190,6 +190,7 @@ class Settings(BaseSettings):
     # placeholder OCR text (app/services/ml_stubs.py). For environments that
     # cannot download the PaddleOCR / SentenceTransformers weights. Refused
     # when ENVIRONMENT=production.
+    TRINETRA_LIVE_ENABLED: bool = False  # Requires official-source and adviser launch sign-off.
     ML_STUBS: bool = False
 
     PLATFORM_SMTP_HOST: str = ""
