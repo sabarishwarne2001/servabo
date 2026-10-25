@@ -8536,6 +8536,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/work-items/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Document Counts
+         * @description Workspace-wide counts, independent of list filters and pagination.
+         */
+        get: operations["document_counts_api_v1_workspaces__workspace_id__work_items_counts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/work-items/{work_item_id}": {
         parameters: {
             query?: never;
@@ -10484,6 +10504,314 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/trinetra/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Access */
+        get: operations["access_api_v1_workspaces__workspace_id__trinetra_access_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/sample": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sample */
+        get: operations["sample_api_v1_workspaces__workspace_id__trinetra_sample_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Profiles */
+        get: operations["profiles_api_v1_workspaces__workspace_id__trinetra_profiles_get"];
+        put?: never;
+        /** Create Profile */
+        post: operations["create_profile_api_v1_workspaces__workspace_id__trinetra_profiles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/reviewed-statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Statement */
+        post: operations["import_statement_api_v1_workspaces__workspace_id__trinetra_reviewed_statements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/reviewed-statements/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Statement */
+        post: operations["preview_statement_api_v1_workspaces__workspace_id__trinetra_reviewed_statements_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/official-statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unsupported Statement */
+        post: operations["unsupported_statement_api_v1_workspaces__workspace_id__trinetra_official_statements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/credits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Credits */
+        get: operations["credits_api_v1_workspaces__workspace_id__trinetra_credits_get"];
+        put?: never;
+        /** Create Credit */
+        post: operations["create_credit_api_v1_workspaces__workspace_id__trinetra_credits_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/credits/{credit_id}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decision */
+        post: operations["decision_api_v1_workspaces__workspace_id__trinetra_credits__credit_id__decisions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/credits/{credit_id}/reconfirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reconfirm */
+        post: operations["reconfirm_api_v1_workspaces__workspace_id__trinetra_credits__credit_id__reconfirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/credits/{credit_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Update Review */
+        post: operations["update_review_api_v1_workspaces__workspace_id__trinetra_credits__credit_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Summary */
+        get: operations["summary_api_v1_workspaces__workspace_id__trinetra_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/credits/{credit_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Detail */
+        get: operations["detail_api_v1_workspaces__workspace_id__trinetra_credits__credit_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/credits/{credit_id}/inquiry-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Draft */
+        get: operations["draft_api_v1_workspaces__workspace_id__trinetra_credits__credit_id__inquiry_draft_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/export.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Evidence */
+        get: operations["export_evidence_api_v1_workspaces__workspace_id__trinetra_export__format__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recompute */
+        post: operations["recompute_api_v1_workspaces__workspace_id__trinetra_reconciliation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/reconciliation/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run Status */
+        get: operations["run_status_api_v1_workspaces__workspace_id__trinetra_reconciliation__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organization_id}/trinetra/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Organization Access */
+        get: operations["organization_access_api_v1_organizations__organization_id__trinetra_access_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organization_id}/trinetra/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Organization Summary */
+        get: operations["organization_summary_api_v1_organizations__organization_id__trinetra_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organizations/{organization_id}/webhooks/endpoints": {
         parameters: {
             query?: never;
@@ -11189,6 +11517,19 @@ export interface components {
             /** Role */
             role: string;
         };
+        /** AccessOut */
+        AccessOut: {
+            /** Live Enabled */
+            live_enabled: boolean;
+            /** Entitled */
+            entitled: boolean;
+            /** Official Formats */
+            official_formats: string[];
+            /** Transcription Format */
+            transcription_format: string;
+            /** Tcs Supported */
+            tcs_supported: boolean;
+        };
         /** AcknowledgeRequest */
         AcknowledgeRequest: {
             /** Accepted */
@@ -11286,6 +11627,18 @@ export interface components {
             is_default: boolean;
             /** Auto Capable Kinds */
             auto_capable_kinds: string[];
+        };
+        /** AllocationIn */
+        AllocationIn: {
+            /**
+             * Snapshot Id
+             * Format: uuid
+             */
+            snapshot_id: string;
+            /** Line Id */
+            line_id: string;
+            /** Amount */
+            amount: string;
         };
         /**
          * AllowanceMeterResponse
@@ -11675,7 +12028,7 @@ export interface components {
          * ApiKeyScope
          * @enum {string}
          */
-        ApiKeyScope: "organizations:read" | "workspaces:read" | "workspaces:write" | "members:read" | "work_items:read" | "work_items:write" | "audit_logs:read" | "files:read" | "files:write" | "webhooks:read" | "webhooks:write" | "webhooks:admin" | "billing:read" | "helm:read" | "helm:write" | "gst:read" | "public_documents:read" | "public_query:write" | "public_workflows:read" | "public_workflows:write";
+        ApiKeyScope: "organizations:read" | "workspaces:read" | "workspaces:write" | "members:read" | "work_items:read" | "work_items:write" | "audit_logs:read" | "files:read" | "files:write" | "webhooks:read" | "webhooks:write" | "webhooks:admin" | "billing:read" | "helm:read" | "helm:write" | "gst:read" | "trinetra:read" | "public_documents:read" | "public_query:write" | "public_workflows:read" | "public_workflows:write";
         /**
          * ApiRateTier
          * @enum {string}
@@ -12851,6 +13204,15 @@ export interface components {
              */
             work_item_id: string;
         };
+        /** BankOut */
+        BankOut: {
+            /** Id */
+            id: string;
+            /** Amount Micros */
+            amount_micros: string;
+            /** On */
+            on: string;
+        };
         /**
          * BatchAnalytics
          * @description Confidence, schema health, lanes and throughput of one batch (see services/batches/service.py).
@@ -13814,6 +14176,71 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /** CaseOut */
+        CaseOut: {
+            /** Id */
+            id: string;
+            /** Profile Id */
+            profile_id?: string | null;
+            /** Counterparty */
+            counterparty: string;
+            /** Reference */
+            reference: string;
+            /** Year */
+            year: number;
+            /** Period */
+            period: string;
+            /** Revision */
+            revision: number;
+            /** Review State */
+            review_state: string;
+            /** Review */
+            review?: {
+                [key: string]: unknown;
+            };
+            /** Status */
+            status: string;
+            /** Expected Micros */
+            expected_micros: string | null;
+            /** Posted Micros */
+            posted_micros: string;
+            /** Gap Micros */
+            gap_micros: string | null;
+            /** Gross Micros */
+            gross_micros: string | null;
+            /** Bank Micros */
+            bank_micros: string | null;
+            /** Booked Micros */
+            booked_micros: string | null;
+            /** Advice Micros */
+            advice_micros: string | null;
+            /** Candidate Ids */
+            candidate_ids: string[];
+            /** Rule Version */
+            rule_version: string;
+            /** Note */
+            note: string;
+            /** Work Item Id */
+            work_item_id?: string | null;
+            /** Statement Work Item Id */
+            statement_work_item_id?: string | null;
+            /** Snapshot Id */
+            snapshot_id?: string | null;
+            /**
+             * Source Current
+             * @default true
+             */
+            source_current: boolean;
+            /** Created At */
+            created_at: string;
+            /**
+             * Age Days
+             * @default 0
+             */
+            age_days: number;
+            /** As Of */
+            as_of: string | null;
+        };
         /**
          * CaseRematchRequest
          * @description Force specific counterparts. Both optional: naming only the PO is a
@@ -13930,6 +14357,13 @@ export interface components {
              * @default 0
              */
             duplicate_count: number;
+        };
+        /** CasesOut */
+        CasesOut: {
+            /** Items */
+            items: components["schemas"]["CaseOut"][];
+            /** Total */
+            total: number;
         };
         /** CashIn */
         CashIn: {
@@ -14755,6 +15189,8 @@ export interface components {
             created_at: string;
             /** Last Message At */
             last_message_at?: string | null;
+            /** Last Message Preview */
+            last_message_preview?: string | null;
         };
         /**
          * ConversationSessionUpdate
@@ -14886,6 +15322,31 @@ export interface components {
              */
             checked_at: string;
             credential: components["schemas"]["ProviderCredentialResponse"];
+        };
+        /** CreditIn */
+        CreditIn: {
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /**
+             * Work Item Id
+             * Format: uuid
+             */
+            work_item_id: string;
+            /** Year */
+            year: number;
+            /** Counterparty */
+            counterparty: string;
+            /** Reference */
+            reference: string;
+            /** Tan */
+            tan: string;
+            /** Amount */
+            amount: string;
+            /** Source Confirmation */
+            source_confirmation: string;
         };
         /**
          * CustomDomainCreate
@@ -15179,15 +15640,6 @@ export interface components {
             /** Total */
             total: number;
         };
-        /** DecisionIn */
-        DecisionIn: {
-            /** Decision */
-            decision: string;
-            /** Work Item Id */
-            work_item_id?: string | null;
-            /** Note */
-            note?: string | null;
-        };
         /** DecisionRequest */
         DecisionRequest: {
             /** Status */
@@ -15229,6 +15681,80 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** DetailOut */
+        DetailOut: {
+            /** Id */
+            id: string;
+            /** Profile Id */
+            profile_id?: string | null;
+            /** Counterparty */
+            counterparty: string;
+            /** Reference */
+            reference: string;
+            /** Year */
+            year: number;
+            /** Period */
+            period: string;
+            /** Revision */
+            revision: number;
+            /** Review State */
+            review_state: string;
+            /** Review */
+            review?: {
+                [key: string]: unknown;
+            };
+            /** Status */
+            status: string;
+            /** Expected Micros */
+            expected_micros: string | null;
+            /** Posted Micros */
+            posted_micros: string;
+            /** Gap Micros */
+            gap_micros: string | null;
+            /** Gross Micros */
+            gross_micros: string | null;
+            /** Bank Micros */
+            bank_micros: string | null;
+            /** Booked Micros */
+            booked_micros: string | null;
+            /** Advice Micros */
+            advice_micros: string | null;
+            /** Candidate Ids */
+            candidate_ids: string[];
+            /** Rule Version */
+            rule_version: string;
+            /** Note */
+            note: string;
+            /** Work Item Id */
+            work_item_id?: string | null;
+            /** Statement Work Item Id */
+            statement_work_item_id?: string | null;
+            /** Snapshot Id */
+            snapshot_id?: string | null;
+            /**
+             * Source Current
+             * @default true
+             */
+            source_current: boolean;
+            /** Created At */
+            created_at: string;
+            /**
+             * Age Days
+             * @default 0
+             */
+            age_days: number;
+            /** As Of */
+            as_of: string | null;
+            /** Statement Lines */
+            statement_lines: components["schemas"]["PostingOut"][];
+            /** Bank Evidence */
+            bank_evidence: components["schemas"]["BankOut"][];
+            /** Events */
+            events: components["schemas"]["EventOut"][];
+            /** Events Total */
+            events_total: number;
+            cash_projection: components["schemas"]["ProjectionOut"];
         };
         /**
          * DetectedTimezoneRequest
@@ -15662,6 +16188,19 @@ export interface components {
             /** Fields */
             fields?: components["schemas"]["FieldConfidenceOut"][];
         };
+        /** DocumentCounts */
+        DocumentCounts: {
+            /** Total */
+            total: number;
+            /** Queued */
+            queued: number;
+            /** Processing */
+            processing: number;
+            /** Completed */
+            completed: number;
+            /** Failed */
+            failed: number;
+        };
         /** DocumentObligations */
         DocumentObligations: {
             /**
@@ -16007,6 +16546,19 @@ export interface components {
         DraftIn: {
             /** Sentence */
             sentence: string;
+        };
+        /** DraftOut */
+        DraftOut: {
+            /** Subject */
+            subject: string;
+            /** Body */
+            body: string;
+            /** Sent */
+            sent: boolean;
+            /** Requires Human Approval */
+            requires_human_approval: boolean;
+            /** External Sending Enabled */
+            external_sending_enabled: boolean;
         };
         /**
          * DraftTestRequest
@@ -16645,6 +17197,34 @@ export interface components {
             };
             /** Language */
             language: string;
+        };
+        /** EventOut */
+        EventOut: {
+            /** Revision */
+            revision: number;
+            /** Action */
+            action: string;
+            /** Reason */
+            reason: string;
+            /** At */
+            at: string;
+            /** Actor Id */
+            actor_id: string | null;
+        };
+        /** EvidenceIn */
+        EvidenceIn: {
+            /**
+             * Work Item Id
+             * Format: uuid
+             */
+            work_item_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "DEDUCTOR_ADVICE" | "ACCOUNTING_RECORD" | "CERTIFICATE" | "CORRECTION_RESPONSE";
+            /** Amount */
+            amount?: string | null;
         };
         /** EvidenceOut */
         EvidenceOut: {
@@ -17384,6 +17964,29 @@ export interface components {
             /** Caveat */
             caveat: string;
         };
+        /** ImportIn */
+        ImportIn: {
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /**
+             * Source Work Item Id
+             * Format: uuid
+             */
+            source_work_item_id: string;
+            /** Source Version */
+            source_version?: string | null;
+            /** Year */
+            year: number;
+            /** Pan */
+            pan: string;
+            /** Confirmed */
+            confirmed: boolean;
+            /** Rows */
+            rows: components["schemas"]["LineIn"][];
+        };
         /** InstallationCreate */
         InstallationCreate: {
             /**
@@ -17819,6 +18422,15 @@ export interface components {
             features: string[];
             /** Source */
             source?: string | null;
+        };
+        /** LineIn */
+        LineIn: {
+            /** Tan */
+            tan: string;
+            /** Amount */
+            amount: string;
+            /** Reference */
+            reference: string;
         };
         /** LineageChild */
         LineageChild: {
@@ -19535,6 +20147,13 @@ export interface components {
             /** Organization Id */
             organization_id?: string | null;
         };
+        /** OrganizationAccessOut */
+        OrganizationAccessOut: {
+            /** Live Enabled */
+            live_enabled: boolean;
+            /** Entitled */
+            entitled: boolean;
+        };
         /**
          * OrganizationArchiveRequest
          * @description HARDENING-T2: the typed confirmation the console already asks for.
@@ -20038,6 +20657,15 @@ export interface components {
          * @enum {string}
          */
         OrganizationStatus: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+        /** OrganizationSummaryOut */
+        OrganizationSummaryOut: {
+            /** Workspaces */
+            workspaces: components["schemas"]["WorkspaceSummaryOut"][];
+            /** Scope */
+            scope: string;
+            /** Is Sample */
+            is_sample: boolean;
+        };
         /**
          * OrganizationUpdate
          * @description Partial update. None means "leave unchanged", not "set to null".
@@ -21171,6 +21799,17 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /** PostingOut */
+        PostingOut: {
+            /** Id */
+            id: string;
+            /** Snapshot Id */
+            snapshot_id: string;
+            /** Amount Micros */
+            amount_micros: string;
+            /** Available Micros */
+            available_micros: string;
+        };
         /** PostingRow */
         PostingRow: {
             /**
@@ -21382,6 +22021,27 @@ export interface components {
             activate: boolean;
             /** Mandate Id */
             mandate_id?: string | null;
+        };
+        /** PreviewOut */
+        PreviewOut: {
+            /** Profile Id */
+            profile_id: string;
+            /** Pan Masked */
+            pan_masked: string;
+            /** Period */
+            period: string;
+            /** Source Work Item Id */
+            source_work_item_id: string;
+            /** Source Version */
+            source_version: string;
+            /** Rows */
+            rows: number;
+            /** Total Micros */
+            total_micros: string;
+            /** Parser Version */
+            parser_version: string;
+            /** Official Format Verified */
+            official_format_verified: boolean;
         };
         /** PreviewRequest */
         PreviewRequest: {
@@ -21611,6 +22271,44 @@ export interface components {
             processing: number;
             /** Total */
             total: number;
+        };
+        /** ProfileIn */
+        ProfileIn: {
+            /** Name */
+            name: string;
+            /** Pan */
+            pan: string;
+        };
+        /** ProfileOut */
+        ProfileOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Pan Masked */
+            pan_masked: string;
+        };
+        /** ProfilesOut */
+        ProfilesOut: {
+            /** Items */
+            items: components["schemas"]["ProfileOut"][];
+        };
+        /** ProjectionOut */
+        ProjectionOut: {
+            /** Gross Micros */
+            gross_micros: string | null;
+            /** Cash Received Micros */
+            cash_received_micros: string | null;
+            /** Reviewed Withholding Micros */
+            reviewed_withholding_micros: string | null;
+            /** Unexplained Micros */
+            unexplained_micros: string | null;
+            /** Overexplained Micros */
+            overexplained_micros: string | null;
+            /** Status */
+            status: string;
+            /** Note */
+            note: string;
         };
         /** PromoActiveIn */
         PromoActiveIn: {
@@ -22453,6 +23151,15 @@ export interface components {
              */
             force: boolean;
         };
+        /** ReconfirmIn */
+        ReconfirmIn: {
+            /** Revision */
+            revision: number;
+            /** Amount */
+            amount: string;
+            /** Reason */
+            reason: string;
+        };
         /** RedactionJobResponse */
         RedactionJobResponse: {
             /**
@@ -23257,6 +23964,33 @@ export interface components {
             /** Skipped */
             skipped: number;
         };
+        /** ReviewIn */
+        ReviewIn: {
+            /** Revision */
+            revision: number;
+            /**
+             * Assign To Me
+             * @default false
+             */
+            assign_to_me: boolean;
+            /**
+             * Priority
+             * @default NORMAL
+             * @enum {string}
+             */
+            priority: "NORMAL" | "HIGH" | "URGENT";
+            /** Due On */
+            due_on?: string | null;
+            /**
+             * Root Cause
+             * @default
+             */
+            root_cause: string;
+            /** Reason */
+            reason: string;
+            /** Evidence */
+            evidence?: components["schemas"]["EvidenceIn"][];
+        };
         /**
          * ReviewItemResponse
          * @description The stable projection. One shape for all three sources.
@@ -23546,6 +24280,22 @@ export interface components {
             counts_by_status: {
                 [key: string]: number;
             };
+        };
+        /** RunOut */
+        RunOut: {
+            /** Job Id */
+            job_id: string;
+        };
+        /** RunStatusOut */
+        RunStatusOut: {
+            /** Job Id */
+            job_id: string;
+            /** Status */
+            status: string;
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            } | null;
         };
         /** RunSummary */
         RunSummary: {
@@ -24439,6 +25189,19 @@ export interface components {
             /** Mention Ids */
             mention_ids: string[];
         };
+        /** StatementOut */
+        StatementOut: {
+            /** Id */
+            id: string;
+            /** Revision */
+            revision: number;
+            /** Fingerprint */
+            fingerprint: string;
+            /** Source Kind */
+            source_kind: string;
+            /** Active */
+            active: boolean;
+        };
         /** SubscriptionBrief */
         SubscriptionBrief: {
             /**
@@ -24547,6 +25310,27 @@ export interface components {
              * @default false
              */
             can_manage_seats: boolean;
+        };
+        /** SummaryOut */
+        SummaryOut: {
+            /** Items */
+            items: components["schemas"]["CaseOut"][];
+            /** Total */
+            total: number;
+            /** Is Sample */
+            is_sample: boolean;
+            /** As Of */
+            as_of: string | null;
+            /** Expected Micros */
+            expected_micros: string;
+            /** Posted Micros */
+            posted_micros: string;
+            /** Gap Micros */
+            gap_micros: string;
+            /** Unresolved */
+            unresolved: number;
+            /** Note */
+            note: string;
         };
         /** SupplierInvoiceCreate */
         SupplierInvoiceCreate: {
@@ -26837,6 +27621,25 @@ export interface components {
             /** Company Logo Url */
             readonly company_logo_url: string | null;
         };
+        /** WorkspaceSummaryOut */
+        WorkspaceSummaryOut: {
+            /** Workspace Id */
+            workspace_id: string;
+            /** Name */
+            name: string;
+            /** Total */
+            total: number;
+            /** Unresolved */
+            unresolved: number;
+            /** Expected Micros */
+            expected_micros: string;
+            /** Posted Micros */
+            posted_micros: string;
+            /** Gap Micros */
+            gap_micros: string;
+            /** As Of */
+            as_of: string | null;
+        };
         /** WorkspaceUpdate */
         WorkspaceUpdate: {
             /** Workspace Name */
@@ -26851,6 +27654,15 @@ export interface components {
             currency?: string | null;
             /** Date Format */
             date_format?: string | null;
+        };
+        /** DecisionIn */
+        app__api__v1__gst__DecisionIn: {
+            /** Decision */
+            decision: string;
+            /** Work Item Id */
+            work_item_id?: string | null;
+            /** Note */
+            note?: string | null;
         };
         /** SettingsIn */
         app__api__v1__gst__SettingsIn: {
@@ -26883,6 +27695,20 @@ export interface components {
             /** First Run Step */
             first_run_step?: number | null;
             approval_chain?: components["schemas"]["ApprovalChainIn"] | null;
+        };
+        /** DecisionIn */
+        app__api__v1__trinetra__DecisionIn: {
+            /** Revision */
+            revision: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "ALLOCATE" | "DISPUTED" | "EXPLAINED" | "WITHDRAWN" | "CA_REVIEWED" | "REOPEN";
+            /** Reason */
+            reason: string;
+            /** Allocations */
+            allocations?: components["schemas"]["AllocationIn"][];
         };
         /**
          * EmailEncryption
@@ -33895,7 +34721,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DecisionIn"];
+                "application/json": components["schemas"]["app__api__v1__gst__DecisionIn"];
             };
         };
         responses: {
@@ -45913,6 +46739,9 @@ export interface operations {
                 mine_only?: boolean;
                 sort_by?: string;
                 sort_order?: string;
+                file_format?: ("pdf" | "docx" | "xlsx" | "csv" | "image") | null;
+                uploaded_from?: string | null;
+                uploaded_to?: string | null;
             };
             header?: never;
             path: {
@@ -45966,6 +46795,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkItemResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    document_counts_api_v1_workspaces__workspace_id__work_items_counts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentCounts"];
                 };
             };
             /** @description Validation Error */
@@ -50562,6 +51423,688 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProposalRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    access_api_v1_workspaces__workspace_id__trinetra_access_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sample_api_v1_workspaces__workspace_id__trinetra_sample_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    profiles_api_v1_workspaces__workspace_id__trinetra_profiles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfilesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_profile_api_v1_workspaces__workspace_id__trinetra_profiles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_statement_api_v1_workspaces__workspace_id__trinetra_reviewed_statements_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_statement_api_v1_workspaces__workspace_id__trinetra_reviewed_statements_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unsupported_statement_api_v1_workspaces__workspace_id__trinetra_official_statements_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    credits_api_v1_workspaces__workspace_id__trinetra_credits_get: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+                year?: number | null;
+            };
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CasesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_credit_api_v1_workspaces__workspace_id__trinetra_credits_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreditIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decision_api_v1_workspaces__workspace_id__trinetra_credits__credit_id__decisions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                credit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__v1__trinetra__DecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reconfirm_api_v1_workspaces__workspace_id__trinetra_credits__credit_id__reconfirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                credit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_review_api_v1_workspaces__workspace_id__trinetra_credits__credit_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                credit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    summary_api_v1_workspaces__workspace_id__trinetra_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detail_api_v1_workspaces__workspace_id__trinetra_credits__credit_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                credit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draft_api_v1_workspaces__workspace_id__trinetra_credits__credit_id__inquiry_draft_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                credit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_evidence_api_v1_workspaces__workspace_id__trinetra_export__format__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                format: "csv" | "xlsx" | "html";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recompute_api_v1_workspaces__workspace_id__trinetra_reconciliation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_status_api_v1_workspaces__workspace_id__trinetra_reconciliation__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    organization_access_api_v1_organizations__organization_id__trinetra_access_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Organization identifier */
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationAccessOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    organization_summary_api_v1_organizations__organization_id__trinetra_summary_get: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Organization identifier */
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationSummaryOut"];
                 };
             };
             /** @description Validation Error */

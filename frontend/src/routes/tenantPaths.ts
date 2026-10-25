@@ -113,6 +113,7 @@ export const ROUTE_PATTERNS = {
   organizationEgress: "egress",
   // GST credit across every workspace (Enterprise). "organizations" is already reserved: no new reserved segment.
   organizationGst: "gst",
+  organizationTrinetra: "trinetra",
   organizationNewWorkspace: `/organizations/${P_ORG}/workspaces/new`,
 
   // ARCH-18 platform administration. No tenant parameter, by design: these
@@ -165,6 +166,7 @@ export const ROUTE_PATTERNS = {
   workspaceProcurementPolicies: "procurement/policies",
   // Session F: GST Credit. A child of the workspace shell like procurement, so no reserved segment is needed.
   workspaceGst: "gst",
+  workspaceTrinetra: "trinetra",
   workspaceRedaction: "redactions/:jobId",
   // ARCH34-S3:radar-path. The audit radar is workspace-scoped because a
   // finding names two work items and work items are workspace-scoped; an
@@ -306,6 +308,7 @@ export const platformRevopsPath = (): string => "/admin/revops";
 export const platformJobsPath = (): string => "/admin/jobs";
 export const organizationEgressPath = (orgSlug: string): string => `${organizationPath(orgSlug)}/egress`;
 export const organizationGstPath = (orgSlug: string): string => `${organizationPath(orgSlug)}/gst`;
+export const organizationTrinetraPath = (orgSlug: string): string => `${organizationPath(orgSlug)}/trinetra`;
 
 export const createWorkspacePath = (orgSlug: string): string =>
   `${organizationPath(orgSlug)}/workspaces/new`;
@@ -772,3 +775,5 @@ export const assertTenantPathIntegrity = (): void => {
       failures.join("\n  - "),
   );
 };
+
+export const trinetraPath = (orgSlug: string, workspaceSlug: string): string => `${workspacePath(orgSlug, workspaceSlug)}/trinetra`;

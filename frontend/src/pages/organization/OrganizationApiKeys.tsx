@@ -49,6 +49,7 @@ const SCOPE_BLURB: Readonly<Record<string, string>> = {
   "helm:write":
     "Feed Helm: re-plan, add cash positions, mark invoices paid, import bank statements. " +
     "Approving actions and changing mandates stay with people. Enterprise.",
+  "trinetra:read": "Read TRINETRA summaries across authorized workspaces. Enterprise; live access requires release validation.",
   "gst:read":
     "Read the organization's GST credit across every workspace: figures, suppliers and invoices. Read-only. Enterprise.",
 };
@@ -68,6 +69,7 @@ export const OrganizationApiKeys: React.FC = () => {
   // A key reaches Helm only on the Enterprise plan (capability.helm_api); elsewhere it is refused.
   const helmApi = useCapabilityAccess(organizationId, CAPABILITY.helmApi);
   // The same for GST credit across every workspace (gst:read).
+  const trinetraApi = useCapabilityAccess(organizationId, CAPABILITY.trinetraAllWorkspaces);
   const gstApi = useCapabilityAccess(organizationId, CAPABILITY.gstCreditAllWorkspaces);
   const [expiresAt, setExpiresAt] = useState("");
   // A key that has already expired never works, so the earliest expiry offered is tomorrow.
@@ -474,7 +476,7 @@ export const OrganizationApiKeys: React.FC = () => {
                 {API_KEY_SCOPES.map((scope) => {
                   const helm = HELM_API_KEY_SCOPES.has(scope);
                   const gst = GST_API_KEY_SCOPES.has(scope);
-                  const locked = (helm && !helmApi.granted) || (gst && !gstApi.granted);
+                  const locked = (helm && !helmApi.granted) || (gst && !gstApi.granted) || (scope === "trinetra:read" && !trinetraApi.granted);
                   return (
                     <label
                       key={scope}

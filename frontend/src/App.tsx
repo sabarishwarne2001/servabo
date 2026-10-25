@@ -92,6 +92,7 @@ const OrganizationLayout = lazy(() => import("@/layouts/OrganizationLayout"));
 // HELM:routes. Helm, the flagship engine: a mode with its own layout (brief §10.1).
 const HelmLayout = lazy(() => import("@/layouts/HelmLayout"));
 const GstCreditOrganization = lazy(() => import("@/pages/gst/GstCreditOrganization"));
+const OrganizationTrinetra = lazy(() => import("@/pages/trinetra/OrganizationTrinetra"));
 const HelmCockpit = lazy(() => import("@/pages/helm/HelmCockpit"));
 const HelmPlan = lazy(() => import("@/pages/helm/HelmPlan"));
 const HelmMandates = lazy(() => import("@/pages/helm/HelmMandates"));
@@ -156,6 +157,7 @@ const AssertionReviewPage = lazy(
 const RedactionStudio = lazy(
   () => import("@/pages/redaction/RedactionStudio"),
 );
+const Trinetra = lazy(() => import("@/pages/trinetra/Trinetra"));
 const GstCredit = lazy(() => import("@/pages/gst/GstCredit"));
 const ProcurementCaseQueue = lazy(
   () => import("@/pages/procurement/CaseQueue"),
@@ -399,6 +401,7 @@ function AppRoutes() {
                   path={ROUTE_PATTERNS.organizationGst}
                   element={<RequireOrganizationRole allowed={BILLING_READERS}><GstCreditOrganization /></RequireOrganizationRole>}
                 />
+                <Route path={ROUTE_PATTERNS.organizationTrinetra} element={<RequireOrganizationRole allowed={BILLING_READERS}><OrganizationTrinetra /></RequireOrganizationRole>} />
                 <Route
                   path={ROUTE_PATTERNS.organizationAnalytics}
                   element={<RequireOrganizationRole allowed={OWNERS_AND_ADMINS}><OrganizationAnalytics /></RequireOrganizationRole>}
@@ -593,6 +596,7 @@ function AppRoutes() {
                   path={ROUTE_PATTERNS.workspaceProcurement}
                   element={<ProcurementCaseQueue />}
                 />
+                <Route path={ROUTE_PATTERNS.workspaceTrinetra} element={<Trinetra />} />
                 <Route path={ROUTE_PATTERNS.workspaceGst} element={<GstCredit />} />
                 <Route
                   path={ROUTE_PATTERNS.workspaceProcurementPolicies}
