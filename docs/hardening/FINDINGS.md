@@ -3678,3 +3678,12 @@ failure locally. The assertion now polls for a positive count; no value, role or
 save assertion was removed. Both autonomy scenarios passed three consecutive
 runs (6 passed, 1.2 minutes) with the delayed real response. Full final-head browser
 CI is still required; no application behavior changed for this test fix.
+
+## F-624 — Organization TRINETRA release gate looked like a server outage (P2)
+
+Final code review found that the organization summary still answered 503 when
+live processing was deliberately disabled, unlike the workspace routes. A new
+API regression failed with that 503. Both surfaces now call the same structured
+409 prerequisite gate, without relaxing capabilities or exposing evidence.
+TRINETRA plus its all-route isolation suite then passed: 77 tests in 104.29 s.
+The final-head CI rerun follows this correction.

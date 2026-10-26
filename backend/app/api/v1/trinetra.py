@@ -137,6 +137,17 @@ class ReviewIn(Strict):
     confirm_receivable: bool = False
 
 
+def require_source_validation():
+    if not settings.TRINETRA_LIVE_ENABLED:
+        raise HTTPException(
+            409,
+            {
+                "code": "TRINETRA_SOURCE_REVIEW_REQUIRED",
+                "message": "Live access awaits official-source and tax-adviser validation. Explore the synthetic examples.",
+            },
+        )
+
+
 def workspace(db, context, wid, *, live=True):
     w = db.get(Workspace, wid)
     if (
@@ -162,14 +173,7 @@ def workspace(db, context, wid, *, live=True):
         )
         if w.is_sample:
             raise HTTPException(409, "Synthetic examples are read-only.")
-        if not settings.TRINETRA_LIVE_ENABLED:
-            raise HTTPException(
-                409,
-                {
-                    "code": "TRINETRA_SOURCE_REVIEW_REQUIRED",
-                    "message": "Live access awaits official-source and tax-adviser validation. Explore the synthetic examples.",
-                },
-            )
+        require_source_validation()
     return w
 
 
@@ -813,8 +817,7 @@ def organization_summary(
         capability_key="capability.trinetra_all_workspaces",
         operation="trinetra.org.summary",
     )
-    if not settings.TRINETRA_LIVE_ENABLED:
-        raise HTTPException(503, "TRINETRA source validation is required.")
+    require_source_validation()
     if inactive_reason(db, organization_id=organization_id) or unpaid_reason(
         db, organization_id=organization_id
     ):

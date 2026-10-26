@@ -177,6 +177,21 @@ def test_launch_gate_remains_closed(world, client, tenant, monkeypatch):
     assert client.get(url + "/sample", headers=tenant.owner.headers).status_code == 200
 
 
+def test_organization_launch_gate_reports_a_prerequisite_not_an_outage(
+    world, client, tenant, monkeypatch, db_session
+):
+    put_on_plan(db_session, tenant.organization, "enterprise")
+    db_session.commit()
+    monkeypatch.setattr(settings, "TRINETRA_LIVE_ENABLED", False)
+    result = client.get(
+        f"/api/v1/organizations/{tenant.organization.id}/trinetra/summary",
+        headers=tenant.owner.headers,
+    )
+    assert result.status_code == 409, result.text
+    assert result.json()["detail"]["code"] == "TRINETRA_SOURCE_REVIEW_REQUIRED"
+    assert "workspaces" not in result.json()
+
+
 def test_jwt_rotation_does_not_duplicate_tax_entity(
     world, client, tenant, monkeypatch, db_session
 ):

@@ -69,7 +69,9 @@ searches found no existing Indian TDS engine; X12's `TDS` segment is an invoice 
   reproduced and fixed; final-head browser checks must be read on the PR.
 - Local backend checks: 326 TRINETRA/lifecycle, 402 Helm/engine, 56 image/extraction
   and 7 document-console tests passed. These sets overlap; their counts are not
-  added into a unique-test total. Initial integration failures and reruns are documented.
+  added into a unique-test total. Final API review also reproduced and corrected an
+  organization disabled-gate 503; all 77 TRINETRA/isolation tests then passed with
+  the shared structured 409 response. Initial failures and reruns are documented.
 - Frontend: 291 unit tests, 12 API contracts, typecheck/build/lint/self-check passed.
   Browser: 6 TRINETRA sample/accessibility checks; 1 full synthetic live review;
   30 existing review/procurement checks; 6 delayed-response autonomy runs passed.

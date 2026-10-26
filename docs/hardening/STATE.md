@@ -33,6 +33,10 @@ Validation:
   console 7 passed (overlapping sets). Frontend units 291 and contracts 12 passed.
 - Sample browser 135: 6 passed; expanded live browser 136: 1 passed; existing
   review/procurement suites 92/96: 30 passed. See TEST-PLAN for actual limits/failures.
+- Final API review found the organization release gate still returned 503. The new
+  regression failed first; a shared structured 409 gate fixed it. All 77 TRINETRA
+  and all-route isolation tests passed (104.29 s). CI on `265011a6` is superseded
+  by the commit containing this correction; inspect the latest run, not that run.
 - Migration head is `tr1a2_review_outcomes`; no new drift (282 baseline entries).
   Populated downgrade/upgrade passed; full chain rollback/upgrade passed in CI.
 
