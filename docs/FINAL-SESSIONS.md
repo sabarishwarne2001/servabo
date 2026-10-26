@@ -23,28 +23,30 @@ Plain language, no prior DevOps knowledge assumed._
   - **PR #40, TRINETRA**, checks that the TDS your customers withhold from your invoices really shows up in your tax
     statement. It is merged and its checks passed, but it is **switched off for customers** until real statement files, a tax
     adviser and a pilot customer have confirmed it. Today customers see a synthetic preview only.
-- **A review of TRINETRA (2026-10-26) found real gaps,** and **session 2A now fixes them as well** (its "Phase T"). The most
-  important:
+- **A review of TRINETRA (2026-10-26) found real gaps,** and its original brief is only partly built. You want it on Business
+  and Enterprise, working like every other feature. So it now has **its own session, 2T, right after 2A**, which fixes the
+  gaps and finishes it. The most important gaps:
   - a confirmed TDS deduction made Helm stop reminding the customer about the whole invoice, even the cash still owed;
   - renaming a document made its tax evidence count as "changed";
   - the check that the invoice is really yours ignored the GSTIN;
   - a Business customer would be stopped for good after 12 statement uploads or 500 cases;
   - there was no way to switch TRINETRA on for **one** pilot customer only.
 
-  HANDOFF "TRINETRA review and the revised session 2A" lists everything.
+  HANDOFF "TRINETRA review and the revised session 2A" lists everything; "Plan change: Final session 2T…" says what 2T builds.
 
 ## 2. The sessions, in order
 
-| | **Final session 1** (done) | **Final session 2A: upgrade** (next) | **Final session 2B: live** |
-| --- | --- | --- | --- |
-| **What** | Study the whole project, bring it up to date, build the money features (email-in, zip upload, GST digest, Zoho/Tally, Sentry, `preflight.py`, …) | Prices for India in rupees; the custom-domain fix; safety jobs that cannot stop silently; a prompt-injection map and tests; **TRINETRA finished and made safe, with a one-customer pilot switch**; Final 1's leftovers; an accuracy report and a pilot playbook; assess Evidence-to-Resolution and build a thin version only if it passes the test; **rewrite the live prompt to match reality** | Test **everything for real** on your PC: real AI and OCR, your real invoices (with the accuracy report), real GST files, Dodo test payments in rupees and dollars, real emails, Slack, Zoho Books, Tally, Sentry, a production rehearsal |
-| **Where** | Claude Code on the web | Claude Code **on the web** | Claude Code **in VS Code on your PC** |
-| **Model** | Opus 5.5, High | **Opus 5.5, High** | Sonnet 5.5, High (Opus 5.5 for a stubborn defect) |
-| **You** | — | Mostly away; type `continue` after a usage reset; merge at the end | **Present**: about 1 hour at the start, then short moments over the day |
-| **Prompt** | [`docs/sessions/FINAL-1-UPGRADE.md`](sessions/FINAL-1-UPGRADE.md) | [`docs/sessions/FINAL-2-UPGRADE.md`](sessions/FINAL-2-UPGRADE.md) | [`docs/sessions/FINAL-2-LIVE.md`](sessions/FINAL-2-LIVE.md) (2A rewrites it before you run it) |
-| **Cost** | Zero | Zero | Zero (free plans; Dodo **Test Mode**, no real money) |
+| | **Final session 1** (done) | **2A: upgrade** (next) | **2T: TRINETRA** | **2B: live** |
+| --- | --- | --- | --- | --- |
+| **What** | Study the whole project, bring it up to date, build the money features (email-in, zip upload, GST digest, Zoho/Tally, Sentry, `preflight.py`, …) | Prices for India in rupees; the custom-domain fix; safety jobs that cannot stop silently; a prompt-injection map and tests; Final 1's leftovers; an accuracy report and a pilot playbook; assess Evidence-to-Resolution and build a thin version only if it passes the test; **rewrite the live prompt to match reality** | **TRINETRA finished for Business and Enterprise:** every line of its original brief, every integration other features have, the review's gaps fixed; statement readers instead of typing; sending inquiries; approval chains; a switch for one pilot customer, then for everyone | Test **everything for real** on your PC: real AI and OCR, your real invoices (with the accuracy report), real GST files, **TRINETRA with your own Form 26AS / AIS**, Dodo test payments in rupees and dollars, real emails, Slack, Zoho Books, Tally, Sentry, a production rehearsal |
+| **Where** | Claude Code on the web | Claude Code **on the web** | Claude Code **on the web** | Claude Code **in VS Code on your PC** |
+| **Model** | Opus 5.5, High | **Opus 5.5, High** | **Opus 5.5, High** | Sonnet 5.5, High (Opus 5.5 for a stubborn defect) |
+| **You** | — | Mostly away; type `continue` after a usage reset; merge at the end | The same | **Present**: about 1 hour at the start, then short moments over the day |
+| **Prompt** | [`FINAL-1-UPGRADE.md`](sessions/FINAL-1-UPGRADE.md) | [`FINAL-2-UPGRADE.md`](sessions/FINAL-2-UPGRADE.md) | [`FINAL-2T-TRINETRA.md`](sessions/FINAL-2T-TRINETRA.md) | [`FINAL-2-LIVE.md`](sessions/FINAL-2-LIVE.md) (2A and 2T rewrite it before you run it) |
+| **Cost** | Zero | Zero | Zero | Zero (free plans; Dodo **Test Mode**, no real money) |
 
-**Run them in this order:** 2A, then 2B. 2B tests what 2A changes, and 2A updates 2B's prompt and the preparation list below.
+**Run them in this order:** 2A, then 2T, then 2B. 2B tests what 2A and 2T change, and both update 2B's prompt and the
+preparation list below.
 Wherever older documents say "Final session 2", they mean 2B, the live session.
 
 ### The decisions you delegated, now written down (N-186 and N-187)
@@ -65,6 +67,12 @@ Wherever older documents say "Final session 2", they mean 2B, the live session.
 - **Custom domains** are included on Business and Enterprise and no longer sold separately (the $199 price is retired).
 - **The Tally Prime file** comes to Starter.
 - **TRINETRA was your one exception to "no new engines"** (N-188). Nothing else new starts before the first pilots (N-189).
+- **TRINETRA goes to Business and Enterprise** (N-190):
+  - 2T finishes it, and ships it in "pilot" mode (live only for organizations you enrol);
+  - 2B proves its statement readers on your own files;
+  - your CA reads its wording (about an hour);
+  - you switch it "on" for everyone on Business and Enterprise.
+  - TCS, payroll TDS, filing and tax advice stay out on purpose.
 
 ## 3. How to run Final session 2A (the upgrade)
 
@@ -87,6 +95,16 @@ Wherever older documents say "Final session 2", they mean 2B, the live session.
    - `docs/product/PILOT-PLAYBOOK.md`: how to run your first paid pilot.
 
    Then re-read §4 below: 2A may have added something to prepare.
+
+## 3b. How to run Final session 2T (TRINETRA)
+
+The same way as 2A, once 2A is merged and `main` is green. Choose **Opus 5.5**, **High**, and paste:
+
+> Read `docs/sessions/FINAL-2T-TRINETRA.md` on `main` and carry it out from section 0. Never stop to ask me.
+
+It is a big session. Type `continue` after each usage reset; it has no cut line, because its goal is that nothing is left behind.
+At the end, read `docs/trinetra/COMPLETION.md`: every line of your original TRINETRA brief, with what was done and where. Merge
+only when every check is green.
 
 ## 4. Before Final session 2B (live): what to prepare (about 1 to 2 hours, all free)
 
@@ -136,6 +154,12 @@ them into the chat.** If you do by accident, rotate that key afterwards.
   - **one real GSTR-2B JSON** (GST portal → Returns dashboard → GSTR-2B → **Download JSON**; any month, any client);
   - **one real e-invoice PDF** (an invoice with an IRN and a signed QR code, usually from a large supplier);
   - **NIC's public key** for checking the QR signature, if the CA knows where to get it.
+- **For TRINETRA** (2B proves its statement readers with these; never committed, never pasted into a chat):
+  - **your own Form 26AS:** income tax e-filing portal → e-File → Income Tax Returns → View Form 26AS → TRACES → download it as
+    **Text** (menu names may have changed since Form 168 replaced the name; 2B guides you). Any PAN holder can download his
+    own; the layout is what matters, not the amounts;
+  - **your own AIS:** e-filing portal → AIS → the TDS/TCS information → download **CSV**;
+  - if possible, one sales invoice on which a customer deducted TDS, and that customer's TDS certificate (Form 16A).
 
 ## 5. How to run Final session 2B (live)
 
@@ -175,7 +199,8 @@ can do it:
 5. Postmark with your domain;
 6. the Hetzner server;
 7. the install;
-8. and the following steps, then live mode.
+8. and the following steps, then live mode;
+9. **TRINETRA:** after 2B marks its readers verified, your CA reads `/trinetra` and the in-app wording; then set its mode to "on".
 
 `preflight.py --online` on the server tells you what is still missing.
 

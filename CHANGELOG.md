@@ -6,6 +6,16 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Docs — Final session 2T: TRINETRA finished for Business and Enterprise (2026-10-26)
+
+- **TRINETRA gets its own session** (N-190): `docs/sessions/FINAL-2T-TRINETRA.md`, after 2A and before 2B. It fixes the review's
+  defects and builds every remaining requirement of the owner's original brief, now kept as `docs/trinetra/ORIGINAL-BRIEF.md`,
+  plus every integration the other features have. A completion matrix leaves no row missing.
+- **Three modes replace the single switch:** off, pilot and on. 2B proves the statement readers on the owner's own files, his CA
+  reads the wording, and he switches it on for Business and Enterprise.
+- **Final session 2A** no longer carries "Phase T"; it touches TRINETRA only for its plan row and copy and the injection map.
+- **Updated to the new order:** the owner's guide, STATE, HANDOFF, the live prompt's note and TRINETRA's launch gates.
+
 ### Docs — Final session 2A revised after TRINETRA (2026-10-26)
 
 - **TRINETRA reviewed** (N-189; HANDOFF "TRINETRA review and the revised session 2A"). Found in the merged code:

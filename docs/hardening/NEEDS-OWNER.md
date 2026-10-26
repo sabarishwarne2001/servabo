@@ -2539,3 +2539,29 @@ the GSTIN; capacities that do not stop a customer for good; one PAN per organiza
 enrolled organization only; a recompute job that tells someone something, or none; and the records. TRINETRA stays off for everyone
 else, and its launch gates (real statement files, a tax adviser, an authorized pilot) still stand. N-186's direction holds: TRINETRA
 was the one exception, and nothing new is started before the first pilots. 2A's numbers move to N-190, F-626 and spec 137.
+
+## N-190 — TRINETRA goes to Business and Enterprise, finished in its own session (DECIDED (owner, 2026-10-26))
+
+The owner wants TRINETRA available to Business and Enterprise and working like Servabo's other features (Helm, three-way matching,
+GST Credit), with nothing left behind. Phase T in Final session 2A would only have fixed its defects and kept it gated. So:
+
+- **Final session 2T** (`docs/sessions/FINAL-2T-TRINETRA.md`, cloud, after 2A) finishes it:
+  - every requirement of the owner's original brief (`docs/trinetra/ORIGINAL-BRIEF.md`) for business TDS receivables;
+  - every integration the other features have;
+  - the review's defects, fixed test-first;
+  - a completion matrix (`docs/trinetra/COMPLETION.md`) with no row left missing.
+- **Three modes replace the single switch:** off; **pilot** (organizations a platform administrator enrols); **on** (every
+  organization whose plan includes TRINETRA: Business and Enterprise). 2T ships "pilot" as the default.
+- **Final session 2B** proves the statement readers (Form 26AS / Form 168 text download, AIS CSV) on the owner's own files, the
+  Zoho TDS read and the inquiry email. It marks each reader verified.
+- **The owner then switches it on.** His CA reads the wording and examples (about an hour), and he sets the mode to "on"
+  (launch-checklist step).
+- **Out of scope on purpose:**
+  - TCS (isolated and off until its own rules and files are validated, as the brief allows);
+  - payroll TDS;
+  - filing;
+  - portal access;
+  - tax advice.
+
+Phase T moved from 2A into 2T. 2A keeps only TRINETRA's plan row and copy (prices, rupees, "Starter") and its existing paths in
+the prompt-injection map. 2A's numbers start at N-191.

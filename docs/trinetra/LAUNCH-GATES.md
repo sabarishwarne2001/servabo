@@ -1,5 +1,9 @@
 # TRINETRA launch gates
 
+> **Plan (N-190, 2026-10-26):** Final session 2T (`docs/sessions/FINAL-2T-TRINETRA.md`) finishes TRINETRA for Business and
+> Enterprise and replaces the single switch with three modes (off, pilot, on). Final session 2B proves the statement readers on
+> real files. Then the owner's CA reads the wording, and the owner sets the mode to "on". This page is updated by 2T.
+
 **Release status: gated implementation; not approved for live tax processing.**
 `TRINETRA_LIVE_ENABLED=false` is the default in code, examples and production compose.
 Do not enable it merely because synthetic tests pass.

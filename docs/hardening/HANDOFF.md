@@ -1053,3 +1053,36 @@ access awaits validation"); no model call, no sending, no money movement.
 
 PR #39's spec number and coverage text are in Phase 4. The GST speed test that flapped once on `main` (#465, then green on #468,
 #472, #478) is Phase 4 item 0: timings in its failure message; the budget does not move.
+
+## Plan change: Final session 2T finishes TRINETRA for Business and Enterprise (2026-10-26)
+
+_Decision N-190. Docs-only change; no code, no migration._
+
+**Why.** The owner wants TRINETRA on Business and Enterprise, working like Helm, three-way matching and GST Credit, with nothing left
+behind. 2A's Phase T would only have fixed the review's defects and kept TRINETRA gated. Finishing it needs a whole session, so it now
+has one: **Final session 2T**, `docs/sessions/FINAL-2T-TRINETRA.md`, run after 2A and before 2B.
+
+**What 2T does.**
+- **Phase 0:** a completion matrix (`docs/trinetra/COMPLETION.md`): every requirement of the owner's original brief
+  (`docs/trinetra/ORIGINAL-BRIEF.md`, added in this change) and every "like every other feature" integration, each with its status and
+  evidence. No row may stay missing.
+- **Phase 1:** the review's defects fixed test-first (the Helm hold, evidence versions, the seller check, one PAN per organization,
+  the case list, the forms' roles, one lifecycle rule).
+- **Phase 2:** three modes (off, pilot, on; ships as "pilot"), plans, capacities that work for a real year, a 50-a-month inquiry
+  allowance on Business.
+- **Phase 3:** statements in without typing: a template, and readers for the Form 26AS / Form 168 text download and the AIS CSV, each
+  self-checked against the file's own totals and "unverified" until 2B.
+- **Phase 4:** expectations from records: printed hints, a template, Zoho Books' TDS withheld.
+- **Phase 5:** the whole money model: credit notes, reversals, advances, split payments, the brief's statuses, reject and annotate.
+- **Phase 6:** resolution end to end: authorized inquiries with secure request links and replies, Enterprise approval chains, a
+  closure ledger, measured cycle time.
+- **Phase 7:** woven in like every other feature: Getting started, search, notifications and the digest, the value receipt and the
+  monthly summary, automation triggers, webhooks and API, a warehouse dataset, the organization view, the Resolution layer, Helm.
+- **Phase 8:** the screens the brief describes, and a user guide.
+- **Phase 9:** performance, hostile files, isolation, injection, privacy.
+- **Phase 10:** records, TRINETRA's phase in the live prompt, the launch-checklist step.
+
+**After 2T.** 2B proves the readers on the owner's own Form 26AS / AIS files and marks them verified. Then the owner's CA reads the
+wording (about an hour) and the owner sets the mode to "on". TCS, payroll TDS, filing, portal access and tax advice are out of scope on
+purpose. Final session 2A keeps only TRINETRA's plan row and copy and its existing paths in the injection map; its numbers start at
+N-191.
