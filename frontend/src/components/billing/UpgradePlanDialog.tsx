@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useAskPlanOwners } from "@/components/billing/AskPlanOwners";
-import { PurchaseAction, formatAddonPrice } from "@/components/billing/AddOnLockCard";
+import { PurchaseAction, addonMonthlyPrice, addonPriceLine } from "@/components/billing/AddOnLockCard";
 import type { AddonAccess } from "@/types/entitlements";
 
 /** "Business and Enterprise", "Developer, Business and Enterprise". */
@@ -32,6 +32,8 @@ export interface UpgradePlanDialogProps {
    */
   readonly addon?: AddonAccess | null;
   readonly organizationId?: string;
+  /** N-187: the currency the add-on's price is shown in (rupees for an Indian organization). */
+  readonly addonCurrency?: "USD" | "INR";
 }
 
 /**
@@ -50,16 +52,17 @@ export const UpgradePlanDialog: React.FC<UpgradePlanDialogProps> = ({
   onClose,
   addon = null,
   organizationId,
+  addonCurrency = "USD",
 }) => {
   const navigate = useNavigate();
   const plans = joinPlanNames(includedIn);
   const askOwners = useAskPlanOwners("upgrade");
   const offerAddon =
     addon !== null && organizationId !== undefined && (addon.state === "NOT_GRANTED" || addon.state === "LAPSED") && addon.purchasable;
-  const addonPrice = offerAddon && addon ? formatAddonPrice(addon.monthly_price_micros, addon.currency) : "";
+  const addonPrice = offerAddon && addon ? addonPriceLine(addon, addonCurrency) : "";
   const addonSentence =
     offerAddon && addon
-      ? ` ${addon.sold_on.length > 0 ? `On ${addon.sold_on.join(" or ")}, ` : ""}you can also add ${addon.display_name} for ${addonPrice} a month for your organization.`
+      ? ` ${addon.sold_on.length > 0 ? `On ${addon.sold_on.join(" or ")}, ` : ""}you can also add ${addon.display_name} for ${addonPrice} for your organization.`
       : "";
   return (
     <ConfirmDialog
@@ -89,7 +92,8 @@ export const UpgradePlanDialog: React.FC<UpgradePlanDialogProps> = ({
             organizationId={organizationId}
             addon={addon}
             canPurchase={canChangePlan}
-            label={`Add ${addon.display_name} — ${addonPrice} a month`}
+            label={`Add ${addon.display_name} — ${addonMonthlyPrice(addon, addonCurrency)} a month`}
+            currency={addonCurrency}
           />
         </div>
       ) : null}

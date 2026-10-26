@@ -4,7 +4,7 @@ import { Lock } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import AskPlanOwners from "@/components/billing/AskPlanOwners";
-import { PurchaseAction, formatAddonPrice } from "@/components/billing/AddOnLockCard";
+import { PurchaseAction, addonMonthlyPrice, addonPriceLine } from "@/components/billing/AddOnLockCard";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, HINT, SURFACE } from "@/components/ui/primitives";
 import { useAddonAccess } from "@/hooks/useAddonAccess";
 import { organizationBillingPath } from "@/routes/tenantPaths";
@@ -29,7 +29,7 @@ export const PreviewLock: React.FC<{
   readonly organizationSlug: string;
   readonly isOwner: boolean;
 }> = ({ title, teaser, onUpgrade, organizationId, organizationSlug, isOwner }) => {
-  const { access } = useAddonAccess(organizationId, "addon.gst_credit");
+  const { access, currency } = useAddonAccess(organizationId, "addon.gst_credit");
   const summary = useQuery({
     queryKey: billingKeys.accessSummary(organizationId),
     queryFn: () => getBillingAccessSummary(organizationId),
@@ -41,7 +41,7 @@ export const PreviewLock: React.FC<{
   const onTrial = summary.data?.trial?.state === "ACTIVE" || (summary.data?.trial?.state === "ENDED" && !summary.data.trial.lapsed);
   const buyHere = notBought && access.purchasable;
   const sellsOn = access?.sold_on.join(" or ") ?? "";
-  const price = access ? formatAddonPrice(access.monthly_price_micros, access.currency) : "";
+  const price = access ? addonPriceLine(access, currency) : "";
 
   return (
     <section className={`${SURFACE} space-y-3 p-6`} aria-labelledby="gst-lock-title" data-testid="gst-preview-lock">
@@ -62,7 +62,7 @@ export const PreviewLock: React.FC<{
         <div className="space-y-3" data-testid="gst-addon-offer">
           <p className="text-sm text-foreground">
             <span className="font-semibold">
-              Add {access.display_name} — {price} a month for your organization.
+              Add {access.display_name} — {price} for your organization.
             </span>{" "}
             It unlocks those lists on your {sellsOn} plan. Business includes it, with Helm.
           </p>
@@ -71,7 +71,8 @@ export const PreviewLock: React.FC<{
               organizationId={organizationId}
               addon={access}
               canPurchase={isOwner}
-              label={`Add ${access.display_name} — ${price} a month for your organization`}
+              label={`Add ${access.display_name} — ${addonMonthlyPrice(access, currency)} a month for your organization`}
+              currency={currency}
             />
             <button type="button" className={BUTTON_SECONDARY} onClick={onUpgrade}>
               See what Business adds

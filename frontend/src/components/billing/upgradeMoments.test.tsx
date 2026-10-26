@@ -168,7 +168,8 @@ describe("add-ons", () => {
     const offer = await screen.findByTestId("upgrade-addon-offer");
     expect(offer.textContent).toContain("Add GST Credit — $49 a month");
     fireEvent.click(screen.getByRole("button", { name: /Add GST Credit/ }));
-    await waitFor(() => expect(checkout).toHaveBeenCalledWith("org-1", "addon.gst_credit"));
+    // N-187: the checkout also names the interval (and the currency, when the add-on lists its prices).
+    await waitFor(() => expect(checkout).toHaveBeenCalledWith("org-1", "addon.gst_credit", expect.objectContaining({ interval: "month" })));
   });
 
   it.each(ADDONS)("$display_name: its lock card names the price and the plans that include it; only the owner can buy it", async (item) => {
@@ -181,7 +182,7 @@ describe("add-ons", () => {
       for (const plan of item.included_in) {expect(card).toContain(plan);}
       if (owner) {
         fireEvent.click(screen.getAllByRole("button")[0] as HTMLElement);
-        await waitFor(() => expect(checkout).toHaveBeenLastCalledWith("org-1", item.addon_key));
+        await waitFor(() => expect(checkout).toHaveBeenLastCalledWith("org-1", item.addon_key, expect.objectContaining({ interval: "month" })));
       } else {
         expect(screen.queryAllByRole("button")).toHaveLength(0);
         await waitFor(() => expect(document.body.textContent).toContain("Ask Ada Owner to"));

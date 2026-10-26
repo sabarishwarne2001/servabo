@@ -364,7 +364,8 @@ export const buildWorkspaceNavigationGroups = (
         path: erpPath(orgSlug, workspaceSlug),
         icon: BookUp,
         description: "Post approved bills, orders, receipts and journals to your ERP, exactly once, with acknowledgements",
-        capability: CAPABILITY.erpPosting,
+        // Final session 2A (N-187): Starter opens it for the Tally Prime file; the rest of ERP posting is Business.
+        capability: CAPABILITY.tallyFile,
         keywords: ["erp", "posting", "quickbooks", "zoho", "business central", "sap", "netsuite", "tally", "edi", "x12", "ubl", "sftp", "journal", "vendor bill"],
       },
       // ARCH49-S2:nav-process

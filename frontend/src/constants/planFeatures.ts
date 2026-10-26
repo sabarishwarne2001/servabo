@@ -42,6 +42,8 @@ export const PLAN_FEATURE_LABELS: Record<PlanFeatureKey, string> = {
   [CAPABILITY.obligations]: "Obligations & deadlines (renewals, notice periods, payments read from documents; calendar feeds)",
   // ARCH47-S2:plan-feature
   [CAPABILITY.erpPosting]: "ERP posting (approved bills, POs, receipts and journals to QuickBooks, Zoho, Business Central, SAP, NetSuite, Tally, EDI X12, UBL, SFTP — exactly once)",
+  // Final session 2A (N-187)
+  [CAPABILITY.tallyFile]: "Tally Prime import file (approved bills as balanced Tally vouchers to download and import)",
   // ARCH48-S2:plan-feature
   [CAPABILITY.collaborativeReview]: "Real-time collaborative review (live queue, who is looking at what, item locks, paragraph-anchored discussions)",
   // ARCH49-S2:plan-feature
@@ -99,6 +101,8 @@ export const PLAN_FEATURE_ORDER: readonly PlanFeatureKey[] = [
   CAPABILITY.obligations,
   // ARCH47-S2:plan-feature-order — Business and Enterprise.
   CAPABILITY.erpPosting,
+  // Final session 2A (N-187) — Starter and up.
+  CAPABILITY.tallyFile,
   // N-021:plan-feature-order — Business and Enterprise.
   CAPABILITY.byok,
   CAPABILITY.calibratedAutonomy,

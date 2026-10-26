@@ -41,6 +41,8 @@ export const CAPABILITY = {
   obligations: "capability.obligations",
   // ARCH47-S2:capability-constant
   erpPosting: "capability.erp_posting",
+  // Final session 2A (N-187): the Tally Prime import file on its own, Starter and up.
+  tallyFile: "capability.tally_file",
   // ARCH48-S2:capability-constant
   collaborativeReview: "capability.collaborative_review",
   // ARCH49-S2:capability-constant

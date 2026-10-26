@@ -49,15 +49,18 @@ const STATE_WORDS: Readonly<Record<string, string>> = {
 };
 
 interface ConnectBooksProps {
+  /** Final session 2A (N-187): Starter has the Tally file only; Zoho Books Connect is Business and Enterprise. */
+  readonly tallyOnly?: boolean;
   readonly workspaceId: string;
   readonly orgSlug: string;
   readonly workspaceSlug: string;
   readonly isAdmin: boolean;
 }
 
-export const ConnectBooks: React.FC<ConnectBooksProps> = ({ workspaceId, orgSlug, workspaceSlug, isAdmin }) => {
+export const ConnectBooks: React.FC<ConnectBooksProps> = ({ workspaceId, orgSlug, workspaceSlug, isAdmin, tallyOnly = false }) => {
   const [params, setParams] = useSearchParams();
-  const zoho = useQuery({ queryKey: erpConnectKeys.zoho(workspaceId), queryFn: () => getZoho(workspaceId), enabled: Boolean(workspaceId) });
+  const zoho = useQuery({ queryKey: erpConnectKeys.zoho(workspaceId), queryFn: () => getZoho(workspaceId),
+    enabled: Boolean(workspaceId) && !tallyOnly });
   const reason = params.get("zoho") === "error" ? REASONS[params.get("reason") ?? ""] ?? "Zoho Books could not be connected." : null;
   const justConnected = params.get("zoho") === "connected";
 
@@ -75,6 +78,15 @@ export const ConnectBooks: React.FC<ConnectBooksProps> = ({ workspaceId, orgSlug
           <button type="button" className="underline" onClick={() => setParams({})}>Dismiss</button>
         </p>
       ) : null}
+      {tallyOnly ? (
+        <section className={`${SURFACE} space-y-2 p-4`} aria-labelledby="zoho-title" data-testid="zoho-locked">
+          <h2 id="zoho-title" className={SECTION_TITLE}>Zoho Books</h2>
+          <p className={HINT}>
+            Posting approved bills straight into Zoho Books, and every other automatic ERP posting, is included on the Business and
+            Enterprise plans. Your plan includes the Tally Prime file below.
+          </p>
+        </section>
+      ) : (
       <section className={`${SURFACE} space-y-3 p-4`} aria-labelledby="zoho-title">
         <h2 id="zoho-title" className={SECTION_TITLE}>Zoho Books</h2>
         <p className={HINT}>
@@ -97,6 +109,7 @@ export const ConnectBooks: React.FC<ConnectBooksProps> = ({ workspaceId, orgSlug
         ) : null}
         {zoho.data?.configured && !isAdmin ? <p className={HINT}>A workspace admin connects Zoho Books.</p> : null}
       </section>
+      )}
       <TallyGuide workspaceId={workspaceId} orgSlug={orgSlug} workspaceSlug={workspaceSlug} isAdmin={isAdmin} />
     </div>
   );

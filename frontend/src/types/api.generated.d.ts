@@ -11569,10 +11569,18 @@ export interface components {
             live_resource_count: number;
             /** Halt Effect */
             halt_effect: string;
-            /** Monthly Price Micros */
+            /**
+             * Monthly Price Micros
+             * @description The dollar monthly price; 0 when the add-on is not sold in dollars monthly (custom domains are sold to nobody since N-187).
+             */
             monthly_price_micros: number;
             /** Currency */
             currency: string;
+            /**
+             * Prices
+             * @description N-187. Every price it is sold at.
+             */
+            prices?: components["schemas"]["AddonPriceOption"][];
             /**
              * Purchasable
              * @description True when an owner can buy this add-on self-serve right now.
@@ -11585,9 +11593,35 @@ export interface components {
             included_in?: string[];
             /**
              * Sold On
-             * @description Plans that may buy this add-on, when it is sold on particular plans only (GST Credit: Developer). Empty: any plan that does not already include it.
+             * @description Plans that may buy this add-on, when it is sold on particular plans only (GST Credit: Starter). Empty: any plan that does not already include it.
              */
             sold_on?: string[];
+        };
+        /**
+         * AddonPriceOption
+         * @description One price an add-on is sold at (Final session 2A, N-187).
+         */
+        AddonPriceOption: {
+            /**
+             * Currency
+             * @enum {string}
+             */
+            currency: "USD" | "INR";
+            /**
+             * Interval
+             * @enum {string}
+             */
+            interval: "month" | "year";
+            /**
+             * Unit Amount
+             * @description Minor units (cents or paise).
+             */
+            unit_amount: number;
+            /**
+             * Purchasable
+             * @description True when its gateway product is configured on this deployment.
+             */
+            purchasable: boolean;
         };
         /** AgentPolicyIn */
         AgentPolicyIn: {
@@ -20330,6 +20364,13 @@ export interface components {
              * Format: date-time
              */
             as_of: string;
+            /**
+             * Default Currency
+             * @description N-187. The currency this organization sees prices in first (INR for India).
+             * @default USD
+             * @enum {string}
+             */
+            default_currency: "USD" | "INR";
             /** Addons */
             addons: components["schemas"]["AddonAccessResponse"][];
             /**
@@ -21655,6 +21696,23 @@ export interface components {
             checkout_available: boolean;
             /** Checkout Unavailable Reason */
             checkout_unavailable_reason?: string | null;
+            /**
+             * Default Currency
+             * @default USD
+             */
+            default_currency: string;
+            /**
+             * India Mandate Limit Minor
+             * @description ₹15,000 in paise (Dodo's default floor).
+             * @default 1500000
+             */
+            india_mandate_limit_minor: number;
+            /**
+             * India Gst Rate Percent
+             * @description GST Dodo adds to a rupee price, in percent.
+             * @default 18
+             */
+            india_gst_rate_percent: number;
         };
         /** PlanOption */
         PlanOption: {
@@ -26336,7 +26394,7 @@ export interface components {
         };
         /**
          * TrialStatusResponse
-         * @description Campaign session 2 (N-052): the organization's place in its one-week free trial.
+         * @description Campaign session 2 (N-052): the organization's place in its free trial.
          */
         TrialStatusResponse: {
             /**
@@ -33079,7 +33137,12 @@ export interface operations {
     };
     create_addon_checkout_session_api_v1_organizations__organization_id__billing_addons__addon_key__checkout_session_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description N-187. USD or INR; the organization's default currency when omitted. */
+                currency?: ("USD" | "INR") | null;
+                /** @description N-187. month or year. */
+                interval?: "month" | "year";
+            };
             header?: never;
             path: {
                 /** @description Organization identifier */

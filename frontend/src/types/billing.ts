@@ -320,6 +320,11 @@ export interface PlanListResponse {
   readonly plans: readonly PlanOption[];
   readonly checkout_available?: boolean;
   readonly checkout_unavailable_reason?: string | null;
+  /** Final session 2A (N-187): the currency shown first (INR for an Indian organization). */
+  readonly default_currency?: string;
+  /** N-187: above this monthly total including GST (paise), Indian banks ask to approve each automatic payment. */
+  readonly india_mandate_limit_minor?: number;
+  readonly india_gst_rate_percent?: number;
 }
 
 export const microsToUnits = (micros: number): number => micros / 1_000_000;
