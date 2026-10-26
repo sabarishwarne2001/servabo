@@ -2,7 +2,35 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-26 (TRINETRA to Business and Enterprise: its own session 2T after 2A)_
+_Last updated: 2026-10-26 (Final session 2A started)_
+
+## Current phase — Final session 2A (FINAL-2-UPGRADE) (2026-10-26)
+Branch `claude/new-session-gbo9ee` (the session's assigned branch; CLAUDE.md says `hardening/<topic>`, the brief says "use the session's
+assigned branch"), based on `main` at `5600d9d` (PR #42 merged). Founder authority delegated: decisions `DECIDED (Final 2A)` from **N-191**,
+findings from **F-626**, browser specs from **137**. Prompt: `docs/sessions/FINAL-2-UPGRADE.md`. **If cut off, type `continue`: carry on from the
+first unticked box. Never restart a ticked phase.**
+Local stack this session: Postgres 16 with pgvector 0.8.7 from the `pgvector/pgvector:pg16` image (pulled through `mirror.gcr.io`; Docker Hub
+answered 429) on :5433 (e2e) and :5434 (backend tests), Redis, backend venv Python 3.12 and `npm ci`. The environment block is `testenv.sh` in
+the session scratchpad (outside the repo).
+
+- [ ] 0. Start-up: docs and code read; stack; this checklist; draft PR; `main`'s latest CI
+- [ ] 0A. `docs/product/COMMERCIAL-READINESS.md`
+- [ ] 0B. `docs/product/RESOLUTION-ASSESSMENT.md` and the build decision (an N-number)
+- [ ] 1. Prices and packaging for India (N-187): catalogue per currency and interval, add-on prices, Dodo products, rupee checkout (currency,
+  country, tax id), the ₹15,000 mandate notice, 14-day trial, "Starter", custom domains to Business and Enterprise, the Tally file on Starter,
+  unit economics in every currency, the website, docs, tests
+- [ ] 2. Safety jobs that cannot stop silently: run reports, the stale watcher and alert, readiness `safety_jobs`, the health page, the
+  sweeps in the scheduler (or not, recorded), `servabo-install-host-jobs`, preflight, docs, tests
+- [ ] 3. Prompt injection: `docs/hardening/PROMPT-INJECTION.md`, registry-walking invariants (a) to (f), the red-team corpus, fixes test-first
+- [ ] 4. Leftovers: the GST speed test's timings, deletion warning emails, a zip in the upload tray, `k1a6`'s downgrade with rows, PR #39's
+  loose ends
+- [ ] 5. The proof kit: `scripts/accuracy_report.py`, `docs/product/PILOT-PLAYBOOK.md`
+- [ ] 6. The Resolution layer (only if 0B says build)
+- [ ] 7. Records and the docs customers see
+- [ ] 8. `docs/sessions/FINAL-2-LIVE.md` rewritten; HANDOFF "Final session 2A → Final session 2B"; PR ready; CI green
+
+- **Next action:** Phase 0.
+
 
 ## Current phase — the final sessions: 2A, then 2T (TRINETRA), then 2B (2026-10-26)
 Branch `hardening/trinetra-to-ga`, based on `main` at `2e0d61c` (PR #41 merged). Docs only: no code, no migration, one Alembic head
