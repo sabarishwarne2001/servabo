@@ -350,6 +350,34 @@ four (`--workers=4`) on COSTS.md's server (4 vCPU, 16 GB). Re-run this before a 
   The existing budget stays as it was.
 - **Decision:** N-142.
 
+## GST Credit: the speed test's steps after Final session 1 (Final session 2A, 2026-10-26)
+
+- **Question:** the speed test flapped once on CI with only "matching took …s" in its message, so nobody could tell which
+  step was slow, or whether Final session 1 (the GST notices, the Monday digest, the e-invoice check) had made matching slower.
+- **Change to the test only:** `tests/performance/test_gst_budgets.py` now times each step by wrapping the functions
+  `recompute` and `import_file` call, prints them with `-s`, and puts them in the failure message, for example
+  "matching took 11.48s (budget 10.0s): read records …; read books …; reconcile …". **The budget did not move** (5 s times
+  `PERF_BUDGET_MULTIPLIER`, 2 on CI).
+- **Measured on the build machine** (`PERF_BUDGET_MULTIPLIER=1`, 10,000 records and 10,000 books, one run):
+
+  | Step | seconds |
+  |---|---|
+  | Import: parse the file | 0.78 |
+  | Import: write the 10,000 records (`COPY`) | 0.65 |
+  | Import: the rest (the return row, checks) | 0.37 |
+  | **Import, whole** | **1.80** |
+  | Matching: read the records | 0.21 |
+  | Matching: read the books (`load_books`) | 0.88 |
+  | Matching: reconcile | 0.19 |
+  | Matching: IMS, exposure and building the rows | 0.12 |
+  | Matching: write the 11,457 result rows (`COPY`) | 0.75 |
+  | Matching: ask Helm to replan (`hooks.replan`) | 0.01 |
+  | **Matching, whole** | **2.23** |
+
+- **Verdict:** the same as Session H's after-figures (matching 2.0 to 2.4 s, import 1.3 to 1.7 s; the import's 1.8 s is one
+  run on a busy machine). Final session 1 did not make matching slower, so nothing in the code changed. Reading the books
+  and writing the rows remain the two largest steps; if CI ever fails again, the message now says which.
+
 ## The e-invoice QR search on documents that cannot hold a code (Session I, 2026-10-20; F-532)
 
 Session F's e-invoice reading (PR #31) renders up to three pages of every PDF in the OCR worker and runs OpenCV over each.
