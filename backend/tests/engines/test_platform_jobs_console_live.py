@@ -20,6 +20,7 @@ from tests.engines.conftest import Engines, drain
 
 SUMMARY = "/api/v1/admin/jobs/summary"
 DEAD = "/api/v1/admin/jobs/dead"
+SAFETY = "/api/v1/admin/jobs/safety"
 
 
 def _staff(engines: Engines) -> dict[str, str]:
@@ -42,7 +43,7 @@ def _dead_job(engines: Engines) -> uuid.UUID:
 
 
 def test_only_platform_staff_can_see_the_jobs_console(engines: Engines) -> None:
-    for path in (SUMMARY, DEAD):
+    for path in (SUMMARY, DEAD, SAFETY):
         assert engines.client.get(path, headers=engines.tenant.owner.headers).status_code == 404
     assert engines.client.post(f"/api/v1/admin/jobs/{uuid.uuid4()}/retry",
                                headers=engines.tenant.owner.headers).status_code == 404
@@ -83,3 +84,24 @@ def test_a_dead_job_is_listed_with_its_reason_and_can_be_retried_once(engines: E
     drain(only=["test.always_fails"], allow_failures=True)
     engines.refresh()
     assert engines.db.execute(select(Job.status).where(Job.id == job_id)).scalar_one() == JobStatus.DEAD
+
+
+def test_the_safety_jobs_cron_runs_are_listed_and_a_late_one_marks_the_page(engines: Engines) -> None:
+    """Final session 2A, Phase 2: the host's safety jobs, as last reported; a job never seen a day after the watching
+    started is NEVER_RAN and the answer is degraded (the page turns red)."""
+    from datetime import datetime, timedelta, timezone
+
+    from app.models.safety_job_run import SafetyJobRun
+    from app.services.ops import safety_jobs
+
+    engines.db.execute(text("DELETE FROM safety_job_runs"))
+    safety_jobs.watching_since(engines.db, now=datetime.now(timezone.utc) - timedelta(days=2))
+    safety_jobs.record(engines.db, name="compliance", outcome="succeeded")
+    engines.db.commit()
+    body = engines.client.get(SAFETY, headers=_staff(engines)).json()
+    states = {row["name"]: row["state"] for row in body["jobs"]}
+    assert body["degraded"] is True and states["compliance"] == "OK" and states["backup"] == "NEVER_RAN"
+    assert states["pitr-drill"] == "UNWATCHED" and all(row["run"] for row in body["jobs"])
+    engines.db.execute(text("DELETE FROM safety_job_runs"))
+    engines.db.commit()
+    assert engines.db.execute(select(SafetyJobRun)).first() is None

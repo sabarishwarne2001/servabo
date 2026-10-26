@@ -8011,6 +8011,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/jobs/safety": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The host's safety jobs: last success, deadline, what to run (Final session 2A)
+         * @description Every safety job cron runs on the server (sweeps, backup, restore drill, uptime heartbeat), as last reported:
+         *     OK, STALE (no success within its deadline), NEVER_RAN (nothing reported a day after the app started watching),
+         *     WAITING (the first day) or UNWATCHED (switched off on this deployment).
+         */
+        get: operations["safety_jobs_status_api_v1_admin_jobs_safety_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/jobs/dead": {
         parameters: {
             query?: never;
@@ -24583,6 +24605,44 @@ export interface components {
          * @enum {string}
          */
         SLOWindow: "HOUR" | "DAY" | "MONTH";
+        /** SafetyJobStatus */
+        SafetyJobStatus: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Schedule */
+            schedule: string;
+            /**
+             * State
+             * @description OK, STALE, NEVER_RAN, WAITING or UNWATCHED
+             */
+            state: string;
+            /** Deadline Hours */
+            deadline_hours: number;
+            /** Last Success At */
+            last_success_at?: string | null;
+            /** Last Failure At */
+            last_failure_at?: string | null;
+            /** Last Started At */
+            last_started_at?: string | null;
+            /** Last Outcome */
+            last_outcome?: string | null;
+            /** Last Detail */
+            last_detail?: string | null;
+            /**
+             * Run
+             * @description The command that runs the job once by hand on the server
+             */
+            run: string;
+        };
+        /** SafetyJobsResponse */
+        SafetyJobsResponse: {
+            /** Jobs */
+            jobs: components["schemas"]["SafetyJobStatus"][];
+            /** Degraded */
+            degraded: boolean;
+        };
         /** SearchHitOut */
         SearchHitOut: {
             /** Kind */
@@ -25385,6 +25445,11 @@ export interface components {
             access_state: string;
             /** Plan Key */
             plan_key?: string | null;
+            /**
+             * Plan Name
+             * @description The plan's name as customers see it (Final session 2A, N-187: the `developer` plan is shown as Starter).
+             */
+            plan_name?: string | null;
             /**
              * Seat Capacity
              * @description Seats the organization holds: the plan's on Free, the purchased quantity on a paid plan. Null: no limit.
@@ -45952,6 +46017,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobsSummary"];
+                };
+            };
+        };
+    };
+    safety_jobs_status_api_v1_admin_jobs_safety_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SafetyJobsResponse"];
                 };
             };
         };
