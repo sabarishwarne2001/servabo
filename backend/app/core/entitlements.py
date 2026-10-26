@@ -479,8 +479,8 @@ _ENTITLEMENTS: tuple[Entitlement, ...] = (
         name=GST_CREDIT_ADDON,
         description=(
             "GST Credit as an add-on: the supplier and invoice lists, IMS recommendations, decisions, the export and "
-            "supplier reminders, for a Developer organization. Bundled with Business and Enterprise (as "
-            "capability.gst_credit); purchasable on Developer only."
+            "supplier reminders, for a Starter organization. Bundled with Business and Enterprise (as "
+            "capability.gst_credit); purchasable on Starter (the `developer` plan) only."
         ),
     ),
     # ARCH31-S0:capability-reconciliation-entitlement
@@ -599,7 +599,7 @@ _ENTITLEMENTS: tuple[Entitlement, ...] = (
         name=AUTOMATIONS_CAPABILITY,
         description=(
             "Automation rules and marketplace workflows: building, changing, testing "
-            "and running them. Bundled into a tier (Developer and up)."
+            "and running them. Bundled into a tier (Starter and up)."
         ),
     ),
     # PHASE1:capability-batch-dispatch-entitlement

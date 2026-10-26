@@ -443,9 +443,13 @@ def _gst_add_on_line(db: Session, organization_id: uuid.UUID) -> Optional[str]:
     if entitlement_service.addon_access(db, organization_id=organization_id,
                                         addon_key=entitlements.GST_CREDIT_ADDON).can_maintain:
         return None
+    from app.services.billing import currency as currency_service
+
     offer = entitlement_service.offer_for(entitlements.GST_CREDIT_ADDON)
-    return (f"{offer.display_name} add-on ({_SYMBOLS.get(offer.currency, '')}{offer.monthly_price_micros // 1_000_000}"
-            f"/month) or Business: GST's supplier list")
+    # N-187: the catalogue's prices in the organization's currency.
+    prices = entitlement_service.price_words(entitlements.GST_CREDIT_ADDON,
+                                             currency_service.default_currency(db, organization_id))
+    return f"{offer.display_name} add-on ({prices}) or Business: GST's supplier list"
 
 
 # ------------------------------------------------------------------------------------------------ the receipt

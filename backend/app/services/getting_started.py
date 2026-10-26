@@ -128,8 +128,13 @@ def evaluate(
     if _at_least(workspace_role, WorkspaceRole.CONTRIBUTOR):
         note = None
         if not gst_gate.full_access(db, workspace):
+            from app.core import entitlements as _entitlements
+            from app.services.billing import entitlement_service as _addons
+
+            # N-187: the plan that sells the add-on by its customer-facing name ("Starter"), from the published plans.
+            sold_on = " or ".join(_addons.sold_on(db, _entitlements.GST_CREDIT_ADDON)) or "Starter"
             note = ("Your plan shows the headline figures from a GSTR-2B. The supplier and invoice lists, the portal recommendations and the "
-                    "export come with Business, or with the GST Credit add-on on Developer.")
+                    f"export come with Business, or with the GST Credit add-on on {sold_on}.")
         add("gst", "Import a GSTR-2B and see which suppliers have not reported your invoices", tick_gst(db, workspace.id), note)
     if organization_role in HELM_ROLES:
         note = None

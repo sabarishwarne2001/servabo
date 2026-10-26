@@ -397,6 +397,17 @@ def purchasable(addon_key: str, *, currency: Optional[str] = None, interval: Opt
                if currency in (None, price.currency) and interval in (None, price.interval))
 
 
+def price_words(addon_key: str, currency: str = "USD") -> str:
+    """The add-on's prices in one phrase, in `currency` when it is sold in it, else in dollars (N-187):
+    "₹1,499 a month or ₹14,990 a year". Read from the catalogue, so no sentence types a price."""
+    from app.services.value_receipt import say_amount
+
+    offer = offer_for(addon_key)
+    shown = currency if any(p.currency == currency for p in offer.prices) else "USD"
+    prices = sorted((p for p in offer.prices if p.currency == shown), key=lambda p: p.interval != "month")
+    return " or ".join(f"{say_amount(p.amount_micros, p.currency)} a {p.interval}" for p in prices)
+
+
 def offered_prices(addon_key: str) -> list[AddonPrice]:
     """The prices of this add-on whose gateway product is configured, in the catalogue's order."""
     return [price for price in offer_for(addon_key).prices if price.product_id()]
@@ -453,6 +464,7 @@ __all__ = [
     "AddonPrice",
     "addon_for_product",
     "offered_prices",
+    "price_words",
     "STATE_ACTIVE",
     "STATE_GRACE",
     "STATE_LAPSED",

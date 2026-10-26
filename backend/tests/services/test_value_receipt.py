@@ -382,6 +382,17 @@ def test_the_receipt_reads_and_never_writes(db_session, world):
     assert before == after
 
 
+def test_an_indian_starter_organization_is_offered_the_add_on_in_rupees(db_session, world):
+    """N-187: an organization whose oldest workspace is in India sees the add-on's rupee prices."""
+    put_on_plan(db_session, world.organization, "developer")
+    for workspace in db_session.query(Workspace).filter(Workspace.organization_id == world.organization.id):
+        workspace.timezone = "Asia/Kolkata"
+    db_session.flush()
+    vr.forget(world.organization.id)
+    body = vr.receipt(db_session, world.organization.id, "trial", now=NOW)
+    assert body["gst_add_on_line"] == "GST Credit add-on (₹1,499 a month or ₹14,990 a year) or Business: GST's supplier list"
+
+
 def test_a_developer_organization_is_offered_the_gst_credit_add_on_or_business(db_session, world):
     """Session H: on Developer the GST list is not only a Business feature, it is also a $49 add-on, and the receipt says so."""
     from app.services.billing import addon_service
@@ -389,7 +400,8 @@ def test_a_developer_organization_is_offered_the_gst_credit_add_on_or_business(d
     put_on_plan(db_session, world.organization, "developer")
     vr.forget(world.organization.id)
     body = vr.receipt(db_session, world.organization.id, "trial", now=NOW)
-    assert body["gst_add_on_line"] == "GST Credit add-on ($49/month) or Business: GST's supplier list"
+    # N-187: the catalogue's prices, monthly and yearly, in the organization's currency (dollars here).
+    assert body["gst_add_on_line"] == "GST Credit add-on ($49 a month or $490 a year) or Business: GST's supplier list"
     assert "GST's supplier list" not in body["also_on_business"]          # said once, in the add-on's own line
     assert "Helm's full planning" in body["also_on_business"]
 

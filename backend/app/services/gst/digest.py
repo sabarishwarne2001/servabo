@@ -61,10 +61,13 @@ def unlock_line(db: Session, organization_id: uuid.UUID) -> Optional[str]:
     if notices.full_access(db, organization_id):
         return None
     if entitlement_service.offered_on_plan(db, organization_id=organization_id, addon_key=entitlements.GST_CREDIT_ADDON):
+        from app.services.billing import currency as currency_service
+
         offer = entitlement_service.offer_for(entitlements.GST_CREDIT_ADDON)
-        dollars = offer.monthly_price_micros // 1_000_000
-        symbol = "$" if offer.currency == "USD" else f"{offer.currency} "
-        return f"Unlock the lists: {offer.display_name} add-on, {symbol}{dollars} a month"
+        # N-187: the catalogue's prices, in the organization's currency (rupees for an Indian organization).
+        prices = entitlement_service.price_words(entitlements.GST_CREDIT_ADDON,
+                                                 currency_service.default_currency(db, organization_id))
+        return f"Unlock the lists: {offer.display_name} add-on, {prices}"
     names = entitlement_service.tiers_including(db, entitlements.GST_CREDIT_ADDON)
     return f"Unlock the lists: GST Credit comes with {' and '.join(names)}" if names else "Unlock the lists: see your plan options"
 
