@@ -6,6 +6,22 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Docs — Final session 2A revised after TRINETRA (2026-10-26)
+
+- **TRINETRA reviewed** (N-189; HANDOFF "TRINETRA review and the revised session 2A"). Found in the merged code:
+  - the Helm reminder hold stops cash reminders for the whole invoice;
+  - evidence goes "stale" on any touch to a document;
+  - the seller check ignores the GSTIN;
+  - plan capacities never free up;
+  - one PAN can live in two workspaces;
+  - there is no pilot switch for one organization;
+  - the recompute job does nothing.
+
+  `docs/sessions/FINAL-2-UPGRADE.md` gained Phase T to fix them test-first, with TRINETRA kept off for everyone but an enrolled
+  pilot.
+- **STATE put in order:** TRINETRA's pre-merge checkpoint now says it was merged, with its final green runs; one "Last updated"
+  line on top.
+
 ### Added — Project TRINETRA (2026-10-26; live processing gated)
 
 - Reviewed business-TDS expectations, immutable statement transcriptions, conserved

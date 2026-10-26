@@ -2,7 +2,32 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-## Current phase — Project TRINETRA (2026-10-26)
+_Last updated: 2026-10-26 (TRINETRA merged and reviewed; Final session 2A revised to finish it)_
+
+## Current phase — Final session 2A, revised after TRINETRA (2026-10-26)
+Branch `hardening/final-2a-trinetra-review`, based on `main` at `04620e9` (PR #40 merged; `main` run #478 green on every job). Docs only:
+no code, no migration, one Alembic head `tr1a2_review_outcomes`. Decision N-189 (next free **N-190**); no finding (next free **F-626**);
+browser specs continue at **137** (PR #39's `122-premium-documents-assistant.spec.ts` shares 122 with `122-zoho-and-tally.spec.ts`; 2A renumbers it).
+
+**Since the 2A prompt was written:** PR #39 redesigned the Documents and AI Assistant consoles (`docs/ui/documents-assistant-upgrade.md`),
+and PR #40 added TRINETRA, a gated TDS evidence workflow (N-188, F-619 to F-625, `docs/trinetra/`). A review of TRINETRA on 2026-10-26
+found it careful and well tested, but with gaps that matter: the Helm reminder hold stops cash reminders for the whole invoice; any touch
+to a document makes its evidence stale; the seller check ignores the GSTIN; plan capacities never free up; one PAN can live in two
+workspaces; there is no way to switch it on for one pilot customer; its recompute job does nothing. HANDOFF "TRINETRA review and the
+revised session 2A" lists them; `docs/sessions/FINAL-2-UPGRADE.md` Phase T fixes them.
+
+- [ ] **Final session 2A** (cloud, Opus 5.5 High): `docs/sessions/FINAL-2-UPGRADE.md`, now with Phase T (TRINETRA).
+- [ ] **Final session 2B** (the owner's PC): `docs/sessions/FINAL-2-LIVE.md`, rewritten by 2A.
+- [ ] The owner launch checklist (HANDOFF), from step 1.
+
+- **Next action:** the owner merges this PR once CI is green, then starts Final session 2A.
+
+## Project TRINETRA (2026-10-26) — merged as PR #40
+
+_Record added 2026-10-26: PR #40 was merged at `04620e9` (11:49 UTC). Its final CI run 40282980125 (head `4eb7adac`) and `main`'s run #478
+after the merge were green on every job. The checkpoint below was written before the merge; "Main is unchanged" and "mark it ready" describe
+that moment. Live processing stays off (`TRINETRA_LIVE_ENABLED=false`). A review of the merged code found gaps that Final session 2A fixes
+(its Phase T; HANDOFF "TRINETRA review and the revised session 2A")._
 
 Branch `hardening/trinetra`, based on `main` at
 `bf8f57f691aec7122d9ebaf4a4e13ae9d22ae19c`. Main is unchanged.
@@ -53,8 +78,6 @@ before restarting the local stack; only one pytest per test database. Raw Action
 logs may be blocked by the environment's network policy; check annotations remain
 readable. The final PR description/checks are the authoritative result after this
 committed checkpoint.
-
-_Last updated: 2026-10-23 (plan change: Final session 2A, the upgrade, comes before 2B, the live session)_
 
 ## Current phase — Plan change: Final session 2A before the live session (2026-10-23)
 Branch `hardening/final-2-upgrade-plan`, based on `main` at `e51f736` (PR #37 merged; `main` run #464 green on every job, the advisory
