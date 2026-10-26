@@ -87,3 +87,38 @@ completeness/freshness checks.
 
 Implementation status and executed validation will be recorded separately once
 the specification and execution workspace are available.
+
+## Verification against the implemented branch — 26 October 2026
+
+The historical inventory above was checked against the current code after the
+complete original attachment became readable. The repository instructions and
+the specification's required product, configuration, runbook, tenancy, security,
+Helm, GST, campaign and owner-decision documents have now been read, including
+all of NEEDS-OWNER. The saved checkpoint was not treated as implementation.
+Repository-wide withholding/26AS/TRACES searches confirmed the missing TDS domain;
+the existing X12 `TDS` segment means invoice total.
+
+The final boundaries differ from the preliminary proposals in these ways:
+
+- Canonical invoice facts, bank permissions, job hooks, compliance lifecycle,
+  billing versions and export escaping are reused as recorded in
+  [EXISTING-CAPABILITY-MAP.md](EXISTING-CAPABILITY-MAP.md).
+- No bank parser or tax-portal connector is added. Unverified official formats are
+  refused; reviewed transcriptions retain their canonical source and fingerprint.
+- TruthMesh/procurement context, discussions and secure requests remain on the
+  existing document review surface. TRINETRA does not create a parallel graph or
+  portal. The sample is a read-only synthetic response, with no extra workspace
+  or financial records to purge.
+- Helm's commercial ledger and settlements are unchanged. An explicit reviewed
+  withholding annotation and reminder hold prevent treating the whole balance as
+  cash still to chase; the hold does not settle an invoice.
+- There is no existing virus scanner to reuse. The threat model now states the
+  actual intake protections and this inherited limitation.
+- The sample avoids unreviewed statutory rates and section labels. Historical
+  FY/AY and post-April-2026 tax-year labels are distinct; independent adviser review
+  remains open. The image's erroneous tax example is not copied.
+
+Current implementation, executed results and remaining acceptance gates are in
+[ARCHITECTURE.md](ARCHITECTURE.md), [TEST-PLAN.md](TEST-PLAN.md) and
+[LAUNCH-GATES.md](LAUNCH-GATES.md). The original audit's future-tense statements
+above are retained as history, not current release claims.

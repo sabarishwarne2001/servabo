@@ -1,8 +1,10 @@
-# Webhook events for GST credit and workflow runs
+# Webhook events for GST credit, workflow runs and TRINETRA
 
 Written in Final session 1 (Phase 6). For people who build on Servabo: your own systems can be told, by a signed web request,
 when one of these five things happens. Everything else about webhooks (signing with `X-Servabo-Signature`, retries, the delivery
 log, rotating the secret) is the same as for every other event: see the Webhooks tab of the organization console.
+
+TRINETRA adds the separately gated Enterprise event documented below.
 
 ## How they behave
 
@@ -80,3 +82,23 @@ Both run events carry the same fields:
 * Migration `k1a6_engine_webhook_events` widens the two database CHECKs that pin the vocabulary. Downgrading it deletes
   deliveries of these events and removes them from endpoints' subscriptions (an endpoint that listened to nothing else is deleted).
 * Code: `backend/app/services/automation/public_events.py`; tests `backend/tests/engines/test_engine_public_webhooks_live.py`.
+
+## `trinetra.case.reviewed`
+
+Requires Enterprise's `capability.trinetra_all_workspaces`, enabled live processing
+and an endpoint explicitly subscribed to this event. Sample evidence emits nothing.
+The transactional outbox deduplicates each case/revision; delivery retains the
+ordinary webhook retry/idempotency behavior above. It reports a recorded review,
+not tax eligibility or money recovered.
+
+| Field | Meaning |
+| --- | --- |
+| `workspace_id`, `case_id` | Opaque identifiers of the workspace and credit case. |
+| `revision` | Integer revision saved by the reviewer. |
+| `state` | Recorded review state, such as `OPEN`, `DISPUTED` or `CA_REVIEWED`. |
+
+No PAN, TAN, invoice reference, amount, note or document content is included.
+The `trinetra:read` scope grants only the authorized organization summary; it does
+not grant case documents, decisions or exports. Migration `tr1a1_credit_assurance`
+adds the database event vocabulary; its downgrade removes these subscriptions
+and deliveries. See [TRINETRA architecture](../trinetra/ARCHITECTURE.md).

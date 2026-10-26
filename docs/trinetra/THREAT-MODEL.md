@@ -18,7 +18,7 @@ Tax portals and customer email destinations are outside TRINETRA's processing pa
 | Stale approved evidence | Canonical source fingerprints, immutable snapshot revisions and explicit reconfirmation. Source edits cannot silently retain a current credit figure. |
 | PAN/TAN leakage | Platform encryption, random encrypted identity salt, HMAC fingerprints, masked profile responses, no identifiers in URLs or telemetry. User-written review notes are confidential content. |
 | Formula or HTML injection | GST's spreadsheet neutralization, HTML escaping, attachment downloads and a sandboxed no-script export CSP. React renders source text as text. |
-| File bombs or fake official formats | No new binary parser. Canonical intake validation/size/virus/decompression controls apply. Unverified official parsing is explicitly refused. |
+| File bombs or fake official formats | No new binary parser. Canonical intake MIME/type, size, active-content and decompression controls apply. The platform has no malware scanner (existing decision N-017); these checks are not an antivirus guarantee. Unverified official parsing is explicitly refused. |
 | Prompt injection | Deterministic arithmetic; no LLM or autonomous action is invoked by this module. Existing extraction stays untrusted until review. |
 | Resource exhaustion | Plan-version capacities and hard ceilings; bounded rows/allocations/history; batched summary reads; debounced shared jobs. |
 | Unexpected communication/payment | Inquiry is a draft only. No tax-portal credentials, sending endpoint, payment operation or return submission. |

@@ -6,6 +6,24 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Added — Project TRINETRA (2026-10-26; live processing gated)
+
+- Reviewed business-TDS expectations, immutable statement transcriptions, conserved
+  allocations, versioned decisions, source comparison, inquiry drafts and CSV/XLSX/HTML
+  evidence exports. Canonical documents, Helm, jobs, outbox and compliance services are reused.
+- Credit-assurance cockpit, nine synthetic scenarios, scoped Enterprise reporting,
+  API/webhook access, and `/trinetra` on the public website. Business/Enterprise
+  capabilities are additive; existing prices, plan names and payment products stay intact.
+- Explicit reviewed withholding annotates Helm receivables and holds gross reminders;
+  it never becomes cash or rewrites a settlement. Later gap closure requires increased
+  statement evidence and current accountant review; recorded minutes mean effort, not savings.
+- Migrations `tr1a1_credit_assurance` and `tr1a2_review_outcomes` follow `k1a7` in one
+  chain. PAN and identity salts join platform encryption rotation; supporting sources
+  join erasure/retention handling. Filelock/setuptools pins address audit findings.
+- `TRINETRA_LIVE_ENABLED=false` by default. Official file parsers, TCS, signed/advance
+  workflows and inquiry sending are unsupported. See `docs/trinetra/DELIVERY.md` and
+  `LAUNCH-GATES.md` for executed tests and incomplete production acceptance.
+
 ### Docs — Final session 2A, the upgrade before the live tests (2026-10-23)
 
 - **A new session runs before the live tests** (N-186): `docs/sessions/FINAL-2-UPGRADE.md`. It answers the owner's commercial

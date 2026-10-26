@@ -6,6 +6,12 @@ the ranked list after it is for after the first paying customers._
 Billing is Dodo Payments (it was Stripe once; where an old note says Stripe, it means Dodo). Build cost is in focused engineering days for one person who
 knows the code: an estimate, not a promise. Running cost is what the idea adds to the monthly bill (`docs/hardening/COSTS.md` has the baseline).
 
+**TRINETRA update (2026-10-26):** the current request adds a gated business-TDS
+review workflow, without changing the separate Final 2A pricing plan. Its implemented
+surfaces, test evidence and remaining official-format, adviser, pilot and product
+acceptance work are tracked in [trinetra/DELIVERY.md](trinetra/DELIVERY.md) and
+[trinetra/LAUNCH-GATES.md](trinetra/LAUNCH-GATES.md). It is not approved for live tax processing.
+
 ## 1. What happened to the first list
 
 | # | Idea | Status |

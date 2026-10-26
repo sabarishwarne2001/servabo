@@ -6,38 +6,46 @@ _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep th
 
 Branch `hardening/trinetra`, based on `main` at
 `bf8f57f691aec7122d9ebaf4a4e13ae9d22ae19c`. Main is unchanged.
-Draft PR: https://github.com/sabarishwarne2001/servabo/pull/40.
-The complete original Markdown specification was read; the attachment, shell,
-PostgreSQL, Redis and object storage work. Official ITD/CBDT guidance was read on
-25 October (HTTP 200); verified official export layouts and adviser sign-off remain
-external gates. The feature still defaults off.
+PR: https://github.com/sabarishwarne2001/servabo/pull/40.
+The complete original Markdown specification, repository instructions and mandatory
+audit documents have been read, including all of NEEDS-OWNER. Shell, attachment,
+PostgreSQL, Redis and object storage work. The historical audit has been verified
+against implementation; it is not counted as completed implementation.
 
-Implementation and validation remain in progress. Four initial milestones were pushed through `5581d0bf`; subsequent commits are
-`fcad46c4` (dependency advisories), `04aac499` (backend) and `1708ac00` (UI/CI). Further work adds side-by-side document review, source
-search/pagination, multiple supporting documents, shared job controls, explicit
-receivable withholding confirmation and a Helm reminder hold. It does not mutate
-cash receipts or Helm settlements. A second additive migration adds previous-import
-comparison baselines, self-reported review minutes and supporting-source lifecycle
-links. Closure requires current accountant review and increased statement evidence;
-reallocating unchanged evidence does not count as closure.
+The gated evidence workflow is implemented and documented in
+`docs/trinetra/DELIVERY.md` (full changed-file inventory, architecture, API/UI,
+migrations, visual direction and acceptance limits). Canonical source comparison,
+multiple evidence attachments, jobs, reviewed withholding/Helm reminder hold,
+previous-import outcomes and lifecycle/key rotation are included. Official ITD/CBDT
+guidance was reached; official export fixtures, adviser approval and customer pilot
+remain external gates. Other incomplete acceptance items are explicit in
+`docs/trinetra/LAUNCH-GATES.md`. Live processing defaults off. No production, payment,
+customer-data or external inquiry action, merge or main-branch change was performed.
 
-Executed: 326 TRINETRA plus lifecycle-registry tests passed; frontend 291 unit tests,
-lint, self-check and a prior live browser journey passed. The expanded live journey passed with advice/accounting attachments; 12 generated
-contracts agree with the running server. Helm/engine regressions: 402 passed. The original PR CI run
-`40213665041` failed: encryption-rotation registry, extraction-reader contract,
-organization lock discipline, TRINETRA isolation registration and a disabled-feature
-503 conflicted with the shared isolation sweep. Fixes are under focused rerun in
-`.dev/trinetra-integration-fixes.log`. The intentional release gate now returns 409;
-its tests still assert refusal. The existing browser suites 92 and 96 then passed all 30 tests locally. CI frontend, website and migration jobs passed on that
-older pushed revision. Full-suite success has NOT been established.
+Validation:
+- Full CI `40254658271` on `bcec7de9` passed all four backend shards, frontend,
+  website (including Lighthouse), migrations/drift, encoding and Python audit.
+- Its browser run failed only autonomy spec 129's count-before-load race; Stripe
+  and gated TRINETRA phases were not reached. A 500 ms delayed real response
+  reproduced the failure. Commit `2189c8f2` adds a polling assertion; both autonomy
+  scenarios passed three times (6 passes) and browser TypeScript passed.
+- Local TRINETRA/lifecycle 326, Helm/engine 402, image/extraction 56 and document
+  console 7 passed (overlapping sets). Frontend units 291 and contracts 12 passed.
+- Sample browser 135: 6 passed; expanded live browser 136: 1 passed; existing
+  review/procurement suites 92/96: 30 passed. See TEST-PLAN for actual limits/failures.
+- Migration head is `tr1a2_review_outcomes`; no new drift (282 baseline entries).
+  Populated downgrade/upgrade passed; full chain rollback/upgrade passed in CI.
 
-**Resume:** inspect logs/process ownership before starting services or pytest.
-One pytest per test database. Preserve this branch and PR. Finish current focused
-checks, execute Helm/GST/TruthMesh and browser regressions, regenerate contract and
-coverage records, update feature/runbook/launch docs, commit and push coherent
-milestones, then require CI results on the final head. The preliminary audit is
-not completion. No deployment, merge, real external messages or customer-data
-processing has been performed.
+**Resume / final review:** inspect current PR checks on the latest pushed head.
+If green, update the PR review description with the exact final run and mark it
+ready; if red, investigate without weakening tests and record the result. Do not
+repeat already-passed full suites without a new reason. Keep the live flag off and
+all incomplete real-source/product acceptance explicit. The PR is for review, not
+production approval. Process state can be lost across resets: inspect ownership
+before restarting the local stack; only one pytest per test database. Raw Actions
+logs may be blocked by the environment's network policy; check annotations remain
+readable. The final PR description/checks are the authoritative result after this
+committed checkpoint.
 
 _Last updated: 2026-10-23 (plan change: Final session 2A, the upgrade, comes before 2B, the live session)_
 
