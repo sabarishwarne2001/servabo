@@ -2604,3 +2604,30 @@ Final session 2B buys once in rupees with a GSTIN (DODO-LOCAL-TEST journey I) an
 valid GST tax invoice, the options are, in order of effort: (1) ask Dodo whether a GST-compliant invoice can be enabled;
 (2) Servabo issues its own GST invoice for rupee sales (needs Servabo's own GST registration and numbering); (3) an Indian
 gateway for rupee sales. Nothing is built for any of them now.
+
+## N-194 — The safety sweeps stay on the server's cron; the app now watches them (DECIDED (Final 2A))
+
+**Question.** The brief asked whether the nightly sweeps should move from the server's cron into the app's own scheduler
+(`worker-scheduler`), so a missing or stopped cron cannot silently stop retention, erasure, reminders and backups.
+
+**Decision: keep them on cron, and make cron's silence impossible to miss.** Reasons, in plain words:
+
+- **Backups and the restore drill must run outside the app.** A backup that runs inside the app stops when the app is
+  broken, which is exactly when it matters; the drill restores into a scratch database with the Postgres tools on the host.
+- **The sweeps already run in their own short-lived container** (`SERVABO_RUNNER`, F-006) with file locks, logs, metrics
+  and Healthchecks pings that `tests/operational/test_host_cron_lines.py` proves line by line. Moving thirteen sweeps into
+  the scheduler would change how each one is locked, timed out and retried at the very end of the release, with no test
+  history in that shape.
+- **The real risk was silence, and that is now covered in the app**: every cron run reports to the app
+  (`POST /api/v1/ops/safety-jobs/{job}/runs`, with `SAFETY_JOB_REPORT_TOKEN`); the hourly `ops.safety_jobs` check emails
+  `OPERATOR_ALERT_EMAILS` (and posts to `ALERT_WEBHOOK`) once a day per job that has not succeeded within its deadline, or
+  has never reported a day after the app started watching; readiness says `safety_jobs: degraded` without taking the site
+  down; Platform admin, Background jobs, lists them in red; `scripts/preflight.py --online` names them. A server where cron
+  was never installed is reported a day after the first start.
+- **`servabo-install-host-jobs`** installs the files and proves the reporting path. It does **not** run the sweeps at
+  install time: several change data or send email (the invitation sweep, the retention purge) and have no dry-run mode.
+  It sends each job a "started" report marked "install check" (which never counts as a success) and runs the read-only
+  uptime check for real.
+
+**Revisit** if the deployment moves off a single server (Kubernetes CronJobs would replace cron, with the same reports).
+

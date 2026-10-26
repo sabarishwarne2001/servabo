@@ -668,6 +668,10 @@ SERVABO_LOG_DIR=/srv/servabo/logs
 LOCK_DIR=/srv/servabo/locks
 SERVABO_BACKUP_DIR=/srv/servabo/backups
 SERVABO_BACKUP_KEY_FILE=/etc/servabo/backup.key
+# Final session 2A: every job reports its runs to the app at this address, with this secret (the SAME value as
+# SAFETY_JOB_REPORT_TOKEN in .env.production; generate: python3 -c "import secrets; print(secrets.token_urlsafe(32))").
+SERVABO_PUBLIC_URL=https://app.example.com
+SAFETY_JOB_REPORT_TOKEN="paste-the-same-token-as-in-env-production"
 # Copy every backup off this server (the file path arrives as $1):
 # SERVABO_BACKUP_MIRROR_CMD='aws s3 cp "$1" s3://YOUR-BACKUP-BUCKET/servabo/'
 # A free Healthchecks.io account emails you when a job fails or does not run. One check per job:
@@ -675,8 +679,7 @@ SERVABO_BACKUP_KEY_FILE=/etc/servabo/backup.key
 # HEARTBEAT_UUID_COMPOSE_BACKUP=<check id>
 # HEARTBEAT_UUID_COMPOSE_RESTORE_DRILL=<check id>
 # HEARTBEAT_UUID_COMPLIANCE=<check id>
-# Is the site up? A check with a 1-minute period and a 5-minute grace (N-017):
-# SERVABO_PUBLIC_URL=https://app.example.com
+# Is the site up? A check with a 1-minute period and a 5-minute grace (N-017; it uses SERVABO_PUBLIC_URL above):
 # HEARTBEAT_UUID_UPTIME=<check id>
 # Every sweep can ping its own check too: HEARTBEAT_UUID_<NAME> (for example HEARTBEAT_UUID_ERP_POSTINGS).
 # The hourly watchdog reports any of the thirteen sweeps without a success in 26 hours; to be told,
@@ -692,8 +695,21 @@ sudo install -m 644 /srv/servabo/backend/deploy/cron.d/servabo-compose-backups /
 sudo sed -i -E 's/^([^#].*servabo-sweep (dr-heartbeat|base-backup|pitr-drill).*)$/# \1/' /etc/cron.d/servabo-sweepers
 ```
 
+Or let one command do the three `install` lines and check everything (Final session 2A):
+
+```bash
+sudo /srv/servabo/backend/deploy/bin/servabo-install-host-jobs
+```
+
+It says OK or FIX for each step: cron installed and running (it starts a stopped one), the `servabo` user,
+`sweepers.env` readable and holding `SERVABO_PUBLIC_URL` and `SAFETY_JOB_REPORT_TOKEN`, the two cron files installed with the
+point-in-time-recovery lines switched off, and then every job once, safely: the uptime check runs for real, and each other
+job sends the app a "started" report marked "install check" (it never counts as a success, so a job whose real run never
+comes is still reported). The sweeps themselves are not run by it: some change data or send email and have no dry-run
+(N-194). It ends with "Ready" or the list of things to fix; run it again after fixing them. `--check` changes nothing.
+
 Do **not** install `servabo-backups`: that file is for a server with Python and the Postgres tools
-installed directly, not for Compose. Check it works now, not at 3 a.m.:
+installed directly, not for Compose (the install command refuses two backup schedules). Check it works now, not at 3 a.m.:
 
 ```bash
 /srv/servabo/backend/deploy/bin/servabo-sweep compliance --report    # prints each tenant's retention policy, changes nothing
@@ -702,6 +718,18 @@ tail -n 20 /srv/servabo/logs/sweep_compliance.log                      # a "SWEE
 
 After the first night, look at the logs in `/srv/servabo/logs` (`sweep_*.log`,
 `compose_backup.log`, `compose_restore_drill.log`), or better, let the monitor tell you.
+
+**Know when a safety job stops (Final session 2A).** Every cron job above reports each run to the app
+(`servabo-report-run`; it never fails the job). Inside the stack, the hourly `ops.safety_jobs` check compares each job's
+last success with its deadline (a nightly sweep 26 hours, the hourly obligations sweep 3 hours, the ERP and process
+sweeps 1 hour, the restore drill 8 days, the uptime check 15 minutes) and, once a day per job, emails
+`OPERATOR_ALERT_EMAILS` "Safety job stopped: … has not succeeded since …" (or "never reported", a day after the app
+first started watching), and posts the same line to `ALERT_WEBHOOK` when that is set in `.env.production`. Platform
+admin, Background jobs, lists every job with its last success and the command that runs it by hand, in red when one is
+late; `/api/v1/health/ready` adds `"safety_jobs": "degraded"` and still answers 200 (a stopped sweep must not take the
+site down); `python scripts/preflight.py --online` names the late jobs. The three point-in-time-recovery jobs are not
+watched on Compose (`SAFETY_JOBS_UNWATCHED`). When the email comes: `systemctl status cron`, `grep CRON /var/log/syslog`,
+the job's log in `/srv/servabo/logs`, then run the job once by hand; the next successful run clears it.
 
 **Know when something breaks (campaign session 4).** The app emails the addresses in
 `OPERATOR_ALERT_EMAILS` (in `.env.production`; required, the app refuses to start without it) through

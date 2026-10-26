@@ -724,9 +724,15 @@ end). Compare what you see with `docs/billing/DODO.md` §6 and note anything dif
 **Step 10 — Backups, scheduled jobs and monitoring (same day as step 7).**
 RUNBOOK §9.4 and §9.6: create `/etc/servabo/backup.key` and copy it into your password manager
 **now**; set `SERVABO_BACKUP_MIRROR_CMD` to copy backups to another provider; install the sweeper
-cron files; create the free Healthchecks.io checks (uptime, backup, restore drill, retention sweep)
-and set `ALERT_WEBHOOK`. Run one backup and one restore drill by hand. *Done when:* the drill
-prints its restore time and every Healthchecks.io check is green.
+cron files with `sudo /srv/servabo/backend/deploy/bin/servabo-install-host-jobs` (Final session 2A: it checks cron is
+running, installs the files, and proves each job can report to the app; set `SAFETY_JOB_REPORT_TOKEN` to the same value
+in `.env.production` and `/etc/servabo/sweepers.env` first); create the free Healthchecks.io checks (uptime, backup,
+restore drill, retention sweep) and set `ALERT_WEBHOOK`. Run one backup and one restore drill by hand. Then **stop cron
+on purpose** (`sudo systemctl stop cron`) and wait: the next day an email "Safety job stopped" (or "never reported")
+arrives at `OPERATOR_ALERT_EMAILS`, Platform admin, Background jobs, shows the jobs in red, and
+`/api/v1/health/ready` says `"safety_jobs": "degraded"` while the site stays up. Start cron again
+(`sudo systemctl start cron`). *Done when:* the install prints "Ready", the drill prints its restore time, every
+Healthchecks.io check is green, and the stopped-cron email arrived and cleared after cron restarted.
 
 **Step 11 — Go live with Dodo.**
 Only after step 4 says verified and step 9 worked. In Dodo, switch off Test Mode, create the same
