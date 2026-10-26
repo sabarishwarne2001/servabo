@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# Final session 2A (Phase 2) — install the server's scheduled jobs and prove they can report to the app.
+#
+#   sudo /srv/servabo/backend/deploy/bin/servabo-install-host-jobs            # a Docker Compose server (RUNBOOK §9)
+#   sudo /srv/servabo/backend/deploy/bin/servabo-install-host-jobs --venv     # a server with Python and the Postgres tools installed
+#   sudo /srv/servabo/backend/deploy/bin/servabo-install-host-jobs --check    # change nothing; only check and test
+#
+# What it does, in order, saying OK or FIX for each step:
+#   1. cron is installed and running (it starts it if it is installed but stopped);
+#   2. the `servabo` user exists and /etc/servabo/sweepers.env is readable by it and holds SERVABO_PUBLIC_URL and
+#      SAFETY_JOB_REPORT_TOKEN (the same token as in .env.production);
+#   3. installs the cron files into /etc/cron.d (Compose: servabo-sweepers + servabo-compose-backups, with the three
+#      point-in-time-recovery lines switched off, N-012; --venv: servabo-sweepers + servabo-backups) and the log and
+#      lock folders;
+#   4. runs each job once in a safe mode and prints what the app was told:
+#        - the uptime heartbeat runs for real (it only reads /api/v1/health/ready);
+#        - every other job sends the app a "started" report marked "install check". The sweeps are NOT run here: several
+#          change data or send email (the invitation sweep, the retention purge) and have no dry-run mode, and the backup
+#          and the restore drill take minutes. A "started" report proves the path cron will use (address, token, job
+#          name) without counting as a success, so the app still alerts if the real run never comes (N-194).
+#
+# Exit 0 when every step is OK. Re-running it is safe. RUNBOOK §9.6.
+set -uo pipefail
+
+ROOT="${SERVABO_ROOT:-/srv/servabo}"
+DEPLOY="${SERVABO_DEPLOY_DIR:-${ROOT}/backend/deploy}"
+CONFIG_FILE="${SERVABO_SWEEPER_ENV:-/etc/servabo/sweepers.env}"
+CRON_TARGET="${SERVABO_CRON_TARGET:-/etc/cron.d}"
+RUN_AS="${SERVABO_JOB_USER:-servabo}"
+MODE="compose"
+CHANGE=1
+for arg in "$@"; do
+    case "${arg}" in
+        --venv) MODE="venv" ;;
+        --compose) MODE="compose" ;;
+        --check) CHANGE=0 ;;
+        -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
+        *) echo "unknown option: ${arg} (see --help)" >&2; exit 64 ;;
+    esac
+done
+
+PROBLEMS=0
+ok()  { printf '  OK   %s\n' "$*"; }
+fix() { printf '  FIX  %s\n' "$*"; PROBLEMS=$((PROBLEMS + 1)); }
+as_user() { if [[ "$(id -un)" == "${RUN_AS}" ]]; then "$@"; else runuser -u "${RUN_AS}" -- "$@"; fi; }
+
+if [[ "${CHANGE}" == 1 && "$(id -u)" != 0 && -z "${SERVABO_INSTALL_UNPRIVILEGED:-}" ]]; then
+    echo "Run it with sudo: it writes to ${CRON_TARGET}. (--check changes nothing and still needs to read ${CONFIG_FILE}.)" >&2
+    exit 1
+fi
+
+echo "1. cron"
+if command -v cron > /dev/null 2>&1 || command -v crond > /dev/null 2>&1; then
+    running() { pgrep -x cron > /dev/null 2>&1 || pgrep -x crond > /dev/null 2>&1; }
+    if ! running && [[ "${CHANGE}" == 1 ]] && command -v systemctl > /dev/null 2>&1; then
+        systemctl enable --now cron > /dev/null 2>&1 || systemctl enable --now crond > /dev/null 2>&1 || true
+    fi
+    if running; then ok "cron is installed and running"; else fix "cron is installed but not running: sudo systemctl enable --now cron"; fi
+else
+    fix "cron is not installed: sudo apt-get install -y cron && sudo systemctl enable --now cron"
+fi
+
+echo "2. the job user and ${CONFIG_FILE}"
+if id "${RUN_AS}" > /dev/null 2>&1; then ok "user ${RUN_AS} exists"; else fix "no user ${RUN_AS}: sudo useradd --system --create-home --groups docker ${RUN_AS}"; fi
+if [[ -r "${CONFIG_FILE}" ]]; then
+    set -a; source "${CONFIG_FILE}"; set +a
+    if as_user test -r "${CONFIG_FILE}" 2> /dev/null; then ok "${CONFIG_FILE} is readable by ${RUN_AS}"; else
+        fix "${RUN_AS} cannot read ${CONFIG_FILE}: sudo chown root:${RUN_AS} ${CONFIG_FILE} && sudo chmod 640 ${CONFIG_FILE}"; fi
+    if [[ -n "${SERVABO_PUBLIC_URL:-}" ]]; then ok "SERVABO_PUBLIC_URL=${SERVABO_PUBLIC_URL}"; else
+        fix "set SERVABO_PUBLIC_URL=https://<your app domain> in ${CONFIG_FILE}"; fi
+    TOKEN="${SAFETY_JOB_REPORT_TOKEN:-}"
+    if [[ ${#TOKEN} -ge 32 ]]; then ok "SAFETY_JOB_REPORT_TOKEN is set"; else
+        fix "set SAFETY_JOB_REPORT_TOKEN (32+ characters, the SAME value as in .env.production) in ${CONFIG_FILE}"; fi
+else
+    fix "${CONFIG_FILE} is missing or unreadable: create it as RUNBOOK §9.6 shows"
+fi
+
+echo "3. the cron files (${MODE})"
+if [[ "${MODE}" == "compose" ]]; then FILES=(servabo-sweepers servabo-compose-backups); OTHER=servabo-backups
+else FILES=(servabo-sweepers servabo-backups); OTHER=servabo-compose-backups; fi
+for name in "${FILES[@]}"; do
+    source_file="${DEPLOY}/cron.d/${name}"
+    if [[ ! -r "${source_file}" ]]; then fix "${source_file} not found: is the checkout at ${ROOT}/backend?"; continue; fi
+    if [[ "${CHANGE}" == 1 ]]; then
+        install -m 644 "${source_file}" "${CRON_TARGET}/${name}" && ok "installed ${CRON_TARGET}/${name}" || fix "could not write ${CRON_TARGET}/${name}"
+    elif [[ -r "${CRON_TARGET}/${name}" ]]; then ok "${CRON_TARGET}/${name} is installed"; else fix "${CRON_TARGET}/${name} is not installed"; fi
+done
+if [[ "${MODE}" == "compose" && -w "${CRON_TARGET}/servabo-sweepers" && "${CHANGE}" == 1 ]]; then
+    # The same command as RUNBOOK §9.6: no WAL archiving on a Compose server (N-012).
+    sed -i -E 's/^([^#].*servabo-sweep (dr-heartbeat|base-backup|pitr-drill).*)$/# \1/' "${CRON_TARGET}/servabo-sweepers"
+    ok "point-in-time-recovery lines switched off (N-012)"
+fi
+if [[ -e "${CRON_TARGET}/${OTHER}" ]]; then
+    fix "${CRON_TARGET}/${OTHER} is also installed: two backup schedules. Remove one: sudo rm ${CRON_TARGET}/${OTHER}"
+fi
+if [[ "${CHANGE}" == 1 ]]; then
+    for dir in "${SERVABO_LOG_DIR:-${ROOT}/logs}" "${LOCK_DIR:-${ROOT}/locks}" "${SERVABO_BACKUP_DIR:-${ROOT}/backups}"; do
+        mkdir -p "${dir}" && chown "${RUN_AS}" "${dir}" 2> /dev/null || true
+    done
+    ok "log, lock and backup folders exist"
+fi
+
+echo "4. each job once, safely, and what the app was told"
+BASE_URL="${SERVABO_REPORT_URL:-${SERVABO_PUBLIC_URL:-}}"
+JOBS=()
+for name in "${FILES[@]}"; do
+    file="${CRON_TARGET}/${name}"; [[ -r "${file}" ]] || file="${DEPLOY}/cron.d/${name}"
+    [[ -r "${file}" ]] || continue
+    while IFS= read -r line; do
+        [[ -z "${line// }" || "${line}" =~ ^[[:space:]]*# || "${line%% *}" == *=* ]] && continue
+        if [[ "${line}" =~ servabo-sweep[[:space:]]+([a-z_-]+) ]]; then JOBS+=("${BASH_REMATCH[1]}")
+        elif [[ "${line}" == *servabo-compose-backup\ * || "${line}" == *servabo-compose-backup ]]; then JOBS+=(backup)
+        elif [[ "${line}" == *servabo-compose-restore-drill* ]]; then JOBS+=(restore-drill)
+        elif [[ "${line}" == *servabo-uptime-heartbeat* ]]; then JOBS+=(uptime)
+        fi
+    done < "${file}"
+done
+if [[ -z "${BASE_URL}" || -z "${SAFETY_JOB_REPORT_TOKEN:-}" ]]; then
+    fix "cannot test the reports without SERVABO_PUBLIC_URL and SAFETY_JOB_REPORT_TOKEN (step 2)"
+else
+    for job in "${JOBS[@]}"; do
+        if [[ "${job}" == "uptime" ]]; then
+            if as_user env SERVABO_SWEEPER_ENV="${CONFIG_FILE}" "${DEPLOY}/bin/servabo-uptime-heartbeat" > /dev/null 2>&1; then
+                ok "uptime: ran for real; the site answered (the heartbeat reports \"succeeded\" to the app itself)"
+            else
+                fix "uptime: ${SERVABO_PUBLIC_URL}/api/v1/health/ready did not answer 200 (RUNBOOK §9.7)"
+            fi
+            continue
+        fi
+        code="$(printf 'X-Servabo-Report-Token: %s\n' "${SAFETY_JOB_REPORT_TOKEN}" | curl -sS -m 10 -o /dev/null -w '%{http_code}' \
+            -X POST -H @- -H 'Content-Type: application/json' \
+            --data '{"outcome":"started","detail":"install check by servabo-install-host-jobs (not a run)"}' \
+            "${BASE_URL%/}/api/v1/ops/safety-jobs/${job}/runs" 2> /dev/null)"
+        case "${code}" in
+            202) ok "${job}: the app accepted a \"started\" report (the real run reports at its cron time)" ;;
+            401) fix "${job}: the app refused the token: SAFETY_JOB_REPORT_TOKEN differs from .env.production (restart web after changing it)" ;;
+            404) fix "${job}: the app does not know this job, or this app version predates Final session 2A: update the app" ;;
+            *)   fix "${job}: no answer from ${BASE_URL%/} (HTTP ${code:-none}): is SERVABO_PUBLIC_URL right and the site up?" ;;
+        esac
+    done
+fi
+
+echo
+if [[ "${PROBLEMS}" == 0 ]]; then
+    echo "Ready: ${#JOBS[@]} jobs installed and reporting. Platform admin, Background jobs, shows them; a job that stops is"
+    echo "emailed to OPERATOR_ALERT_EMAILS once a day (a job never seen is reported a day after the first hourly check)."
+    exit 0
+fi
+echo "${PROBLEMS} thing(s) to fix above; run this again afterwards."
+exit 1
