@@ -13,9 +13,9 @@ Local stack this session: Postgres 16 with pgvector 0.8.7 from the `pgvector/pgv
 answered 429) on :5433 (e2e) and :5434 (backend tests), Redis, backend venv Python 3.12 and `npm ci`. The environment block is `testenv.sh` in
 the session scratchpad (outside the repo).
 
-- [ ] 0. Start-up: docs and code read; stack; this checklist; draft PR; `main`'s latest CI
-- [ ] 0A. `docs/product/COMMERCIAL-READINESS.md`
-- [ ] 0B. `docs/product/RESOLUTION-ASSESSMENT.md` and the build decision (an N-number)
+- [x] 0. Start-up: docs and code read; stack; this checklist; draft PR #43; `main`'s latest CI (run #482 on `5600d9d`) green
+- [x] 0A. `docs/product/COMMERCIAL-READINESS.md`
+- [x] 0B. `docs/product/RESOLUTION-ASSESSMENT.md` and the build decision: N-191, build a thin "Recoveries" layer after the must-haves
 - [ ] 1. Prices and packaging for India (N-187): catalogue per currency and interval, add-on prices, Dodo products, rupee checkout (currency,
   country, tax id), the ₹15,000 mandate notice, 14-day trial, "Starter", custom domains to Business and Enterprise, the Tally file on Starter,
   unit economics in every currency, the website, docs, tests
@@ -29,7 +29,7 @@ the session scratchpad (outside the repo).
 - [ ] 7. Records and the docs customers see
 - [ ] 8. `docs/sessions/FINAL-2-LIVE.md` rewritten; HANDOFF "Final session 2A → Final session 2B"; PR ready; CI green
 
-- **Next action:** Phase 0.
+- **Next action:** Phase 1 (prices and packaging for India).
 
 
 ## Current phase — the final sessions: 2A, then 2T (TRINETRA), then 2B (2026-10-26)
