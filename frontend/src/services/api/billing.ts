@@ -123,7 +123,7 @@ export const getBillingAccess = async (
  * explanation at all when the organization went read-only.
  */
 /**
- * Campaign session 2 (N-052): where the organization stands in its one-week free
+ * Campaign session 2 (N-052): where the organization stands in its free
  * trial. `NONE` for a paying organization (or one with no trial clock).
  */
 export interface TrialStatus {

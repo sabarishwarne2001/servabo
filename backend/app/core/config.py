@@ -893,9 +893,13 @@ class Settings(BaseSettings):
     # Dodo product ids for purchasable add-ons. Test and live ids differ, so
     # these are environment values, never literals in code. Unset means the
     # add-on is not self-serve on this deployment and the console says so.
-    DODO_ADDON_PRODUCT_CUSTOM_DOMAIN: str | None = None
+    # Final session 2A (N-187): one product per currency and interval it is sold at; custom domains are no longer sold
+    # (included in Business and Enterprise), so DODO_ADDON_PRODUCT_CUSTOM_DOMAIN was removed.
     DODO_ADDON_PRODUCT_WAREHOUSE_SYNC: str | None = None
     DODO_ADDON_PRODUCT_GST_CREDIT: str | None = None
+    DODO_ADDON_PRODUCT_GST_CREDIT_YEARLY: str | None = None
+    DODO_ADDON_PRODUCT_GST_CREDIT_INR: str | None = None
+    DODO_ADDON_PRODUCT_GST_CREDIT_YEARLY_INR: str | None = None
     # D-6. Days existing add-on resources keep working after the grant ends.
     BILLING_ADDON_GRACE_DAYS: int = 14
     # D-11. Days of full access after a renewal failure. Matches Dodo's default
@@ -905,8 +909,9 @@ class Settings(BaseSettings):
     BILLING_LAPSED_TIER_KEY: str = "free"
     # N-052 (owner decision). Free is a trial of this many days per owner account,
     # counted from the account's first organization; after it, new work needs a
-    # paid plan (app/services/trial_service.py).
-    FREE_TRIAL_DAYS: int = 7
+    # paid plan (app/services/trial_service.py). Final session 2A (N-187): 14 days (was 7), so that one monthly
+    # GSTR-2B (published on the 14th) falls inside every trial.
+    FREE_TRIAL_DAYS: int = 14
     # ARCH-30 Tranche 3. How Dodo bills a mid-cycle seat change. Dodo documents
     # that the three "_immediately" modes charge now and move the renewal date;
     # do_not_bill keeps the date and bills the new quantity at renewal.

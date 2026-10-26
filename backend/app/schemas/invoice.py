@@ -229,7 +229,7 @@ class SeatChangeRequest(BaseModel):
 
 
 class TrialStatusResponse(BaseModel):
-    """Campaign session 2 (N-052): the organization's place in its one-week free trial."""
+    """Campaign session 2 (N-052): the organization's place in its free trial."""
 
     state: Literal["NONE", "ACTIVE", "ENDED"] = "NONE"
     ends_at: Optional[datetime] = None

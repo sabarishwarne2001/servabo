@@ -12,7 +12,7 @@ import { DownloadReceiptPdf, ReceiptBody, useValueReceipt } from "@/components/b
 import { organizationBillingPath } from "@/routes/tenantPaths";
 import { formatTimestampDate } from "@/utils/displayTime";
 
-/** The banner shows from day 5 of the 7-day trial (three days left), as N-052 decided. */
+/** The banner shows for the trial's last three days, as N-052 decided (day 12 of the 14-day trial since N-187). */
 const BANNER_DAYS_LEFT = 3;
 
 const dismissKey = (organizationId: string): string => `servabo.trialEnded.seen.${organizationId}`;
@@ -47,7 +47,7 @@ export interface TrialBannerProps {
 }
 
 /**
- * Campaign session 2 — the one-week free trial (owner decision N-052).
+ * Campaign session 2 — the free trial (owner decision N-052; 14 days since Final session 2A, N-187).
  *
  * Every member reads the same member-readable summary the read-only gate uses,
  * so what the banner says and what the server refuses cannot disagree.

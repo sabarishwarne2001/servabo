@@ -40,7 +40,7 @@ interface RawPlan {
 
 /** What each plan is for, in one line. */
 export const PLAN_LABELS: Record<string, { name: string; for: string }> = {
-  free: { name: "Free trial", for: "Try Servabo on your own documents for a week. No card needed." },
+  free: { name: "Free trial", for: "Try Servabo on your own documents for two weeks, long enough for one monthly GSTR-2B. No card needed." },
   developer: { name: "Developer", for: "For one team reading documents into its own tools, with the API and automations." },
   business: { name: "Business", for: "For finance and operations teams: matching, Helm, obligations and ERP posting." },
   enterprise: { name: "Enterprise", for: "For organizations that need single sign-on, approval chains and every control." },

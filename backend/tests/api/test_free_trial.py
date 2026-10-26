@@ -108,7 +108,7 @@ def _publish_free(db: Session) -> None:
 # --- The clock ----------------------------------------------------------------------------------
 
 
-def test_a_first_organization_starts_a_seven_day_trial_on_the_owners_account(client, db_session: Session) -> None:
+def test_a_first_organization_starts_a_fourteen_day_trial_on_the_owners_account(client, db_session: Session) -> None:
     _publish_free(db_session)
     user, headers = _verified_user(db_session)
     before = datetime.now(timezone.utc)
@@ -122,7 +122,8 @@ def test_a_first_organization_starts_a_seven_day_trial_on_the_owners_account(cli
     assert organization.trial_ends_at is not None, "a new organization has no trial clock"
     assert account.trial_ends_at == organization.trial_ends_at
     length = organization.trial_ends_at - before
-    assert timedelta(days=7) - timedelta(minutes=1) <= length <= timedelta(days=7, minutes=1)
+    # N-187 (Final session 2A): the trial is 14 days (it was 7).
+    assert timedelta(days=14) - timedelta(minutes=1) <= length <= timedelta(days=14, minutes=1)
 
 
 def test_a_second_organization_does_not_restart_the_accounts_trial(client, db_session: Session) -> None:

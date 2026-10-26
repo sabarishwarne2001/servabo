@@ -74,55 +74,72 @@ Servabo pays nothing for those tokens (N-048, N-054).
 
 ## 4. The worst case for one Free user
 
-A Free account gets the **one-week trial** (N-052, TENANCY-AND-PLANS §4.3) and Free's monthly
-allowances, which are **shared by every Free organization the same person owns**
-(`quota_service.usage_pool`), so making more organizations does not multiply them. After the week,
-the organization is read-only: nothing more is processed until it subscribes.
+A Free account gets the **14-day trial** (N-052; 14 days since Final session 2A, N-187, so that one monthly GSTR-2B
+fits inside it; TENANCY-AND-PLANS §4.3) and Free's allowances, which are **shared by every Free organization the same
+person owns** (`quota_service.usage_pool`), so making more organizations does not multiply them. After the trial, the
+organization is read-only: nothing more is processed until it subscribes.
 
-| Free allowance (per month, refused at the limit) | Worst-case cost to Servabo |
+| Free allowance (refused at the limit) | Worst-case cost to Servabo |
 |---|---|
-| 300,000 input tokens on GPT-OSS 120B | $0.045 |
-| 60,000 output tokens on GPT-OSS 120B | $0.036 |
-| 50 OCR pages, 25 documents | server CPU: about 2–3 minutes of one vCPU |
+| 1,000,000 input tokens on GPT-OSS 120B | $0.15 |
+| 200,000 output tokens on GPT-OSS 120B | $0.12 |
+| 200 OCR pages, 100 documents | $0.40 at the OCR cost basis (server CPU: about 10 minutes of one vCPU) |
 | 0.25 GB storage | under $0.01 a month |
 | A handful of emails (verify, trial reminders) | under $0.01 |
 | Usage cost ceiling (the platform's safety net) | refuses at $1.00 |
 
-**Worst case: about $0.10 per Free sign-up**, and never more than the $1.00 usage ceiling, because
-the token allowances stop it first. The real risk is not one Free user but many fake ones: each
-verified email address gets its own trial. Sign-up requires a verified email and is rate-limited
-per address (`POLICY_PUBLIC_READ`); if you ever see a wave of sign-ups, Platform admin → Usage shows
-it, and the trial can be shortened with one setting (`FREE_TRIAL_DAYS` in `.env.production`).
+**Worst case: about $0.68 per Free sign-up**, and never more than the $1.00 usage ceiling. The real risk is not one Free
+user but many fake ones: each verified email address gets its own trial. Sign-up requires a verified email and is
+rate-limited per address (`POLICY_PUBLIC_READ`); if you ever see a wave of sign-ups, Platform admin → Usage shows it, and
+the trial can be shortened with one setting (`FREE_TRIAL_DAYS` in `.env.production`).
 
 ## 5. What a paying seat leaves
 
-| Plan | Price per seat per month | Model cost at the seat's full token allowance, GPT-OSS 120B | Notes |
+_Rewritten in Final session 2A (2026-10-26, N-187): every plan is now sold in dollars and in rupees, monthly and yearly, with
+one set of allowances sized for the **lowest** of those prices._
+
+| Plan | Allowance per seat per month | Model cost at the seat's full token allowance, GPT-OSS 120B | Notes |
 |---|---|---|---|
-| Developer | $49 | 15M input + 2M output = $2.25 + $1.20 = **$3.45** | refused above; the usage ceiling is $25 a seat |
-| Business | $299 | 100M input + 20M output = $15 + $12 = **$27** | input overage billed above |
-| Enterprise | $799 | 300M input + 75M output = $45 + $45 = **$90** | overage billed above |
+| Starter (`developer`) | 300 documents, 1,500 OCR pages, 10 GB | 6M input + 1M output = $0.90 + $0.60 = **$1.50** | refused above; the usage ceiling is $8 a seat |
+| Business | 1,500 documents, 6,000 OCR pages, 25 GB | 20M input + 4M output = $3 + $2.40 = **$5.40** | input overage billed above where the gateway bills usage |
+| Enterprise | 4,000 documents, 20,000 OCR pages, 100 GB | 60M input + 15M output = $9 + $9 = **$18** | overage billed above where the gateway bills usage |
 
-So even a seat that uses every token keeps more than 85% of its price before the server, the
-payment provider's fee and support. Most seats use a small part of their allowance.
+The allowances were cut (Starter from 500 documents and 5,000 pages, Business from 5,000 and 40,000, Enterprise from 10,000 and
+95,000), **not the prices**: the rupee prices are about a third of the dollar ones, and one plan must mean the same thing in every
+currency. The OCR cost basis, which dominates every row ($0.002 a page), is still an **estimate**; once Final session 2B measures
+PaddleOCR on the production server, the page allowances can rise in step with a lower measured cost (never lower a cost basis without
+a measurement).
 
-### After Dodo Payments' fees (website and payments session, C12)
+### After Dodo Payments' fees (C12; every currency since Final session 2A)
 
-Dodo Payments keeps 4% + 40 cents of each payment, plus 1.5% for an international card and 0.5% for
-a subscription (`backend/app/core/payment_fees.py`; Dodo's pricing page, read 2026-10-16). The
-figures below take the dearest usual case, an international subscription of one seat, and every
-cost at its ceiling (OCR pages, tokens on the default model, storage, embeddings;
-`tests/scripts/test_plan_unit_economics.py`, which fails if these rows go stale). Typical use is a
-fifth of each allowance.
+Dodo keeps 4% + 40 cents of each dollar payment, plus 1.5% for an international card and 0.5% for a subscription; on a **domestic
+Indian** payment (an Indian customer paying in rupees) it keeps 4% + 15 cents, plus 0.5% for a subscription
+(`backend/app/core/payment_fees.py`; Dodo's pricing page as quoted by search extracts on 2026-10-23 and 2026-10-26, the page itself
+could not be opened from the build sandbox). Rupees are converted at a fixed, conservative **₹90 to the dollar** (the market rate on
+2026-10-26 was about ₹88). A yearly price is shown per month (divided by twelve), with its one yearly fee spread over the months. Every
+cost is at its ceiling (OCR pages, tokens on the default model, storage, embeddings; `tests/scripts/test_plan_unit_economics.py`, which
+fails if these rows go stale). Typical use is a fifth of each allowance.
 
-| Plan | Price per seat | Dodo fee | Cost at the ceilings | Margin at the ceilings | Margin at typical use |
-|---|---|---|---|---|---|
-| Developer | $49 | $3.34 | $14.05 | 65% | 87% |
-| Business | $299 | $18.34 | $112.95 | 56% | 86% |
-| Enterprise | $799 | $48.34 | $303.48 | 56% | 86% |
+| Plan | Price | Per seat per month, in dollars | Dodo fee | Cost at the ceilings | Margin at the ceilings | Margin at typical use |
+|---|---|---|---|---|---|---|
+| Starter | $49 a month | $49.00 | $3.34 | $4.74 | 84% | 91% |
+| Starter | $490 a year | $40.83 | $2.48 | $4.74 | 82% | 92% |
+| Starter | ₹1,499 a month | $16.66 | $0.90 | $4.74 | 66% | 89% |
+| Starter | ₹14,990 a year | $13.88 | $0.64 | $4.74 | 61% | 89% |
+| Business | $299 a month | $299.00 | $18.34 | $18.00 | 88% | 93% |
+| Business | $2,990 a year | $249.17 | $14.98 | $18.00 | 87% | 93% |
+| Business | ₹4,999 a month | $55.54 | $2.65 | $18.00 | 63% | 89% |
+| Business | ₹49,990 a year | $46.29 | $2.10 | $18.00 | 57% | 88% |
+| Enterprise | $799 a month | $799.00 | $48.34 | $60.40 | 86% | 92% |
+| Enterprise | ₹14,999 a month | $166.66 | $7.65 | $60.40 | 59% | 88% |
 
-The rule: every paid plan keeps **at least 55%** at its ceilings after the fee. Enterprise kept 54.7%
-with 100,000 OCR pages a seat, so its allowance became 95,000 pages a seat (the price did not move;
-NEEDS-OWNER, C12). A chargeback costs a further $30.
+The rules, checked against **every** row: at least **60%** at the ceilings before the fee, **50%** if every token went to the dearest
+model the platform serves, and **55%** after the fee. The binding row is Business at ₹49,990 a year (57% after the fee). If Dodo turns
+out to add its 1.5% international surcharge to Indian cards too, that row still keeps 55.1%. Before Final session 2A the test checked
+only the dollar monthly prices, and Business at $2,990 a year kept 54.6% at the old allowances (F-626). A chargeback costs a further $30.
+
+**The trial** (Free, 14 days, 100 documents, 200 OCR pages): about **$0.68** per trial account at its ceilings, against an acquisition
+ceiling of $1.00 (raised from $0.25 with the longer trial, N-187), backed by the platform's $1.00 usage ceiling on Free.
 
 ## 6. Keep these numbers true
 

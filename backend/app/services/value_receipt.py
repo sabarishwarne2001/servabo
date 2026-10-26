@@ -4,7 +4,7 @@
     cached(db, organization_id, period)      the same, kept in Redis for ten minutes per organization and period
     forget(organization_id)                  drops the kept copies (tests, and a new import is allowed to show at once)
 
-`period` is "trial" (the organization's trial window: the seven days that end at `organizations.trial_ends_at`)
+`period` is "trial" (the organization's trial window: the FREE_TRIAL_DAYS (14) days that end at `organizations.trial_ends_at`)
 or "month" (the current calendar month in the time zone of the organization's oldest workspace; organizations
 have no time zone of their own, N-141).
 
@@ -139,7 +139,7 @@ def _zone(name: Optional[str]) -> ZoneInfo:
 
 def window(organization: Organization, workspaces: list[Workspace], period: str,
            now: datetime) -> tuple[datetime, datetime, str]:
-    """`[start, end)` in UTC and the zone name. The trial window is the seven days ending at the trial's end
+    """`[start, end)` in UTC and the zone name. The trial window is the trial's length (FREE_TRIAL_DAYS) ending at its end
     (clipped to now); the month is the calendar month in the zone of the oldest workspace."""
     if period not in PERIODS:
         raise ReceiptError("period must be trial or month")

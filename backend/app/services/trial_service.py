@@ -1,4 +1,4 @@
-"""Campaign session 2 — the one-week free trial (owner decision N-052).
+"""Campaign session 2 — the free trial (owner decision N-052; 14 days since Final session 2A, N-187).
 
 WHAT THE OWNER DECIDED
 ======================
@@ -60,7 +60,7 @@ NOT_ON_TRIAL = "NONE"
 TRIAL_ACTIVE = "ACTIVE"
 TRIAL_ENDED = "ENDED"
 
-#: The banner shows from this many days before the end (day 5 of a 7-day trial).
+#: The banner shows from this many days before the end (day 12 of the 14-day trial).
 BANNER_DAYS_LEFT = 3
 
 

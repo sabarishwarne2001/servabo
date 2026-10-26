@@ -318,11 +318,11 @@ def test_business_is_not_told_what_business_adds(db_session, world):
     assert vr.receipt(db_session, world.organization.id, "trial", now=NOW)["also_on_business"] == []
 
 
-def test_the_trial_window_ends_at_the_trials_end_and_starts_seven_days_before(db_session, world):
+def test_the_trial_window_ends_at_the_trials_end_and_starts_fourteen_days_before(db_session, world):
     org = world.organization
     ends = NOW + 2 * DAY
     body = vr.receipt(db_session, org.id, "trial", now=NOW)
-    assert datetime.fromisoformat(body["period_start"]) == ends - 7 * DAY
+    assert datetime.fromisoformat(body["period_start"]) == ends - 14 * DAY  # N-187: a 14-day trial (was 7)
     assert datetime.fromisoformat(body["period_end"]) == NOW
     after = vr.receipt(db_session, org.id, "trial", now=NOW + 5 * DAY)           # the trial is over: the window is fixed
     assert datetime.fromisoformat(after["period_end"]) == ends

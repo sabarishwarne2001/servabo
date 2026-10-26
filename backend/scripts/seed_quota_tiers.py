@@ -54,10 +54,10 @@ PLATFORM_KEY = {
     "overage_policy": "REFUSE",
 }
 
-# ARCH-30 Tranche 2 (D-8). Enterprise bundles both add-ons. Developer and
-# Business buy them as separate gateway subscriptions ($199 and $300 a month),
-# recorded in `organization_addons`, not here: a purchase has its own lifecycle
-# and a published tier version cannot change.
+# ARCH-30 Tranche 2 (D-8). A plan that includes an add-on carries its key; a plan that sells it buys it as its own
+# gateway subscription, recorded in `organization_addons`, not here: a purchase has its own lifecycle and a published
+# tier version cannot change. Final session 2A (N-187): custom domains are included in Business and Enterprise and sold
+# to nobody (the $199 add-on is retired); warehouse sync stays a $300 add-on for Starter, in dollars only.
 ADDON_CUSTOM_DOMAIN = {
     "limit_key": "addon.custom_domain",
     "max_cost_micros": 0,
@@ -87,9 +87,10 @@ ADDON_GST_CREDIT = {
 # plan cards, the sidebar locks and every 402 on the request path read it back.
 #
 #   Free        core extraction and workspace chat; every premium row absent
-#   Developer   + developer API keys, outgoing webhooks, custom branding and
-#                 vanity domains (the custom-domain add-on, bundled)
-#   Business    + three-way reconciliation, the forensic radar, custom email,
+#   Developer   + developer API keys, outgoing webhooks, custom branding and the
+#   ("Starter")   Tally Prime import file (N-187; shown to customers as "Starter")
+#   Business    + custom domains (the custom-domain add-on, bundled; N-187),
+#                 three-way reconciliation, the forensic radar, custom email,
 #                 extraction memory (ARCH41-S2:tier-business),
 #                 the entity graph (ARCH42-S1:tier-business),
 #                 case intelligence & the packet dicer (ARCH43-S1:tier-business),
@@ -120,7 +121,7 @@ DEVELOPER_FEATURES = [
     _capability("capability.outgoing_webhooks"),
     _capability("capability.custom_branding"),
     _capability("capability.automations"),  # campaign session 1, N-049: not on Free
-    ADDON_CUSTOM_DOMAIN,
+    _capability("capability.tally_file"),  # Final session 2A (N-187, closes N-174): the Tally Prime import file
 ]
 BUSINESS_CAPABILITIES = [
     _capability("capability.reconciliation"),
@@ -139,7 +140,8 @@ BUSINESS_CAPABILITIES = [
     _capability("capability.trinetra"),
     _capability("capability.gst_credit"),  # Session F: GST Credit (N-135)
 ]
-BUSINESS_FEATURES = [*DEVELOPER_FEATURES, *BUSINESS_CAPABILITIES, ADDON_WAREHOUSE_SYNC, ADDON_GST_CREDIT]
+BUSINESS_FEATURES = [*DEVELOPER_FEATURES, *BUSINESS_CAPABILITIES, ADDON_CUSTOM_DOMAIN, ADDON_WAREHOUSE_SYNC,
+                     ADDON_GST_CREDIT]
 ENTERPRISE_CAPABILITIES = [
     _capability("capability.reconciliation"),
     _capability("capability.anomaly_radar"),
@@ -173,7 +175,8 @@ ENTERPRISE_CAPABILITIES = [
     _capability("capability.gst_credit"),  # Session F: GST Credit (N-135)
     _capability("capability.gst_credit_all_workspaces"),
 ]
-ENTERPRISE_FEATURES = [*DEVELOPER_FEATURES, *ENTERPRISE_CAPABILITIES, ADDON_WAREHOUSE_SYNC, ADDON_GST_CREDIT]
+ENTERPRISE_FEATURES = [*DEVELOPER_FEATURES, *ENTERPRISE_CAPABILITIES, ADDON_CUSTOM_DOMAIN, ADDON_WAREHOUSE_SYNC,
+                       ADDON_GST_CREDIT]
 
 # ARCH-29 Tranche 2 / HM-S1. Commercial terms.
 #
@@ -214,59 +217,83 @@ COMMERCIALS: dict[str, dict[str, Any]] = {
     },
 }
 
-# N-051: yearly on Developer and Business at ten times the monthly price per seat (two months
-# free). Enterprise yearly is arranged by agreement, by email (not self-serve). A yearly price is
-# offered in the app only once its gateway product id is configured (`publish_yearly_prices`); the
-# website's price list (`scripts/export_public_pricing.py`) reads this same table.
+# Final session 2A (N-187): every price a plan is sold at, per currency and interval, per seat. Dollars for the world
+# (unchanged), rupees for India (GST added on top by Dodo, the merchant of record). Yearly is ten months (two free);
+# Enterprise yearly stays by agreement, by email, in both currencies (N-051). A price is offered in the app only once
+# its gateway product id is configured (`publish_price_books`); the website's price list
+# (`scripts/export_public_pricing.py`), `scripts/dodo_setup.py` and the unit-economics test read this same table.
+# The tier version's own price (COMMERCIALS above) is the dollar monthly one; every other price lives in a book.
+PLAN_PRICES: tuple[dict[str, Any], ...] = (
+    {"tier": "developer", "interval": "month", "currency": "USD", "unit_amount_micros": 49_000_000,
+     "gateway_price_id_env": "GATEWAY_PRICE_ID_DEVELOPER"},
+    {"tier": "developer", "interval": "year", "currency": "USD", "unit_amount_micros": 490_000_000,
+     "gateway_price_id_env": "GATEWAY_PRICE_ID_DEVELOPER_YEARLY"},
+    {"tier": "developer", "interval": "month", "currency": "INR", "unit_amount_micros": 1_499_000_000,
+     "gateway_price_id_env": "GATEWAY_PRICE_ID_DEVELOPER_INR"},
+    {"tier": "developer", "interval": "year", "currency": "INR", "unit_amount_micros": 14_990_000_000,
+     "gateway_price_id_env": "GATEWAY_PRICE_ID_DEVELOPER_YEARLY_INR"},
+    {"tier": "business", "interval": "month", "currency": "USD", "unit_amount_micros": 299_000_000,
+     "gateway_price_id_env": "GATEWAY_PRICE_ID_BUSINESS"},
+    {"tier": "business", "interval": "year", "currency": "USD", "unit_amount_micros": 2_990_000_000,
+     "gateway_price_id_env": "GATEWAY_PRICE_ID_BUSINESS_YEARLY"},
+    {"tier": "business", "interval": "month", "currency": "INR", "unit_amount_micros": 4_999_000_000,
+     "gateway_price_id_env": "GATEWAY_PRICE_ID_BUSINESS_INR"},
+    {"tier": "business", "interval": "year", "currency": "INR", "unit_amount_micros": 49_990_000_000,
+     "gateway_price_id_env": "GATEWAY_PRICE_ID_BUSINESS_YEARLY_INR"},
+    {"tier": "enterprise", "interval": "month", "currency": "USD", "unit_amount_micros": 799_000_000,
+     "gateway_price_id_env": "GATEWAY_PRICE_ID_ENTERPRISE"},
+    {"tier": "enterprise", "interval": "month", "currency": "INR", "unit_amount_micros": 14_999_000_000,
+     "gateway_price_id_env": "GATEWAY_PRICE_ID_ENTERPRISE_INR"},
+)
+
+#: N-051's yearly dollar prices, read from PLAN_PRICES (the name older callers use).
 YEARLY_COMMERCIALS: dict[str, dict[str, Any]] = {
-    "developer": {
-        "unit_amount_micros": 490_000_000,
-        "currency": "USD",
-        "gateway_price_id_env": "GATEWAY_PRICE_ID_DEVELOPER_YEARLY",
-    },
-    "business": {
-        "unit_amount_micros": 2_990_000_000,
-        "currency": "USD",
-        "gateway_price_id_env": "GATEWAY_PRICE_ID_BUSINESS_YEARLY",
-    },
+    p["tier"]: {"unit_amount_micros": p["unit_amount_micros"], "currency": p["currency"],
+                "gateway_price_id_env": p["gateway_price_id_env"]}
+    for p in PLAN_PRICES if p["interval"] == "year" and p["currency"] == "USD"
 }
 
-def publish_yearly_prices(db: Any, *, environ: Optional[dict[str, str]] = None) -> Optional[str]:
-    """Publish the USD plan price book once yearly products exist at the gateway (C11); its code.
 
-    The app sells an interval only through a published plan price book (`revops.price_books`).
-    With GATEWAY_PRICE_ID_DEVELOPER_YEARLY and/or _BUSINESS_YEARLY set, the book holds each
-    plan's monthly price (with its monthly product id) and the configured yearly prices from
-    YEARLY_COMMERCIALS, so the plan cards offer Monthly and Yearly. Without them nothing is
-    published and the switch stays hidden. A published USD book with the same entries is left
-    as it is (the seed can run again); a different one is superseded by publishing a new one.
+def publish_price_books(db: Any, *, environ: Optional[dict[str, str]] = None) -> dict[str, str]:
+    """Publish one plan price book per currency for the products configured at the gateway; {currency: code}.
+
+    The app sells an (interval, currency) only through a published plan price book (`revops.price_books`); the tier
+    version's own price covers dollars monthly. So a dollar book is published once a yearly dollar product exists
+    (C11), and a rupee book once any rupee product exists (N-187). Each book holds every configured price in its
+    currency, with its product id. A published book with the same entries is left as it is (the seed can run again);
+    a different one is superseded by publishing a new one, which retires the old in the same transaction.
     """
     from app.services.revops import price_books
 
     env = dict(os.environ if environ is None else environ)
-    yearly = {key: env.get(c["gateway_price_id_env"]) for key, c in YEARLY_COMMERCIALS.items()}
-    yearly = {key: value for key, value in yearly.items() if value}
-    if not yearly:
-        return None
-    wanted: set[tuple[str, str, int, Optional[str]]] = set()
-    for key, c in COMMERCIALS.items():
-        monthly_id = env.get(c["gateway_price_id_env"]) if c["gateway_price_id_env"] else None
-        if c["unit_amount_micros"] > 0 and monthly_id:
-            wanted.add((key, "month", int(c["unit_amount_micros"]), monthly_id))
-    for key, price_id in yearly.items():
-        wanted.add((key, "year", int(YEARLY_COMMERCIALS[key]["unit_amount_micros"]), price_id))
-    current = [p for p in price_books.published_prices(db) if p.currency == "USD"]
-    if {(p.tier_key, p.interval, p.unit_amount_micros, p.gateway_price_id) for p in current} == wanted:
-        return current[0].book_code
-    code = f"SEED-USD-{datetime.now(timezone.utc):%Y%m%d%H%M%S}"
-    book = price_books.create_book(db, code=code, currency="USD",
-                                   notes="Published by scripts/seed_quota_tiers.py (monthly and yearly prices).",
-                                   actor_id=None)
-    for key, interval, micros, price_id in sorted(wanted):
-        price_books.set_entry(db, book_id=book["id"], tier_key=key, interval=interval,
-                              unit_amount_minor=micros // 10_000, gateway_price_id=price_id)
-    price_books.publish(db, book_id=book["id"], actor_id=None)
-    return book["code"]
+    published: dict[str, str] = {}
+    current_all = price_books.published_prices(db)
+    for currency in ("USD", "INR"):
+        wanted = {
+            (p["tier"], p["interval"], int(p["unit_amount_micros"]), env[p["gateway_price_id_env"]].strip())
+            for p in PLAN_PRICES
+            if p["currency"] == currency and (env.get(p["gateway_price_id_env"]) or "").strip()
+        }
+        if not wanted or (currency == "USD" and all(interval == "month" for _, interval, _, _ in wanted)):
+            continue
+        current = [p for p in current_all if p.currency == currency]
+        if {(p.tier_key, p.interval, p.unit_amount_micros, p.gateway_price_id) for p in current} == wanted:
+            published[currency] = current[0].book_code
+            continue
+        code = f"SEED-{currency}-{datetime.now(timezone.utc):%Y%m%d%H%M%S}"
+        book = price_books.create_book(db, code=code, currency=currency,
+                                       notes="Published by scripts/seed_quota_tiers.py (N-187).", actor_id=None)
+        for key, interval, micros, price_id in sorted(wanted):
+            price_books.set_entry(db, book_id=book["id"], tier_key=key, interval=interval,
+                                  unit_amount_minor=micros // 10_000, gateway_price_id=price_id)
+        price_books.publish(db, book_id=book["id"], actor_id=None)
+        published[currency] = book["code"]
+    return published
+
+
+def publish_yearly_prices(db: Any, *, environ: Optional[dict[str, str]] = None) -> Optional[str]:
+    """The dollar book's code after `publish_price_books` (C11's name; None when no dollar book is needed)."""
+    return publish_price_books(db, environ=environ).get("USD")
 
 
 # Campaign session 1 — the plan table, decided under delegated founder authority
@@ -302,22 +329,24 @@ PLACEHOLDER_TIERS: dict[str, dict[str, Any]] = {
                 "max_cost_micros": 1_000_000,
                 "overage_policy": "REFUSE",
             },
-            # Safety net above the counts: 25 documents of up to 10 pages (only 50
-            # of them OCR'd) and 30 assistant questions need ~250k input tokens.
+            # Final session 2A (N-187): the trial is 14 days with 100 documents and 200 OCR pages, so one monthly
+            # GSTR-2B cycle fits inside it. Safety net above the counts: 100 documents and 30 assistant questions
+            # need under 1M input tokens. At its ceilings a trial account costs about $0.68 (the unit-economics
+            # test's acquisition ceiling is $1.00, backed by the $1.00 `*` row above).
             {
                 "limit_key": "llm.input_token",
-                "max_quantity": "300000",
+                "max_quantity": "1000000",
                 "overage_policy": "REFUSE",
                 "grace_quantity": "500",
             },
             {
                 "limit_key": "llm.output_token",
-                "max_quantity": "60000",
+                "max_quantity": "200000",
                 "overage_policy": "REFUSE",
                 "grace_quantity": "250",
             },
-            {"limit_key": "ocr.page", "max_quantity": "50", "overage_policy": "REFUSE"},
-            {"limit_key": "document.upload", "max_quantity": "25", "overage_policy": "REFUSE"},
+            {"limit_key": "ocr.page", "max_quantity": "200", "overage_policy": "REFUSE"},
+            {"limit_key": "document.upload", "max_quantity": "100", "overage_policy": "REFUSE"},
             {"limit_key": "assistant.message", "max_quantity": "30", "overage_policy": "REFUSE"},
             # 250 MB stored at any time (checked at upload; sampled monthly).
             {
@@ -335,40 +364,46 @@ PLACEHOLDER_TIERS: dict[str, dict[str, Any]] = {
             _plan_limit("limit.helm_backtest_months", 3),
         ],
     },
+    # Final session 2A (N-187): the paid allowances below are sized for the LOWEST price of each plan in any currency
+    # (the rupee yearly price, per month, at a conservative ₹90 to the dollar, after Dodo's India fee), so that one set
+    # of allowances serves every currency and keeps tests/scripts/test_plan_unit_economics.py's margins. The prices did
+    # not move; the allowances did (they were sized for the dollar prices). The OCR cost basis that dominates them is
+    # still ESTIMATED ($0.002 a page): allowances may rise once Final session 2B measures a lower real cost.
     "developer": {
-        "display_name": "Developer",
+        # The key stays `developer` (code, API, gateway variables); customers see "Starter" (N-187).
+        "display_name": "Starter",
         "entries": [
             {
                 "limit_key": "*",
-                "max_cost_micros": 25_000_000,
+                "max_cost_micros": 8_000_000,
                 "overage_policy": "REFUSE",
             },
             {
                 "limit_key": "llm.input_token",
-                "max_quantity": "15000000",
+                "max_quantity": "6000000",
                 "overage_policy": "REFUSE",
                 "grace_quantity": "5000",
             },
             {
                 "limit_key": "llm.output_token",
-                "max_quantity": "2000000",
+                "max_quantity": "1000000",
                 "overage_policy": "REFUSE",
                 "grace_quantity": "2000",
             },
             {
                 "limit_key": "storage.gb_month",
-                "max_quantity": "25",
+                "max_quantity": "10",
                 "overage_policy": "ALLOW_AND_BILL",
                 "overage_price_tier_key": OVERAGE_TIER_KEY,
             },
             {
                 "limit_key": "ocr.page",
-                "max_quantity": "5000",
+                "max_quantity": "1500",
                 "overage_policy": "ALLOW_AND_BILL",
                 "overage_price_tier_key": OVERAGE_TIER_KEY,
             },
-            {"limit_key": "document.upload", "max_quantity": "500", "overage_policy": "REFUSE"},
-            {"limit_key": "assistant.message", "max_quantity": "1000", "overage_policy": "REFUSE"},
+            {"limit_key": "document.upload", "max_quantity": "300", "overage_policy": "REFUSE"},
+            {"limit_key": "assistant.message", "max_quantity": "500", "overage_policy": "REFUSE"},
             PLATFORM_KEY,
             _plan_limit("limit.workspaces", 3),
             _plan_limit("limit.file_size_mb", 50),
@@ -382,42 +417,43 @@ PLACEHOLDER_TIERS: dict[str, dict[str, Any]] = {
         "entries": [
             {
                 "limit_key": "*",
-                "max_cost_micros": 500_000_000,
+                "max_cost_micros": 30_000_000,
                 "overage_policy": "REFUSE",
             },
             {
+                # N-187: 4M (was 20M) per seat, with the rows below, for the rupee yearly price.
                 "limit_key": "llm.output_token",
-                "max_quantity": "20000000",
+                "max_quantity": "4000000",
                 "overage_policy": "REFUSE",
                 "grace_quantity": "10000",
             },
             {
-                # Campaign session 2 (N-054): 100M (was 150M) per seat. At GPT-OSS 120B's
-                # real price (the default model, $0.15 / $0.60 per million) a seat used to
-                # every ceiling kept 56%; past this, tokens bill overage at over six times cost.
+                # Campaign session 2 (N-054): 100M (was 150M) per seat. N-187: 20M per seat, so a seat at the
+                # rupee yearly price (₹4,166 a month) keeps 61% at every ceiling; past this, tokens bill overage
+                # at over six times cost where the gateway bills usage.
                 "limit_key": "llm.input_token",
-                "max_quantity": "100000000",
+                "max_quantity": "20000000",
                 "overage_policy": "ALLOW_AND_BILL",
                 "overage_price_tier_key": OVERAGE_TIER_KEY,
                 "grace_quantity": "10000",
             },
             {
                 "limit_key": "storage.gb_month",
-                "max_quantity": "250",
+                "max_quantity": "25",
                 "overage_policy": "ALLOW_AND_BILL",
                 "overage_price_tier_key": OVERAGE_TIER_KEY,
             },
             {
-                # Campaign session 2 (N-054): 40,000 (was 50,000), with the input tokens
-                # above: together a seat used to every ceiling keeps 62% at the suppliers'
-                # real prices. Pages past this bill overage at ten times their cost.
+                # Campaign session 2 (N-054): 40,000 (was 50,000). N-187: 6,000 per seat (1,500 documents of
+                # about four pages), sized for the rupee yearly price. Pages past this bill overage at ten times
+                # their cost where the gateway bills usage.
                 "limit_key": "ocr.page",
-                "max_quantity": "40000",
+                "max_quantity": "6000",
                 "overage_policy": "ALLOW_AND_BILL",
                 "overage_price_tier_key": OVERAGE_TIER_KEY,
             },
-            {"limit_key": "document.upload", "max_quantity": "5000", "overage_policy": "ALLOW_AND_WARN"},
-            {"limit_key": "assistant.message", "max_quantity": "10000", "overage_policy": "ALLOW_AND_WARN"},
+            {"limit_key": "document.upload", "max_quantity": "1500", "overage_policy": "ALLOW_AND_WARN"},
+            {"limit_key": "assistant.message", "max_quantity": "3000", "overage_policy": "ALLOW_AND_WARN"},
             PLATFORM_KEY,
             _plan_limit("limit.workspaces", 20),
             _plan_limit("limit.file_size_mb", 100),
@@ -436,23 +472,24 @@ PLACEHOLDER_TIERS: dict[str, dict[str, Any]] = {
         "entries": [
             {
                 "limit_key": "*",
-                "max_cost_micros": 10_000_000_000,
+                "max_cost_micros": 100_000_000,
                 "overage_policy": "ALLOW_AND_WARN",
             },
             # Per seat. 1B in / 250M out a seat, all on the dearest model the platform
             # pays for, took a seat to a 44% margin (N-046); past these, tokens are
             # billed at the overage rate. Campaign session 2 (N-054): 300M in / 75M out
             # (were 500M / 125M); at GPT-OSS 120B's real price a seat at every ceiling
-            # kept 53%, now 61%.
+            # kept 53%, now 61%. N-187: 60M in / 15M out, sized with the rows below for the rupee price
+            # (₹14,999, about $167 at ₹90): a seat at every ceiling keeps 64%.
             {
                 "limit_key": "llm.input_token",
-                "max_quantity": "300000000",
+                "max_quantity": "60000000",
                 "overage_policy": "ALLOW_AND_BILL",
                 "overage_price_tier_key": OVERAGE_TIER_KEY,
             },
             {
                 "limit_key": "llm.output_token",
-                "max_quantity": "75000000",
+                "max_quantity": "15000000",
                 "overage_policy": "ALLOW_AND_BILL",
                 "overage_price_tier_key": OVERAGE_TIER_KEY,
             },
@@ -460,21 +497,21 @@ PLACEHOLDER_TIERS: dict[str, dict[str, Any]] = {
             # and took a seat used to its limits to a 37% margin (NEEDS-OWNER N-046).
             {
                 "limit_key": "storage.gb_month",
-                "max_quantity": "1000",
+                "max_quantity": "100",
                 "overage_policy": "ALLOW_AND_BILL",
                 "overage_price_tier_key": OVERAGE_TIER_KEY,
             },
             # Per seat. Website and payments session (C12): 95,000 pages, down from
             # 100,000, so a seat used to every ceiling keeps 55% after Dodo Payments'
             # fees (6% + 40 cents on an international subscription); at 100,000 it kept
-            # 54.7%. The allowance moved, never the price (NEEDS-OWNER, C12).
+            # 54.7%. The allowance moved, never the price (NEEDS-OWNER, C12). N-187: 20,000, for the rupee price.
             {
                 "limit_key": "ocr.page",
-                "max_quantity": "95000",
+                "max_quantity": "20000",
                 "overage_policy": "ALLOW_AND_BILL",
                 "overage_price_tier_key": OVERAGE_TIER_KEY,
             },
-            {"limit_key": "document.upload", "max_quantity": "10000", "overage_policy": "ALLOW_AND_WARN"},
+            {"limit_key": "document.upload", "max_quantity": "4000", "overage_policy": "ALLOW_AND_WARN"},
             # No assistant.message row: fair use under the token ceilings.
             # No limit.* rows: unlimited workspaces; file size and pages per
             # document up to the platform maximum; unlimited Helm mandates (N-082).
@@ -936,10 +973,9 @@ def main(argv: Optional[list[str]] = None) -> int:
             )
             published.append(f"{tier.key}/v{tier.version}")
         db.flush()
-        # Website and payments session (C11): the yearly prices, once their products exist.
-        yearly_book = publish_yearly_prices(db)
-        if yearly_book:
-            print(f"plan prices: {yearly_book} (monthly and yearly)")
+        # C11 and N-187: the yearly and the rupee prices, once their products exist.
+        for currency, book_code in publish_price_books(db).items():
+            print(f"plan prices: {book_code} ({currency})")
 
         moved: list[dict[str, Any]] = []
         if args.carry_forward:
