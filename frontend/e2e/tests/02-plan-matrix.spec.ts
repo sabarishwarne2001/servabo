@@ -31,7 +31,7 @@ const WS_PROBES: Record<string, { path: string; plan: Plan }> = {
   "ws:tables": { path: "tables", plan: "business" },
   "ws:obligations": { path: "obligations", plan: "business" },
   "ws:procurement": { path: "procurement/cases", plan: "business" },
-  "ws:erp": { path: "erp/postings", plan: "business" },
+  "ws:erp": { path: "erp/postings", plan: "developer" }, // N-187: the Tally file on Starter lists its own postings
   "ws:radar": { path: "anomalies", plan: "business" },
   "ws:process": { path: "process/overview", plan: "enterprise" },
   "ws:corroboration": { path: "corroboration/runs", plan: "enterprise" },

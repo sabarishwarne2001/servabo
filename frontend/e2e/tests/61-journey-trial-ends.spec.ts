@@ -54,7 +54,7 @@ test.describe("Journey: the trial ends, then the customer subscribes", () => {
     await page.goto(customer.org("members"));
     await expect(page.locator("main")).toContainText(customer.email);
     await page.goto(customer.org("billing"));
-    await expect(page.getByRole("list", { name: "Developer allowances" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Starter allowances" })).toBeVisible(); // N-187: "Developer" is shown as "Starter"
     await expectHealthyPage(page);
 
     // Uploads and the assistant are paused, and say why.
@@ -79,7 +79,7 @@ test.describe("Journey: the trial ends, then the customer subscribes", () => {
       { title: "Subscribed" });
     expect(resumed.status, resumed.text).toBeLessThan(300);
     await page.goto(customer.org("billing"));
-    await expect(page.locator("main")).toContainText(/Developer/);
+    await expect(page.locator("main")).toContainText(/Starter/); // N-187
     await expectHealthyPage(page);
   });
 });

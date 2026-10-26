@@ -281,6 +281,16 @@ def _dodo_catalogue(db) -> list[str]:
             "product_id": tier.gateway_price_id, "name": tier.display_name, "interval": interval,
             "price": int(tier.unit_amount_micros) // 10_000, "currency": tier.currency or "USD"})
         added.append(tier.gateway_price_id)
+    # N-187: the price books' products (rupees, yearly), each with its own currency and interval.
+    from app.services.revops import price_books
+
+    for price in price_books.published_prices(db):
+        if price.gateway_price_id and price.gateway_price_id not in added:
+            _dodo_call("POST", "/_fake/product", {
+                "product_id": price.gateway_price_id, "name": price.tier_key.title() if price.tier_key != "developer" else "Starter",
+                "interval": "Year" if price.interval == "year" else "Month",
+                "price": price.unit_amount_micros // 10_000, "currency": price.currency})
+            added.append(price.gateway_price_id)
     for offer in ADDON_CATALOG.values():  # Session H: an add-on is one product per organization
         for price in offer.prices:  # N-187: each currency and interval is its own product
             product_id = price.product_id()

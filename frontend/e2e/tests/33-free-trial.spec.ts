@@ -23,7 +23,7 @@ test.describe("Trial: the last days", () => {
     await expect(banner).toContainText("Your free trial ends in 2 days", { timeout: 15_000 });
     await banner.getByRole("link", { name: "Choose a plan" }).click();
     await expect(page).toHaveURL(new RegExp(`${org("S", "billing")}$`));
-    await expect(page.getByRole("list", { name: "Developer allowances" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Starter allowances" })).toBeVisible(); // N-187: "Developer" is shown as "Starter"
     await expectHealthyPage(page);
   });
 });

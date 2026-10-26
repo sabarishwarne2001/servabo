@@ -64,7 +64,8 @@ test.describe("Free: plan cards", () => {
     await expect(free).toContainText("30 assistant messages / month");
     await expect(free).toContainText("Files up to 10 MB");
     await expect(free).toContainText("2 seats (owner included)");
-    const developer = page.getByRole("list", { name: "Developer allowances" });
+    // N-187 (Final session 2A): the `developer` plan is shown as "Starter".
+    const developer = page.getByRole("list", { name: "Starter allowances" });
     await expect(developer).toContainText("500 documents uploaded / month per seat");
     await expectHealthyPage(page);
   });

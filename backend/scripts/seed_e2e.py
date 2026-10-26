@@ -175,6 +175,13 @@ E2E_PRICE_IDS = {
     "GATEWAY_PRICE_ID_DEVELOPER": "price_e2e_test_developer",
     "GATEWAY_PRICE_ID_BUSINESS": "price_e2e_test_business",
     "GATEWAY_PRICE_ID_ENTERPRISE": "price_e2e_test_enterprise",
+    # Final session 2A (N-187): the rupee products, so the suite runs the configuration production sells (a rupee
+    # price book beside the dollar plan prices; Indian organizations see rupees first).
+    "GATEWAY_PRICE_ID_DEVELOPER_INR": "price_e2e_test_developer_inr",
+    "GATEWAY_PRICE_ID_BUSINESS_INR": "price_e2e_test_business_inr",
+    "GATEWAY_PRICE_ID_ENTERPRISE_INR": "price_e2e_test_enterprise_inr",
+    "GATEWAY_PRICE_ID_DEVELOPER_YEARLY_INR": "price_e2e_test_developer_yearly_inr",
+    "GATEWAY_PRICE_ID_BUSINESS_YEARLY_INR": "price_e2e_test_business_yearly_inr",
 }
 
 

@@ -371,6 +371,8 @@ class FakeDodo:
 
     def _route(self, method: str, path: str, query: dict[str, list[str]], body: dict[str, Any]) -> tuple[int, str, bytes]:
         seg = path.strip("/").split("/")
+        if method == "GET" and path == "/favicon.ico":
+            return 204, "image/x-icon", b""  # the browser asks for one on the checkout page; nothing to show
         if method == "POST" and path == "/checkouts":
             cart = body.get("product_cart") or []
             if not cart:
@@ -380,6 +382,14 @@ class FakeDodo:
                                 email=customer.get("email") or "owner@example.com",
                                 customer_id=customer.get("customer_id"), metadata=body.get("metadata") or {},
                                 return_url=body.get("return_url") or "")
+            # Final session 2A (N-187): what an Indian business checkout tells Dodo, shown on the stand-in's page.
+            flags = body.get("feature_flags") or {}
+            self.checkouts[cid]["india"] = {
+                "billing_currency": body.get("billing_currency"),
+                "country": (body.get("billing_address") or {}).get("country"),
+                "tax_id": body.get("tax_id"),
+                "require_tax_id": bool(flags.get("require_tax_id")),
+            }
             return _json(200, {"session_id": cid, "checkout_url": f"{self.base_url}/checkout/{cid}"})
         if seg[0] == "checkout" and len(seg) == 2 and method == "GET":
             return 200, "text/html; charset=utf-8", _checkout_page(self.checkouts[seg[1]], self.products).encode()
@@ -652,6 +662,18 @@ def _pdf(text: str) -> bytes:
     return bytes(out)
 
 
+def _india_lines(session: dict[str, Any]) -> str:
+    """An Indian checkout as Dodo documents it: UPI and RuPay offered, a tax id asked for (Final session 2A)."""
+    from html import escape
+
+    india = session.get("india") or {}
+    if india.get("country") != "IN":
+        return ""
+    tax = escape(str(india.get("tax_id") or ""))
+    return (f"<p data-testid='india'>Billing country: IN. Pay by UPI, RuPay or an Indian card. "
+            f"Tax ID {'required' if india.get('require_tax_id') else 'optional'}: <span data-testid='tax-id'>{tax}</span></p>")
+
+
 def _checkout_page(session: dict[str, Any], products: dict[str, dict[str, Any]]) -> str:
     product = products[session["product_id"]]
     price = product["price"]
@@ -661,7 +683,7 @@ def _checkout_page(session: dict[str, Any], products: dict[str, dict[str, Any]])
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Dodo Payments test checkout</title></head>
 <body><main><h1>Test checkout</h1>
 <p>{escape(product['name'])} &times; {session['quantity']}: {price['currency']} {amount:,.2f} per {price['payment_frequency_interval'].lower()}</p>
-<p>Test mode stand-in for Dodo Payments. No card is charged.</p>
+{_india_lines(session)}<p>Test mode stand-in for Dodo Payments. No card is charged.</p>
 <form method="post" action="/checkout/{session['session_id']}/pay"><button type="submit">Pay</button></form>
 <form method="post" action="/checkout/{session['session_id']}/pay?outcome=declined"><button type="submit">Decline the card</button></form>
 </main></body></html>"""
