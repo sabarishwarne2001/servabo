@@ -509,9 +509,13 @@ def create_addon_checkout(
     *,
     organization_id: uuid.UUID,
     addon_key: str,
+    currency: Optional[str] = None,
+    interval: str = "month",
 ):
-    """Start a gateway checkout for one add-on. Returns portal_service.EphemeralSession."""
+    """Start a gateway checkout for one add-on, in a currency and interval it is sold at (N-187; the organization's
+    default currency when none is named). Returns portal_service.EphemeralSession."""
     from app.services.billing import account_service, portal_service
+    from app.services.billing import currency as currency_service
     from app.services.billing.payment_gateway import (
         active_gateway_name,
         get_payment_gateway,
@@ -528,6 +532,11 @@ def create_addon_checkout(
             "Starting a checkout would bill for something already provided."
         )
 
+    if not offer.sold:
+        names = " and ".join(entitlement_service.tiers_including(db, addon_key)) or "a higher plan"
+        raise AddonNotOfferedError(
+            f"{offer.display_name} is not sold as an add-on. It is included in {names}: upgrade to {names} to use it."
+        )
     if not entitlement_service.offered_on_plan(db, organization_id=organization_id, addon_key=addon_key):
         plans = " or ".join(entitlement_service.sold_on(db, addon_key)) or "a plan that sells it"
         raise AddonNotOfferedError(
@@ -535,15 +544,19 @@ def create_addon_checkout(
             "or choose a plan that includes it."
         )
 
-    if not entitlement_service.purchasable(addon_key):
+    currency = currency or currency_service.default_currency(db, organization_id)
+    if offer.price(currency, interval) is None and not entitlement_service.purchasable(addon_key, currency=currency):
+        currency = "USD"  # sold in dollars only (warehouse sync)
+    if not entitlement_service.purchasable(addon_key, currency=currency, interval=interval):
         raise portal_service.CheckoutConfigurationError(
-            f"{offer.display_name} is not available for self-serve purchase on "
+            f"{offer.display_name} is not available for self-serve purchase billed {interval}ly in {currency} on "
             "this deployment. Contact sales, or upgrade to a plan that includes it."
         )
 
     success_url, cancel_url = _return_addresses(db, organization_id)
     gateway_name = active_gateway_name()
-    product_id = str(getattr(settings, offer.product_setting))
+    price = offer.price(currency, interval)
+    product_id = str(price.product_id())
     account = account_service.get_for_organization(db, organization_id=organization_id)
     customer_id = (
         account.gateway_customer_id
@@ -565,6 +578,7 @@ def create_addon_checkout(
         cancel_url=cancel_url,
         client_reference_id=str(organization_id),
         metadata={"organization_id": str(organization_id), "addon_key": addon_key},
+        **({"indian_buyer": buyer} if (buyer := currency_service.indian_buyer(db, organization_id, currency)) else {}),
     )
 
     expires_at = (

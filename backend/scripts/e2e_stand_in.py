@@ -282,12 +282,14 @@ def _dodo_catalogue(db) -> list[str]:
             "price": int(tier.unit_amount_micros) // 10_000, "currency": tier.currency or "USD"})
         added.append(tier.gateway_price_id)
     for offer in ADDON_CATALOG.values():  # Session H: an add-on is one product per organization
-        product_id = getattr(settings, offer.product_setting, None)
-        if product_id:
-            _dodo_call("POST", "/_fake/product", {
-                "product_id": product_id, "name": offer.display_name, "interval": "Month",
-                "price": int(offer.monthly_price_micros) // 10_000, "currency": offer.currency})
-            added.append(product_id)
+        for price in offer.prices:  # N-187: each currency and interval is its own product
+            product_id = price.product_id()
+            if product_id:
+                _dodo_call("POST", "/_fake/product", {
+                    "product_id": product_id, "name": offer.display_name,
+                    "interval": "Year" if price.interval == "year" else "Month",
+                    "price": int(price.amount_micros) // 10_000, "currency": price.currency})
+                added.append(product_id)
     return added
 
 

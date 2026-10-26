@@ -63,7 +63,7 @@ def dodo(monkeypatch: pytest.MonkeyPatch):
         fake.add_product(name="Custom domains", price=19_900, product_id="pdt_custom_domain")
         fake.add_product(name="Warehouse sync", price=30_000, product_id="pdt_warehouse_sync")
         fake.add_product(name="GST Credit", price=4_900, product_id="pdt_gst_credit")
-        monkeypatch.setattr(settings, "DODO_ADDON_PRODUCT_CUSTOM_DOMAIN", "pdt_custom_domain")
+        # N-187: the custom-domain add-on is retired (included in Business and Enterprise), so it has no setting.
         monkeypatch.setattr(settings, "DODO_ADDON_PRODUCT_WAREHOUSE_SYNC", "pdt_warehouse_sync")
         monkeypatch.setattr(settings, "DODO_ADDON_PRODUCT_GST_CREDIT", "pdt_gst_credit")
         yield fake

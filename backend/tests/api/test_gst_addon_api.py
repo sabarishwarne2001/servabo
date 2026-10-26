@@ -21,7 +21,8 @@ def test_the_api_shows_the_catalogue_price_and_only_an_owner_can_start_a_checkou
     assert "addons" in body, body
     gst = next(a for a in body["addons"] if a["addon_key"] == GST)
     assert gst["monthly_price_micros"] == entitlement_service.offer_for(GST).monthly_price_micros == 49_000_000
-    assert (gst["currency"], gst["state"], gst["purchasable"], gst["sold_on"]) == ("USD", "NOT_GRANTED", True, ["Developer"])
+    # N-187: the plan that sells it is shown as "Starter" (its key stays `developer`).
+    assert (gst["currency"], gst["state"], gst["purchasable"], gst["sold_on"]) == ("USD", "NOT_GRANTED", True, ["Starter"])
 
     url = f"{base}/billing/addons/{GST}/checkout-session"
     assert client.post(url, headers=tenant.contributor.headers).status_code == 403

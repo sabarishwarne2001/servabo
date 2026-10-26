@@ -3,10 +3,12 @@
     python scripts/dodo_setup.py                          # check every configured product id
     python scripts/dodo_setup.py --create-test-products   # create what is missing, print the env lines
 
-Servabo sells five plan products (Developer, Business and Enterprise monthly, per seat; Developer
-and Business yearly, per seat) and three add-ons (custom domains, warehouse sync, GST Credit; one per
-organization). Each is a Dodo product whose id goes into an environment variable
-(GATEWAY_PRICE_ID_*, DODO_ADDON_PRODUCT_*). The expected price, interval and currency come from
+Servabo sells **fifteen** products (Final session 2A, N-187): ten plan products, per seat (Starter, the
+`developer` key, and Business monthly and yearly in dollars and in rupees; Enterprise monthly in dollars and in
+rupees), and five add-on products, one per organization (warehouse sync, dollars monthly; GST Credit, dollars and
+rupees, monthly and yearly). The custom-domain add-on was retired: custom domains are included in Business and
+Enterprise. Each is a Dodo product whose id goes into an environment variable (GATEWAY_PRICE_ID_*,
+DODO_ADDON_PRODUCT_*); the rupee ones end in _INR. The expected price, interval and currency come from
 the same tables the app sells from (`scripts/seed_quota_tiers.py`, the add-on catalogue), so this
 script and the app cannot disagree about what a product should cost.
 
@@ -67,17 +69,20 @@ def wanted_products() -> list[WantedProduct]:
     seed = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(seed)
 
+    names = {key: tier["display_name"] for key, tier in seed.PLACEHOLDER_TIERS.items()}
+    period = {"month": ("monthly", "Month"), "year": ("yearly", "Year")}
     wanted: list[WantedProduct] = []
-    for key, terms in seed.COMMERCIALS.items():
-        if terms.get("gateway_price_id_env") and int(terms["unit_amount_micros"]) > 0:
-            wanted.append(WantedProduct(terms["gateway_price_id_env"], f"Servabo {key.title()} (per seat, monthly)",
-                                        int(terms["unit_amount_micros"]) // 10_000, terms["currency"], "Month", True))
-    for key, terms in seed.YEARLY_COMMERCIALS.items():
-        wanted.append(WantedProduct(terms["gateway_price_id_env"], f"Servabo {key.title()} (per seat, yearly)",
-                                    int(terms["unit_amount_micros"]) // 10_000, terms["currency"], "Year", True))
+    for price in seed.PLAN_PRICES:
+        words, interval = period[price["interval"]]
+        wanted.append(WantedProduct(price["gateway_price_id_env"],
+                                    f"Servabo {names[price['tier']]} (per seat, {words}, {price['currency']})",
+                                    int(price["unit_amount_micros"]) // 10_000, price["currency"], interval, True))
     for offer in ADDON_CATALOG.values():
-        wanted.append(WantedProduct(offer.product_setting, f"Servabo add-on: {offer.display_name} (monthly)",
-                                    int(offer.monthly_price_micros) // 10_000, offer.currency, "Month", False))
+        for price in offer.prices:  # custom domains: none (N-187)
+            words, interval = period[price.interval]
+            wanted.append(WantedProduct(price.product_setting,
+                                        f"Servabo add-on: {offer.display_name} ({words}, {price.currency})",
+                                        int(price.amount_micros) // 10_000, price.currency, interval, False))
     return wanted
 
 

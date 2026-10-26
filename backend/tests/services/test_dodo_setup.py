@@ -48,14 +48,21 @@ def test_creating_the_test_products_then_checking_them(fake, capsys) -> None:
     assert script.main(["--create-test-products"], environ) == 0
     lines = _env_lines(capsys.readouterr().out)
     assert set(lines) == {w.env for w in script.wanted_products()}
-    assert len(lines) == 8  # five plan products and three add-ons
+    # N-187 (Final session 2A): ten plan products (dollars and rupees, monthly and yearly; Enterprise monthly only) and
+    # five add-on products (warehouse sync in dollars; GST Credit in both currencies, monthly and yearly). Was eight.
+    assert len(lines) == 15
+    assert "DODO_ADDON_PRODUCT_CUSTOM_DOMAIN" not in lines, "the custom-domain add-on is retired"
+    rupees = dodo.products[lines["GATEWAY_PRICE_ID_BUSINESS_INR"]]["price"]
+    assert (rupees["price"], rupees["currency"], rupees["payment_frequency_interval"]) == (499_900, "INR", "Month")
+    gst_year = dodo.products[lines["DODO_ADDON_PRODUCT_GST_CREDIT_YEARLY_INR"]]["price"]
+    assert (gst_year["price"], gst_year["currency"], gst_year["payment_frequency_interval"]) == (1_499_000, "INR", "Year")
     business = dodo.products[lines["GATEWAY_PRICE_ID_BUSINESS"]]
     assert (business["price"]["price"], business["price"]["payment_frequency_interval"]) == (29_900, "Month")
     assert dodo.products[lines["GATEWAY_PRICE_ID_BUSINESS_YEARLY"]]["price"]["payment_frequency_interval"] == "Year"
     assert business["tax_category"] == "saas" and business["price"]["tax_inclusive"] is False
 
     assert script.main([], {**environ, **lines}) == 0
-    assert "All 8 products match" in capsys.readouterr().out
+    assert "All 15 products match" in capsys.readouterr().out
 
     # Running the creation again changes nothing.
     before = len(dodo.products)
@@ -80,4 +87,4 @@ def test_a_wrong_or_missing_product_is_named(fake, capsys) -> None:
     assert "WRONG    DODO_ADDON_PRODUCT_WAREHOUSE_SYNC" in out and "not every 1 Month" in out
     assert "NOT SET  GATEWAY_PRICE_ID_ENTERPRISE" in out
     assert "pdt_does_not_exist" in out and "no such product" in out
-    assert "4 of 8 products need attention" in out
+    assert "4 of 15 products need attention" in out

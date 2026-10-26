@@ -18,14 +18,15 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timezone
+from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import OrganizationContext, RequireOrgOwner, RequireOrgRole, get_db
 from app.models.audit_log import AuditAction, AuditResourceType
 from app.models.organization import OrganizationRole
-from app.schemas.entitlements import AddonAccessResponse, OrganizationEntitlementsResponse
+from app.schemas.entitlements import AddonAccessResponse, AddonPriceOption, OrganizationEntitlementsResponse
 from app.schemas.invoice import EphemeralSessionResponse
 from app.services import audit_service
 from app.services.billing import addon_service, entitlement_service
@@ -84,6 +85,11 @@ def get_entitlements(
                 halt_effect=offer.halt_effect,
                 monthly_price_micros=offer.monthly_price_micros,
                 currency=offer.currency,
+                # N-187: every price it is sold at, and whether each can be bought here now.
+                prices=[AddonPriceOption(currency=p.currency, interval=p.interval, unit_amount=p.amount_micros // 10_000,
+                                         purchasable=bool(p.product_id()) and entitlement_service.purchasable(
+                                             key, currency=p.currency, interval=p.interval))
+                        for p in offer.prices],
                 purchasable=entitlement_service.purchasable(key)
                 and entitlement_service.offered_on_plan(db, organization_id=organization_id, addon_key=key),
                 included_in=entitlement_service.tiers_including(db, key),
@@ -94,9 +100,12 @@ def get_entitlements(
     # ARCH35-S1:capabilities-resolved. Tier resolved once for the list.
     from app.api import capability_gate
 
+    from app.services.billing import currency as currency_service
+
     return OrganizationEntitlementsResponse(
         organization_id=organization_id,
         as_of=now,
+        default_currency=currency_service.default_currency(db, organization_id),
         addons=addons,
         capabilities=capability_gate.granted_capabilities(
             db, organization_id=organization_id
@@ -114,6 +123,9 @@ def get_entitlements(
 def create_addon_checkout_session(
     organization_id: uuid.UUID,
     addon_key: str,
+    currency: Optional[Literal["USD", "INR"]] = Query(
+        default=None, description="N-187. USD or INR; the organization's default currency when omitted."),
+    interval: Literal["month", "year"] = Query(default="month", description="N-187. month or year."),
     db: Session = Depends(get_db),
     context: OrganizationContext = Depends(RequireOrgOwner),
 ) -> EphemeralSessionResponse:
@@ -123,7 +135,7 @@ def create_addon_checkout_session(
 
     try:
         session = addon_service.create_addon_checkout(
-            db, organization_id=organization_id, addon_key=addon_key
+            db, organization_id=organization_id, addon_key=addon_key, currency=currency, interval=interval
         )
     except (CheckoutConfigurationError, addon_service.AddonAlreadyGrantedError,
             addon_service.AddonNotOfferedError) as exc:
@@ -137,6 +149,8 @@ def create_addon_checkout_session(
         action=AuditAction.CHECKOUT_STARTED,
         details={
             "addon_key": addon_key,
+            "currency": currency,
+            "interval": interval,
             "gateway_session_id": session.stripe_session_id,
             "url_persisted": False,
         },
