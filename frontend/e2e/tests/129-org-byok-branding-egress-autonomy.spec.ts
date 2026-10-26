@@ -306,11 +306,18 @@ test.describe("Calibrated autonomy", () => {
     const customer = await enterpriseCustomer("orgautonomy");
     const admin = await addMember(customer, "orgauto-admin", "ADMIN");
     await signInAs(page, customer.email);
+    // Exercise the real loading state: the heading renders before the overview arrives.
+    // Keep the real response and permissions; only delivery is delayed.
+    await page.route("**/api/v1/organizations/*/autonomy", async (route) => {
+      const response = await route.fetch();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await route.fulfill({ response });
+    });
     await page.goto(customer.org("autonomy"));
     const limit = page.locator("#autonomy-alpha");
     await expect(page.getByRole("heading", { name: "Calibrated autonomy" })).toBeVisible({ timeout: 30_000 });
     const decisionTypes = page.getByRole("navigation", { name: "Decision types" }).getByRole("button");
-    expect(await decisionTypes.count()).toBeGreaterThan(0);
+    await expect.poll(() => decisionTypes.count(), { timeout: 30_000 }).toBeGreaterThan(0);
     await expect(limit).toBeVisible({ timeout: 30_000 });
     const save = page.getByRole("button", { name: "Save and recalculate" });
     await expect(save).toBeDisabled();

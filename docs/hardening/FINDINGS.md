@@ -3668,3 +3668,13 @@ CVE-2026-112913 and CVE-2026-112907, plus setuptools 83.0.0 affected by
 GHSA-xmj3-9gf7-h52w. Full and web pins now use 4.2.1 and 84.1.0 respectively.
 `pip check`, 56 image/extraction contract tests and the repeated audit pass; the
 audit reports no known vulnerabilities. Full final-head CI is pending.
+
+## F-623 — Autonomy browser assertion raced the overview response (P2)
+
+CI `40254658271` passed every backend shard but failed spec 129: the heading was
+visible while the asynchronous overview still had zero decision buttons. Delaying
+the real response by 500 ms reproduced the same expected-positive/actual-zero
+failure locally. The assertion now polls for a positive count; no value, role or
+save assertion was removed. Both autonomy scenarios passed three consecutive
+runs (6 passed, 1.2 minutes) with the delayed real response. Full final-head browser
+CI is still required; no application behavior changed for this test fix.
