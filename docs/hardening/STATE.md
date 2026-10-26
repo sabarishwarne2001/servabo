@@ -16,9 +16,11 @@ the session scratchpad (outside the repo).
 - [x] 0. Start-up: docs and code read; stack; this checklist; draft PR #43; `main`'s latest CI (run #482 on `5600d9d`) green
 - [x] 0A. `docs/product/COMMERCIAL-READINESS.md`
 - [x] 0B. `docs/product/RESOLUTION-ASSESSMENT.md` and the build decision: N-191, build a thin "Recoveries" layer after the must-haves
-- [ ] 1. Prices and packaging for India (N-187): catalogue per currency and interval, add-on prices, Dodo products, rupee checkout (currency,
+- [x] 1. Prices and packaging for India (N-187): catalogue per currency and interval, add-on prices, Dodo products, rupee checkout (currency,
   country, tax id), the ₹15,000 mandate notice, 14-day trial, "Starter", custom domains to Business and Enterprise, the Tally file on Starter,
-  unit economics in every currency, the website, docs, tests
+  unit economics in every currency, the website, docs, tests. Findings F-626 to F-629; decisions N-192, N-193 (open: GSTIN on the
+  Dodo invoice). Browser regression of the billing, plan and ERP specs: 175 passed, 4 failed and fixed (F-629, N-187 expected values,
+  spec 137 isolation), re-run green. Unverified until 2B: Dodo's real rupee checkout, its exact refusal wording above the mandate.
 - [ ] 2. Safety jobs that cannot stop silently: run reports, the stale watcher and alert, readiness `safety_jobs`, the health page, the
   sweeps in the scheduler (or not, recorded), `servabo-install-host-jobs`, preflight, docs, tests
 - [ ] 3. Prompt injection: `docs/hardening/PROMPT-INJECTION.md`, registry-walking invariants (a) to (f), the red-team corpus, fixes test-first
@@ -29,7 +31,7 @@ the session scratchpad (outside the repo).
 - [ ] 7. Records and the docs customers see
 - [ ] 8. `docs/sessions/FINAL-2-LIVE.md` rewritten; HANDOFF "Final session 2A → Final session 2B"; PR ready; CI green
 
-- **Next action:** Phase 1 (prices and packaging for India).
+- **Next action:** Phase 2 (safety jobs).
 
 
 ## Current phase — the final sessions: 2A, then 2T (TRINETRA), then 2B (2026-10-26)

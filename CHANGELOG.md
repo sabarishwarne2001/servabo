@@ -6,6 +6,25 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Added — Final session 2A, Phase 1: sellable in India (2026-10-26)
+
+- **Prices in rupees and yearly** (N-187), per seat: Starter ₹1,499 or $49 a month, ₹14,990 or $490 a year; Business ₹4,999
+  or $299 a month, ₹49,990 or $2,990 a year; Enterprise ₹14,999 or $799 a month (all in `docs/hardening/TENANCY-AND-PLANS.md`,
+  margins in `docs/hardening/COSTS.md` §4). Fifteen Dodo products (`scripts/dodo_setup.py`); GST Credit sold monthly and
+  yearly in both currencies.
+- **Rupee checkout**: billing country India, UPI and RuPay, a GSTIN required and pre-filled from the organization's own GSTR-2B.
+  Before paying, a monthly total above ₹15,000 (with GST) says Indian banks ask the payer to approve each such payment, and offers
+  yearly instead.
+- **14-day trial** with 100 documents and 200 pages; **"Developer" is now called Starter** (the plan key stays `developer`).
+- **Custom domains are included in Business and Enterprise**; the $199 add-on is retired. **The Tally Prime file is on Starter**.
+- **The website shows rupees by default** with a switch to dollars.
+
+### Fixed — Final session 2A, Phase 1
+
+- A seat or plan change moved a rupee or yearly subscriber onto dollar monthly billing (F-627).
+- A seat increase whose charge failed was applied unpaid; a rupee subscriber was quoted the dollar seat price (F-628).
+- The margin test never checked yearly prices (F-626); the payment confirmation named the plan by its key (F-629).
+
 ### Docs — Final session 2T: TRINETRA finished for Business and Enterprise (2026-10-26)
 
 - **TRINETRA gets its own session** (N-190): `docs/sessions/FINAL-2T-TRINETRA.md`, after 2A and before 2B. It fixes the review's
