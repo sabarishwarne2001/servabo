@@ -28,11 +28,10 @@ test.describe("Paying in rupees as an Indian business", () => {
     customer = await newCustomer("rupees", "Rupee Distributors Pvt Ltd");
     const zone = await api(customer.session, "PATCH", `/workspaces/${customer.wsId}`, { timezone: "Asia/Kolkata" });
     expect(zone.status, zone.text).toBe(200);
-    // A GSTR-2B import tells Servabo the organization's own GSTIN, which the checkout pre-fills.
+    // A GSTR-2B import tells Servabo the organization's own GSTIN, which the checkout pre-fills. It carries no invoices,
+    // so this India-zone organization never has a Monday GST digest to send (spec 121 counts every digest sent).
     const form = new FormData();
-    const statement = gstr2b(BUYER, "2026-09", [
-      { gstin: gstin("27", "AABCS5555K"), name: "Sahyadri Packaging", docs: [{ number: "A-1", date: "2026-09-05", taxable: 1000 }] },
-    ]);
+    const statement = gstr2b(BUYER, "2026-09", []);
     form.append("file", new Blob([statement], { type: "application/json" }), "GSTR2B_092026.json");
     expect((await api(customer.session, "POST", `/workspaces/${customer.wsId}/gst/returns`, form)).status).toBe(200);
     standIn("dodo-catalogue", null); // the plans in dollars and rupees, as products at the stand-in Dodo
