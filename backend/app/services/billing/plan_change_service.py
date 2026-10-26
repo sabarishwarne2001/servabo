@@ -147,6 +147,16 @@ def downgrade_blockers(db: Session, *, organization_id: uuid.UUID, tier: QuotaTi
     return blockers
 
 
+def _target_price(db: Session, subscription: Subscription, tier: QuotaTier):
+    """The target plan's price in the currency and interval the subscription is billed in (F-627)."""
+    from app.services.billing import currency as currency_service
+
+    try:
+        return currency_service.price_for_plan(db, subscription, tier.key)
+    except LookupError as exc:
+        raise PlanChangeError(f"{exc} Email us to change plans.", code="PRICE_NOT_SOLD") from exc
+
+
 def preview(db: Session, *, organization_id: uuid.UUID, tier_key: str, seats: int) -> Preview:
     from app.services.billing.dodo_gateway import get_dodo_gateway
 
@@ -158,17 +168,19 @@ def preview(db: Session, *, organization_id: uuid.UUID, tier_key: str, seats: in
         raise PlanChangeError("That is the current plan. Seats are changed under Seats.", code="SAME_PLAN")
     current = db.get(QuotaTier, subscription.quota_tier_id)
     current_price = int(current.unit_amount_micros or 0) if current is not None else 0
+    # The plans' dollar monthly prices order them (the ladder is the same in every currency and interval, N-187).
     upgrade = int(target.unit_amount_micros) > current_price
-    renewal = int(target.unit_amount_micros) * seats
+    price = _target_price(db, subscription, target)
+    renewal = int(price.unit_amount_micros) * seats
     if upgrade:
         quote = get_dodo_gateway().preview_change_plan(
-            subscription_id=subscription.gateway_subscription_id, product_id=target.gateway_price_id,
+            subscription_id=subscription.gateway_subscription_id, product_id=price.gateway_price_id,
             quantity=seats, proration_mode=UPGRADE_MODE)
         return Preview(direction="UPGRADE", effective="NOW", effective_at=_now(),
                        amount_now_micros=quote.prorated_amount_micros, currency=quote.currency,
                        next_renewal_micros=renewal, plan_name=target.display_name, seats=seats)
     return Preview(direction="DOWNGRADE", effective="AT_RENEWAL", effective_at=subscription.current_period_end,
-                   amount_now_micros=0, currency=(target.currency or "USD").upper(), next_renewal_micros=renewal,
+                   amount_now_micros=0, currency=price.currency.upper(), next_renewal_micros=renewal,
                    plan_name=target.display_name, seats=seats,
                    blockers=downgrade_blockers(db, organization_id=organization_id, tier=target, seats=seats))
 
@@ -191,7 +203,8 @@ def apply(db: Session, *, organization_id: uuid.UUID, actor_id: uuid.UUID, tier_
     target = _tier(db, tier_key)
     if shown.direction == "UPGRADE":
         snapshot = get_dodo_gateway().change_plan(
-            subscription_id=subscription.gateway_subscription_id, product_id=target.gateway_price_id,
+            subscription_id=subscription.gateway_subscription_id,
+            product_id=_target_price(db, subscription, target).gateway_price_id,
             quantity=seats, proration_mode=UPGRADE_MODE, on_payment_failure="prevent_change")
         dodo_reconcile_service.apply_snapshot(db, snapshot=snapshot, organization_id=organization_id,
                                               source="plan_change.upgrade")
@@ -258,7 +271,8 @@ def apply_due(db: Session, *, now: Optional[datetime] = None, limit: int = 100) 
         tier = _tier(db, subscription.pending_quota_tier_key)
         seats = int(subscription.pending_seats or subscription.seats_purchased)
         snapshot = get_dodo_gateway().change_plan(
-            subscription_id=subscription.gateway_subscription_id, product_id=tier.gateway_price_id,
+            subscription_id=subscription.gateway_subscription_id,
+            product_id=_target_price(db, subscription, tier).gateway_price_id,
             quantity=seats, proration_mode=DOWNGRADE_MODE, on_payment_failure="apply_change")
         subscription.pending_quota_tier_key = subscription.pending_seats = None
         subscription.pending_effective_at = subscription.pending_requested_at = None

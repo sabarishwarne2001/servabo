@@ -172,6 +172,23 @@ def resolve_price(db: Session, *, tier_key: str, interval: str, currency: str) -
     return None
 
 
+def price_of_product(db: Session, price_id: Optional[str]) -> Optional[PlanPrice]:
+    """A gateway product id -> the (tier, interval, currency, amount) it sells, from the published books, else from the
+    tier versions' own (dollar monthly) prices. None for an unknown product (Final session 2A, F-627)."""
+    if not price_id:
+        return None
+    for price in published_prices(db):
+        if price.gateway_price_id == price_id:
+            return price
+    row = db.execute(text("SELECT key, billing_interval, currency, unit_amount_micros FROM quota_tiers "
+                          "WHERE gateway_price_id = :p AND published_at IS NOT NULL ORDER BY version DESC LIMIT 1"),
+                     {"p": price_id}).first()
+    if row is None or row[3] is None:
+        return None
+    return PlanPrice(str(row[0]), str(row[1] or "month"), str(row[2] or "USD"), int(row[3]), price_id, None, None,
+                     "TIER")
+
+
 def tier_for_gateway_price(db: Session, price_id: str) -> Optional[str]:
     """A webhook's product id -> the plan it sells (plan books first, then the tier versions' own prices)."""
     row = db.execute(text("SELECT DISTINCT tier_key FROM plan_price_book_entries WHERE gateway_price_id = :p"),
@@ -182,5 +199,6 @@ def tier_for_gateway_price(db: Session, price_id: str) -> Optional[str]:
     return str(row[0]) if row else None
 
 
-__all__ = ["PlanPrice", "book_detail", "create_book", "delete_entry", "digest_of", "list_books", "publish",
+__all__ = ["PlanPrice", "book_detail", "create_book", "delete_entry", "digest_of", "list_books", "price_of_product",
+           "publish",
            "published_prices", "resolve_price", "set_entry", "tier_for_gateway_price"]

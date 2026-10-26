@@ -443,14 +443,20 @@ def seat_price_disclosure(
             # resolved the product any other way could quote a number
             # for a different plan than the one the write would move
             # the customer to, which is worse than quoting nothing.
-            tier = db.get(QuotaTier, subscription.quota_tier_id)
-            if tier is None or not tier.gateway_price_id:
+            from app.services.billing import currency as currency_service
+
+            # F-627: the product the write uses (the one billed now), so the preview quotes the same change.
+            product_id = currency_service.billed_product_id(subscription)
+            if not product_id:
+                tier = db.get(QuotaTier, subscription.quota_tier_id)
+                product_id = tier.gateway_price_id if tier is not None else None
+            if not product_id:
                 raise LookupError(
                     "tier has no gateway price id; nothing to preview"
                 )
             dodo_preview = _dodo.get_dodo_gateway().preview_change_plan(
                 subscription_id=subscription.gateway_subscription_id,
-                product_id=tier.gateway_price_id,
+                product_id=product_id,
                 quantity=after,
                 # The SAME mode the write will use. Previewing
                 # `prorated_immediately` and then writing whatever the
@@ -643,15 +649,22 @@ def _write_seats_at_gateway(
         from app.models.quota_tier import QuotaTier
         from app.services.billing.payment_gateway import get_payment_gateway
 
-        tier = db.get(QuotaTier, subscription.quota_tier_id)
-        if tier is None or not tier.gateway_price_id:
+        from app.services.billing import currency as currency_service
+
+        # F-627 (Final session 2A): the product the subscription is billed on now (its currency and interval), not the
+        # plan's dollar monthly product, which would have moved a rupee or yearly subscriber onto dollar monthly.
+        product_id = currency_service.billed_product_id(subscription)
+        if not product_id:
+            tier = db.get(QuotaTier, subscription.quota_tier_id)
+            product_id = tier.gateway_price_id if tier is not None else None
+        if not product_id:
             raise SeatError(
                 f"Subscription {subscription.id} is pinned to a tier with no gateway "
                 "price id; the seat count cannot be changed at the gateway."
             )
         dodo_snapshot = get_payment_gateway(subscription.gateway).set_subscription_seats(
             subscription_id=subscription.gateway_subscription_id,
-            product_id=tier.gateway_price_id,
+            product_id=product_id,
             seats=seats,
             proration_mode=str(settings.BILLING_DODO_SEAT_PRORATION_MODE),
         )

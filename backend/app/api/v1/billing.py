@@ -219,7 +219,12 @@ def list_plans(
         )
 
     not_ready = portal_service.gateway_readiness()
+    from app.services.billing import currency as _currency
+
     return PlanListResponse(
+        default_currency=_currency.default_currency(db, context.organization_id),
+        india_mandate_limit_minor=_currency.MANDATE_FLOOR_PAISE,
+        india_gst_rate_percent=_currency.GST_RATE_PERCENT,
         checkout_available=not_ready is None,
         checkout_unavailable_reason=not_ready,
         organization_id=context.organization_id,
@@ -715,6 +720,10 @@ def create_checkout_session(
             interval=payload.interval or "month", currency=payload.currency or "USD", seats=payload.seats,
             price_id=payload.price_id, promo_code=payload.promo_code)
         price_id = prepared.price_id
+    # N-187: a checkout in rupees is an Indian business purchase (UPI and RuPay, the buyer's GSTIN).
+    from app.services.billing import currency as _currency
+
+    buyer = _currency.indian_buyer(db, context.organization_id, prepared.price.currency if prepared else None)
     try:
         session = portal_service.create_checkout_session(
             db,
@@ -725,6 +734,7 @@ def create_checkout_session(
             success_url=payload.success_url,
             cancel_url=payload.cancel_url,
             **({"discount_code": prepared.discount_code} if prepared is not None and prepared.discount_code else {}),
+            **({"indian_buyer": buyer} if buyer is not None else {}),
         )
     except portal_service.PaidSubscriptionActiveError as exc:
         raise HTTPException(
