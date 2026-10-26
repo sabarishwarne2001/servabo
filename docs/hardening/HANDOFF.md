@@ -1014,3 +1014,42 @@ session 2B** (`docs/sessions/FINAL-2-LIVE.md`). Wherever a section above says "F
 tray, `k1a6`'s downgrade with rows present, and a check of the owner's lockfile commit `e51f736`.
 
 **Numbers.** N-186 and N-187 are this plan; 2A starts at N-188 and F-619; browser specs continue at 135.
+
+## TRINETRA review and the revised session 2A (2026-10-26)
+
+_Decision N-189. Docs-only change; no code, no migration (head `tr1a2_review_outcomes`)._
+
+**What landed after the 2A prompt was written.**
+- **PR #39** redesigned the Documents and AI Assistant consoles (`docs/ui/documents-assistant-upgrade.md`; `GET …/work-items/counts`).
+  Its browser spec reused the number 122, and it wrote no campaign record.
+- **PR #40, TRINETRA** (`docs/trinetra/`, N-188, F-619 to F-625): reviewed TDS evidence for invoices on which a customer withheld tax.
+  It has four tables, 20 routes, a LIGHT job, a Helm annotation and reminder hold, a website page, and CI run 40282980125 and
+  `main` #478 green. Live processing is off; customers see a synthetic preview.
+
+**What the review found** (by reading the merged code; 2A proves each with a failing test first, or records it as not a defect):
+
+| # | Finding | Where | Why it matters |
+| --- | --- | --- | --- |
+| 1 | A confirmed withholding makes Helm refuse **every** cash reminder for the invoice, even when most of it is unpaid cash; the refusal is a FAILED action at send time, not a Guard block, and it survives the flag being turned off | `trinetra/helm_adapter.py`, `helm/hands.py`, `helm/executor.py` | It can stop collections, which Helm sells |
+| 2 | "Current" means `work_items.updated_at` is unchanged, and that column moves on **any** update (a rename or summary by automation, batch healing, a reprocess) | `trinetra/service.py`, `db/base.py` | False "stale": reconfirming clears allocations; a statement snapshot becomes unusable |
+| 3 | The seller check compares an extracted PAN as printed (no upper-casing or spacing rules), ignores the PAN inside `vendor_gstin`, falls back to the name alone, and can raise a 500 on non-ASCII text | `trinetra/service.py` (`receivable`) | Real invoices refused, or matched on a name |
+| 4 | Plan capacities count every snapshot and case ever made, and nothing archives them | `trinetra/service.py`, `api/v1/trinetra.py` | A Business organization stops for good after 12 imports or 500 cases |
+| 5 | A PAN is unique only within a workspace | `trinetra/service.py` (`create_profile`) | The same government posting can be allocated twice in one organization |
+| 6 | One global switch; no way to turn TRINETRA on for a single pilot customer | `core/config.py` and every gate | The launch gates require a pilot |
+| 7 | `trinetra.recompute` computes the summary and discards it | `workers/handlers/trinetra.py`, `trinetra/hooks.py` | Work with no effect; nobody is told when evidence goes stale |
+| 8 | Smaller points: the case list does several queries per row; the page's write forms check `role === "ADMIN"` only; TRINETRA rows are deleted on erasure while GST rows are kept (N-163); statements are typed row by row | `api/v1/trinetra.py`, `pages/trinetra/Trinetra.tsx`, `compliance/data_map.py` | Speed, an owner's view, one lifecycle policy, real-world usability |
+
+**What is in good shape.** Exact money (integer micros); revision checks; locks; the many-to-many allocation that cannot spend a
+posting twice within a profile; refusal of unverified official formats; masked and encrypted PAN with key rotation; scoped
+exports with formula and HTML safety; compliance registry entries; isolation sweeps; honest website and in-app copy ("live
+access awaits validation"); no model call, no sending, no money movement.
+
+**Where it goes.** `docs/sessions/FINAL-2-UPGRADE.md` gained:
+- **Phase T** (items 1 to 12), which fixes all of the above;
+- TRINETRA in Phase 0 (its place in the commercial page; the reference design for the resolution assessment);
+- TRINETRA in Phase 1 (its plan row, its rupee and "Starter" copy), Phase 3 (its extraction hints) and Phase 6 (its cases as
+  their own kind, never counted as cash);
+- a TRINETRA pilot phase in the live prompt it rewrites (Phase 8).
+
+PR #39's spec number and coverage text are in Phase 4. The GST speed test that flapped once on `main` (#465, then green on #468,
+#472, #478) is Phase 4 item 0: timings in its failure message; the budget does not move.

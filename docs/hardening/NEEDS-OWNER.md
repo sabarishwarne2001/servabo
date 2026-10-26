@@ -2527,3 +2527,15 @@ authorized pilot remain required before enabling it. Documented transition guida
 was reached; that does not validate file layouts or legal eligibility. No deployment,
 merge, live provider action or customer-data processing is authorized by this record.
 See `docs/trinetra/LAUNCH-GATES.md` for the concrete remaining validation.
+
+## N-189 — Final session 2A also finishes TRINETRA (DECIDED (owner, 2026-10-26))
+
+TRINETRA (N-188) was merged as PR #40 before Final session 2A ran. The owner asked for it to be checked thoroughly, and for every
+issue, gap or bug found to be resolved in 2A, together with everything 2A already held. A review of the merged code on 2026-10-26
+(HANDOFF "TRINETRA review and the revised session 2A") found it careful, honestly documented and well tested, and gated off as
+promised, with gaps that matter. 2A's new **Phase T** fixes them, test-first. In order: the Helm reminder hold (never chase withheld tax
+as cash, but still chase the cash that is owed); evidence versions that change only when the evidence changes; a seller check that reads
+the GSTIN; capacities that do not stop a customer for good; one PAN per organization; a **pilot mode** that switches TRINETRA on for one
+enrolled organization only; a recompute job that tells someone something, or none; and the records. TRINETRA stays off for everyone
+else, and its launch gates (real statement files, a tax adviser, an authorized pilot) still stand. N-186's direction holds: TRINETRA
+was the one exception, and nothing new is started before the first pilots. 2A's numbers move to N-190, F-626 and spec 137.
