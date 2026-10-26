@@ -108,6 +108,8 @@ class FakeDodo:
     outbox: list[Delivery] = field(default_factory=list)
     #: Paths that answer with this status instead (a test makes Dodo fail).
     failures: dict[str, int] = field(default_factory=dict)
+    #: Final session 2A: the message a failing path answers with (Dodo's own words, for a test that reads them).
+    failure_messages: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self._lock = threading.RLock()
@@ -358,7 +360,8 @@ class FakeDodo:
             self.calls.append((method, path, body))
             for prefix, status in self.failures.items():
                 if path.startswith(prefix):
-                    return _json(status, {"code": "FAKE_FAILURE", "message": f"fake failure for {prefix}"})
+                    return _json(status, {"code": "FAKE_FAILURE",
+                                          "message": self.failure_messages.get(prefix, f"fake failure for {prefix}")})
             try:
                 return self._route(method, path, parse_qs(parts.query), body or {})
             except LookupError as exc:

@@ -990,6 +990,23 @@ def _gateway_refusal(exc: Exception, organization_id: uuid.UUID) -> HTTPExceptio
         "billing.seat_change_refused",
         extra={"organization_id": str(organization_id), "error": type(exc).__name__},
     )
+    if _is_payment_refusal(exc):
+        # Final session 2A (N-187 rule 8). The extra seats are charged at once, and Dodo refuses the change when that
+        # charge fails (`on_payment_failure: prevent_change`). In India the usual reason is the card or UPI mandate:
+        # an automatic payment above the amount the customer approved needs a new approval. Said plainly, with the
+        # place to approve it, never left to a dunning email.
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "MANDATE_APPROVAL_NEEDED",
+                "message": (
+                    "Your bank or UPI app has to approve the new amount before the extra seats can be charged. "
+                    "Nothing was charged and your seats are unchanged. Open Manage payment method, approve the new "
+                    "amount, then add the seats again."
+                ),
+                "details": {"action": "PORTAL"},
+            },
+        )
     return HTTPException(
         status_code=status.HTTP_409_CONFLICT,
         detail={
@@ -998,6 +1015,14 @@ def _gateway_refusal(exc: Exception, organization_id: uuid.UUID) -> HTTPExceptio
             "details": {"reason": str(exc)[:300]},
         },
     )
+
+
+def _is_payment_refusal(exc: Exception) -> bool:
+    """Dodo refused a seat change because its charge failed (a mandate limit, a declined payment). Dodo's exact
+    wording is unverified (Final session 2B checks it, DODO-LOCAL-TEST.md journey I); these words are its documented
+    ones for India's mandates and failed payments."""
+    words = str(exc).lower()
+    return any(w in words for w in ("mandate", "payment failed", "payment_failed", "insufficient", "declined"))
 
 
 @router.put(

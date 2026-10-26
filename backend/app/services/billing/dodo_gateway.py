@@ -547,9 +547,12 @@ class DodoGateway:
         """Change the seat quantity on a live subscription, then re-fetch (D-9).
 
         Dodo's change-plan requires the product id even when only the quantity
-        changes; the caller passes the product of the tier the subscription is
-        pinned to. The response body is not trusted for state: the subscription
-        is re-fetched so `state_version` orders this write against webhooks.
+        changes; the caller passes the product the subscription is billed on (F-627). The response body is not
+        trusted for state: the subscription is re-fetched so `state_version` orders this write against webhooks.
+
+        Final session 2A: `on_payment_failure: prevent_change`, as for an upgrade. A seat increase is charged at once;
+        when that charge fails (above an Indian card or UPI mandate, for example) Dodo must refuse the change rather
+        than apply it unpaid and leave the subscription for dunning to chase. Releasing seats charges nothing.
         """
         if int(seats) < 1:
             raise DodoGatewayError("Dodo subscriptions need at least one unit.")
@@ -571,6 +574,7 @@ class DodoGateway:
                 "product_id": product_id,
                 "quantity": int(seats),
                 "proration_billing_mode": proration_mode,
+                "on_payment_failure": "prevent_change",
             },
         )
         return self.fetch_subscription(subscription_id)

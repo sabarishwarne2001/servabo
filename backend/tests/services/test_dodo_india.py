@@ -75,6 +75,36 @@ def test_a_seat_change_keeps_a_rupee_subscriber_on_the_rupee_product(rupees, cli
     assert write["quantity"] == 3
 
 
+def test_a_rupee_subscriber_is_quoted_the_rupee_seat_price(rupees, client, db, org) -> None:
+    """The seat price shown before adding a seat is what Dodo will charge: the billed product's price, in rupees."""
+    subscribe(rupees, client, db, org, product="pdt_business_inr", seats=2)
+    quote = client.get(f"/api/v1/organizations/{org['organization'].id}/billing/price-book/seat",
+                       params={"additional_seats": 1}, headers=_owner(org))
+    assert quote.status_code == 200, quote.text
+    body = quote.json()
+    assert body["currency"] == "INR"
+    assert body["unit_price_micros"] == BUSINESS_INR * 10_000
+
+
+def test_a_seat_increase_whose_charge_fails_is_refused_not_applied_unpaid(rupees, client, db, org) -> None:
+    """A seat increase is charged at once; if the charge fails (above an Indian card or UPI mandate, for example) the
+    change must not be applied and left unpaid for dunning to chase. Servabo asks Dodo to refuse it
+    (`on_payment_failure: prevent_change`) and tells the customer to approve the new amount."""
+    sub_id = subscribe(rupees, client, db, org, product="pdt_business_inr", seats=2)
+    path = f"/subscriptions/{sub_id}/change-plan"
+    rupees.failures[path] = 400
+    rupees.failure_messages[path] = "Payment failed: the amount is above the customer's mandate limit"
+    response = client.put(f"/api/v1/organizations/{org['organization'].id}/billing/seats",
+                          json={"seats": 4}, headers=_owner(org))
+    assert response.status_code == 409, response.text
+    detail = response.json()["detail"]
+    assert detail["code"] == "MANDATE_APPROVAL_NEEDED", detail
+    assert "approve" in detail["message"].lower() and "nothing was charged" in detail["message"].lower()
+    [write] = _seat_writes(rupees, sub_id)
+    assert write["on_payment_failure"] == "prevent_change"
+    assert row(db, sub_id).seats_purchased == 2
+
+
 def test_a_seat_change_keeps_a_yearly_subscriber_on_the_yearly_product(rupees, client, db, org) -> None:
     sub_id = subscribe(rupees, client, db, org, product="pdt_business_year", seats=1)
     response = client.put(f"/api/v1/organizations/{org['organization'].id}/billing/seats",
