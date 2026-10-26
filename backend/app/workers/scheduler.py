@@ -217,6 +217,14 @@ DEFAULT_SCHEDULE: tuple[ScheduledJob, ...] = (
         ),
     ),
     ScheduledJob(
+        job_type="compliance.deletion_notices",
+        interval_seconds=3_600,
+        description=(
+            "Warn the owners and admins of a deleted workspace or organization: at once, and 5 days before its "
+            "content is erased (N-164, Final session 2A)."
+        ),
+    ),
+    ScheduledJob(
         job_type="identity.sweep_replay_guard",
         interval_seconds=3_600,
         description="Prune expired SAML replay-guard entries (ARCH-16).",

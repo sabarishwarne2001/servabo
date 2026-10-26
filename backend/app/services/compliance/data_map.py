@@ -413,6 +413,8 @@ REGISTRY: dict[str, TableRule] = {
                note="Job payloads carry ids and the stored file key, not document text; finished jobs age out."),
     "monthly_receipt_sends": _r(Kind.MONEY, Erasure.KEEP, Sweep.NONE, OrgPurge.KEEP, why=_NO + "a send record: a period, a count"),
     "gst_notice_sends": _r(Kind.MONEY, Erasure.KEEP, Sweep.NONE, OrgPurge.KEEP, why=_NO + "a send record: a kind, a key, a count"),
+    "deletion_notice_sends": _r(Kind.MONEY, Erasure.KEEP, Sweep.NONE, OrgPurge.KEEP,
+                                why=_NO + "a send record: what was deleted, when, which warning, a count"),
 
     # ----------------------------------------------------------------- ERP
     "erp_targets": _secret("Holds the connection and its credentials."),

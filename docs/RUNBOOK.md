@@ -931,7 +931,9 @@ Deleting a workspace or an organization archives it; its data is purged later by
 books, the Helm ledger, invoices, usage) and the audit trail stay; an organization itself is deleted 72 months after archiving
 (`ARCHIVED_PURGE_GRACE_DAYS`, `ARCHIVED_FINAL_DELETE_MONTHS`; the CGST Act s.36 books period). Look first without changing anything:
 `$COMPOSE run --rm ... python scripts/sweep_compliance.py --archived` (a dry run prints what it would do). The final deletion refuses, and
-says so, while an audit entry is younger than 400 days: the audit trail is never shortened.
+says so, while an audit entry is younger than 400 days: the audit trail is never shortened. The organization's owners and admins
+are emailed twice (Final session 2A): at once ("will be erased on <date>; restore until then") and 5 days before the erasure ("last
+chance"), by the hourly `compliance.deletion_notices` job inside the stack; nothing to install.
 
 ### 9.12 GST credit notices, the Monday digest, and Zoho Books Connect (Final session 1)
 

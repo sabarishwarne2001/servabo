@@ -2287,7 +2287,9 @@ own choice; the product does not stop it (a warning on the retention screen is a
 `--apply`) now purges an archived workspace or organization **30 days** after archiving (`ARCHIVED_PURGE_GRACE_DAYS`; until then Restore
 works): documents through the sweep's path, conversations, settings, stored files. Money records and the audit trail stay. An organization is
 **deleted 72 months** after archiving (`ARCHIVED_FINAL_DELETE_MONTHS`, matching N-163). The owner must schedule the command (RUNBOOK).
-Not done: an email to the owner at day 1 and day 25 of the 30 ("your data will be deleted on ...").
+Not done: an email to the owner at day 1 and day 25 of the 30 ("your data will be deleted on ..."). **Done in Final session 2A (Phase 4):** the owners and admins get one email
+at once ("will be erased on <date>; restore until then") and one 5 days before the purge ("last chance to restore"), each once, from
+the hourly `compliance.deletion_notices` job; a restore stops them (`tests/api/test_deletion_notices.py`).
 
 ## N-165 — The final deletion never shortens the audit trail (DECIDED (Final 1))
 
