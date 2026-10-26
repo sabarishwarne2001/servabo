@@ -701,14 +701,19 @@ the R2 bucket, the mail login, Groq and Dodo, and `--send-test-email you@yourcom
 *Done when:* preflight says READY and `https://app.servabo.app/api/v1/health/ready` says ready.
 
 **Step 8 — Create the plans in Dodo (test mode) and publish them.**
-RUNBOOK §9.2 step 8: `dodo_setup.py --create-test-products` creates the five plan products and three
-add-ons (Session H added GST Credit) and prints eight lines for `.env.production`; then `dodo_setup.py` must say OK for all eight;
-then the two seed commands and the first administrator. *Done when:* signed in as a new user, the
-Billing page shows Developer $49, Business $299 and Enterprise $799 per seat.
+RUNBOOK §9.2 step 8: `dodo_setup.py --create-test-products` creates the **fifteen** products (Final session 2A, N-187):
+ten plan products (Starter, Business and Enterprise in dollars and in rupees, monthly and yearly; Enterprise monthly only)
+and five add-on products (GST Credit in both currencies, monthly and yearly; warehouse sync in dollars) and prints fifteen
+lines for `.env.production`; then `dodo_setup.py` must say OK for all fifteen; then the two seed commands and the first
+administrator. *Done when:* signed in as a new user whose workspace is in India's time zone, the Billing page opens in
+rupees and shows Starter ₹1,499, Business ₹4,999 and Enterprise ₹14,999 per user; switching the currency shows $49,
+$299 and $799.
 
 **Step 9 — Connect Dodo's webhooks and buy a plan with a test card.**
 RUNBOOK §9.2 step 9: add the webhook endpoint in Dodo (Test Mode), put its secret in
-`DODO_WEBHOOK_SECRET`, restart. Then, as a new customer, buy Developer with Dodo's test card.
+`DODO_WEBHOOK_SECRET`, restart. Then, as a new customer, buy Starter with Dodo's test card, and once more **in rupees**
+with Dodo's test UPI id (`success@upi`) or Indian test card, giving a GSTIN at checkout: check that Dodo's invoice shows
+that GSTIN and the CGST and SGST (or IGST) lines (N-193).
 *Done when:* back in Servabo the page says "Payment confirmed", Billing shows the plan and the
 invoice "issued by Dodo Payments", and its "Download invoice" opens Dodo's PDF. Also try: upgrade to
 Business (the amount shown is what is charged), a refund from Dodo's dashboard (the invoice says
@@ -725,10 +730,10 @@ prints its restore time and every Healthchecks.io check is green.
 
 **Step 11 — Go live with Dodo.**
 Only after step 4 says verified and step 9 worked. In Dodo, switch off Test Mode, create the same
-eight products in live mode (same prices: plan products per seat, recurring, tax not included), a
+fifteen products in live mode (same prices and currencies: plan products per seat, recurring, tax not included), a
 live webhook endpoint (same URL) and a live API key. In `.env.production`: the live key, the live
-webhook secret, the eight live product ids, `DODO_LIVEMODE=true`; restart, and run the seed commands
-again (step 8). Buy one seat of Developer with your own card, then refund it from Dodo's dashboard.
+webhook secret, the fifteen live product ids, `DODO_LIVEMODE=true`; restart, and run the seed commands
+again (step 8). Buy one seat of Starter in rupees with your own UPI or card, then refund it from Dodo's dashboard.
 *Done when:* your own live payment shows in Billing and the refund shows as "Refunded".
 
 **Step 12 — Before the first customer.**

@@ -75,7 +75,7 @@ tax-adviser review before being described as law-reviewed.
 
 Viewers read; workspace administrators write and export. API keys can read only
 the scoped organization summary with `trinetra:read` and the Enterprise capability.
-Free/Developer get synthetic examples only. Business caps are 2 profiles, 12
+Free/Starter (the `developer` plan, N-187) get synthetic examples only. Business caps are 2 profiles, 12
 retained snapshots and 500 retained cases per organization. Enterprise defaults
 are 10/60/5,000. Published subscription versions supply the limits, with finite
 platform ceilings. No prices, provider products or billing intervals change.

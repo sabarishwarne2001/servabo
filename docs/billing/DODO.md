@@ -81,6 +81,20 @@ subscription's webhook to be reconciled before saying "Payment confirmed".
 4% + $0.40 per payment, +1.5% for international cards, +0.5% for subscriptions; $30 per chargeback
 (`app/core/payment_fees.py`). Docs: <https://docs.dodopayments.com/miscellaneous/pricing-and-fee-structure>
 
+**India, in rupees (Final session 2A, N-187).** A domestic Indian payment (Indian card, RuPay, UPI) is 4% + 15 cents, +0.5% for
+subscriptions (`dodo_india_fee_micros`); the margin checks convert rupees at a fixed ₹90 to the dollar. As quoted from
+dodopayments.com/pricing by search extracts on 2026-10-26 (the page could not be opened from the build sandbox); Final session 2B
+confirms it, and whether the 1.5% international surcharge is ever added to an Indian card (if it were, Business yearly in rupees
+still keeps 55.1% after fees, COSTS.md §5).
+
+**A checkout in rupees** (`dodo_gateway.indian_checkout_fields`) sends `billing_currency: "INR"`, `billing_address: {country:
+"IN"}`, `feature_flags: {allow_tax_id, require_tax_id, allow_customer_editing_tax_id}` and, when Servabo knows it, `tax_id` (the
+organization's GSTIN). It does **not** send `mandate_min_amount_inr_paise`: Dodo's default ₹15,000 floor applies (N-192). Indian
+card and UPI mandates: an automatic payment above ₹15,000 needs the customer's approval each time, and a charge above the mandate
+registered at checkout fails until the customer authorizes again (docs.dodopayments.com, features/payment-methods/india and
+features/subscription, search extracts, 2026-10-26). The billing page says so before a monthly rupee checkout above ₹15,000 with GST
+and offers yearly. Whether Dodo's invoice prints the buyer's GSTIN **and splits CGST, SGST and IGST** is not documented (N-193).
+
 ## 6. Not yet confirmed against a real Dodo test account
 
 Built from the documentation and proven only against the stand-in. Run these once in Dodo's test
@@ -121,13 +135,16 @@ risky migration for no customer benefit. They hold Dodo data too:
 
 ```
 cd backend
-python scripts/dodo_setup.py --create-test-products   # creates the 5 plan products and 3 add-ons, prints env lines
+python scripts/dodo_setup.py --create-test-products   # creates the 10 plan products and 5 add-on products, prints env lines
 python scripts/dodo_setup.py                          # checks every configured id
 ```
 
 It refuses to run with `DODO_LIVEMODE=true` or the live host. The check reports each product as OK,
 NOT SET or WRONG (missing, one-time price, wrong price, currency or interval, tax included in the
 price, another tax category). Plan products are priced per seat (the checkout quantity is the number
-of seats); add-ons (custom domains, warehouse sync and GST Credit, $49 a month) are one per organization.
-The eighth product, **GST Credit** (`DODO_ADDON_PRODUCT_GST_CREDIT`), is the add-on a Developer organization buys
-to get the GST Credit lists; Business and Enterprise include them through the plan, so a checkout there is refused.
+of seats); add-ons are one per organization. **Fifteen products** since Final session 2A (N-187): each plan in dollars
+and in rupees, monthly and yearly (Enterprise monthly only, yearly by agreement), `GATEWAY_PRICE_ID_*` and `GATEWAY_PRICE_ID_*_INR`;
+**GST Credit** (`DODO_ADDON_PRODUCT_GST_CREDIT`, `_YEARLY`, `_INR`, `_YEARLY_INR`: $49 or $490, ₹1,499 or ₹14,990), the add-on a
+Starter organization buys to get the GST Credit lists (Business and Enterprise include them, so a checkout there is refused); and
+**warehouse sync** in dollars ($300 a month). The custom-domain add-on was retired: custom domains are included in Business and
+Enterprise.

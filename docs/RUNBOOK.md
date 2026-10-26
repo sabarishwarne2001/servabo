@@ -406,18 +406,29 @@ curl -fsS https://app.example.com/api/v1/health/ready      # {"status":"ready"} 
 **8. Create the plans and the first administrator, once** *(not run here)*.
 
 Plans first. The plan names, limits and prices are defined in `backend/scripts/seed_quota_tiers.py`
-(Developer $49, Business $299 and Enterprise $799 per seat per month; Developer $490 and Business
-$2,990 per seat per year; add-ons: custom domains $199 and warehouse sync $300 a month);
-**confirm them before launch (N-011)**. Each is a product in your Dodo account. In **test mode**,
-let the setup script create them and print their ids:
+(`PLAN_PRICES`; decided in N-187, Final session 2A). Per user (seat), GST or other tax added by Dodo:
+
+| | Starter (key `developer`) | Business | Enterprise |
+| --- | --- | --- | --- |
+| India, monthly | ₹1,499 | ₹4,999 | ₹14,999 |
+| India, yearly | ₹14,990 | ₹49,990 | by agreement |
+| Elsewhere, monthly | $49 | $299 | $799 |
+| Elsewhere, yearly | $490 | $2,990 | by agreement |
+
+Add-ons, one price per organization: **GST Credit** (Starter only) ₹1,499 a month or ₹14,990 a year, $49 a month
+or $490 a year; **warehouse sync** (Starter, dollars only) $300 a month. **Custom domains are not an add-on any
+more**: they are included in Business and Enterprise (N-187). Each price is its own product in your Dodo account:
+**fifteen** in all. In **test mode**, let the setup script create them and print their ids:
 
 ```bash
 $COMPOSE exec -T web python scripts/dodo_setup.py --create-test-products
 ```
 
-Paste the eight lines it prints (`GATEWAY_PRICE_ID_DEVELOPER`, `_BUSINESS`, `_ENTERPRISE`,
-`_DEVELOPER_YEARLY`, `_BUSINESS_YEARLY`, `DODO_ADDON_PRODUCT_CUSTOM_DOMAIN`,
-`DODO_ADDON_PRODUCT_WAREHOUSE_SYNC`, `DODO_ADDON_PRODUCT_GST_CREDIT`) into `.env.production`, run `$COMPOSE up -d`, then check them:
+Paste the fifteen lines it prints into `.env.production`: the plan products `GATEWAY_PRICE_ID_DEVELOPER`,
+`_BUSINESS`, `_ENTERPRISE`, `_DEVELOPER_YEARLY`, `_BUSINESS_YEARLY`, and the rupee ones `_DEVELOPER_INR`,
+`_BUSINESS_INR`, `_ENTERPRISE_INR`, `_DEVELOPER_YEARLY_INR`, `_BUSINESS_YEARLY_INR`; the add-ons
+`DODO_ADDON_PRODUCT_WAREHOUSE_SYNC`, `DODO_ADDON_PRODUCT_GST_CREDIT`, `_GST_CREDIT_YEARLY`, `_GST_CREDIT_INR` and
+`_GST_CREDIT_YEARLY_INR`. Run `$COMPOSE up -d`, then check them:
 
 ```bash
 $COMPOSE exec -T web python scripts/dodo_setup.py      # every line must say OK
@@ -929,7 +940,7 @@ one-line fix and where to click. It never prints a secret (at most "set", or the
 `--json` gives machine-readable output. `--online` adds read-only calls (database, Redis, storage bucket, SMTP login without sending, Groq's model list,
 Dodo's product list, Postmark's server record); against a **live** Dodo account it refuses unless you add `--i-mean-live` (it still only reads).
 `--send-test-email you@example.com` sends exactly one message. It checks: the environment and URLs, the production guard, database, Redis, storage (and R2's EU
-endpoint), the mail relay, the Groq, Gemini and encryption keys, Dodo (test or live agree, the webhook secret, all eight product ids), email-in, Zoho,
+endpoint), the mail relay, the Groq, Gemini and encryption keys, Dodo (test or live agree, the webhook secret, all fifteen product ids), email-in, Zoho,
 error tracking, the NIC key, the backup key and folder, `ALERT_WEBHOOK`, `OPERATOR_ALERT_EMAILS` and the CPU-only image.
 
 ### 9.15 Webhook events for GST and workflow runs, warehouse datasets, pack checks, and the logo (Final session 1)
