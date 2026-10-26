@@ -34,7 +34,7 @@ email-validator==2.3.0
 et_xmlfile==2.0.0
 eval_type_backport==0.4.0
 fastapi==0.136.3
-filelock==3.29.5
+filelock==4.2.1
 flatbuffers==25.12.19
 frozenlist==1.8.0
 fsspec==2026.6.0
@@ -157,7 +157,7 @@ scikit-learn==1.9.0
 scipy==1.18.0
 sentence-transformers==5.6.0
 sentry-sdk==2.73.0
-setuptools==83.0.0
+setuptools==84.1.0
 shapely==2.1.2
 shellingham==1.5.4
 signxml==5.1.0
