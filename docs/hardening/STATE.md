@@ -21,8 +21,10 @@ the session scratchpad (outside the repo).
   unit economics in every currency, the website, docs, tests. Findings F-626 to F-629; decisions N-192, N-193 (open: GSTIN on the
   Dodo invoice). Browser regression of the billing, plan and ERP specs: 175 passed, 4 failed and fixed (F-629, N-187 expected values,
   spec 137 isolation), re-run green. Unverified until 2B: Dodo's real rupee checkout, its exact refusal wording above the mandate.
-- [ ] 2. Safety jobs that cannot stop silently: run reports, the stale watcher and alert, readiness `safety_jobs`, the health page, the
-  sweeps in the scheduler (or not, recorded), `servabo-install-host-jobs`, preflight, docs, tests
+- [x] 2. Safety jobs that cannot stop silently: run reports, the stale watcher and alert, readiness `safety_jobs`, the health page, the
+  sweeps in the scheduler (or not, recorded), `servabo-install-host-jobs`, preflight, docs, tests. Sweeps stay on cron (N-194);
+  readiness adds `safety_jobs: degraded` only when degraded (a healthy answer stays `{"status": "ready"}`, F-042). Unverified until
+  2B: a real server's cron, and the stopped-cron email arriving the next day (checklist step 10).
 - [ ] 3. Prompt injection: `docs/hardening/PROMPT-INJECTION.md`, registry-walking invariants (a) to (f), the red-team corpus, fixes test-first
 - [ ] 4. Leftovers: the GST speed test's timings, deletion warning emails, a zip in the upload tray, `k1a6`'s downgrade with rows, PR #39's
   loose ends
@@ -31,7 +33,7 @@ the session scratchpad (outside the repo).
 - [ ] 7. Records and the docs customers see
 - [ ] 8. `docs/sessions/FINAL-2-LIVE.md` rewritten; HANDOFF "Final session 2A → Final session 2B"; PR ready; CI green
 
-- **Next action:** Phase 2 (safety jobs).
+- **Next action:** Phase 3 (prompt injection).
 
 
 ## Current phase — the final sessions: 2A, then 2T (TRINETRA), then 2B (2026-10-26)

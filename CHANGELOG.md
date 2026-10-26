@@ -6,6 +6,15 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Added — Final session 2A, Phase 2: safety jobs that cannot stop silently (2026-10-26)
+
+- **Every server cron job reports its runs to the app** (sweeps, backups, restore drill, uptime check). When one has not
+  succeeded within its deadline, or never reported a day after start, the operator is emailed once a day (and
+  `ALERT_WEBHOOK` hears it); Platform admin, Background jobs, shows it in red; readiness says `safety_jobs: degraded`
+  but the site stays up; `preflight.py --online` names it.
+- **`servabo-install-host-jobs`** installs the cron files and proves every job can report (RUNBOOK 9.6). New settings:
+  `SAFETY_JOB_REPORT_TOKEN`, `ALERT_WEBHOOK`, `SAFETY_JOBS_UNWATCHED`. The sweeps stay on cron (N-194).
+
 ### Added — Final session 2A, Phase 1: sellable in India (2026-10-26)
 
 - **Prices in rupees and yearly** (N-187), per seat: Starter ₹1,499 or $49 a month, ₹14,990 or $490 a year; Business ₹4,999
