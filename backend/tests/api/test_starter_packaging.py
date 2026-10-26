@@ -91,3 +91,12 @@ def test_the_custom_domain_route_refusal_on_starter_names_business_not_an_add_on
     assert "Business and Enterprise" in message and "upgrade" in message.lower()
     assert "is an add-on" not in message
     assert raised.value.details["included_in"] == ["Business", "Enterprise"]
+
+
+def test_the_billing_state_names_the_plan_starter(client, db_session: Session, tenant) -> None:
+    """The checkout return page said "You're on the developer plan" (browser spec 60): the state now carries the name."""
+    put_on_plan(db_session, tenant.organization, "developer")
+    db_session.commit()
+    state = client.get(f"/api/v1/organizations/{tenant.organization.id}/billing/subscription", headers=tenant.owner.headers)
+    assert state.status_code == 200, state.text
+    assert state.json()["plan_key"] == "developer" and state.json()["plan_name"] == "Starter"

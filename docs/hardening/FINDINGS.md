@@ -3724,3 +3724,10 @@ that failed first (`test_a_seat_increase_whose_charge_fails_is_refused_not_appli
 `test_a_rupee_subscriber_is_quoted_the_rupee_seat_price`); the write now sends `prevent_change`, a refused charge answers
 `MANDATE_APPROVAL_NEEDED` in words with "Approve the new amount", and the quote reads the billed product. Dodo's exact
 refusal wording is **unverified** (Final session 2B, DODO-LOCAL-TEST journey I).
+
+## F-629 — The payment confirmation named the plan by its internal key (P3)
+
+After paying for Starter, the checkout return page said "You're on the developer plan with 1 seat": it printed the plan
+key, not the name customers buy (N-187 shows `developer` as Starter). Found by browser spec 60; proven by
+`tests/api/test_starter_packaging.py::test_the_billing_state_names_the_plan_starter`, which failed first (the billing
+state carried no name). The state now carries `plan_name` and the page uses it; spec 60 checks "starter plan with 1 seat".

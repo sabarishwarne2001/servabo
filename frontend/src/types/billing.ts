@@ -211,6 +211,8 @@ export interface SubscriptionStateResponse {
   readonly access_state: string;
   /** Campaign session 1: what the server's seat check enforces. */
   readonly plan_key: string | null;
+  /** Final session 2A (N-187): the plan's name as customers see it ("Starter" for the `developer` key). */
+  readonly plan_name?: string | null;
   /** The plan's seats on Free, the purchased quantity on a paid plan; null = no limit. */
   readonly seat_capacity: number | null;
   readonly seat_capacity_source: "PURCHASED" | "PLAN" | "OVERRIDE" | "UNLIMITED";

@@ -234,6 +234,13 @@ def list_plans(
     )
 
 
+def _plan_name(db: Session, organization_id: uuid.UUID) -> Optional[str]:
+    """The current plan's display name (Final session 2A, N-187: `developer` is shown as Starter)."""
+    tier = quota_service.resolve_tier(db, organization_id=organization_id, at=datetime.now(timezone.utc))
+    return tier.display_name if tier else None
+
+
+
 @router.get(
     "/organizations/{organization_id}/billing/subscription",
     response_model=SubscriptionStateResponse,
@@ -274,6 +281,7 @@ def get_subscription_state(
             db, organization_id=context.organization_id
         ).value,
         plan_key=capacity.plan_key,
+        plan_name=_plan_name(db, context.organization_id),
         seat_capacity=capacity.capacity,
         seat_capacity_source=capacity.source,
         seats_pending_invitations=capacity.pending_invitations,

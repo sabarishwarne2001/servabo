@@ -203,6 +203,10 @@ class SubscriptionStateResponse(BaseModel):
     # Campaign session 1: what the seat check enforces, so the page and the
     # server cannot disagree about whether someone can be added.
     plan_key: Optional[str] = None
+    plan_name: Optional[str] = Field(
+        default=None,
+        description="The plan's name as customers see it (Final session 2A, N-187: the `developer` plan is shown as Starter).",
+    )
     seat_capacity: Optional[int] = Field(
         default=None,
         description="Seats the organization holds: the plan's on Free, the purchased quantity on a paid plan. Null: no limit.",
