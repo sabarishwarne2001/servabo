@@ -408,6 +408,46 @@ def check_operations(report: Report, s: Any, strict: bool) -> None:
         report.add(g, "CPU-only image", SKIPPED, "torch is not installed here (the web image carries none)")
 
 
+def probe_safety_jobs(settings: Any) -> list[dict[str, Any]]:
+    """Read-only: what each host safety job last reported (Final session 2A, Phase 2)."""
+    from app.db.session import SessionLocal
+    from app.services.ops import safety_jobs
+
+    with SessionLocal() as db:
+        return safety_jobs.statuses(db)
+
+
+def check_safety_jobs(report: Report, s: Any, strict: bool, online: bool) -> None:
+    """Final session 2A, Phase 2: the host's cron jobs can report their runs, and (online) every one has reported in time."""
+    g = "operations"
+    token = secret_text(s.SAFETY_JOB_REPORT_TOKEN)
+    fix = ("Generate one with `python -c 'import secrets; print(secrets.token_urlsafe(32))'` and put the SAME value in .env.production "
+           "and /etc/servabo/sweepers.env, then run `sudo servabo-install-host-jobs`.")
+    if not token:
+        report.add(g, "SAFETY_JOB_REPORT_TOKEN", MISSING if strict else SKIPPED, "", fix, "RUNBOOK §9.6")
+    else:
+        good = len(token) >= 32
+        report.add(g, "SAFETY_JOB_REPORT_TOKEN", OK if good else WRONG, "set" if good else "shorter than 32 characters",
+                   "" if good else fix, "RUNBOOK §9.6")
+    if not online:
+        report.add(g, "safety jobs (online)", SKIPPED, "needs --online (reads the last report of each cron job)")
+        return
+    try:
+        rows = probe_safety_jobs(s)
+    except Exception as exc:  # noqa: BLE001
+        report.add(g, "safety jobs (online)", WRONG, type(exc).__name__, "The database did not answer: fix the database line first.")
+        return
+    late = [r["name"] for r in rows if r["state"] in ("STALE", "NEVER_RAN")]
+    waiting = [r["name"] for r in rows if r["state"] == "WAITING"]
+    if late:
+        report.add(g, "safety jobs (online)", WRONG, "late: " + ", ".join(late),
+                   "Cron has stopped or cannot report: run `sudo servabo-install-host-jobs` and read what it prints.", "RUNBOOK §9.6")
+    else:
+        watched = [r for r in rows if r["state"] != "UNWATCHED"]
+        detail = f"{len(watched) - len(waiting)} of {len(watched)} reported in time"
+        report.add(g, "safety jobs (online)", OK, detail + (f"; {len(waiting)} not yet due" if waiting else ""))
+
+
 # ---------------------------------------------------------------------------------------------- running and printing
 
 def send_test_error() -> tuple[bool, str]:
@@ -446,6 +486,7 @@ def run(settings: Any, *, online: bool = False, i_mean_live: bool = False) -> Re
     check_dodo(report, settings, online, i_mean_live)
     check_features(report, settings, online)
     check_operations(report, settings, strict)
+    check_safety_jobs(report, settings, strict, online)
     return report
 
 

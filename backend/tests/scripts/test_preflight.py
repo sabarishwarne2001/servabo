@@ -30,6 +30,7 @@ SECRETS = {
     "PLATFORM_SMTP_PASSWORD": "smtp_pw_" + secrets.token_hex(12),
     "ZOHO_CLIENT_SECRET": "zoho_secret_" + secrets.token_hex(12),
     "POSTMARK_INBOUND_WEBHOOK_PASSWORD": "inbound_pw_" + secrets.token_hex(12),
+    "SAFETY_JOB_REPORT_TOKEN": "report_" + secrets.token_hex(20),
 }
 
 
@@ -63,6 +64,7 @@ def boot(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(preflight, "probe_redis", lambda s: None)
     monkeypatch.setattr(preflight, "probe_storage", lambda s: None)
     monkeypatch.setattr(preflight, "probe_smtp", lambda s: None)
+    monkeypatch.setattr(preflight, "probe_safety_jobs", lambda s: [{"name": "compliance", "state": "OK"}, {"name": "pitr-drill", "state": "UNWATCHED"}])
 
     import sys
     import types
@@ -112,6 +114,8 @@ def test_a_complete_production_setup_is_ready(boot):
     ({"POSTMARK_INBOUND_HASH": ""}, "email-in", preflight.WRONG),
     ({"EINVOICE_QR_PUBLIC_KEY_PEM": "not a key"}, "NIC e-invoice key", preflight.WRONG),
     ({"OPERATOR_ALERT_EMAILS": "ops-at-example"}, "OPERATOR_ALERT_EMAILS", preflight.WRONG),
+    ({"SAFETY_JOB_REPORT_TOKEN": ""}, "SAFETY_JOB_REPORT_TOKEN", preflight.MISSING),
+    ({"SAFETY_JOB_REPORT_TOKEN": "too-short"}, "SAFETY_JOB_REPORT_TOKEN", preflight.WRONG),
 ])
 def test_each_thing_wrong_is_named(boot, change, item, expected):
     report = preflight.run(boot(**change))
@@ -237,3 +241,17 @@ def test_send_test_error_says_so_when_error_tracking_is_off(boot, monkeypatch, c
     monkeypatch.setattr(preflight, "load_settings", lambda: (settings, None))
     assert preflight.main(["--send-test-error"]) == 1
     assert "SENTRY_DSN is empty" in capsys.readouterr().out
+
+
+def test_online_names_the_safety_jobs_that_stopped_reporting(boot, monkeypatch):
+    """Final session 2A, Phase 2: a cron job that has not reported in time is named, with the command that checks the host."""
+    report = preflight.run(boot(), online=True)
+    assert status_of(report, "safety jobs (online)") == preflight.OK
+    monkeypatch.setattr(preflight, "probe_safety_jobs", lambda s: [{"name": "compliance", "state": "STALE"},
+                                                                   {"name": "backup", "state": "NEVER_RAN"},
+                                                                   {"name": "uptime", "state": "OK"}])
+    report = preflight.run(boot(), online=True)
+    item = next(i for i in report.items if i.name == "safety jobs (online)")
+    assert item.status == preflight.WRONG and item.detail == "late: compliance, backup"
+    assert "servabo-install-host-jobs" in item.fix and not report.ready
+    assert status_of(preflight.run(boot()), "safety jobs (online)") == preflight.SKIPPED  # offline reads nothing
