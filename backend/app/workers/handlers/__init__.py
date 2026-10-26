@@ -99,7 +99,7 @@ GST_NOTICE_JOB_TYPES: frozenset[str] = frozenset({"gst.digest", "gst.notices"})
 #: Campaign session 3 (N-062): owners are told at 80% and 100% of a monthly plan limit.
 USAGE_ALERT_JOB_TYPES: frozenset[str] = frozenset({"usage.limit_alerts"})
 #: Campaign session 4 (§C.4): the deployment's owner is emailed about dead jobs and error bursts.
-OPS_ALERT_JOB_TYPES: frozenset[str] = frozenset({"ops.alerts"})
+OPS_ALERT_JOB_TYPES: frozenset[str] = frozenset({"ops.alerts", "ops.safety_jobs"})  # Final session 2A: safety jobs
 #: Flagship session: Helm (docs/helm/ARCHITECTURE.md §10). On the LIGHT profile.
 HELM_JOB_TYPES: frozenset[str] = frozenset(
     {"helm.ledger_build", "helm.plan", "helm.backtest", "helm.execute", "helm.briefing", "helm.sample"}
@@ -516,6 +516,11 @@ def _operator_alerts(payload: dict[str, Any]) -> dict[str, Any]:
     return handle_operator_alerts(payload)
 
 
+def _safety_jobs(payload: dict[str, Any]) -> dict[str, Any]:
+    from app.workers.handlers.operator_alerts import handle_safety_jobs
+    return handle_safety_jobs(payload)
+
+
 _HANDLERS = {
     "document.extract": _document_extract,
     "document.enrich": _document_enrich,
@@ -636,6 +641,7 @@ _HANDLERS = {
     "gst.notices": _gst_notices,
     # Campaign session 4 (§C.4). On the LIGHT profile; every five minutes in DEFAULT_SCHEDULE.
     "ops.alerts": _operator_alerts,
+    "ops.safety_jobs": _safety_jobs,  # Final session 2A (Phase 2)
     # Flagship session: Helm. On the LIGHT profile (app/workers/profiles.py).
     # Session F: GST Credit. On the LIGHT profile; nightly in DEFAULT_SCHEDULE.
     "gst.recompute": _gst_recompute,

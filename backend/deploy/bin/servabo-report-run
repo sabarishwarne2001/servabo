@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Final session 2A (Phase 2) — tell Servabo that a safety job started, succeeded or failed.
+#
+#   servabo-report-run <job> <started|succeeded|failed> [detail]
+#
+# Called by servabo-sweep, servabo-compose-backup, servabo-compose-restore-drill and servabo-uptime-heartbeat. It posts
+# to the app's public address (POST /api/v1/ops/safety-jobs/<job>/runs) with the shared secret SAFETY_JOB_REPORT_TOKEN
+# (the same value in /etc/servabo/sweepers.env and .env.production); the token is passed on stdin, never on the command
+# line, so `ps` does not show it. Inside the app, the hourly `ops.safety_jobs` check alerts the operator when a job has
+# not succeeded within its deadline (Platform admin, Background jobs, shows them all).
+#
+# It NEVER fails the job that called it: an unreachable app or a missing setting is one line on stderr and exit 0.
+set -u
+
+CONFIG_FILE="${SERVABO_SWEEPER_ENV:-/etc/servabo/sweepers.env}"
+[[ -r "${CONFIG_FILE}" ]] && source "${CONFIG_FILE}"
+
+JOB="${1:-}"
+OUTCOME="${2:-}"
+DETAIL="${3:-}"
+[[ -n "${JOB}" && -n "${OUTCOME}" ]] || { echo "usage: $(basename "$0") <job> <started|succeeded|failed> [detail]" >&2; exit 0; }
+
+BASE_URL="${SERVABO_REPORT_URL:-${SERVABO_PUBLIC_URL:-${APP_DOMAIN:+https://${APP_DOMAIN}}}}"
+if [[ -z "${BASE_URL}" || -z "${SAFETY_JOB_REPORT_TOKEN:-}" ]]; then
+    echo "SAFETY_JOB_REPORT_SKIPPED: set SERVABO_PUBLIC_URL and SAFETY_JOB_REPORT_TOKEN in ${CONFIG_FILE}" >&2
+    exit 0
+fi
+
+# JSON-escape the detail (backslash, quote, control characters) and keep it short.
+DETAIL="${DETAIL:0:500}"
+DETAIL="${DETAIL//\\/\\\\}"
+DETAIL="${DETAIL//\"/\\\"}"
+DETAIL="$(printf '%s' "${DETAIL}" | tr '\000-\037' ' ')"
+BODY="{\"outcome\":\"${OUTCOME}\",\"detail\":\"${DETAIL}\"}"
+
+printf 'X-Servabo-Report-Token: %s\n' "${SAFETY_JOB_REPORT_TOKEN}" \
+    | curl -fsS -m 10 --retry 2 --retry-delay 2 -o /dev/null -X POST \
+        -H @- -H 'Content-Type: application/json' --data "${BODY}" \
+        "${BASE_URL%/}/api/v1/ops/safety-jobs/${JOB}/runs" \
+    || echo "SAFETY_JOB_REPORT_FAILED: ${JOB} ${OUTCOME} could not reach ${BASE_URL%/}" >&2
+exit 0

@@ -15,6 +15,10 @@ its monitor while the site answers and reports a failure when it does not.
 
 The three point-in-time-recovery lines need WAL archiving, which the compose deployment does not
 have (N-012): RUNBOOK §9.6 switches them off, and this proves its command does exactly that.
+
+Final session 2A (Phase 2): every line also reports its run to the app (`servabo-report-run`, POST
+/api/v1/ops/safety-jobs/<job>/runs with SAFETY_JOB_REPORT_TOKEN); the stand-in plays the app and
+each test checks the job said it started and how it ended.
 """
 
 from __future__ import annotations
@@ -114,9 +118,14 @@ def cron_db() -> Iterator[dict[str, str]]:
         admin.close()
 
 
+REPORT_TOKEN = secrets.token_urlsafe(32)
+REPORT_PATH = re.compile(r"^/api/v1/ops/safety-jobs/(?P<job>[^/]+)/runs$")
+
+
 class _Stand_in(http.server.BaseHTTPRequestHandler):
     healthy = True
     pings: list[str] = []
+    reports: list[tuple[str, str]] = []  # (job, outcome) the app was told, with the right token
 
     def do_GET(self) -> None:  # noqa: N802 - the http.server hook
         if self.path.startswith("/ping/"):
@@ -130,8 +139,18 @@ class _Stand_in(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"OK" if status == 200 else b"unavailable")
 
-    def do_POST(self) -> None:  # noqa: N802 - the watchdog's alert webhook
-        self.rfile.read(int(self.headers.get("Content-Length") or 0))
+    def do_POST(self) -> None:  # noqa: N802 - the watchdog's alert webhook, and the safety-job reports
+        body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        report = REPORT_PATH.match(self.path)
+        if report:
+            authorized = self.headers.get("X-Servabo-Report-Token") == REPORT_TOKEN
+            if authorized:
+                import json
+
+                type(self).reports.append((report["job"], json.loads(body)["outcome"]))
+            self.send_response(202 if authorized else 401)
+            self.end_headers()
+            return
         self.do_GET()
 
     def log_message(self, *args: object) -> None:
@@ -141,6 +160,7 @@ class _Stand_in(http.server.BaseHTTPRequestHandler):
 @pytest.fixture()
 def monitor() -> Iterator[str]:
     _Stand_in.pings = []
+    _Stand_in.reports = []
     _Stand_in.healthy = True
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Stand_in)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -186,8 +206,8 @@ def test_each_sweep_line_succeeds_and_tells_its_monitor(
     name: str, args: list[str], cron_db: dict[str, str], monitor: str, tmp_path: pathlib.Path
 ) -> None:
     check = uuid.uuid4().hex
-    env = _host(tmp_path, cron_db, HEARTBEAT_BASE=f"{monitor}/ping",
-                **{f"HEARTBEAT_UUID_{name.upper()}": check})
+    env = _host(tmp_path, cron_db, HEARTBEAT_BASE=f"{monitor}/ping", SERVABO_REPORT_URL=monitor,
+                SAFETY_JOB_REPORT_TOKEN=REPORT_TOKEN, **{f"HEARTBEAT_UUID_{name.upper()}": check})
     command = [str(BACKEND / "deploy/bin/servabo-sweep"), name, *args]
     done = subprocess.run(command, cwd=BACKEND, env=env, capture_output=True, text=True, timeout=600)
     log = (tmp_path / "logs" / f"sweep_{name}.log").read_text()
@@ -197,6 +217,7 @@ def test_each_sweep_line_succeeds_and_tells_its_monitor(
     metric = (tmp_path / "textfile" / f"servabo_sweeper_{name}.prom").read_text()
     assert f'servabo_sweeper_last_success_timestamp_seconds{{sweeper="{name}"}}' in metric
     assert _Stand_in.pings == [check]
+    assert _Stand_in.reports == [(name, "started"), (name, "succeeded")]
 
 
 def test_the_runbook_switches_the_point_in_time_lines_off() -> None:
@@ -270,6 +291,7 @@ def _compose_env(tmp: pathlib.Path, database: dict[str, str], monitor: str) -> d
         SERVABO_PG_EXEC=f"env PGHOST={c['host']} PGPORT={c['port']} PGPASSWORD={c['password']}",
         SERVABO_BACKUP_KEY_FILE=str(key), HEARTBEAT_BASE=f"{monitor}/ping",
         HEARTBEAT_UUID_COMPOSE_BACKUP="backup", HEARTBEAT_UUID_COMPOSE_RESTORE_DRILL="drill",
+        SERVABO_REPORT_URL=monitor, SAFETY_JOB_REPORT_TOKEN=REPORT_TOKEN,
     )
 
 
@@ -323,6 +345,8 @@ def test_the_compose_backup_and_the_timed_restore_drill(
     assert re.search(r"restore time: \d+s", log), log
     assert seconds < 300, f"a restore of a small database took {seconds:.0f}s"
     assert _Stand_in.pings == ["backup", "drill"]
+    assert _Stand_in.reports == [("backup", "started"), ("backup", "succeeded"),
+                                 ("restore-drill", "started"), ("restore-drill", "succeeded")]
 
 
 def test_a_backup_that_does_not_match_its_checksum_fails_the_drill(
@@ -337,13 +361,15 @@ def test_a_backup_that_does_not_match_its_checksum_fails_the_drill(
     assert drill.returncode != 0
     assert "does not match its checksum" in (tmp_path / "logs" / "compose_restore_drill.log").read_text()
     assert _Stand_in.pings == ["backup", "drill/fail"]
+    assert _Stand_in.reports[-1] == ("restore-drill", "failed")
 
 
 def test_the_uptime_check_pings_while_the_site_answers_and_fails_when_it_does_not(
     monitor: str, tmp_path: pathlib.Path
 ) -> None:
     env = {**os.environ, "SERVABO_SWEEPER_ENV": str(tmp_path / "sweepers.env"), "SERVABO_LOG_DIR": str(tmp_path),
-           "SERVABO_PUBLIC_URL": monitor, "HEARTBEAT_BASE": f"{monitor}/ping", "HEARTBEAT_UUID_UPTIME": "uptime"}
+           "SERVABO_PUBLIC_URL": monitor, "HEARTBEAT_BASE": f"{monitor}/ping", "HEARTBEAT_UUID_UPTIME": "uptime",
+           "SAFETY_JOB_REPORT_TOKEN": REPORT_TOKEN}
     (tmp_path / "sweepers.env").touch()
     command = _on_this_machine(_cron_lines("servabo-compose-backups")[2])
     command = command.replace("/etc/servabo/sweepers.env", env["SERVABO_SWEEPER_ENV"])
@@ -351,6 +377,7 @@ def test_the_uptime_check_pings_while_the_site_answers_and_fails_when_it_does_no
     _Stand_in.healthy = False
     assert subprocess.run(["bash", "-c", command], env=env, timeout=60).returncode != 0
     assert _Stand_in.pings == ["uptime", "uptime/fail"]
+    assert _Stand_in.reports == [("uptime", "succeeded"), ("uptime", "failed")]
     assert "UPTIME_CHECK_FAILED" in (tmp_path / "uptime.log").read_text()
 
 
@@ -366,7 +393,8 @@ def test_the_python_backup_and_restore_drill_lines(cron_db: dict[str, str], moni
     assert key.returncode == 0, key.stderr
     secret = key.stdout.strip().splitlines()[-1].strip()  # the key alone, base64
     env = _host(tmp_path, cron_db, SERVABO_BACKUP_KEY=secret, HEARTBEAT_BASE=f"{monitor}/ping",
-                HEARTBEAT_UUID_BACKUP="py-backup", HEARTBEAT_UUID_RESTORE_DRILL="py-drill")
+                HEARTBEAT_UUID_BACKUP="py-backup", HEARTBEAT_UUID_RESTORE_DRILL="py-drill",
+                SERVABO_REPORT_URL=monitor, SAFETY_JOB_REPORT_TOKEN=REPORT_TOKEN)
     for command in _cron_lines("servabo-backups"):
         argv = shlex.split(_on_this_machine(command))
         done = subprocess.run(argv, cwd=BACKEND, env=env, capture_output=True, text=True, timeout=600)
@@ -375,3 +403,5 @@ def test_the_python_backup_and_restore_drill_lines(cron_db: dict[str, str], moni
         assert done.returncode == 0, log[-3000:]
         assert f"SWEEP_WRAPPER_DONE | {name} | status=0 outcome=ok" in log
     assert _Stand_in.pings == ["py-backup", "py-drill"]
+    assert _Stand_in.reports == [("backup", "started"), ("backup", "succeeded"),
+                                 ("restore-drill", "started"), ("restore-drill", "succeeded")]

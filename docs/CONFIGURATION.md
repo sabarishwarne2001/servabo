@@ -14,7 +14,7 @@ in the containers unless you add it to the service's `environment:` in `docker-c
 is not read by any code, is missing from this page, or is one production cannot run without and
 is missing from `.env.production.template` (or does not stop the app from starting when unset).
 
-322 settings. Columns: name, type, default, where it appears (`example` =
+325 settings. Columns: name, type, default, where it appears (`example` =
 `.env.example`, `production` = `.env.production.template`, `guard` = checked by the production
 guard), and the comment written above it in the code.
 
@@ -77,6 +77,9 @@ guard), and the comment written above it in the code.
 | `OPERATOR_ALERT_EMAILS` | `str` | `''` | example, production, guard | Who is emailed (through the platform relay) about dead background jobs, gateway events that will never be applied, bursts of server errors and duplicate gateway subscriptions. Comma-separated addresses. Required in prod… |
 | `OPERATOR_ALERT_5XX_THRESHOLD` | `int` | `20` | production | Server errors (5xx answers, all API processes together) in five minutes that count as a burst worth an alert. |
 | `OPERATOR_ALERT_REPEAT_MINUTES` | `int` | `60` | production | The same alert is emailed again at most this often while it keeps happening. |
+| `ALERT_WEBHOOK` | `str` | `''` | example, production | Final session 2A (Phase 2). Also tell this address when a safety job is stale: a Healthchecks.io check's failure address works (it accepts the POST and emails or texts you). The host watchdog reads the same name from sw… |
+| `SAFETY_JOB_REPORT_TOKEN` | `SecretStr \| None` | `None` | example, production | The shared secret the host's safety jobs (sweeps, backup, restore drill, uptime heartbeat) send with each run report (`POST /api/v1/ops/safety-jobs/{name}/runs`, header `X-Servabo-Report-Token`); the same value goes in … |
+| `SAFETY_JOBS_UNWATCHED` | `str` | `'dr-heartbeat,base-backup,pitr-drill'` | example, production | Safety jobs this deployment does not run (comma-separated names), so they are not watched. The three point-in-time-recovery jobs are switched off on a Docker Compose server (RUNBOOK 9.6, N-012). |
 | `FRONTEND_URL` | `str` | `'http://localhost:3000'` | example, production, guard |  |
 | `WEBSITE_URL` | `str` | `'https://servabo.app'` | production | Website session (B7): the public website (pricing, terms, privacy, refunds). Emails link its legal pages; the fallback domain is https://getservabo.com. |
 | `EMAIL_ENCRYPTION_KEYS` | `Optional[SecretStr]` | `None` | example, production, guard |  |

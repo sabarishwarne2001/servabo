@@ -68,4 +68,20 @@ def get_ready() -> JSONResponse:
         except Exception as exc:  # noqa: BLE001 - the detail stays in the log, not the response
             logger.warning("readiness.failed", extra={"dependency": name, "error": type(exc).__name__})
             return JSONResponse(status_code=503, content={"status": "not_ready"})
-    return JSONResponse(status_code=200, content={"status": "ready"})
+    return JSONResponse(status_code=200, content={"status": "ready", **_safety_jobs()})
+
+
+def _safety_jobs() -> dict[str, str]:
+    """Final session 2A: `safety_jobs: degraded` when a host safety job is stale or never reported. Never fails
+    readiness: a stopped sweep must not take the app down. Omitted when every job is fine (F-042: no detail on a healthy
+    answer) and when it cannot be read."""
+    try:
+        from app.db.session import SessionLocal
+        from app.services.ops import safety_jobs
+
+        with SessionLocal() as db:
+            state = safety_jobs.readiness(db)
+        return {"safety_jobs": state} if state == "degraded" else {}
+    except Exception:  # noqa: BLE001 - readiness answers about Postgres and Redis; this is extra information
+        logger.warning("readiness.safety_jobs_unreadable", exc_info=True)
+        return {}

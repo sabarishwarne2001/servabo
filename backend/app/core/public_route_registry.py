@@ -279,6 +279,15 @@ PUBLIC_ROUTES: tuple[PublicRoute, ...] = (
         credential="none — the published price list, no tenant data",
         rate_limit_policy="POLICY_PUBLIC_READ",
     ),
+    # Final session 2A, Phase 2. The host's cron jobs (sweeps, backups, restore drill,
+    # uptime heartbeat) report each run here. Not in the OpenAPI schema; no tenant data.
+    PublicRoute(
+        path="/api/v1/ops/safety-jobs/{name}/runs",
+        methods=("POST",),
+        phase="FINAL-2A",
+        credential="X-Servabo-Report-Token (SAFETY_JOB_REPORT_TOKEN), constant-time compare",
+        rate_limit_policy="POLICY_WEBHOOK_INBOUND",
+    ),
 )
 
 

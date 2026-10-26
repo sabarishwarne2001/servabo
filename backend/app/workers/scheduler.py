@@ -208,6 +208,15 @@ DEFAULT_SCHEDULE: tuple[ScheduledJob, ...] = (
         description="Email the deployment's owner about dead jobs, dead payment events and error bursts (§C.4).",
     ),
     ScheduledJob(
+        job_type="ops.safety_jobs",
+        interval_seconds=3_600,
+        description=(
+            "Compare each host safety job's last reported success (the sweeps, the backup, the restore drill, the "
+            "uptime heartbeat) with its deadline; a stale or never-reported job is one operator alert a day, and the "
+            "next ops.alerts run emails it (Final session 2A)."
+        ),
+    ),
+    ScheduledJob(
         job_type="identity.sweep_replay_guard",
         interval_seconds=3_600,
         description="Prune expired SAML replay-guard entries (ARCH-16).",

@@ -151,6 +151,10 @@ x-app-env: &app-env
   OPERATOR_ALERT_EMAILS: ${OPERATOR_ALERT_EMAILS:?OPERATOR_ALERT_EMAILS must be set, e.g. you@yourcompany.com}
   OPERATOR_ALERT_5XX_THRESHOLD: ${OPERATOR_ALERT_5XX_THRESHOLD:-20}
   OPERATOR_ALERT_REPEAT_MINUTES: ${OPERATOR_ALERT_REPEAT_MINUTES:-60}
+  # Final session 2A: the host's cron jobs report their runs (RUNBOOK 9.6); a stale one is alerted.
+  SAFETY_JOB_REPORT_TOKEN: ${SAFETY_JOB_REPORT_TOKEN:-}
+  ALERT_WEBHOOK: ${ALERT_WEBHOOK:-}
+  SAFETY_JOBS_UNWATCHED: ${SAFETY_JOBS_UNWATCHED:-dr-heartbeat,base-backup,pitr-drill}
 
   # Final session 1. These were in the template but never reached the containers, so zip upload limits, email-in, archived-data
   # purging and Zoho sign-in could not be switched on by the template alone (F-580). Defaults are the settings' own.

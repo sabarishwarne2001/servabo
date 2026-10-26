@@ -229,6 +229,11 @@ from app.api.v1.admin import jobs as admin_jobs  # noqa: E402
 
 api_router.include_router(admin_jobs.router)
 
+# Final session 2A (Phase 2): the host's safety jobs report their runs (shared-secret header; hidden from the schema).
+from app.api.v1 import ops_reports  # noqa: E402
+
+api_router.include_router(ops_reports.router)
+
 # Global & Identity Federation
 api_router.include_router(health_router, prefix="/health", tags=["Health"])
 api_router.include_router(auth_router, prefix="/auth", tags=["Authentication"])

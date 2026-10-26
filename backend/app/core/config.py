@@ -214,6 +214,17 @@ class Settings(BaseSettings):
     OPERATOR_ALERT_5XX_THRESHOLD: int = 20
     #: The same alert is emailed again at most this often while it keeps happening.
     OPERATOR_ALERT_REPEAT_MINUTES: int = 60
+    #: Final session 2A (Phase 2). Also tell this address when a safety job is stale: a Healthchecks.io check's failure
+    #: address works (it accepts the POST and emails or texts you). The host watchdog reads the same name from
+    #: sweepers.env. Empty: email only.
+    ALERT_WEBHOOK: str = ""
+    #: The shared secret the host's safety jobs (sweeps, backup, restore drill, uptime heartbeat) send with each run
+    #: report (`POST /api/v1/ops/safety-jobs/{name}/runs`, header `X-Servabo-Report-Token`); the same value goes in
+    #: /etc/servabo/sweepers.env. Empty: reports are refused, and every job reads "never reported" a day after start.
+    SAFETY_JOB_REPORT_TOKEN: SecretStr | None = None
+    #: Safety jobs this deployment does not run (comma-separated names), so they are not watched. The three
+    #: point-in-time-recovery jobs are switched off on a Docker Compose server (RUNBOOK 9.6, N-012).
+    SAFETY_JOBS_UNWATCHED: str = "dr-heartbeat,base-backup,pitr-drill"
 
     @property
     def operator_alert_recipients(self) -> list[str]:
