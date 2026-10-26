@@ -1,7 +1,7 @@
 # The final sessions: what they are, and how to run them
 
-_Written 2026-10-22 for the owner; updated 2026-10-23 when the upgrade session (2A) was added. Plain language, no prior DevOps
-knowledge assumed._
+_Written 2026-10-22 for the owner; updated 2026-10-23 when the upgrade session (2A) was added, and 2026-10-26 after TRINETRA.
+Plain language, no prior DevOps knowledge assumed._
 
 ## 1. Where things stand (2026-10-23)
 
@@ -18,12 +18,26 @@ knowledge assumed._
 
   You also proposed an "Evidence-to-Resolution" idea, to be built only if it is truly needed and truly earns money.
   **Session 2A answers these before the live tests.**
+- **Since then (2026-10-23 to 26) two more changes were merged:**
+  - **PR #39** redesigned the Documents and AI Assistant screens;
+  - **PR #40, TRINETRA**, checks that the TDS your customers withhold from your invoices really shows up in your tax
+    statement. It is merged and its checks passed, but it is **switched off for customers** until real statement files, a tax
+    adviser and a pilot customer have confirmed it. Today customers see a synthetic preview only.
+- **A review of TRINETRA (2026-10-26) found real gaps,** and **session 2A now fixes them as well** (its "Phase T"). The most
+  important:
+  - a confirmed TDS deduction made Helm stop reminding the customer about the whole invoice, even the cash still owed;
+  - renaming a document made its tax evidence count as "changed";
+  - the check that the invoice is really yours ignored the GSTIN;
+  - a Business customer would be stopped for good after 12 statement uploads or 500 cases;
+  - there was no way to switch TRINETRA on for **one** pilot customer only.
+
+  HANDOFF "TRINETRA review and the revised session 2A" lists everything.
 
 ## 2. The sessions, in order
 
 | | **Final session 1** (done) | **Final session 2A: upgrade** (next) | **Final session 2B: live** |
 | --- | --- | --- | --- |
-| **What** | Study the whole project, bring it up to date, build the money features (email-in, zip upload, GST digest, Zoho/Tally, Sentry, `preflight.py`, …) | Prices for India in rupees; the custom-domain fix; safety jobs that cannot stop silently; a prompt-injection map and tests; Final 1's leftovers; an accuracy report and a pilot playbook; assess Evidence-to-Resolution and build a thin version only if it passes the test; **rewrite the live prompt to match reality** | Test **everything for real** on your PC: real AI and OCR, your real invoices (with the accuracy report), real GST files, Dodo test payments in rupees and dollars, real emails, Slack, Zoho Books, Tally, Sentry, a production rehearsal |
+| **What** | Study the whole project, bring it up to date, build the money features (email-in, zip upload, GST digest, Zoho/Tally, Sentry, `preflight.py`, …) | Prices for India in rupees; the custom-domain fix; safety jobs that cannot stop silently; a prompt-injection map and tests; **TRINETRA finished and made safe, with a one-customer pilot switch**; Final 1's leftovers; an accuracy report and a pilot playbook; assess Evidence-to-Resolution and build a thin version only if it passes the test; **rewrite the live prompt to match reality** | Test **everything for real** on your PC: real AI and OCR, your real invoices (with the accuracy report), real GST files, Dodo test payments in rupees and dollars, real emails, Slack, Zoho Books, Tally, Sentry, a production rehearsal |
 | **Where** | Claude Code on the web | Claude Code **on the web** | Claude Code **in VS Code on your PC** |
 | **Model** | Opus 5.5, High | **Opus 5.5, High** | Sonnet 5.5, High (Opus 5.5 for a stubborn defect) |
 | **You** | — | Mostly away; type `continue` after a usage reset; merge at the end | **Present**: about 1 hour at the start, then short moments over the day |
@@ -50,6 +64,7 @@ Wherever older documents say "Final session 2", they mean 2B, the live session.
 - **The free trial becomes 14 days** with 100 documents, so one monthly GSTR-2B fits inside it.
 - **Custom domains** are included on Business and Enterprise and no longer sold separately (the $199 price is retired).
 - **The Tally Prime file** comes to Starter.
+- **TRINETRA was your one exception to "no new engines"** (N-188). Nothing else new starts before the first pilots (N-189).
 
 ## 3. How to run Final session 2A (the upgrade)
 
