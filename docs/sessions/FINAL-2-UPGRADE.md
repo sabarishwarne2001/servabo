@@ -1,14 +1,15 @@
 # Final session 2A (FINAL-2-UPGRADE): make Servabo sellable in India, safe to run, and provable
 
-_Revised 2026-10-26 after PR #40 (TRINETRA) and PR #39 (Documents and Assistant redesign): Phase T and the TRINETRA review
-findings were added; the numbers moved to N-190, F-626 and spec 137._
+_Revised 2026-10-26 after PR #40 (TRINETRA) and PR #39 (Documents and Assistant redesign). Revised again the same day: finishing
+TRINETRA for Business and Enterprise moved to its own session, **Final session 2T** (`docs/sessions/FINAL-2T-TRINETRA.md`), which
+runs right after this one (N-190). The numbers start at N-191, F-626 and spec 137._
 
 | | |
 | --- | --- |
 | **Where** | Claude Code on the web (the cloud), repository `servabo` |
 | **Model / effort** | **Opus 5.5, High** |
-| **Before you start** | PR #40 (TRINETRA) is merged, the PR that revised this file (TRINETRA review, 2026-10-26) is merged, and **CI is green on `main`** (run #478 on `04620e9` was green on every job) |
-| **After it** | Final session 2B, on your own PC: `docs/sessions/FINAL-2-LIVE.md`. **This session rewrites that prompt** so it matches what is really there. |
+| **Before you start** | PR #40 (TRINETRA) is merged, the PR that added Final session 2T (2026-10-26) is merged, and **CI is green on `main`** |
+| **After it** | **Final session 2T** (TRINETRA, in the cloud), then Final session 2B on your own PC: `docs/sessions/FINAL-2-LIVE.md`. **This session rewrites the live prompt** so it matches what is really there; 2T adds TRINETRA's part. |
 | **External cost** | Zero. Every outside service is played by a stand-in here. Final session 2B connects the real accounts. |
 | **If usage runs out** | Type `continue` in the same session after the reset. Each phase is finished, tested and pushed before the next one starts. |
 
@@ -43,7 +44,8 @@ new to SaaS. Explain everything you report in plain language, with no jargon lef
   a Helm annotation and a Helm reminder hold, and a website page. Its CI (run 40282980125) and `main` after the merge (run #478)
   were green. **Live processing is off** (`TRINETRA_LIVE_ENABLED=false`): customers see a synthetic preview only, and its own
   launch gates require official statement samples, a tax adviser's review and an authorized pilot before it is switched on.
-  **A review on 2026-10-26 found real gaps (§0 table, Phase T).** This session fixes them.
+  **A review on 2026-10-26 found real gaps.** **Final session 2T**, which runs right after this one, fixes them and finishes
+  TRINETRA for Business and Enterprise (N-190). This session touches TRINETRA only where it says so.
 
 Before trying everything for real, the owner asked for one more session, with these goals:
 
@@ -59,8 +61,8 @@ Before trying everything for real, the owner asked for one more session, with th
    coordinate the fix → **verify** that it was fixed → measure the money. The owner wants it built only if the product does not
    already do it, and only if it would really earn money.
 4. **Final session 1's small leftovers.**
-5. **TRINETRA: fix what the review found** (Phase T), so that it is correct, safe for the rest of the product, and ready for an
-   authorized pilot, while it stays off for everyone else.
+5. **TRINETRA, only where it meets this session:** its plan row and its copy follow the new prices, currency and "Starter"
+   name (Phase 1), and its existing paths go into the prompt-injection map (Phase 3). Everything else is Final session 2T.
 6. **Make the live session's prompt match reality.** This session ends by rewriting `docs/sessions/FINAL-2-LIVE.md`.
 
 **The direction (decided by the owner, N-186): no new engines.** Servabo already has more engines than one founder can sell.
@@ -89,16 +91,8 @@ session makes the existing product cheaper to buy, safer to run, provable, and f
 | The owner's own commit | `e51f736` ("package_update") removed two optional peer entries (`ajv`, `fast-uri`) from `frontend/package-lock.json`. Every CI run on `main` since (#468, #472, #478) was green, the frontend job included. Nothing to do beyond noting it. | `git show e51f736` |
 | The GST speed test flapped once | `main`'s run #465 failed `tests/performance/test_gst_budgets.py` with "matching took 10.23s" against a 10 s budget, on a commit that changed only the lockfile. It passed on #468, #472 and #478. Most likely a slow shared CI machine. **Do not move the budget**; make the test print its step timings when it fails, so the next red run explains itself. | `docs/hardening/PERFORMANCE.md` ("the matching step on a shared CI machine") |
 | PR #39's loose ends | Its browser spec `122-premium-documents-assistant.spec.ts` shares the number 122 with `122-zoho-and-tally.spec.ts`. It wrote no STATE, FINDINGS or HANDOFF entry. Its coverage row for `GET …/work-items/counts` carries evidence text copied from another row ("scoped Enterprise summary key", "migration up/down/up"). | `frontend/e2e/tests/`, `docs/hardening/COVERAGE.csv` |
-| Records after TRINETRA | `STATE.md` was put in order on 2026-10-26: TRINETRA's working checkpoint now carries a dated note that PR #40 was merged and its final runs were green. `docs/trinetra/DELIVERY.md`, `TEST-PLAN.md` and some COVERAGE rows still say the final CI was "pending". HANDOFF has the review ("TRINETRA review and the revised session 2A"), but no TRINETRA hand-over of its own. The next free numbers are **N-190** (N-189 is this revision's own decision), **F-626** and browser spec **137**. | `docs/hardening/STATE.md`, `docs/trinetra/`, `docs/hardening/HANDOFF.md`, `docs/hardening/COVERAGE.csv` |
-| **TRINETRA: the Helm reminder hold** | Once a withholding is confirmed on an invoice, `helm/hands.py` refuses **every** cash reminder for that invoice (`HELM_WITHHOLDING_REVIEW`). That includes the case where the customer still owes most of the invoice in cash, for example ₹1,16,000 of ₹1,18,000 with ₹2,000 withheld. The refusal lands at send time as a **FAILED** action, not as a Guard block, so the planner may propose it again, and the person sees "failed". The hold also survives the flag being switched off and a plan downgrade, by design, so a stale confirmation can stop collections indefinitely. | `backend/app/services/trinetra/helm_adapter.py` (`reminder_requires_review`), `backend/app/services/helm/hands.py` (`send_reminder`), `helm/executor.py` |
-| **TRINETRA: "changed" means any touch** | A case's invoice, its supporting evidence and the active statement are "current" only while each document's `work_items.updated_at` is unchanged (`invoice_version`, `current()`, the evidence `source_version`). `updated_at` moves on **any** update to the row (`onupdate=func.now()`): a rename or summary set by an automation (`work_item.mutate`), batch healing, or a reprocess that yields the same fields. Such a touch makes the expectation stale, so reconfirming clears its allocations, and it makes a whole statement snapshot unusable until it is re-imported. | `backend/app/services/trinetra/service.py`, `backend/app/db/base.py` (`TimestampMixin`) |
-| **TRINETRA: the seller check** | `receivable()` compares the extracted `vendor_pan` to the profile's PAN **as printed**: no upper-casing, no removal of spaces. It never derives the PAN from `vendor_gstin`, although an Indian B2B invoice prints the GSTIN and the PAN is characters 3 to 12 of it. Without a PAN it falls back to matching on the **name** only. `hmac.compare_digest` raises a `TypeError` (a 500 error) on non-ASCII text. A real invoice is therefore likely to be refused as "seller does not match", or matched on a name alone. | `service.py` (`receivable`), `backend/app/services/helm/identity.py` |
-| **TRINETRA: capacities that never free up** | The plan capacities count **every** snapshot and every case the organization ever created (`count()` over all rows, superseded and withdrawn included), and nothing can archive them. A Business organization therefore stops for good after its 12th statement import or its 500th case, which one busy year can reach. | `service.py` (`capacity`, `import_reviewed`), `api/v1/trinetra.py` (`create_credit`) |
-| **TRINETRA: one PAN, two workspaces** | Duplicate PANs are refused only **within** a workspace. The same legal entity can have a profile in two workspaces of one organization, each with its own salt, and the same government posting can then be allocated once in each: credit counted twice. | `service.py` (`create_profile`) |
-| **TRINETRA: no way to run a pilot** | `TRINETRA_LIVE_ENABLED` is one switch for the whole deployment. The launch gates require an **authorized pilot with one customer**, but switching the flag on opens live TRINETRA to every Business and Enterprise organization. | `backend/app/core/config.py`; every gate in `api/v1/trinetra.py`, `workers/handlers/trinetra.py`, `trinetra/hooks.py`, `events.py`, `helm_adapter.py` |
-| **TRINETRA: a job that does nothing** | `trinetra.recompute` is queued on every document change in a workspace that has a profile. It computes the summary and throws it away: no notice, no event, no stored figure. Nobody is told when a confirmed case goes stale or a new gap appears. | `workers/handlers/trinetra.py`, `trinetra/hooks.py` |
-| TRINETRA: smaller points | The case list builds each row with separate queries (`s.view` without the batched bundle the summary uses), so 100 rows mean several hundred queries. The page shows write forms only when `workspace.role === "ADMIN"`; check what an organization owner sees. TRINETRA rows are deleted when a person's documents are erased, while GST rows are kept as money records (N-163); the two rules should be one deliberate policy. Uploading a statement is a form of up to 500 typed rows; there is no bulk import. | `api/v1/trinetra.py` (`credits`), `frontend/src/pages/trinetra/Trinetra.tsx`, `services/compliance/data_map.py` |
-| TRINETRA and the rest of this session | Its plan copy, its website page (a price column in dollars "per seat") and its docs say "Developer"; Phase 1 changes prices, the currency and the name. Its printed extraction hints (`tds_amount`, `deductor_tan`, `tds_section`) are new paths from document text (Phase 3). It is itself an evidence-to-resolution workflow for one kind of money, with an owner, priority, due date, root cause, evidence, decisions and measured closure (Phase 0B and Phase 6). The live prompt does not mention it (Phase 8). | — |
+| Records after TRINETRA | `STATE.md` was put in order on 2026-10-26: TRINETRA's working checkpoint now carries a dated note that PR #40 was merged and its final runs were green. `docs/trinetra/DELIVERY.md`, `TEST-PLAN.md` and some COVERAGE rows still say the final CI was "pending". HANDOFF has the review ("TRINETRA review and the revised session 2A"). Those TRINETRA records are Final session 2T's job. The next free numbers are **N-191** (N-189 and N-190 are the plan's own decisions), **F-626** and browser spec **137**. | `docs/hardening/STATE.md`, `docs/trinetra/`, `docs/hardening/HANDOFF.md`, `docs/hardening/COVERAGE.csv` |
+| TRINETRA and the rest of this session | Its plan copy, its website page (a price column in dollars "per seat") and its docs say "Developer"; Phase 1 changes prices, the currency and the name. Its printed extraction hints (`tds_amount`, `deductor_tan`, `tds_section`) are new paths from document text (Phase 3). It is itself an evidence-to-resolution workflow for one kind of money, with an owner, priority, due date, root cause, evidence, decisions and measured closure (Phase 0B and Phase 6). The live prompt does not mention it; Final session 2T writes its part. Its defects and unfinished parts are listed in 2T's own prompt. | `docs/sessions/FINAL-2T-TRINETRA.md` |
 
 ## 1. Authority and rules
 
@@ -108,8 +102,8 @@ session makes the existing product cheaper to buy, safer to run, provable, and f
     the band in §4. Record every number you change and why.
   - Every other decision: decide like a careful senior engineer at a top SaaS company, build it, and record it in
     `docs/hardening/NEEDS-OWNER.md` as `DECIDED (Final 2A)`.
-  - Never stop to ask. The next free numbers are decisions from **N-190** (N-186, N-187 and N-189 are this plan's own; N-188
-    is TRINETRA's), findings from **F-626**, and browser specs from **137**. Check `STATE.md`.
+  - Never stop to ask. The next free numbers are decisions from **N-191** (N-186, N-187, N-189 and N-190 are the plan's own;
+    N-188 is TRINETRA's), findings from **F-626**, and browser specs from **137**. Check `STATE.md`.
 - **Evidence rule (CLAUDE.md):** a bug is fixed only when a test failed first, the fix is applied, that test passes and the
   rest of the suite still passes. Anything not proven is reported as "unverified".
 - **CLAUDE.md hard rules hold:**
@@ -141,11 +135,10 @@ session makes the existing product cheaper to buy, safer to run, provable, and f
   - At most two helper agents at a time, each with a narrow brief and a clear "done when".
   - Run long suites in the background. Keep command output short.
   - The full backend and browser suites run once at the end, or on the ready PR's CI.
-- **The cut line.** Phases 1 to 3, Phase T and Phase 8 are the must-haves. If usage gets tight after Phase 5, skip the build
-  part of Phase 6 (keep its assessment), go to Phase 8, write the hand-over and stop cleanly.
-- **TRINETRA stays off for everyone** except an organization a platform administrator deliberately enrols in the pilot (Phase
-  T). Never switch it on globally, never build an "official" statement parser without real, legally obtained files, and never
-  add TCS or automatic sending.
+- **The cut line.** Phases 1 to 3 and Phase 8 are the must-haves. If usage gets tight after Phase 5, skip the build part of
+  Phase 6 (keep its assessment), go to Phase 8, write the hand-over and stop cleanly.
+- **TRINETRA belongs to Final session 2T.** Here, change only its plan row and its copy (Phase 1) and map its existing paths
+  (Phase 3). Do not change its code, and do not switch it on.
 
 ## 2. Start-up
 
@@ -199,9 +192,8 @@ An honest page the owner can act on. It does not sell Servabo to the owner. It h
    and the unit-economics test), and how many customers cover the fixed costs.
 5. **Three risks a careful investor would name,** and what reduces each.
 6. **Where TRINETRA fits.** Who would pay for it (for example a distributor whose large buyers withhold TDS on purchases), what it
-   does today (a reviewed, transcribed comparison), what must happen before it can be sold (its launch gates and Phase T), and
-   whether it belongs in the first pilots or after them. Be plain about it: until a statement can be brought in without typing
-   it row by row, it is a pilot feature, not a selling point.
+   does today (a reviewed, transcribed comparison), and the order before it is sold: Final session 2T finishes it, 2B proves its
+   statement readers on real files, the owner's CA reads it, then it is switched on for Business and Enterprise.
 
 Keep it to what the evidence supports. No market-size figures without a cited source.
 
@@ -264,7 +256,7 @@ Zoho Books ₹749 to ₹2,999 a month. At current prices almost no Indian SMB wi
 | Tally Prime import file (download) | — | **included** (closes N-174) | included | included |
 | Zoho Books Connect and every automatic ERP posting | — | — | included | included |
 | Warehouse sync | — | not sold in rupees | included | included |
-| TRINETRA (N-188; live only for a pilot organization, Phase T) | synthetic preview | synthetic preview | included, with 2 profiles, 12 snapshots and 500 cases (counted as Phase T decides) | included, with organization reporting, API and webhook, and 10 / 60 / 5,000 |
+| TRINETRA (N-188, N-190; switched on by Final session 2T) | synthetic preview | synthetic preview | included, with 2 profiles, 12 snapshots and 500 cases (2T decides what they count) | included, with organization reporting, API and webhook, and 10 / 60 / 5,000 |
 
 **International, in dollars.** The per-user prices **do not change**: $49, $299 and $799, and $490 and $2,990 a year. The GST
 Credit add-on gains a yearly price: **$490 a year**, beside $49 a month. Custom domains, the Tally file and the Starter name
@@ -471,99 +463,7 @@ email our data out?" The answer must be "no, and here is the test that proves it
    injection was flagged where the product flags it.
 4. **Fix every gap test-first,** and record the findings.
 
-## 7. Phase T (P0/P1): TRINETRA, finished and safe
-
-**Why it earns money:** TRINETRA touches Helm's collections, and Helm earns money. A confirmed withholding of ₹2,000 must never
-stop the reminder for ₹1,16,000 of unpaid cash. And TRINETRA can only ever be sold after a pilot, which needs a way to switch it
-on for **one** customer. Everything here is proven test-first; each item the code read in §0 suggested is either fixed with a
-failing test first, or recorded as "not a defect" with the evidence.
-
-**What not to do:** do not switch TRINETRA on globally; do not build an "official" Form 26AS / Form 168 / AIS parser without
-real, legally obtained files; do not add TCS, automatic inquiry sending or ERP-derived expectations. Those stay in its launch
-gates.
-
-1. **The Helm reminder hold (P0).**
-   - A confirmed withholding must stop Helm from chasing the **withheld tax** as cash. It must not stop Helm from chasing the
-     **cash** the customer still owes.
-   - Decide the rule and record it. Recommended: the reminder states the cash still due (gross, less reviewed withholding,
-     less matched receipts) when that is positive, says in one line that ₹X was withheld as TDS under review, and is held only
-     when nothing is left to chase in cash.
-   - A hold is a **Guard block with a plain reason** (the planner knows, does not keep proposing it, and the person sees
-     "held for withholding review", with a link to the case), not a FAILED action.
-   - **Keep the safety property** when the flag is off, a plan lapses or evidence goes stale: never chase withheld tax as cash.
-     The withheld amount stays visible.
-   - Helm gets a list of "reminders held for withholding review", with the way to release each one.
-   - **Tests:** cash still owed → the reminder goes out for the net amount; fully explained → held as a Guard block;
-     withdrawn → released; flag off → still never chases the tax; no repeated proposals; the sample company untouched.
-2. **"Changed" means the evidence changed (P0).**
-   - Replace `updated_at` as the version of an invoice, a piece of supporting evidence or a statement with a fingerprint of
-     what the evidence **is**:
-     - the stored file;
-     - the extracted fields TRINETRA reads;
-     - the `DocumentRole` facts (role, total, currency, date);
-     - for a statement, the stored file.
-   - A rename, a summary edit, a tag, a reprocess that yields the same fields, or batch healing that changes nothing material
-     must leave the case current. A field correction, a different file or a changed total must make it stale.
-   - Existing rows: none exist in production (the flag is off). Migrate or recompute them in a tested way all the same.
-   - **Tests:** one per kind of touch, both ways.
-3. **The seller check (P0).**
-   - Normalize every PAN (upper case; strip spaces and punctuation).
-   - Derive the PAN from `vendor_gstin` (characters 3 to 12, after validating the GSTIN with the repository's existing GSTIN
-     helper).
-   - Compare every identity the invoice offers. Refuse only on a real disagreement, and name the field that disagreed.
-   - A name-only match needs an explicit confirmation by the reviewer, recorded in the case history.
-   - Odd input (non-ASCII, empty, malformed) gives a plain 422, never a 500.
-   - **Tests:** GSTIN only; lower-case PAN; PAN with spaces; another seller's GSTIN; non-ASCII; name only.
-4. **Capacities that work for a real year (P1).**
-   - Decide what the plan capacities count, so that a Business organization doing quarterly imports and a normal volume of
-     cases never hits a permanent wall. Recommended: profiles as today; **active** snapshots (one per profile and year); and
-     **open** cases.
-   - Superseded snapshots and closed or withdrawn cases count against a separate, much higher retention ceiling, and age out
-     under the retention policy (`data_map`).
-   - Record the decision as an N-number. Update the tier seed, `plan_limits`, the tenancy doc and TRINETRA's docs.
-   - **Tests:** the 13th quarterly import and the 501st case over time succeed on Business; the open-case cap still refuses.
-5. **One legal entity, one profile, per organization (P1).**
-   - The same PAN in two workspaces must not let one government posting be allocated twice.
-   - Recommended: refuse a second profile for the same PAN in another workspace of the organization, with a sentence naming
-     the workspace that holds it. Compare with an organization-level keyed fingerprint, never by decrypting across workspaces
-     in a loop. Record sharing one profile across workspaces as a later option.
-   - **Tests:** refused in a second workspace, still allowed in another organization; isolation sweeps green.
-6. **A pilot switch for one organization (P0).**
-   - Replace the single global boolean with three modes, keeping the default: **off** (today's behaviour); **pilot** (live
-     only for organizations a platform administrator has enrolled, audited); **on** (every entitled organization).
-   - Keep `TRINETRA_LIVE_ENABLED` working as a backward-compatible alias, or replace it in every template and doc; record which.
-   - **One helper decides "is TRINETRA live for this organization"**. Every gate uses it: the routes, the worker, the hooks, the
-     event, the Helm annotation and the `/access` answer.
-   - Enrolment is a platform-admin action with an audit row and a reason, and appears on the platform admin's organization page.
-   - **Tests:** each gate in each mode; a non-enrolled Business organization in pilot mode sees the preview; enrolment is
-     audited; `preflight.py` reports the mode, and warns when it is "on".
-7. **Make `trinetra.recompute` worth running, or stop queuing it (P1).**
-   - Recommended: when it runs, it compares the result with the case's last known state. It sends **one** in-app notice (the
-     existing notification service; a "TDS evidence" category, owners and admins, on by default, optional) when a case with a
-     confirmed withholding loses its evidence, when a statement import changes a case to "possible missing posting", or when a
-     case passes its due date.
-   - Each notice is sent once per case revision. Nothing is sent when nothing changed.
-   - If you decide against notices, stop queuing the job on document changes and say why.
-   - **Tests** either way.
-8. **The case list in batches (P1).** Build the list from the same batched path as the summary. Add a query-count test like the
-   summary's.
-9. **One data-lifecycle rule for tax evidence (P1).** Decide whether TRINETRA's reviewed figures, like GST's books (N-163), are
-   records the business must keep, or content that goes with the documents. Apply one consistent rule in `data_map.py`, test it,
-   and record the legal basis you rely on. Mark it for the owner's lawyer, as N-163 was.
-10. **Who sees the write forms (P1).** An organization owner and a workspace administrator see the forms; a workspace viewer and
-    a member do not. Match the server's rule exactly, with a browser assertion.
-11. **Bulk transcription (P2, only if everything above is green).**
-    - A Servabo template (CSV or XLSX, ≤ 500 rows) that a CA fills from the statement and uploads through the **same** preview,
-      confirm and import path. It is still a human transcription, labelled as such, never an "official format".
-    - Validate every row; refuse, with the row number, rather than guess.
-    - Test it with the existing hostile-input patterns (formulas, oversize, bad money).
-12. **TRINETRA's records.**
-    - Update `docs/trinetra/` (DELIVERY, TEST-PLAN, LAUNCH-GATES with the pilot mode, PRODUCT, ARCHITECTURE, THREAT-MODEL) to
-      the merged state: the final CI run 40282980125, `main` run #478, and this session's changes.
-    - Add a TRINETRA section to HANDOFF ("TRINETRA → next"): what is live, for whom, and what its launch gates still need.
-    - Replace the "pending" wording in TRINETRA's COVERAGE rows with the final runs.
-
-## 8. Phase 4 (P1): Final session 1's leftovers
+## 7. Phase 4 (P1): Final session 1's leftovers
 
 0. **The GST speed test that flapped once** (§0).
    - Make `test_gst_budgets.py` put its step timings in its failure message (read, reconcile, write, and what Final 1 added).
@@ -583,7 +483,7 @@ gates.
    - correct the evidence text of the `GET …/work-items/counts` coverage row;
    - add one FINDINGS/HANDOFF line saying what the redesign changed, pointing to `docs/ui/documents-assistant-upgrade.md`.
 
-## 9. Phase 5 (P1): the proof kit (accuracy and the first pilots)
+## 8. Phase 5 (P1): the proof kit (accuracy and the first pilots)
 
 **Why it earns money:** "92% match confidence" on a screen sells nothing by itself. "**98% of fields right on 120 real Indian
 GST invoices, measured**" and "**₹3.2 lakh of GST credit protected in 30 days for <customer>**" do.
@@ -613,7 +513,7 @@ GST invoices, measured**" and "**₹3.2 lakh of GST credit protected in 30 days 
 
    Plain words, a few pages.
 
-## 10. Phase 6 (P1, only if Phase 0B said "build"): the Resolution layer
+## 9. Phase 6 (P1, only if Phase 0B said "build"): the Resolution layer
 
 Build it **thin**, on top of what exists. Name it in plain words: for example a "Recoveries" page with **Found → Being fixed →
 Verified** columns. Record the final name.
@@ -657,15 +557,13 @@ Verified** columns. Record the final name.
    - the plan gate;
    - one browser spec walking an issue from found to verified on the sample company, with axe in light and dark.
 
-8. **TRINETRA's cases** join the read model only for an organization where TRINETRA is live (Phase T's helper), as their own
-   kind: "TDS not yet in the statement". Their figure is a **possible credit gap**, never cash. TRINETRA's "confirmed later gap
-   closure" may show beside "Recovered, verified" only as **"TDS credit now visible in the statement"**: never added to rupees
-   recovered, never counted twice, and labelled as not cash. Reuse TRINETRA's case pattern (owner, priority, due date, root
-   cause, reasoned decisions) for the other kinds, rather than inventing a second one.
+8. **Leave room for TRINETRA.** Build the read model so that a kind can be added through one adapter. Final session 2T adds
+   TRINETRA's cases, as "TDS not yet in the statement": a possible credit gap, never cash. Reuse TRINETRA's case pattern (owner,
+   priority, due date, root cause, reasoned decisions) for the other kinds, rather than inventing a second one.
 
 If 0B said "do not build", write instead what Final 2B should measure about today's flow during the pilot, and stop.
 
-## 11. Phase 7: records and the docs that customers see
+## 10. Phase 7: records and the docs that customers see
 
 - **Update:**
   - `PRODUCT-NEXT.md` (what this session did; the next list after the first pilots);
@@ -673,16 +571,16 @@ If 0B said "do not build", write instead what Final 2B should measure about toda
   - `DODO.md`, `DODO-LOCAL-TEST.md` (a rupee journey, the mandate notice, the GSTIN check);
   - the website (pricing, the product pages' honest lines for the Resolution layer if built, the trial length, `/trinetra`
     in rupees and with "per user");
-  - `docs/trinetra/` (Phase T, item 12);
   - `CHANGELOG.md`, `FINDINGS.md`, `COVERAGE.csv`, `NEEDS-OWNER.md`.
 - **`docs/FINAL-SESSIONS.md`** (the owner's guide): what 2A did, in plain words, and anything new the owner must prepare for
   2B. For example: a Dodo test-mode UPI or Indian test card if Dodo offers one, 30 to 50 real invoices **with their truth
   sheet filled in**, and the GSTIN he will use to buy.
 
-## 12. Phase 8 (must): rewrite the live session's prompt to match reality
+## 11. Phase 8 (must): rewrite the live session's prompt to match reality
 
 `docs/sessions/FINAL-2-LIVE.md` was written before Final session 1 and this session. Rewrite the parts that changed, keeping its
-rules, its structure and everything still true. **Remove the "Do not run this yet" note at its top** once the rewrite is done:
+rules, its structure and everything still true. **Change the "Do not run this yet" note at its top** to say that Final session
+2T adds TRINETRA's phase and removes the note:
 
 1. **Its §0 and start-up:** what exists now (Final 1 and 2A), and the hand-over it must read first (step 2 below).
 2. **Dodo (its Phase 8):**
@@ -704,15 +602,7 @@ rules, its structure and everything still true. **Remove the "Do not run this ye
 6. **The Resolution layer** (if built): walk one real issue from found to verified on the owner's own data, or on the sample
    company if none occurs.
 7. **The deletion warning emails** in a real inbox.
-8. **TRINETRA, as a pilot on the owner's PC.** Add a phase:
-   - set the local stack to pilot mode and enrol the owner's own test organization;
-   - if the owner has a sales invoice on which a customer withheld TDS, and his own Form 26AS / Form 168 or AIS downloaded
-     by himself from the e-filing portal (never committed, never pasted into the chat), walk one real case: profile, the
-     reviewed expectation, a few transcribed rows (or the bulk template if Phase T built it), allocation, the advice and the
-     accounting record, confirmation, the Helm reminder for the **net** cash, the exports;
-   - otherwise walk the synthetic journey on the real models;
-   - write down, **without any values**, how the real statement's columns are laid out, for a future parser;
-   - mark each TRINETRA launch gate Confirmed, Differs or Not checked.
+8. **TRINETRA:** leave its phase to Final session 2T, which writes it.
 9. **Every "Not checked" reason** that this session removed or added.
 
 Also write a section **"Final session 2A → Final session 2B"** in `docs/hardening/HANDOFF.md`, in the shape of Final 1's hand-over:
@@ -723,10 +613,10 @@ Also write a section **"Final session 2A → Final session 2B"** in `docs/harden
 - what was not reached;
 - what is unverified, in plain words.
 
-## 13. Finish line
+## 12. Finish line
 
-- **Phases 1, 2, 3, T and 8 are done and tested** (Phase T's item 11 is optional). Phases 4 to 7 as far as usage allowed,
-  each item either done with tests or listed as not reached. Phase 6 is built or explicitly declined, with the reason.
+- **Phases 1, 2, 3 and 8 are done and tested.** Phases 4 to 7 as far as usage allowed, each item either done with tests or
+  listed as not reached. Phase 6 is built or explicitly declined, with the reason.
 - **These pass,** locally or on the ready PR's CI:
   - `pytest -q`;
   - the frontend's typecheck, lint, `check:self`, `test:unit` and build;
@@ -734,19 +624,18 @@ Also write a section **"Final session 2A → Final session 2B"** in `docs/harden
   - the full browser suite.
 - `campaign_slices.py --check all` exits 0. There is one Alembic head, with up, down and up.
 - **Records:**
-  - `COMMERCIAL-READINESS.md`, `RESOLUTION-ASSESSMENT.md`, `PROMPT-INJECTION.md`, `PILOT-PLAYBOOK.md`, `docs/trinetra/`;
-  - `FINDINGS.md`, `COVERAGE.csv`, `STATE.md` (next action: Final session 2B), `HANDOFF.md`, `NEEDS-OWNER.md`, `CHANGELOG.md`;
+  - `COMMERCIAL-READINESS.md`, `RESOLUTION-ASSESSMENT.md`, `PROMPT-INJECTION.md`, `PILOT-PLAYBOOK.md`;
+  - `FINDINGS.md`, `COVERAGE.csv`, `STATE.md` (next action: Final session 2T), `HANDOFF.md`, `NEEDS-OWNER.md`, `CHANGELOG.md`;
   - the rewritten `FINAL-2-LIVE.md`, and `FINAL-SESSIONS.md`.
 - **Mark the PR ready.** The description explains, for a non-engineer:
   - the new prices and why;
   - what keeps the safety jobs honest;
   - what stops a malicious invoice;
-  - what was fixed in TRINETRA, and how a single pilot customer is switched on;
   - whether the Resolution layer was built and why;
   - what Final 2B will now check.
 - **CI is green before the owner merges.** Then stop, and tell the owner in eight lines or fewer:
   - the prices;
-  - what was fixed, TRINETRA included;
+  - what was fixed;
   - the Resolution decision;
   - what is still unproven;
-  - that Final 2B is next.
+  - that Final session 2T (TRINETRA) is next, then 2B.
