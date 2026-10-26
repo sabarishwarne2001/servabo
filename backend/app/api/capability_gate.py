@@ -32,6 +32,8 @@ from app.services import audit_service
 CAPABILITY_REQUIRED_CODE = "CAPABILITY_REQUIRED"
 
 _DISPLAY_NAMES = {
+    entitlements.TRINETRA_ALL_WORKSPACES_CAPABILITY: "TRINETRA across authorized workspaces",
+    entitlements.TRINETRA_CAPABILITY: "TRINETRA credit assurance",
     entitlements.RECONCILIATION_CAPABILITY: "Procurement matching",
     # ARCH32-S1:capability-redaction-display. Without an entry here the 402
     # body reads "capability.redaction is included on higher plans", which is

@@ -16,6 +16,7 @@ export const API_KEY_SCOPES = [
   "helm:read",
   "helm:write",
   "gst:read",
+  "trinetra:read",
 ] as const;
 
 export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];

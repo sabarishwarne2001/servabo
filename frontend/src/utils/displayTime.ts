@@ -333,3 +333,15 @@ export const runDisplayFormatSelfCheck = (): string[] => {
   }
   return failures;
 };
+
+/** Exact wire micros; never coerce financial totals through a binary float. */
+export function formatInrMicros(micros: string | number | null | undefined): string {
+  if (micros === null || micros === undefined) {
+    return "—";
+  }
+  const value = BigInt(micros);
+  const positive = value < 0n ? -value : value;
+  const paise = (positive + 5000n) / 10000n;
+  const whole = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(paise / 100n);
+  return `${value < 0n ? "-" : ""}₹${whole}.${String(paise % 100n).padStart(2, "0")}`;
+}

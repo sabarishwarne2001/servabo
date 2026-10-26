@@ -13,6 +13,8 @@ export type AddonFeatureKey = "addon.custom_domain" | "addon.warehouse_sync" | "
 export type PlanFeatureKey = CapabilityKey | AddonFeatureKey;
 
 export const PLAN_FEATURE_LABELS: Record<PlanFeatureKey, string> = {
+  "capability.trinetra_all_workspaces": "TRINETRA across authorized workspaces (release gated)",
+  "capability.trinetra": "TRINETRA credit assurance (release gated)",
   [CAPABILITY.developerApi]: "Developer API keys",
   [CAPABILITY.outgoingWebhooks]: "Outgoing webhooks",
   [CAPABILITY.customBranding]: "Custom branding",

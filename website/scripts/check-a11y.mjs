@@ -7,7 +7,7 @@ import { serve } from "./serve-dist.mjs";
 import { pages } from "./pages.mjs";
 
 const server = await serve(Number(process.env.PORT ?? 4323));
-const browser = await chromium.launch();
+const browser = await chromium.launch({ executablePath: process.env.E2E_CHROMIUM_PATH || undefined });
 const failures = [];
 let runs = 0;
 try {

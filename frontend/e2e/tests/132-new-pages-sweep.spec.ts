@@ -25,6 +25,7 @@ const helm = (sub: string): string => `/${TENANTS.C.org}/helm${sub ? `/${sub}` :
 const TARGETS: ReadonlyArray<{ readonly id: string; readonly path: string }> = [
   { id: "workspace GST Credit", path: ws("C", "gst") },
   { id: "organization GST Credit", path: org("C", "gst") },
+  { id: "organization TRINETRA", path: org("C", "trinetra") },
   { id: "new workspace", path: org("C", "workspaces/new") },
   ...HELM_PAGES.map((sub) => ({ id: `Helm ${sub || "cockpit"}`, path: helm(sub) })),
 ];

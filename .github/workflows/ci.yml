@@ -486,6 +486,16 @@ jobs:
           npx playwright test -c e2e tests/6
           npx playwright test -c e2e tests/20-organization.spec.ts -g "Billing"
 
+      - name: Run the gated TRINETRA review journey with synthetic evidence
+        working-directory: frontend
+        env:
+          CI: "1"
+          TRINETRA_LIVE_ENABLED: "true"
+          E2E_TRINETRA_LIVE: "1"
+        run: |
+          ../frontend/e2e/scripts/start-stack.sh
+          npx playwright test -c e2e tests/136-trinetra-review.spec.ts
+
       - name: Name the failing browser tests
         # Same reason as in the pytest job: annotations are readable where the raw log is not.
         if: failure()

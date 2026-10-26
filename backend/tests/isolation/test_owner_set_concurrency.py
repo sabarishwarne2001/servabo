@@ -334,6 +334,9 @@ def test_the_lock_is_the_first_statement_of_every_owner_set_mutation():
 OWNER_SET_TABLES = frozenset({"organizations", "organization_members"})
 OWNER_SET_MODELS = frozenset({"Organization", "OrganizationMember"})
 ALLOWED_OWNER_SET_LOCKS = {
+    "app/services/trinetra/service.py": (
+        "TRINETRA: serialize organization-wide profile/snapshot/case capacity admission; NO KEY UPDATE permits child FK checks"
+    ),
     "app/services/organization_member_service.py": (
         "ARCH-05: the owner-change helper; every owner-set mutation starts with it"
     ),

@@ -7,6 +7,7 @@ import { SOLUTIONS } from "../data/solutions";
 const PATHS = [
   "/",
   "/helm",
+  "/trinetra",
   "/product",
   ...SOLUTIONS.map((s) => `/solutions/${s.slug}`),
   "/pricing",

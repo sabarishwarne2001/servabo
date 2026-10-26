@@ -48,6 +48,9 @@ class PlanLimit:
 
 
 _PLAN_LIMITS: tuple[PlanLimit, ...] = (
+    PlanLimit("limit.trinetra_profiles", "profiles", "TRINETRA legal-entity profiles per organization."),
+    PlanLimit("limit.trinetra_snapshots", "snapshots", "Retained TRINETRA statement snapshots per organization."),
+    PlanLimit("limit.trinetra_cases", "cases", "Retained TRINETRA credit cases per organization."),
     PlanLimit(
         name=SEATS_LIMIT,
         unit="seats",

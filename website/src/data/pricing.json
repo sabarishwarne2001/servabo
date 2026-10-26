@@ -260,6 +260,7 @@
         "capability.outgoing_webhooks",
         "capability.reconciliation",
         "capability.table_intelligence",
+        "capability.trinetra",
         "capability.truthmesh"
       ],
       "helm": {
@@ -367,6 +368,8 @@
         "capability.redaction",
         "capability.semantic_assertions",
         "capability.table_intelligence",
+        "capability.trinetra",
+        "capability.trinetra_all_workspaces",
         "capability.truthmesh",
         "capability.universal_corroborator"
       ],

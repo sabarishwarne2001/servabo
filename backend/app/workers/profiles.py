@@ -213,6 +213,7 @@ LIGHT = WorkerProfile(
             # Session F: GST Credit. Reads stored rows and runs deterministic matching in Python; no model,
             # OCR or PDF engine.
             "gst.recompute",
+        "trinetra.recompute",
             "helm.ledger_build",
             "helm.plan",
             "helm.backtest",

@@ -36,6 +36,7 @@ export const WEBHOOK_EVENT_TYPES = [
   "helm.mandate.breached",
   // The engines (any plan with webhooks): ids and figures only, each sent once.
   "gst.return.imported",
+  "trinetra.case.reviewed",
   "gst.invoice.at_risk",
   "gst.supplier.not_reported",
   "automation.run.failed",

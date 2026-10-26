@@ -46,6 +46,13 @@ The product was called FlowPilot AI until 2026-10-16. [CHANGELOG.md](CHANGELOG.m
 
 ## Project status
 
+**TRINETRA is a separately gated addition.** The reviewed business-TDS evidence
+workflow and synthetic preview are documented in
+[docs/trinetra/PRODUCT.md](docs/trinetra/PRODUCT.md). Live processing defaults off;
+[launch gates](docs/trinetra/LAUNCH-GATES.md) list the real-source, adviser and pilot
+work still required. [Delivery evidence](docs/trinetra/DELIVERY.md) records this
+branch's implementation, validation and limitations.
+
 **Release-ready.** The hardening campaign is complete; its records are in
 [`docs/hardening/`](docs/hardening/):
 

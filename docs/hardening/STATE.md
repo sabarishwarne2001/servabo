@@ -2,6 +2,58 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
+## Current phase — Project TRINETRA (2026-10-26)
+
+Branch `hardening/trinetra`, based on `main` at
+`bf8f57f691aec7122d9ebaf4a4e13ae9d22ae19c`. Main is unchanged.
+PR: https://github.com/sabarishwarne2001/servabo/pull/40.
+The complete original Markdown specification, repository instructions and mandatory
+audit documents have been read, including all of NEEDS-OWNER. Shell, attachment,
+PostgreSQL, Redis and object storage work. The historical audit has been verified
+against implementation; it is not counted as completed implementation.
+
+The gated evidence workflow is implemented and documented in
+`docs/trinetra/DELIVERY.md` (full changed-file inventory, architecture, API/UI,
+migrations, visual direction and acceptance limits). Canonical source comparison,
+multiple evidence attachments, jobs, reviewed withholding/Helm reminder hold,
+previous-import outcomes and lifecycle/key rotation are included. Official ITD/CBDT
+guidance was reached; official export fixtures, adviser approval and customer pilot
+remain external gates. Other incomplete acceptance items are explicit in
+`docs/trinetra/LAUNCH-GATES.md`. Live processing defaults off. No production, payment,
+customer-data or external inquiry action, merge or main-branch change was performed.
+
+Validation:
+- Full CI `40254658271` on `bcec7de9` passed all four backend shards, frontend,
+  website (including Lighthouse), migrations/drift, encoding and Python audit.
+- Its browser run failed only autonomy spec 129's count-before-load race; Stripe
+  and gated TRINETRA phases were not reached. A 500 ms delayed real response
+  reproduced the failure. Commit `2189c8f2` adds a polling assertion; both autonomy
+  scenarios passed three times (6 passes) and browser TypeScript passed.
+- Local TRINETRA/lifecycle 326, Helm/engine 402, image/extraction 56 and document
+  console 7 passed (overlapping sets). Frontend units 291 and contracts 12 passed.
+- Sample browser 135: 6 passed; expanded live browser 136: 1 passed; existing
+  review/procurement suites 92/96: 30 passed. See TEST-PLAN for actual limits/failures.
+- Final API review found the organization release gate still returned 503. The new
+  regression failed first; a shared structured 409 gate fixed it. All 77 TRINETRA
+  and all-route isolation tests passed (104.29 s). CI on `265011a6` is superseded
+  by the commit containing this correction; inspect the latest run, not that run.
+- The final sample consistency check reproduced mismatched creation dates and case
+  ages. They now agree at the fixed sample evidence date; 31 domain/API tests passed.
+  Inspect CI on the latest commit containing this correction rather than intermediate runs.
+- Migration head is `tr1a2_review_outcomes`; no new drift (282 baseline entries).
+  Populated downgrade/upgrade passed; full chain rollback/upgrade passed in CI.
+
+**Resume / final review:** inspect current PR checks on the latest pushed head.
+If green, update the PR review description with the exact final run and mark it
+ready; if red, investigate without weakening tests and record the result. Do not
+repeat already-passed full suites without a new reason. Keep the live flag off and
+all incomplete real-source/product acceptance explicit. The PR is for review, not
+production approval. Process state can be lost across resets: inspect ownership
+before restarting the local stack; only one pytest per test database. Raw Actions
+logs may be blocked by the environment's network policy; check annotations remain
+readable. The final PR description/checks are the authoritative result after this
+committed checkpoint.
+
 _Last updated: 2026-10-23 (plan change: Final session 2A, the upgrade, comes before 2B, the live session)_
 
 ## Current phase — Plan change: Final session 2A before the live session (2026-10-23)

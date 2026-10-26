@@ -796,3 +796,5 @@ from app.models.gst import GstDecision, GstMatch, GstNoticeSend, GstReturn, GstR
 
 # Final session 1: email-in.
 from app.models.inbound_email import InboundEmailAddress, InboundEmailSender, InboundMessage, WorkItemSource  # noqa: E402,F401
+
+from app.models.trinetra import TrinetraProfile, TrinetraStatement, TrinetraCredit, TrinetraDecision  # noqa: E402,F401

@@ -159,6 +159,8 @@ Free is a **trial of 7 days per owner account** (owner decision N-052). The acco
 | Document redaction (`capability.redaction`) | — | — | — | yes |
 | Clause assertions (`capability.semantic_assertions`) | — | — | — | yes |
 | Table intelligence (`capability.table_intelligence`) | — | — | yes | yes |
+| TRINETRA credit assurance (`capability.trinetra`) | — | — | yes | yes |
+| TRINETRA across authorized workspaces (`capability.trinetra_all_workspaces`) | — | — | — | yes |
 | TruthMesh: the cross-document digital twin (`capability.truthmesh`) | — | — | yes | yes |
 | The document corroborator (`capability.universal_corroborator`) | — | — | — | yes |
 | AI on the platform's provider account (`llm.platform_key`) | yes | yes | yes | yes |

@@ -459,7 +459,13 @@ export interface HelmSettings {
   business_type: string | null;
   first_run_step: number;
   approval_chain: HelmApprovalChain;
-  cash: { currency: string; amount_micros: number; as_of: string; source: string; age_days: number }[];
+  cash: {
+    currency: string;
+    amount_micros: number;
+    as_of: string;
+    source: string;
+    age_days: number;
+  }[];
 }
 
 /** One tier of an approval chain: above this amount, this many different people approve a payment. */
@@ -506,6 +512,12 @@ export interface HelmCounterparty {
 }
 
 export interface HelmPromise {
+  withholding_review?: {
+    case_id: string;
+    reviewed_micros: string | null;
+    reminder_held: boolean;
+    note: string;
+  };
   id: string;
   kind: string;
   direction: string;
@@ -540,7 +552,13 @@ export interface HelmLedger {
 export interface HelmCalendar {
   start: string;
   days: number;
-  entries: { direction: "WE_OWE" | "OWED_TO_US"; on: string; currency: string; amount_micros: number; count: number }[];
+  entries: {
+    direction: "WE_OWE" | "OWED_TO_US";
+    on: string;
+    currency: string;
+    amount_micros: number;
+    count: number;
+  }[];
   /** Promises in workspaces the viewer cannot read: counted, never summed. */
   hidden: { direction: "WE_OWE" | "OWED_TO_US"; on: string; count: number }[];
 }
@@ -625,7 +643,10 @@ export interface BacktestResult {
   totals?: Record<Honesty, Record<string, number>>;
   by_category?: Record<string, Record<Honesty, Record<string, number>>>;
   counts?: Record<string, number>;
-  timeline?: { on: string; events: { mandate: string; summary: string; honesty: Honesty; category: string }[] }[];
+  timeline?: {
+    on: string;
+    events: { mandate: string; summary: string; honesty: Honesty; category: string }[];
+  }[];
   cash_history?: Record<string, { on: string; amount_micros: number; source: string }[]>;
   honesty_rule?: string;
   duration_ms?: number;

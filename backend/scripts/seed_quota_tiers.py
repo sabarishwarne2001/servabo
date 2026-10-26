@@ -136,6 +136,7 @@ BUSINESS_CAPABILITIES = [
     _capability("capability.erp_posting"),  # ARCH47-S1:tier-business
     _capability("capability.byok"),  # N-021:tier-business
     _capability("capability.helm"),  # flagship session: Helm (N-082)
+    _capability("capability.trinetra"),
     _capability("capability.gst_credit"),  # Session F: GST Credit (N-135)
 ]
 BUSINESS_FEATURES = [*DEVELOPER_FEATURES, *BUSINESS_CAPABILITIES, ADDON_WAREHOUSE_SYNC, ADDON_GST_CREDIT]
@@ -167,6 +168,8 @@ ENTERPRISE_CAPABILITIES = [
     _capability("capability.helm_approval_chains"),
     _capability("capability.helm_all_workspaces"),
     _capability("capability.helm_api"),
+    _capability("capability.trinetra_all_workspaces"),
+    _capability("capability.trinetra"),
     _capability("capability.gst_credit"),  # Session F: GST Credit (N-135)
     _capability("capability.gst_credit_all_workspaces"),
 ]
@@ -422,6 +425,9 @@ PLACEHOLDER_TIERS: dict[str, dict[str, Any]] = {
             # Helm (N-082): 15 active mandates, a 6-month backtest.
             _plan_limit("limit.helm_mandates", 15),
             _plan_limit("limit.helm_backtest_months", 6),
+            _plan_limit("limit.trinetra_profiles", 2),
+            _plan_limit("limit.trinetra_snapshots", 12),
+            _plan_limit("limit.trinetra_cases", 500),
             *BUSINESS_FEATURES,
         ],
     },
@@ -473,6 +479,9 @@ PLACEHOLDER_TIERS: dict[str, dict[str, Any]] = {
             # No limit.* rows: unlimited workspaces; file size and pages per
             # document up to the platform maximum; unlimited Helm mandates (N-082).
             _plan_limit("limit.helm_backtest_months", 24),
+            _plan_limit("limit.trinetra_profiles", 10),
+            _plan_limit("limit.trinetra_snapshots", 60),
+            _plan_limit("limit.trinetra_cases", 5000),
             PLATFORM_KEY,
             *ENTERPRISE_FEATURES,
         ],

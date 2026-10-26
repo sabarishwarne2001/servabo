@@ -89,8 +89,10 @@ import {
   platformJobsPath,
   organizationEgressPath,
   organizationGstPath,
+  organizationTrinetraPath,
   procurementPath,
   gstPath,
+  trinetraPath,
   procurementPoliciesPath,
   radarPath,
   verificationPath,
@@ -340,6 +342,11 @@ export const buildWorkspaceNavigationGroups = (
       },
       // Session F: GST Credit. No `capability` here on purpose: importing a GSTR-2B and the headline figures are
       // the preview, open on every plan; the page itself locks the lists and opens the upgrade dialog.
+      {
+        id: "trinetra", name: "TRINETRA", route: "workspaceTrinetra",
+        path: trinetraPath(orgSlug, workspaceSlug), icon: ReceiptIndianRupee,
+        description: "Withholding-to-credit evidence assurance", keywords: ["tds", "withholding", "trinetra", "26as"],
+      },
       {
         id: "gst",
         name: "GST credit",
@@ -691,6 +698,7 @@ export const buildOrganizationNavigationItems = (
   // GST credit across every workspace (Enterprise, read-only): owners, admins and billing, like Helm's plan across
   // every workspace. Plan-gated on the page and on the API.
   if (role === "OWNER" || role === "ADMIN" || role === "BILLING") {
+    items.push({name:"TRINETRA, all workspaces",path:organizationTrinetraPath(orgSlug),capability:CAPABILITY.trinetraAllWorkspaces,icon:ReceiptIndianRupee});
     items.push({
       name: "GST credit, all workspaces",
       path: organizationGstPath(orgSlug),

@@ -39,6 +39,7 @@ from app.services.helm import counterparties, identity, ledger, msme
 from app.services.obligations import extract as obligations_extract
 from app.services.procurement_matching import line_extraction as lines
 from app.services.truthmesh import facts as truthmesh_facts
+from app.services.trinetra import fields as trinetra_fields
 
 pytestmark = pytest.mark.no_db
 
@@ -93,6 +94,9 @@ def _union(*lists: Iterable[str]) -> set[str]:
 
 #: concept -> every spelling any reader of that concept accepts (taken from the readers themselves).
 CONCEPTS: dict[str, set[str]] = {
+    "printed withholding amount": _union(trinetra_fields.AMOUNT_KEYS),
+    "printed deductor TAN": _union(trinetra_fields.TAN_KEYS),
+    "printed TDS section label": _union(trinetra_fields.SECTION_KEYS),
     "invoice number": _union(
         erp_sources._KEYS["invoice_number"], lines.ROLE_NUMBER_KEYS["INVOICE"],
         truthmesh_facts.OWN_NUMBER_KEYS["INVOICE"], gst_fields.INVOICE_NUMBER_KEYS,

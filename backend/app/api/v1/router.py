@@ -292,3 +292,6 @@ for _router, _suffix, _tag in _SCOPED:
         prefix=f"{WORKSPACE_PREFIX}{_suffix}",
         tags=[_tag],
     )
+
+from app.api.v1 import trinetra
+api_router.include_router(trinetra.router)

@@ -3638,3 +3638,60 @@ Severity here: P0 = High, P1 = Medium, P2 = Low. Everything not run against the 
 | F-603 | Medium | Found while building (tests and browser passes) | **Raw server text reached people.** Eight screens put `error.message` into a toast, and a validation failure read like `body.name: String should have at least 1 character`. Now a server sentence for a refusal (4xx), a plain fallback for a fault (5xx), and a validation list turned into one sentence; `check:self` fails a new case. | `errors.validation.test.ts`; "no raw error text" guard | Fixed (`66137c7`, `1443236`) |
 | F-604 | Low | Found while building (tests and browser passes) | **Rupees were grouped in thousands on billing and revenue screens** (₹150,000.00) beside lakh grouping in Helm and GST (₹1,50,000.00), depending on the browser's language; nothing stopped a screen building its own money text. One formatter, and a guard. | `formatMoney.test.ts`; "money, one way" guard | Fixed (`61397b5`) |
 | F-605 | Medium | Found while building (tests and browser passes) | **A new workspace had an empty initials badge where a logo should be**, and the logo itself was the old one. The new Servabo logo replaces it everywhere and is the default for any workspace without its own (or whose own will not load). **The artwork was supplied as a picture only: this is a vector recreation (see NEEDS-OWNER N-176).** | `defaultLogo.test.tsx`, spec 125 | Fixed (`93ca674`) |
+
+## F-619 — TRINETRA identifiers omitted from platform encryption rotation (P1)
+
+First PR CI's encrypted-column registry test failed for PAN and identity salt. Both
+columns now join the existing rotation sweep. The new regression rotates a populated
+profile, removes the old key and proves decryption plus identity stability. Targeted
+checks pass; full final-head CI is pending.
+
+## F-620 — Supporting evidence could outlive source erasure (P1)
+
+New erase/purge tests failed: a supporting document's removal left its case/history
+and comparison copies. Source ID lists now use the existing compliance data-map
+JSON-array linkage. Both modes remove dependent evidence. TRINETRA plus registry
+checks: 326 passed. Whole derived comparison snapshots may be removed when an input
+is erased; canonical originals retain their own lifecycle. Full CI pending.
+
+## F-621 — TRINETRA capacity locks did not follow FK-safe lock discipline (P1)
+
+CI's owner-row lock invariant rejected query-style locks and plain FOR UPDATE on
+organizations. Admission now uses explicit select plus FOR NO KEY UPDATE, preserving
+serialization while allowing child FK checks. The lock is documented in the existing
+invariant's reason registry. Concurrency and structural checks pass; full CI pending.
+
+## F-622 — Newly published dependency advisories (P1)
+
+The initial Python audit found filelock 3.29.5 affected by CVE-2026-112940,
+CVE-2026-112913 and CVE-2026-112907, plus setuptools 83.0.0 affected by
+GHSA-xmj3-9gf7-h52w. Full and web pins now use 4.2.1 and 84.1.0 respectively.
+`pip check`, 56 image/extraction contract tests and the repeated audit pass; the
+audit reports no known vulnerabilities. Full final-head CI is pending.
+
+## F-623 — Autonomy browser assertion raced the overview response (P2)
+
+CI `40254658271` passed every backend shard but failed spec 129: the heading was
+visible while the asynchronous overview still had zero decision buttons. Delaying
+the real response by 500 ms reproduced the same expected-positive/actual-zero
+failure locally. The assertion now polls for a positive count; no value, role or
+save assertion was removed. Both autonomy scenarios passed three consecutive
+runs (6 passed, 1.2 minutes) with the delayed real response. Full final-head browser
+CI is still required; no application behavior changed for this test fix.
+
+## F-624 — Organization TRINETRA release gate looked like a server outage (P2)
+
+Final code review found that the organization summary still answered 503 when
+live processing was deliberately disabled, unlike the workspace routes. A new
+API regression failed with that 503. Both surfaces now call the same structured
+409 prerequisite gate, without relaxing capabilities or exposing evidence.
+TRINETRA plus its all-route isolation suite then passed: 77 tests in 104.29 s.
+The final-head CI rerun follows this correction.
+
+## F-625 — Synthetic case creation dates disagreed with displayed ages (P2)
+
+The preview used different case ages but one creation timestamp. A new arithmetic
+check failed against the sample's displayed 31 March 2026 evidence date. Creation
+timestamps now agree with each age at that fixed date; money and period labels
+are unchanged. Domain and API tests passed: 31 tests in 23.91 s. The sample help
+explicitly explains that this illustrative age does not advance with today's clock.

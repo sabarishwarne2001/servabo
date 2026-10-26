@@ -74,6 +74,7 @@ WEBHOOK_EVENT_TYPES: Final[FrozenSet[str]] = frozenset(
         # intended consumer. Ids and figures only (amounts in micros with their currency, dates, counts, states): never a
         # supplier's name, an invoice number, an error message or a rule's name. Each is sent once per occurrence.
         "gst.return.imported",
+        "trinetra.case.reviewed",
         "gst.invoice.at_risk",
         "gst.supplier.not_reported",
         "automation.run.failed",

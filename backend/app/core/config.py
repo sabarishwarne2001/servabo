@@ -186,6 +186,9 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL_NAME: str = "all-MiniLM-L6-v2"
     EMBEDDING_BATCH_SIZE: int = 32
     OCR_LANGUAGE: str = "en"
+    # Enables reviewed TRINETRA evidence processing only after official-source and
+    # tax-adviser launch sign-off. Synthetic examples remain available while off.
+    TRINETRA_LIVE_ENABLED: bool = False
     # TEST STUBS, not models: hashed bag-of-words embeddings and labelled
     # placeholder OCR text (app/services/ml_stubs.py). For environments that
     # cannot download the PaddleOCR / SentenceTransformers weights. Refused
