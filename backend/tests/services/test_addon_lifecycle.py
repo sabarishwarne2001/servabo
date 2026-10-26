@@ -119,7 +119,7 @@ def test_a_bundled_addon_survives_a_cancelled_purchase_and_a_downgrade_gets_the_
     db_session: Session, tenant
 ) -> None:
     org = tenant.organization
-    put_on_plan(db_session, org, "developer")
+    put_on_plan(db_session, org, "business")  # N-187: custom domains are bundled into Business (was Developer)
     _purchase(db_session, org.id, "active", 1)
     domain = _verified_domain(db_session, org.id, "portal.acme-addon.example")
     _purchase(db_session, org.id, "cancelled", 2)
@@ -134,13 +134,19 @@ def test_a_bundled_addon_survives_a_cancelled_purchase_and_a_downgrade_gets_the_
 
 def test_nobody_is_sold_an_addon_they_already_have(db_session: Session, tenant, monkeypatch) -> None:
     org = tenant.organization
-    put_on_plan(db_session, org, "developer")
+    put_on_plan(db_session, org, "business")  # N-187: custom domains are bundled into Business (was Developer)
     with pytest.raises(addon_service.AddonAlreadyGrantedError, match="already included"):
         addon_service.create_addon_checkout(db_session, organization_id=org.id, addon_key=DOMAIN)
 
+    # N-187: below Business custom domains are not sold at all; the refusal names the plan to upgrade to.
     put_on_plan(db_session, org, "free")
-    monkeypatch.setattr(entitlement_service, "purchasable", lambda _key: False)
+    with pytest.raises(addon_service.AddonNotOfferedError, match="included in Business"):
+        addon_service.create_addon_checkout(db_session, organization_id=org.id, addon_key=DOMAIN)
+
+    # A sold add-on that is not purchasable here is still refused in words (warehouse sync, no product configured).
+    monkeypatch.setattr(entitlement_service, "purchasable", lambda _key, **_kw: False)
     from app.services.billing import portal_service
 
+    put_on_plan(db_session, org, "developer")
     with pytest.raises(portal_service.CheckoutConfigurationError, match="upgrade to a plan that includes it"):
-        addon_service.create_addon_checkout(db_session, organization_id=org.id, addon_key=DOMAIN)
+        addon_service.create_addon_checkout(db_session, organization_id=org.id, addon_key=entitlements.WAREHOUSE_SYNC_ADDON)

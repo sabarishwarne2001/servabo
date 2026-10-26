@@ -69,3 +69,25 @@ def test_free_has_no_tally_file(db_session: Session, tenant) -> None:
         capability_gate.require_capability_for_organization(
             db_session, organization_id=tenant.organization.id, actor_id=None,
             capability_key=entitlements.TALLY_FILE_CAPABILITY, operation="test", audit=False)
+
+
+def test_the_custom_domain_route_refusal_on_starter_names_business_not_an_add_on(db_session: Session, tenant) -> None:
+    """N-187: a Starter organization claiming a custom domain is told to upgrade to Business (it is not sold)."""
+    from app.api import addon_gate
+    from app.core.billing_errors import AddonRequiredError
+
+    for plan in ("free", "developer", "business", "enterprise"):
+        put_on_plan(db_session, tenant.organization, plan)
+    put_on_plan(db_session, tenant.organization, "developer")
+
+    class Context:
+        organization_id = tenant.organization.id
+        user_id = tenant.owner.user.id
+
+    with pytest.raises(AddonRequiredError) as raised:
+        addon_gate.require_addon(db_session, context=Context(), addon_key=entitlements.CUSTOM_DOMAIN_ADDON,
+                                 operation="custom_domains.create", allow_grace=False)
+    message = str(raised.value)
+    assert "Business and Enterprise" in message and "upgrade" in message.lower()
+    assert "is an add-on" not in message
+    assert raised.value.details["included_in"] == ["Business", "Enterprise"]

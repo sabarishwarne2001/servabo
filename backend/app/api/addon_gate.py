@@ -66,6 +66,7 @@ def require_addon(
         return access
 
     offer = entitlement_service.offer_for(addon_key)
+    included = entitlement_service.tiers_including(db, addon_key)
     audit_service.record_independently(
         organization_id=context.organization_id,
         actor_id=context.user_id,
@@ -90,6 +91,13 @@ def require_addon(
             f"The {offer.display_name} add-on has ended, so {offer.halt_effect}. "
             "Add it again to your plan to restore this."
         )
+    elif not offer.sold:
+        # Final session 2A (N-187): included in plans only (custom domains: Business and Enterprise), never sold.
+        names = " and ".join(included) or "a higher plan"
+        message = (
+            f"{offer.display_name} are included in {names}. Upgrade to {included[0] if included else 'a higher plan'} "
+            "to use them."
+        )
     else:
         message = (
             f"{offer.display_name} is an add-on. Add it to your plan, or upgrade "
@@ -101,6 +109,7 @@ def require_addon(
         details={
             "addon_key": addon_key,
             "addon_name": offer.display_name,
+            "included_in": included,
             "state": access.state,
             "grace_ends_at": (
                 access.grace_ends_at.isoformat() if access.grace_ends_at else None
