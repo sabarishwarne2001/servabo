@@ -7,7 +7,7 @@
   },
   "trial": {
     "plan_key": "free",
-    "days": 7
+    "days": 14
   },
   "plans": [
     {
@@ -25,13 +25,13 @@
       "allowances": [
         {
           "key": "document.upload",
-          "limit_quantity": 25,
+          "limit_quantity": 100,
           "period": "MONTH",
           "overage_policy": "REFUSE"
         },
         {
           "key": "ocr.page",
-          "limit_quantity": 50,
+          "limit_quantity": 200,
           "period": "MONTH",
           "overage_policy": "REFUSE"
         },
@@ -91,7 +91,7 @@
     },
     {
       "key": "developer",
-      "display_name": "Developer",
+      "display_name": "Starter",
       "is_priced": true,
       "per_seat": true,
       "prices": [
@@ -102,6 +102,16 @@
         },
         {
           "interval": "month",
+          "currency": "INR",
+          "unit_amount": 149900
+        },
+        {
+          "interval": "year",
+          "currency": "INR",
+          "unit_amount": 1499000
+        },
+        {
+          "interval": "month",
           "currency": "USD",
           "unit_amount": 4900
         }
@@ -109,19 +119,19 @@
       "allowances": [
         {
           "key": "document.upload",
-          "limit_quantity": 500,
+          "limit_quantity": 300,
           "period": "MONTH",
           "overage_policy": "REFUSE"
         },
         {
           "key": "ocr.page",
-          "limit_quantity": 5000,
+          "limit_quantity": 1500,
           "period": "MONTH",
           "overage_policy": "REFUSE"
         },
         {
           "key": "assistant.message",
-          "limit_quantity": 1000,
+          "limit_quantity": 500,
           "period": "MONTH",
           "overage_policy": "REFUSE"
         },
@@ -145,7 +155,7 @@
         },
         {
           "key": "storage.gb_month",
-          "limit_quantity": 25,
+          "limit_quantity": 10,
           "period": "MONTH",
           "overage_policy": "REFUSE"
         },
@@ -157,11 +167,11 @@
         }
       ],
       "features": [
-        "addon.custom_domain",
         "capability.automations",
         "capability.custom_branding",
         "capability.developer_api",
-        "capability.outgoing_webhooks"
+        "capability.outgoing_webhooks",
+        "capability.tally_file"
       ],
       "helm": {
         "edition": "preview",
@@ -186,6 +196,16 @@
         },
         {
           "interval": "month",
+          "currency": "INR",
+          "unit_amount": 499900
+        },
+        {
+          "interval": "year",
+          "currency": "INR",
+          "unit_amount": 4999000
+        },
+        {
+          "interval": "month",
           "currency": "USD",
           "unit_amount": 29900
         }
@@ -193,19 +213,19 @@
       "allowances": [
         {
           "key": "document.upload",
-          "limit_quantity": 5000,
+          "limit_quantity": 1500,
           "period": "MONTH",
           "overage_policy": "ALLOW_AND_WARN"
         },
         {
           "key": "ocr.page",
-          "limit_quantity": 40000,
+          "limit_quantity": 6000,
           "period": "MONTH",
           "overage_policy": "REFUSE"
         },
         {
           "key": "assistant.message",
-          "limit_quantity": 10000,
+          "limit_quantity": 3000,
           "period": "MONTH",
           "overage_policy": "ALLOW_AND_WARN"
         },
@@ -229,7 +249,7 @@
         },
         {
           "key": "storage.gb_month",
-          "limit_quantity": 250,
+          "limit_quantity": 25,
           "period": "MONTH",
           "overage_policy": "REFUSE"
         },
@@ -260,6 +280,7 @@
         "capability.outgoing_webhooks",
         "capability.reconciliation",
         "capability.table_intelligence",
+        "capability.tally_file",
         "capability.trinetra",
         "capability.truthmesh"
       ],
@@ -281,6 +302,11 @@
       "prices": [
         {
           "interval": "month",
+          "currency": "INR",
+          "unit_amount": 1499900
+        },
+        {
+          "interval": "month",
           "currency": "USD",
           "unit_amount": 79900
         }
@@ -288,13 +314,13 @@
       "allowances": [
         {
           "key": "document.upload",
-          "limit_quantity": 10000,
+          "limit_quantity": 4000,
           "period": "MONTH",
           "overage_policy": "ALLOW_AND_WARN"
         },
         {
           "key": "ocr.page",
-          "limit_quantity": 95000,
+          "limit_quantity": 20000,
           "period": "MONTH",
           "overage_policy": "REFUSE"
         },
@@ -324,7 +350,7 @@
         },
         {
           "key": "storage.gb_month",
-          "limit_quantity": 1000,
+          "limit_quantity": 100,
           "period": "MONTH",
           "overage_policy": "REFUSE"
         },
@@ -368,6 +394,7 @@
         "capability.redaction",
         "capability.semantic_assertions",
         "capability.table_intelligence",
+        "capability.tally_file",
         "capability.trinetra",
         "capability.trinetra_all_workspaces",
         "capability.truthmesh",
@@ -388,13 +415,9 @@
     {
       "key": "addon.custom_domain",
       "name": "Custom domains",
-      "monthly_price": {
-        "currency": "USD",
-        "unit_amount": 19900
-      },
+      "prices": [],
       "per": "organization",
       "included_in": [
-        "developer",
         "business",
         "enterprise"
       ],
@@ -403,10 +426,13 @@
     {
       "key": "addon.warehouse_sync",
       "name": "Warehouse sync",
-      "monthly_price": {
-        "currency": "USD",
-        "unit_amount": 30000
-      },
+      "prices": [
+        {
+          "interval": "month",
+          "currency": "USD",
+          "unit_amount": 30000
+        }
+      ],
       "per": "organization",
       "included_in": [
         "business",
@@ -419,10 +445,28 @@
     {
       "key": "addon.gst_credit",
       "name": "GST Credit",
-      "monthly_price": {
-        "currency": "USD",
-        "unit_amount": 4900
-      },
+      "prices": [
+        {
+          "interval": "month",
+          "currency": "USD",
+          "unit_amount": 4900
+        },
+        {
+          "interval": "year",
+          "currency": "USD",
+          "unit_amount": 49000
+        },
+        {
+          "interval": "month",
+          "currency": "INR",
+          "unit_amount": 149900
+        },
+        {
+          "interval": "year",
+          "currency": "INR",
+          "unit_amount": 1499000
+        }
+      ],
       "per": "organization",
       "included_in": [
         "business",

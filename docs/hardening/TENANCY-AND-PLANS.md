@@ -89,34 +89,34 @@ Owners and admins of the organization are admins of every workspace. Billing man
 
 ### 4.1 Prices
 
-| Plan | Price |
+| Plan | Price (GST or other tax added by the merchant of record) |
 |---|---|
-| Free | $0 |
-| Developer | $49 per seat per month |
-| Business | $299 per seat per month |
-| Enterprise | $799 per seat per month |
+| Free | ₹0 / $0 |
+| Starter | ₹1,499 per seat per month; ₹14,990 per seat per year; $49 per seat per month; $490 per seat per year |
+| Business | ₹4,999 per seat per month; ₹49,990 per seat per year; $299 per seat per month; $2,990 per seat per year |
+| Enterprise | ₹14,999 per seat per month; $799 per seat per month |
 
 ### 4.2 Monthly allowances
 
 Free is per organization, and **one Free allowance is shared by every Free organization an account owns** (archived ones included): `app.services.quota_service.usage_pool`. A paid plan's allowances are **per seat, pooled across the organization**: the figure times the seats the subscription holds (`app.services.quota_service.seat_factor`). Documents, OCR pages, assistant messages and storage are what a customer plans by; the token and cost ceilings are the platform's safety net above them. Overage: *refuse* stops at the ceiling, *bill overage* continues and bills each unit above it at the price book's overage price, *warn* continues free of charge and the usage screens show the overrun. Token allowances cover the models the platform serves on its own keys (`openai/gpt-oss-20b` on Groq, `openai/gpt-oss-120b` on Groq); every other listed model runs on the organization's own provider key, and a call that would put one on the platform's key is answered by the platform default (N-054, `app.core.ai_models.platform_safe`).
 
-| Per month | Free | Developer | Business | Enterprise |
+| Per month | Free | Starter | Business | Enterprise |
 |---|---|---|---|---|
-| Document uploads | 25 (refuse) | 500 / seat (refuse) | 5,000 / seat (warn) | 10,000 / seat (warn) |
-| OCR pages | 50 (refuse) | 5,000 / seat (bill overage) | 40,000 / seat (bill overage) | 95,000 / seat (bill overage) |
-| Assistant messages | 30 (refuse) | 1,000 / seat (refuse) | 10,000 / seat (warn) | no ceiling |
-| Storage (GB, a hard ceiling only where REFUSE) | 0.25 (refuse) | 25 / seat (bill overage) | 250 / seat (bill overage) | 1,000 / seat (bill overage) |
-| AI input tokens (safety net) | 300,000 (refuse) | 15,000,000 / seat (refuse) | 100,000,000 / seat (bill overage) | 300,000,000 / seat (bill overage) |
-| AI output tokens (safety net) | 60,000 (refuse) | 2,000,000 / seat (refuse) | 20,000,000 / seat (refuse) | 75,000,000 / seat (bill overage) |
-| Usage cost ceiling, USD (safety net) | $1 (refuse) | $25 / seat (refuse) | $500 / seat (refuse) | $10,000 / seat (warn) |
+| Document uploads | 100 (refuse) | 300 / seat (refuse) | 1,500 / seat (warn) | 4,000 / seat (warn) |
+| OCR pages | 200 (refuse) | 1,500 / seat (bill overage) | 6,000 / seat (bill overage) | 20,000 / seat (bill overage) |
+| Assistant messages | 30 (refuse) | 500 / seat (refuse) | 3,000 / seat (warn) | no ceiling |
+| Storage (GB, a hard ceiling only where REFUSE) | 0.25 (refuse) | 10 / seat (bill overage) | 25 / seat (bill overage) | 100 / seat (bill overage) |
+| AI input tokens (safety net) | 1,000,000 (refuse) | 6,000,000 / seat (refuse) | 20,000,000 / seat (bill overage) | 60,000,000 / seat (bill overage) |
+| AI output tokens (safety net) | 200,000 (refuse) | 1,000,000 / seat (refuse) | 4,000,000 / seat (refuse) | 15,000,000 / seat (bill overage) |
+| Usage cost ceiling, USD (safety net) | $1 (refuse) | $8 / seat (refuse) | $30 / seat (refuse) | $100 / seat (warn) |
 
 ### 4.3 The free trial
 
-Free is a **trial of 7 days per owner account** (owner decision N-052). The account's clock (`users.trial_ends_at`) starts when the person creates their first organization; every organization they create copies it (`organizations.trial_ends_at`), so a second organization, a new workspace or an ownership transfer never restarts it. While an organization is on Free the allowances above apply. When the trial ends without a live paid subscription the organization is **read-only**: every write route, upload path, re-processing, the assistant, new workspaces and the worker's engine and automation jobs refuse with a 402 `TRIAL_ENDED` (remedy `SUBSCRIBE`) (`app.services.trial_service.assert_trial_active`, `app.api.billing_write_gate.assert_billing_writes_allowed`, `app.workers.tenant_gate.unpaid_reason`). Reading, search, export, deleting, member management, archiving, checkout and the billing portal stay open. Subscribing lifts it at once; a paid plan that lapses to Free afterwards is asked to subscribe again. Owners are emailed two days before the end and when it ends (`trial.reminders`). Nothing is deleted when a trial ends.
+Free is a **trial of 14 days per owner account** (owner decision N-052). The account's clock (`users.trial_ends_at`) starts when the person creates their first organization; every organization they create copies it (`organizations.trial_ends_at`), so a second organization, a new workspace or an ownership transfer never restarts it. While an organization is on Free the allowances above apply. When the trial ends without a live paid subscription the organization is **read-only**: every write route, upload path, re-processing, the assistant, new workspaces and the worker's engine and automation jobs refuse with a 402 `TRIAL_ENDED` (remedy `SUBSCRIBE`) (`app.services.trial_service.assert_trial_active`, `app.api.billing_write_gate.assert_billing_writes_allowed`, `app.workers.tenant_gate.unpaid_reason`). Reading, search, export, deleting, member management, archiving, checkout and the billing portal stay open. Subscribing lifts it at once; a paid plan that lapses to Free afterwards is asked to subscribe again. Owners are emailed two days before the end and when it ends (`trial.reminders`). Nothing is deleted when a trial ends.
 
 ### 4.4 Per-organization limits
 
-| Per organization | Free | Developer | Business | Enterprise |
+| Per organization | Free | Starter | Business | Enterprise |
 |---|---|---|---|---|
 | Seats | 2 | purchased seats | purchased seats | purchased seats |
 | Workspaces | 1 | 3 | 20 | unlimited |
@@ -127,7 +127,7 @@ Free is a **trial of 7 days per owner account** (owner decision N-052). The acco
 
 ### 4.5 Capabilities
 
-| Capability | Free | Developer | Business | Enterprise |
+| Capability | Free | Starter | Business | Enterprise |
 |---|---|---|---|---|
 | Forensic audit radar (`capability.anomaly_radar`) | — | — | yes | yes |
 | Automations (`capability.automations`) | — | yes | yes | yes |
@@ -159,6 +159,7 @@ Free is a **trial of 7 days per owner account** (owner decision N-052). The acco
 | Document redaction (`capability.redaction`) | — | — | — | yes |
 | Clause assertions (`capability.semantic_assertions`) | — | — | — | yes |
 | Table intelligence (`capability.table_intelligence`) | — | — | yes | yes |
+| The Tally Prime import file (`capability.tally_file`) | — | yes | yes | yes |
 | TRINETRA credit assurance (`capability.trinetra`) | — | — | yes | yes |
 | TRINETRA across authorized workspaces (`capability.trinetra_all_workspaces`) | — | — | — | yes |
 | TruthMesh: the cross-document digital twin (`capability.truthmesh`) | — | — | yes | yes |
@@ -167,10 +168,10 @@ Free is a **trial of 7 days per owner account** (owner decision N-052). The acco
 
 ### 4.6 Add-ons
 
-| Add-on | Free | Developer | Business | Enterprise |
+| Add-on | Free | Starter | Business | Enterprise |
 |---|---|---|---|---|
-| Custom domains (`addon.custom_domain`) | — | included | included | included |
-| GST Credit (`addon.gst_credit`) | — | $49/month | included | included |
+| Custom domains (`addon.custom_domain`) | — | — | included | included |
+| GST Credit (`addon.gst_credit`) | — | ₹1,499/month or ₹14,990/year or $49/month or $490/year | included | included |
 | Warehouse sync (`addon.warehouse_sync`) | — | $300/month | included | included |
 
 ### 4.7 Helm

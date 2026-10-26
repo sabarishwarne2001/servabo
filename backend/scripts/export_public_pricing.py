@@ -75,13 +75,15 @@ def _tiers(gateway: Optional[str]) -> list[SimpleNamespace]:
     return tiers
 
 
-def _yearly_prices() -> list[Any]:
+def _book_prices() -> list[Any]:
+    """Every price a plan is sold at besides its tier's own dollar monthly one (N-051 yearly, N-187 rupees)."""
     from app.services.revops.price_books import PlanPrice
     from scripts import seed_quota_tiers as seed
 
     return [
-        PlanPrice(key, "year", c["currency"], int(c["unit_amount_micros"]), None, None, None, "SEED")
-        for key, c in seed.YEARLY_COMMERCIALS.items()
+        PlanPrice(p["tier"], p["interval"], p["currency"], int(p["unit_amount_micros"]), None, None, None, "SEED")
+        for p in seed.PLAN_PRICES
+        if (p["interval"], p["currency"]) != ("month", "USD")
     ]
 
 
@@ -121,11 +123,13 @@ def _addons(tiers: list[SimpleNamespace]) -> list[dict[str, Any]]:
     out = []
     for key, offer in ADDON_CATALOG.items():
         included = [t.key for t in tiers if any(e.limit_key == key for e in t.entries)]
-        sold_on = list(offer.sold_on_tiers) or [k for k in paid if k not in included]
+        sold_on = (list(offer.sold_on_tiers) or [k for k in paid if k not in included]) if offer.sold else []
         out.append({
             "key": key,
             "name": offer.display_name,
-            "monthly_price": {"currency": offer.currency, "unit_amount": int(offer.monthly_price_micros) // 10_000},
+            # N-187: every price it is sold at (empty: included in plans only, never sold, as custom domains).
+            "prices": [{"interval": p.interval, "currency": p.currency, "unit_amount": int(p.amount_micros) // 10_000}
+                       for p in offer.prices],
             "per": "organization",
             "included_in": included,
             "sold_on": [k for k in sold_on if k not in included],
@@ -145,7 +149,7 @@ def build(gateway: Optional[str] = None) -> dict[str, Any]:
     name = normalize_gateway(gateway or Settings.model_fields["BILLING_GATEWAY"].default)
     tiers = _tiers(name)
     catalog = plan_catalog.catalog_from_tiers(
-        tiers, _yearly_prices(), trial_days=int(settings.FREE_TRIAL_DAYS), at=AS_OF
+        tiers, _book_prices(), trial_days=int(settings.FREE_TRIAL_DAYS), at=AS_OF
     )
     capabilities = get_payment_gateway(name).capabilities
     helm = {tier.key: _helm(tier) for tier in tiers}
