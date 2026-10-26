@@ -115,6 +115,7 @@ __all__ = [
     "OBLIGATIONS_CAPABILITY",
     # ARCH47-S1:capability-erp-posting-export
     "ERP_POSTING_CAPABILITY",
+    "TALLY_FILE_CAPABILITY",
     # ARCH48-S1:capability-collaborative-review-export
     "COLLABORATIVE_REVIEW_CAPABILITY",
     # ARCH49-S1:capability-process-intelligence-export
@@ -363,6 +364,11 @@ OBLIGATIONS_CAPABILITY: str = "capability.obligations"
 #: (no model call).
 ERP_POSTING_CAPABILITY: str = "capability.erp_posting"
 
+#: Final session 2A (N-187, closes N-174). The Tally Prime import file on its own: the guided Tally set-up, approved
+#: bills rendered as Tally vouchers and downloaded for a person to import. Starter and up. Every other ERP target and
+#: every automatic posting stays ERP posting (Business and Enterprise).
+TALLY_FILE_CAPABILITY: str = "capability.tally_file"
+
 #: ARCH48-S1:capability-collaborative-review. Real-Time Collaborative Review &
 #: Live Presence: the review hub goes live (queue updates pushed over an
 #: authenticated WebSocket, fanned out across API workers through Redis),
@@ -421,6 +427,7 @@ CAPABILITY_KEYS: tuple[str, ...] = (
     UNIVERSAL_CORROBORATOR_CAPABILITY,
     OBLIGATIONS_CAPABILITY,
     ERP_POSTING_CAPABILITY,
+    TALLY_FILE_CAPABILITY,  # Final session 2A, N-187
     COLLABORATIVE_REVIEW_CAPABILITY,
     PROCESS_INTELLIGENCE_CAPABILITY,  # ARCH49-S1:capability-keys
     EGRESS_LOCKDOWN_CAPABILITY,  # ARCH50-S1:capability-keys
@@ -678,6 +685,14 @@ _ENTITLEMENTS: tuple[Entitlement, ...] = (
             "references to CSV/XLSX, EDI X12, UBL 2.1, Tally, SFTP and REST/OData targets (QuickBooks Online, "
             "Zoho Books, Business Central, S/4HANA, NetSuite), with acknowledgement reconciliation. "
             "Bundled into a tier."
+        ),
+    ),
+    # Final session 2A, N-187
+    Entitlement(
+        name=TALLY_FILE_CAPABILITY,
+        description=(
+            "The Tally Prime import file: approved bills as balanced Tally Purchase vouchers, downloaded and imported "
+            "by a person. Bundled into a tier (Starter and up)."
         ),
     ),
     # ARCH48-S1:capability-collaborative-review-entitlement

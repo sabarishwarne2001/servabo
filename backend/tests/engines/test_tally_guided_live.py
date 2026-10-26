@@ -46,5 +46,7 @@ def test_unanswered_ledgers_fall_back_to_tallys_usual_names_and_the_company_is_r
 def test_only_an_administrator_on_the_erp_posting_plan(engines: Engines):
     engines.plan("business")
     assert engines.post("/erp/tally/setup", ANSWERS, as_user=engines.tenant.contributor).status_code == 403
-    engines.plan("developer")
+    # N-187 (Final session 2A, closes N-174): Starter (`developer`) now includes the Tally file
+    # (tests/engines/test_tally_on_starter_live.py); Free still does not.
+    engines.plan("free")
     assert engines.post("/erp/tally/setup", ANSWERS).status_code == 402

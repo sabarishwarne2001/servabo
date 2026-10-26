@@ -70,6 +70,7 @@ _DISPLAY_NAMES = {
     entitlements.OBLIGATIONS_CAPABILITY: "Obligations and calendar feeds",
     # ARCH47-S1:capability-display
     entitlements.ERP_POSTING_CAPABILITY: "ERP posting",
+    entitlements.TALLY_FILE_CAPABILITY: "The Tally Prime import file",  # Final session 2A, N-187
     # ARCH48-S1:capability-display
     entitlements.COLLABORATIVE_REVIEW_CAPABILITY: "Real-time collaborative review",
     # ARCH49-S1:capability-display
