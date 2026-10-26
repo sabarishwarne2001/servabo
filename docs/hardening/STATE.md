@@ -37,6 +37,9 @@ Validation:
   regression failed first; a shared structured 409 gate fixed it. All 77 TRINETRA
   and all-route isolation tests passed (104.29 s). CI on `265011a6` is superseded
   by the commit containing this correction; inspect the latest run, not that run.
+- The final sample consistency check reproduced mismatched creation dates and case
+  ages. They now agree at the fixed sample evidence date; 31 domain/API tests passed.
+  Inspect CI on the latest commit containing this correction rather than intermediate runs.
 - Migration head is `tr1a2_review_outcomes`; no new drift (282 baseline entries).
   Populated downgrade/upgrade passed; full chain rollback/upgrade passed in CI.
 

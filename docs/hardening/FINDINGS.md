@@ -3687,3 +3687,11 @@ API regression failed with that 503. Both surfaces now call the same structured
 409 prerequisite gate, without relaxing capabilities or exposing evidence.
 TRINETRA plus its all-route isolation suite then passed: 77 tests in 104.29 s.
 The final-head CI rerun follows this correction.
+
+## F-625 — Synthetic case creation dates disagreed with displayed ages (P2)
+
+The preview used different case ages but one creation timestamp. A new arithmetic
+check failed against the sample's displayed 31 March 2026 evidence date. Creation
+timestamps now agree with each age at that fixed date; money and period labels
+are unchanged. Domain and API tests passed: 31 tests in 23.91 s. The sample help
+explicitly explains that this illustrative age does not advance with today's clock.

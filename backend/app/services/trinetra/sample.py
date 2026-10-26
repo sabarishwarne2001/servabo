@@ -1,6 +1,6 @@
 """Transient synthetic scenarios: no customer records, tax rates or legal claims."""
 
-from datetime import date
+from datetime import date, timedelta
 from dataclasses import replace
 from app.services.trinetra.domain import (
     Scope,
@@ -27,6 +27,8 @@ def cockpit():
     ]
     items = []
     for i, (name, expected, posted, available) in enumerate(examples):
+        as_of = date(2026, 3, 31)
+        age_days = [1, 18, 24, 32, 2, 9, 4, 7, 3][i]
         c = Credit(
             str(i),
             scope,
@@ -77,9 +79,10 @@ def cockpit():
                 year=2025,
                 period=tax_period(date(2026, 3, 31))[1],
                 revision=1,
-                age_days=[1, 18, 24, 32, 2, 9, 4, 7, 3][i],
+                age_days=age_days,
                 review_state="OPEN",
-                created_at="2026-03-31T00:00:00+00:00",
+                created_at=(as_of - timedelta(days=age_days)).isoformat()
+                + "T00:00:00+00:00",
                 as_of="2026-03-31",
                 source_kind="Illustrative synthetic evidence",
                 **result,

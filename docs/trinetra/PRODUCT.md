@@ -66,6 +66,8 @@ disputed ₹1,800; no uploaded posting ₹2,400; a later ₹1,200 posting; suspe
 deductor mismatch ₹900; ₹4,000 allocated from a shared ₹6,000 quarterly posting;
 an unsupported source with an unknown gap; and a credit note requiring review.
 The partial-remittance case shows ₹50,000 bank cash separately from withholding.
+Sample case ages are measured at that fixed statement date, with matching creation
+dates; they do not keep aging against the real calendar.
 No section, tax rate or taxable basis is asserted. The examples still require
 tax-adviser review before being described as law-reviewed.
 

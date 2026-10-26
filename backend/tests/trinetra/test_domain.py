@@ -126,3 +126,12 @@ def test_bank_shortfall_does_not_create_a_tax_basis():
     assert r["expected_micros"] is None
     assert r["gap_micros"] is None
     assert r["status"] == "EVIDENCE_NEEDED"
+def test_sample_aging_uses_its_displayed_evidence_date():
+    from datetime import date, datetime
+    from app.services.trinetra.sample import cockpit
+
+    sample = cockpit()
+    as_of = date.fromisoformat(sample["as_of"])
+    for item in sample["items"]:
+        created = datetime.fromisoformat(item["created_at"]).date()
+        assert item["age_days"] == (as_of - created).days

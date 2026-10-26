@@ -96,6 +96,8 @@ Nine read-only synthetic scenarios derive their figures from the deterministic
 engine. Historical FY 2025–26/AY 2026–27 is distinct from Tax Year 2026–27. Unknown
 gaps are excluded rather than treated as zero. The erroneous 194C/10% example is
 not copied; no unreviewed statutory rate, section or taxable base is asserted.
+Creation dates and ages agree at the sample's fixed 31 March 2026 evidence date;
+the new regression failed first, then all 31 domain/API checks passed after correction.
 The samples have not received independent tax-adviser approval.
 
 ## Remaining acceptance and deployment gates

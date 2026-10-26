@@ -47,6 +47,7 @@ they do not validate real OCR/model quality, real tax exports or payment provide
 | --- | --- |
 | TRINETRA plus compliance data-map registry | 326 passed; includes supporting-source erasure/retention and populated downgrade/upgrade. |
 | Final TRINETRA plus all-route isolation rerun | 77 passed in 104.29 s. Organization disabled-gate regression failed first (503), then passed with the shared structured 409 prerequisite response. |
+| Synthetic date consistency and API regressions | 31 passed in 23.91 s after reproducing and correcting creation-date/sample-age disagreement. Amounts and period labels are unchanged. |
 | TRINETRA, structural/locking/key-rotation/extraction checks and two engine suites | 153 passed; two engine sweeps stopped at an unconfigured local SMTP relay. Both were rerun with the declared test relay below. |
 | Those engine suites plus existing Helm service regressions | 402 passed. |
 | Image dependency contracts and extraction contracts after security upgrades | 56 passed; `pip check` found no broken requirements. |
