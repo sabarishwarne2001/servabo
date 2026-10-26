@@ -15746,6 +15746,7 @@ export interface components {
             age_days: number;
             /** As Of */
             as_of: string | null;
+            printed_evidence: components["schemas"]["PrintedEvidenceOut"];
             /** Statement Lines */
             statement_lines: components["schemas"]["PostingOut"][];
             /** Bank Evidence */
@@ -17200,6 +17201,11 @@ export interface components {
         };
         /** EventOut */
         EventOut: {
+            /**
+             * Review Minutes
+             * @default 0
+             */
+            review_minutes: number;
             /** Revision */
             revision: number;
             /** Action */
@@ -20724,6 +20730,29 @@ export interface components {
             /** Postings */
             postings: components["schemas"]["OutcomePosting"][];
         };
+        /** OutcomesOut */
+        OutcomesOut: {
+            /**
+             * Confirmed Gap Closure Micros
+             * @default 0
+             */
+            confirmed_gap_closure_micros: string;
+            /**
+             * Confirmed Cases
+             * @default 0
+             */
+            confirmed_cases: number;
+            /**
+             * Review Minutes
+             * @default 0
+             */
+            review_minutes: number;
+            /**
+             * Note
+             * @default No measured outcomes for synthetic examples.
+             */
+            note: string;
+        };
         /**
          * OwnershipTransferInitiateRequest
          * @description Input to propose an ownership transfer.
@@ -22233,6 +22262,17 @@ export interface components {
             basis?: string | null;
             /** Flagged Work Item Id */
             flagged_work_item_id?: string | null;
+        };
+        /** PrintedEvidenceOut */
+        PrintedEvidenceOut: {
+            /** Amount Micros */
+            amount_micros: string | null;
+            /** Deductor Tan Masked */
+            deductor_tan_masked: string | null;
+            /** Section Label */
+            section_label: string | null;
+            /** Note */
+            note: string;
         };
         /** ProcessOverview */
         ProcessOverview: {
@@ -23990,6 +24030,11 @@ export interface components {
             reason: string;
             /** Evidence */
             evidence?: components["schemas"]["EvidenceIn"][];
+            /**
+             * Confirm Receivable
+             * @default false
+             */
+            confirm_receivable: boolean;
         };
         /**
          * ReviewItemResponse
@@ -25317,6 +25362,7 @@ export interface components {
             items: components["schemas"]["CaseOut"][];
             /** Total */
             total: number;
+            outcomes?: components["schemas"]["OutcomesOut"];
             /** Is Sample */
             is_sample: boolean;
             /** As Of */
@@ -27709,6 +27755,11 @@ export interface components {
             reason: string;
             /** Allocations */
             allocations?: components["schemas"]["AllocationIn"][];
+            /**
+             * Review Minutes
+             * @default 0
+             */
+            review_minutes: number;
         };
         /**
          * EmailEncryption

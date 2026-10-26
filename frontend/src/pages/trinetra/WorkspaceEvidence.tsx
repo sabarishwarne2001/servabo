@@ -8,7 +8,7 @@ import {
   importReviewedStatement,
   previewReviewedStatement,
 } from "@/services/api/trinetra";
-import { getWorkItems } from "@/services/api/workItem";
+import SourcePicker from "./SourcePicker";
 import { rupees } from "./format";
 import { errorMessage } from "@/services/api/errors";
 
@@ -27,10 +27,6 @@ export default function WorkspaceEvidence({ workspaceId }: { workspaceId: string
   const profiles = useQuery({
     queryKey: ["trinetra", workspaceId, "profiles"],
     queryFn: () => listTaxProfiles(workspaceId),
-  });
-  const docs = useQuery({
-    queryKey: ["trinetra", workspaceId, "documents"],
-    queryFn: () => getWorkItems(workspaceId, { page: 1, pageSize: 100 }),
   });
   const save = useMutation({
     mutationFn: async (form: FormData) => {
@@ -157,26 +153,16 @@ export default function WorkspaceEvidence({ workspaceId }: { workspaceId: string
                 ))}
               </select>
             </label>
-            <label className="text-sm">
-              Source document
-              <select
-                required
-                className={`${SELECT} mt-1`}
-                value={source}
-                onChange={(e) => {
-                  setSource(e.target.value);
-                  setConfirmed(false);
-                  setPreview(null);
-                }}
-              >
-                <option value="">Choose uploaded evidence</option>
-                {docs.data?.items.map((doc) => (
-                  <option key={doc.id} value={doc.id}>
-                    {doc.original_filename}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SourcePicker
+              workspaceId={workspaceId}
+              value={source}
+              required
+              onChange={(value) => {
+                setSource(value);
+                setConfirmed(false);
+                setPreview(null);
+              }}
+            />
             <label className="text-sm">
               Financial / tax year starting
               <input

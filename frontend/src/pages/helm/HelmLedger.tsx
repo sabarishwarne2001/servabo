@@ -10,9 +10,9 @@ import { CalendarHeatmap, type HeatDay } from "@/components/helm/ui/CalendarHeat
 import { HelmPageHeader } from "@/components/helm/ui/HelmPageHeader";
 import { HelmSkeleton } from "@/components/helm/ui/HelmSkeleton";
 import { LoadFailed } from "@/components/common/LoadFailed";
-import { workItemDetailsPath } from "@/routes/tenantPaths";
+import { workItemDetailsPath, trinetraPath } from "@/routes/tenantPaths";
 import { getHelmCalendar, getHelmLedger, helmKeys } from "@/services/api/helm";
-import { formatCalendarDate } from "@/utils/displayTime";
+import { formatCalendarDate, formatInrMicros } from "@/utils/displayTime";
 import type { HelmPromise } from "@/types/helm";
 
 const VIEWS = [
@@ -60,7 +60,10 @@ const CONFIDENCE_WORDS: Record<string, string> = {
   EXTRACTED: "read from the document, unchecked",
 };
 
-const PromiseRow: React.FC<{ readonly promise: HelmPromise; readonly slugs: Map<string, string> }> = ({ promise, slugs }) => {
+const PromiseRow: React.FC<{
+  readonly promise: HelmPromise;
+  readonly slugs: Map<string, string>;
+}> = ({ promise, slugs }) => {
   const { orgSlug } = useHelm();
   const evidence = promise.evidence.filter((e) => typeof e.work_item_id === "string");
   const workspaceSlug = slugs.get(promise.workspace_id);
@@ -71,23 +74,51 @@ const PromiseRow: React.FC<{ readonly promise: HelmPromise; readonly slugs: Map<
         <span className="helm-muted block text-xs">
           {KIND_WORDS[promise.kind] ?? promise.kind}
           {promise.counterparty_name ? ` · ${promise.counterparty_name}` : ""}
-          {promise.readable ? ` · ${CONFIDENCE_WORDS[promise.confidence] ?? promise.confidence.toLowerCase()}` : ""}
+          {promise.readable
+            ? ` · ${CONFIDENCE_WORDS[promise.confidence] ?? promise.confidence.toLowerCase()}`
+            : ""}
         </span>
         {promise.ask_access ? (
           <span className="helm-muted mt-1 inline-flex items-center gap-1 text-xs">
             <Lock className="h-3 w-3" aria-hidden="true" />
-            In {promise.workspace_name ?? "a workspace"} you cannot read. Ask a workspace admin for access.
+            In {promise.workspace_name ?? "a workspace"} you cannot read. Ask a workspace admin for
+            access.
           </span>
         ) : null}
       </td>
       <td>
-        <span className={`helm-chip helm-state-${STATUS_TONES[promise.status] ?? "unknown"} px-2 text-xs`}>
+        <span
+          className={`helm-chip helm-state-${STATUS_TONES[promise.status] ?? "unknown"} px-2 text-xs`}
+        >
           {STATUS_WORDS[promise.status] ?? promise.status}
         </span>
       </td>
-      <td className="whitespace-nowrap text-xs">{promise.due_date ? formatCalendarDate(promise.due_date) : "—"}</td>
+      <td className="whitespace-nowrap text-xs">
+        {promise.due_date ? formatCalendarDate(promise.due_date) : "—"}
+      </td>
       <td className="text-right font-semibold">
-        {promise.amount_micros !== null ? <Money micros={promise.amount_micros} currency={promise.currency} /> : "—"}
+        {promise.amount_micros !== null ? (
+          <Money micros={promise.amount_micros} currency={promise.currency} />
+        ) : (
+          "—"
+        )}
+        {promise.withholding_review && (
+          <div className="mt-1 max-w-xs text-xs font-normal">
+            <p>
+              Commercial balance · includes reviewed withholding{" "}
+              {formatInrMicros(promise.withholding_review.reviewed_micros)}
+            </p>
+            <p>{promise.withholding_review.note}</p>
+            {workspaceSlug && (
+              <Link
+                className="helm-accent underline"
+                to={`${trinetraPath(orgSlug, workspaceSlug)}?case=${encodeURIComponent(promise.withholding_review.case_id)}`}
+              >
+                Review withholding · reminder held
+              </Link>
+            )}
+          </div>
+        )}
       </td>
       <td className="text-xs">
         {workspaceSlug && evidence.length > 0 ? (
@@ -99,7 +130,9 @@ const PromiseRow: React.FC<{ readonly promise: HelmPromise; readonly slugs: Map<
                   className="helm-accent inline-flex items-center gap-1 hover:underline"
                 >
                   <FileText className="h-3 w-3" aria-hidden="true" />
-                  <span className="max-w-[12rem] truncate">{String(item.document ?? "Document")}</span>
+                  <span className="max-w-[12rem] truncate">
+                    {String(item.document ?? "Document")}
+                  </span>
                 </Link>
               </li>
             ))}
@@ -118,7 +151,9 @@ export const HelmLedger: React.FC = () => {
   const [params, setParams] = useSearchParams();
   // The cockpit's Promise calendar opens one day here: ?view=owe|owed&due=YYYY-MM-DD.
   const asked = params.get("view");
-  const [view, setView] = useState<ViewId>(VIEWS.some((v) => v.id === asked) ? (asked as ViewId) : "owe");
+  const [view, setView] = useState<ViewId>(
+    VIEWS.some((v) => v.id === asked) ? (asked as ViewId) : "owe",
+  );
   const [counterparty, setCounterparty] = useState("");
   const dueParam = params.get("due");
   const due = dueParam && /^\d{4}-\d{2}-\d{2}$/.test(dueParam) ? dueParam : undefined;
@@ -131,7 +166,11 @@ export const HelmLedger: React.FC = () => {
       return next;
     });
   const ledger = useQuery({
-    queryKey: helmKeys.ledger(organizationId, book.id, filters as Record<string, string | boolean | undefined>),
+    queryKey: helmKeys.ledger(
+      organizationId,
+      book.id,
+      filters as Record<string, string | boolean | undefined>,
+    ),
     queryFn: () => getHelmLedger(organizationId, book.id, filters),
   });
   // The Promise calendar on top: the next 12 weeks of what we owe or are owed; a day filters the table.
@@ -152,7 +191,10 @@ export const HelmLedger: React.FC = () => {
     const out = new Map<string, HeatDay>();
     for (const e of calendar.data?.entries ?? []) {
       if (e.direction === heatDirection && e.currency === heatCurrency) {
-        out.set(e.on, { value: e.amount_micros, words: `${formatHelmMoney(e.amount_micros, e.currency)} in ${e.count} ${e.count === 1 ? "promise" : "promises"}` });
+        out.set(e.on, {
+          value: e.amount_micros,
+          words: `${formatHelmMoney(e.amount_micros, e.currency)} in ${e.count} ${e.count === 1 ? "promise" : "promises"}`,
+        });
       }
     }
     return out;
@@ -166,7 +208,10 @@ export const HelmLedger: React.FC = () => {
       }
       return next;
     });
-  const slugs = useMemo(() => new Map(overview.workspaces.map((w) => [w.id, w.slug])), [overview.workspaces]);
+  const slugs = useMemo(
+    () => new Map(overview.workspaces.map((w) => [w.id, w.slug])),
+    [overview.workspaces],
+  );
   const counterparties = useMemo(() => {
     const seen = new Map<string, string>();
     for (const promise of ledger.data?.promises ?? []) {
@@ -189,17 +234,29 @@ export const HelmLedger: React.FC = () => {
           <div className="helm-panel helm-enter p-5" style={{ ["--i" as string]: 1 }}>
             <p className="helm-label">We owe (open)</p>
             <div className="helm-numeral mt-2 text-[1.75rem]">
-              {ledger.data ? <MoneyByCurrency totals={ledger.data.open_totals.WE_OWE} empty="Nothing open" /> : "…"}
+              {ledger.data ? (
+                <MoneyByCurrency totals={ledger.data.open_totals.WE_OWE} empty="Nothing open" />
+              ) : (
+                "…"
+              )}
             </div>
           </div>
           <div className="helm-panel helm-enter p-5" style={{ ["--i" as string]: 2 }}>
             <p className="helm-label">Owed to us (open)</p>
             <div className="helm-numeral mt-2 text-[1.75rem]">
-              {ledger.data ? <MoneyByCurrency totals={ledger.data.open_totals.OWED_TO_US} empty="Nothing open" /> : "…"}
+              {ledger.data ? (
+                <MoneyByCurrency totals={ledger.data.open_totals.OWED_TO_US} empty="Nothing open" />
+              ) : (
+                "…"
+              )}
             </div>
           </div>
         </div>
-        <section aria-labelledby="helm-ledger-calendar" className="helm-panel helm-enter min-w-0 p-5 lg:col-span-7" style={{ ["--i" as string]: 3 }}>
+        <section
+          aria-labelledby="helm-ledger-calendar"
+          className="helm-panel helm-enter min-w-0 p-5 lg:col-span-7"
+          style={{ ["--i" as string]: 3 }}
+        >
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
             <h2 id="helm-ledger-calendar" className="helm-label">
               Promise calendar · {view === "owed" ? "owed to us" : "we owe"}
@@ -235,17 +292,29 @@ export const HelmLedger: React.FC = () => {
           ))}
         </div>
         {due ? (
-          <span className="helm-chip helm-chip-accent gap-1.5 px-3 py-1 text-[13px]" data-testid="helm-ledger-day">
+          <span
+            className="helm-chip helm-chip-accent gap-1.5 px-3 py-1 text-[13px]"
+            data-testid="helm-ledger-day"
+          >
             <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
             Due on {formatCalendarDate(due)}
-            <button type="button" className="-mr-1 rounded-full p-0.5" onClick={clearDay} aria-label="Show every day">
+            <button
+              type="button"
+              className="-mr-1 rounded-full p-0.5"
+              onClick={clearDay}
+              aria-label="Show every day"
+            >
               <X className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </span>
         ) : null}
         <label className="text-xs">
           <span className="helm-label">Counterparty</span>
-          <select className="helm-input mt-1 h-8 min-h-0 w-56 py-0 text-xs" value={counterparty} onChange={(e) => setCounterparty(e.target.value)}>
+          <select
+            className="helm-input mt-1 h-8 min-h-0 w-56 py-0 text-xs"
+            value={counterparty}
+            onChange={(e) => setCounterparty(e.target.value)}
+          >
             <option value="">All</option>
             {counterparties.map(([key, name]) => (
               <option key={key} value={key}>
@@ -263,14 +332,19 @@ export const HelmLedger: React.FC = () => {
         <div className="helm-panel max-h-[70vh] overflow-auto p-2">
           <table className="helm-table w-full min-w-[720px] text-sm">
             <caption className="helm-muted px-3 py-2 text-left text-xs">
-              {ledger.data?.total ?? 0} promises{ledger.data && ledger.data.total > (ledger.data.promises.length ?? 0) ? `, the first ${ledger.data.promises.length} shown` : ""}
+              {ledger.data?.total ?? 0} promises
+              {ledger.data && ledger.data.total > (ledger.data.promises.length ?? 0)
+                ? `, the first ${ledger.data.promises.length} shown`
+                : ""}
             </caption>
             <thead>
               <tr>
                 <th scope="col">Promise</th>
                 <th scope="col">Status</th>
                 <th scope="col">Due</th>
-                <th scope="col" className="text-right">Amount</th>
+                <th scope="col" className="text-right">
+                  Amount
+                </th>
                 <th scope="col">Evidence</th>
               </tr>
             </thead>
@@ -280,7 +354,9 @@ export const HelmLedger: React.FC = () => {
               ))}
             </tbody>
           </table>
-          {(ledger.data?.promises ?? []).length === 0 ? <p className="helm-muted px-3 py-4 text-sm">Nothing here.</p> : null}
+          {(ledger.data?.promises ?? []).length === 0 ? (
+            <p className="helm-muted px-3 py-4 text-sm">Nothing here.</p>
+          ) : null}
         </div>
       )}
     </div>

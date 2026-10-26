@@ -34,7 +34,7 @@ for (const [tenant, user] of [
         name: "Blocked synthetic profile",
         pan: "ABCDE1234F",
       });
-      expect([402, 403, 503]).toContain(denied.status);
+      expect([402, 403, 409]).toContain(denied.status);
     });
   });
 }

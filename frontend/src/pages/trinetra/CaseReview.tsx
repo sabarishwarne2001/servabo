@@ -18,6 +18,7 @@ export default function CaseReview({
   const cache = useQueryClient();
   const [action, setAction] = useState("ALLOCATE");
   const [reason, setReason] = useState("");
+  const [minutes, setMinutes] = useState("0");
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const detail = useQuery({
     queryKey: ["trinetra", workspaceId, "case", creditId],
@@ -33,6 +34,7 @@ export default function CaseReview({
         revision: detail.data.revision,
         action,
         reason,
+        review_minutes: Number(minutes),
         allocations:
           action === "ALLOCATE"
             ? detail.data.statement_lines
@@ -47,6 +49,7 @@ export default function CaseReview({
     },
     onSuccess: () => {
       setReason("");
+      setMinutes("0");
       setAmounts({});
       void cache.invalidateQueries({ queryKey: ["trinetra", workspaceId] });
     },
@@ -67,7 +70,12 @@ export default function CaseReview({
   return (
     <div className="space-y-4 border-t border-border pt-4">
       {detail.data && (
-        <ReviewTools workspaceId={workspaceId} data={detail.data} canDecide={canDecide} />
+        <ReviewTools
+          key={detail.data.revision}
+          workspaceId={workspaceId}
+          data={detail.data}
+          canDecide={canDecide}
+        />
       )}
       <h3 className="text-sm font-semibold">Review history</h3>
       <ol className="space-y-2 text-xs">
@@ -134,6 +142,18 @@ export default function CaseReview({
                 className={`${INPUT} mt-1`}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm">
+              Minutes spent on this review (optional)
+              <input
+                type="number"
+                min={0}
+                max={480}
+                step={1}
+                className={`${INPUT} mt-1`}
+                value={minutes}
+                onChange={(e) => setMinutes(e.target.value)}
               />
             </label>
             <button className={BUTTON_PRIMARY} disabled={save.isPending}>

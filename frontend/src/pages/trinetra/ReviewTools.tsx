@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTenant } from "@/hooks/useTenant";
 import { workItemDetailsPath } from "@/routes/tenantPaths";
 import { BUTTON_SECONDARY, INPUT, SELECT } from "@/components/ui/primitives";
 import { reconfirmCredit, updateCreditReview, type CaseDetail } from "@/services/api/trinetra";
 import { errorMessage } from "@/services/api/errors";
-import { getWorkItems } from "@/services/api/workItem";
+import SourcePicker from "./SourcePicker";
 import { rupees } from "./format";
 
 export default function ReviewTools({
@@ -19,11 +20,17 @@ export default function ReviewTools({
 }) {
   const { state } = useTenant();
   const cache = useQueryClient();
-  const documents = useQuery({
-    queryKey: ["trinetra", workspaceId, "documents"],
-    queryFn: () => getWorkItems(workspaceId, { page: 1, pageSize: 100 }),
-    enabled: canDecide,
-  });
+  const [evidence, setEvidence] = useState(() =>
+    (data.review?.evidence ?? []).map((e) => ({
+      work_item_id: e.work_item_id,
+      kind: e.kind,
+      amount:
+        e.amount_micros === null || e.amount_micros === undefined
+          ? ""
+          : `${BigInt(e.amount_micros) / 1000000n}.${((BigInt(e.amount_micros) % 1000000n) / 10000n).toString().padStart(2, "0")}`,
+    })),
+  );
+  const [document, setDocument] = useState("");
   const save = useMutation({
     mutationFn: async (form: FormData) => {
       const reason = String(form.get("reason") ?? "");
@@ -34,7 +41,6 @@ export default function ReviewTools({
           reason,
         });
       }
-      const evidenceId = String(form.get("document") ?? "").trim();
       return updateCreditReview(workspaceId, data.id, {
         revision: data.revision,
         assign_to_me: form.get("claim") === "on",
@@ -42,15 +48,19 @@ export default function ReviewTools({
         root_cause: String(form.get("cause") ?? ""),
         due_on: form.get("due") || null,
         reason,
-        evidence: evidenceId
-          ? [
-              {
-                work_item_id: evidenceId,
-                kind: String(form.get("kind")),
-                amount: form.get("evidenceAmount") || null,
-              },
-            ]
-          : [],
+        confirm_receivable: form.get("confirmReceivable") === "on",
+        evidence: [
+          ...evidence,
+          ...(document
+            ? [
+                {
+                  work_item_id: document,
+                  kind: String(form.get("kind")),
+                  amount: String(form.get("evidenceAmount") ?? ""),
+                },
+              ]
+            : []),
+        ].map((e) => ({ ...e, amount: e.amount || null })),
       });
     },
     onSuccess: () => {
@@ -73,6 +83,11 @@ export default function ReviewTools({
       <h3 className="font-semibold">Source evidence</h3>
       <p>{source(data.work_item_id, "Open invoice and its review discussion")}</p>
       <p>{source(data.statement_work_item_id, "Open active statement source")}</p>
+      <p className="text-xs text-muted-foreground">
+        Printed invoice fields (unapproved): {rupees(data.printed_evidence.amount_micros)} ·{" "}
+        {data.printed_evidence.deductor_tan_masked ?? "TAN unavailable"} ·{" "}
+        {data.printed_evidence.section_label ?? "Section unavailable"}. {data.printed_evidence.note}
+      </p>
       {!data.source_current && (
         <p role="alert" className="text-destructive">
           The source changed. Reconfirm the supported expectation; previous allocations will be
@@ -95,6 +110,10 @@ export default function ReviewTools({
       <section className="rounded border border-border p-3">
         <h3 className="font-medium">Receivable evidence projection</h3>
         <p className="mt-2">
+          Cash received: {rupees(data.cash_projection.cash_received_micros)} · Reviewed withholding:{" "}
+          {rupees(data.cash_projection.reviewed_withholding_micros)}
+        </p>
+        <p className="mt-2">
           Unexplained balance: {rupees(data.cash_projection.unexplained_micros)}
         </p>
         {data.cash_projection.status === "CONFLICT" && (
@@ -105,9 +124,18 @@ export default function ReviewTools({
         </p>
       </section>
       <dl className="space-y-1">
-        <div>Owner: {data.review?.owner_id ? "Assigned reviewer" : "Unassigned"}</div>
-        <div>Priority: {data.review?.priority ?? "NORMAL"}</div>
-        <div>Root cause: {data.review?.root_cause || "Under investigation"}</div>
+        <div className="flex gap-2">
+          <dt>Owner</dt>
+          <dd>{data.review?.owner_id ? "Assigned reviewer" : "Unassigned"}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt>Priority</dt>
+          <dd>{data.review?.priority ?? "NORMAL"}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt>Root cause</dt>
+          <dd>{data.review?.root_cause || "Under investigation"}</dd>
+        </div>
       </dl>
       {data.review?.evidence?.map((item) => (
         <p key={`${item.work_item_id}-${item.kind}`}>
@@ -205,21 +233,33 @@ export default function ReviewTools({
                 />
               </label>
               <p className="text-xs text-muted-foreground">
-                Choose an existing source document. This replaces the supporting evidence selection;
-                historical references remain in the review history. Upload and discuss records in
-                Documents.
+                Attach separate customer advice, accounting records and responses. Existing
+                selections stay attached until removed. Upload and discuss records in Documents.
               </p>
-              <label className="block">
-                Supporting document
-                <select name="document" className={`${SELECT} mt-1`}>
-                  <option value="">No supporting document</option>
-                  {documents.data?.items.map((doc) => (
-                    <option key={doc.id} value={doc.id}>
-                      {doc.original_filename}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <ul className="space-y-2">
+                {evidence.map((item) => (
+                  <li key={item.work_item_id}>
+                    {source(item.work_item_id, item.kind.toLowerCase().replaceAll("_", " "))}
+                    <button
+                      type="button"
+                      className={`${BUTTON_SECONDARY} ml-2`}
+                      onClick={() =>
+                        setEvidence(evidence.filter((e) => e.work_item_id !== item.work_item_id))
+                      }
+                    >
+                      Remove evidence
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {evidence.length < 20 && (
+                <SourcePicker
+                  workspaceId={workspaceId}
+                  value={document}
+                  onChange={setDocument}
+                  label="Supporting document"
+                />
+              )}
               <label className="block">
                 Evidence kind
                 <select name="kind" className={`${SELECT} mt-1`}>
@@ -253,6 +293,16 @@ export default function ReviewTools({
                   maxLength={1000}
                   className={`${INPUT} mt-1`}
                 />
+              </label>
+              <label className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  name="confirmReceivable"
+                  defaultChecked={data.review?.withholding_confirmed ?? false}
+                />
+                Confirm withholding for the receivable projection. Current customer advice and
+                accounting amounts must agree. This holds Helm cash reminders until reviewed; it
+                does not certify government posting.
               </label>
               <button disabled={save.isPending} className={BUTTON_SECONDARY}>
                 Save review details

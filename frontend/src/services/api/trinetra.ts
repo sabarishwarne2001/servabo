@@ -16,7 +16,13 @@ export interface CreditCase {
     priority?: string;
     root_cause?: string;
     due_on?: string;
-    evidence?: { work_item_id: string; kind: string; current: boolean }[];
+    withholding_confirmed?: boolean;
+    evidence?: {
+      work_item_id: string;
+      kind: string;
+      current: boolean;
+      amount_micros?: string | number | null;
+    }[];
   };
   expected_micros: string | null;
   posted_micros: string;
@@ -28,6 +34,12 @@ export interface CreditCase {
   as_of: string | null;
 }
 export interface Cockpit {
+  outcomes?: {
+    confirmed_gap_closure_micros: string;
+    confirmed_cases: number;
+    review_minutes: number;
+    note: string;
+  };
   is_sample: boolean;
   items: CreditCase[];
   total: number;
@@ -51,6 +63,12 @@ export interface TaxProfile {
   pan_masked: string;
 }
 export interface CaseDetail extends CreditCase {
+  printed_evidence: {
+    amount_micros: string | null;
+    deductor_tan_masked: string | null;
+    section_label: string | null;
+    note: string;
+  };
   cash_projection: {
     status: string;
     cash_received_micros: string | null;

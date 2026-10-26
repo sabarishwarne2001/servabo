@@ -1,6 +1,9 @@
 import WorkspaceEvidence from "./WorkspaceEvidence";
 import CaseReview from "./CaseReview";
 import ExportEvidence from "./ExportEvidence";
+import CaseDetail from "./CaseDetail";
+import ReconciliationRun from "./ReconciliationRun";
+import { Link, useSearchParams } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Eye, Search, ShieldCheck, X } from "lucide-react";
@@ -19,7 +22,7 @@ const stages = [
   "Reviewed resolution",
 ];
 
-export default function Trinetra() {
+function Cockpit() {
   const workspace = useActiveWorkspace();
   const id = workspace?.workspaceId ?? "";
   const [sample, setSample] = useState(true);
@@ -115,6 +118,34 @@ export default function Trinetra() {
       </section>
       {!sample && live && workspace?.role === "ADMIN" && <WorkspaceEvidence workspaceId={id} />}
       {!sample && live && workspace?.role === "ADMIN" && <ExportEvidence workspaceId={id} />}
+      {!sample && live && workspace?.role === "ADMIN" && <ReconciliationRun workspaceId={id} />}
+      <details className={`${SURFACE} p-4 text-sm`}>
+        <summary className="cursor-pointer font-semibold">
+          Getting started with credit evidence
+        </summary>
+        <ol className="mt-3 list-decimal space-y-2 pl-5">
+          <li>
+            Confirm the receiving entity and source period. Upload documents through Documents;
+            ordinary access, retention and intake limits apply.
+          </li>
+          <li>
+            Record only a supported withholding expectation. Bank shortfalls do not establish TDS;
+            tax basis and eligibility may remain unknown.
+          </li>
+          <li>
+            Compare Helm bank receipts, customer advice and accounting evidence. Link the originals
+            so another reviewer can inspect them.
+          </li>
+          <li>
+            Preview the selected statement scope and manually checked rows. Official file layouts
+            are not yet supported.
+          </li>
+          <li>
+            Allocate posted amounts with a reason, request clarification through the existing
+            document discussion, and export a dossier for accountant review.
+          </li>
+        </ol>
+      </details>
       <div className="flex flex-wrap gap-3">
         <label className="text-sm">
           Tax period
@@ -177,6 +208,16 @@ export default function Trinetra() {
               </section>
             ))}
           </div>
+          {!sample && data.outcomes && (
+            <section className={`${SURFACE} p-4 text-sm`} aria-label="Measured review outcomes">
+              <p className="font-medium">
+                Confirmed later gap closure: {rupees(data.outcomes.confirmed_gap_closure_micros)} ·{" "}
+                {data.outcomes.confirmed_cases} reviewed cases · {data.outcomes.review_minutes}{" "}
+                recorded review minutes
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{data.outcomes.note}</p>
+            </section>
+          )}
           <ol
             className={`${SURFACE} grid gap-3 p-5 sm:grid-cols-5`}
             aria-label="Five evidence stages"
@@ -333,6 +374,14 @@ export default function Trinetra() {
                     Rule: {current.rule_version}
                   </p>
                   {!sample && (
+                    <Link
+                      className={BUTTON_SECONDARY}
+                      to={`?case=${encodeURIComponent(current.id)}`}
+                    >
+                      Compare source documents
+                    </Link>
+                  )}
+                  {!sample && (
                     <CaseReview
                       key={current.id}
                       workspaceId={id}
@@ -353,4 +402,10 @@ export default function Trinetra() {
       ) : null}
     </div>
   );
+}
+
+export default function Trinetra() {
+  const [params] = useSearchParams();
+  const creditId = params.get("case");
+  return creditId ? <CaseDetail key={creditId} creditId={creditId} /> : <Cockpit />;
 }
