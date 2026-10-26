@@ -33,6 +33,11 @@ Live processing defaults off. Read [LAUNCH-GATES.md](LAUNCH-GATES.md) before a p
 8. Prepare a plain-text inquiry draft, or export CSV, XLSX and an HTML evidence
    dossier. Nothing sends an inquiry automatically. Use the existing document's
    discussion and secure-request workflow for collaboration.
+9. Open **Compare source documents** for side-by-side canonical sources and review
+   controls. Search or page through source documents when attaching evidence. Attach
+   advice and accounting records separately, then explicitly confirm withholding for
+   the receivable projection. Helm shows that amount separately and holds gross cash
+   reminders. Changed evidence requires review; confirmation never marks an invoice paid.
 
 ## Meaning of the figures
 
@@ -44,6 +49,8 @@ Live processing defaults off. Read [LAUNCH-GATES.md](LAUNCH-GATES.md) before a p
 | Unresolved cases | Cases without a fully allocated posting or an explicit explained/withdrawn outcome. |
 | Deductor advice / accounting record | Separate amounts explicitly attached by a reviewer; neither becomes a posted statement amount. |
 | Bank receipt | Canonical Helm matched receipt, available only under the viewer's Helm/book/workspace permissions. It never creates a TDS expectation. |
+| Confirmed later gap closure | Current CA-reviewed closure against the immediately preceding import, with the same invoice version/expectation, capped by the increase in that deductor's uploaded postings. Not cumulative recovery. |
+| Recorded review minutes | Optional whole minutes entered on each decision, summed as effort. Not measured time saved. |
 
 Totals can cover several periods. The case filter narrows the queue; headline
 figures retain the workspace scope. The import timestamp is an **evidence as-of**
@@ -77,7 +84,7 @@ existing document/OCR/storage allowances.
 ## Boundaries still requiring work
 
 See [LAUNCH-GATES.md](LAUNCH-GATES.md). Official formats, TCS, automatic ERP
-expectation derivation, net-of-TDS Helm settlement reporting, and verified
-credit-gap-closure/time-saving metrics are not production-ready. The present
+expectation derivation, signed/advance workflows and externally validated outcomes
+remain gated. The present
 surface is a gated reviewed-evidence workflow, not completion of all original
 production acceptance criteria.

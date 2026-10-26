@@ -3638,3 +3638,33 @@ Severity here: P0 = High, P1 = Medium, P2 = Low. Everything not run against the 
 | F-603 | Medium | Found while building (tests and browser passes) | **Raw server text reached people.** Eight screens put `error.message` into a toast, and a validation failure read like `body.name: String should have at least 1 character`. Now a server sentence for a refusal (4xx), a plain fallback for a fault (5xx), and a validation list turned into one sentence; `check:self` fails a new case. | `errors.validation.test.ts`; "no raw error text" guard | Fixed (`66137c7`, `1443236`) |
 | F-604 | Low | Found while building (tests and browser passes) | **Rupees were grouped in thousands on billing and revenue screens** (₹150,000.00) beside lakh grouping in Helm and GST (₹1,50,000.00), depending on the browser's language; nothing stopped a screen building its own money text. One formatter, and a guard. | `formatMoney.test.ts`; "money, one way" guard | Fixed (`61397b5`) |
 | F-605 | Medium | Found while building (tests and browser passes) | **A new workspace had an empty initials badge where a logo should be**, and the logo itself was the old one. The new Servabo logo replaces it everywhere and is the default for any workspace without its own (or whose own will not load). **The artwork was supplied as a picture only: this is a vector recreation (see NEEDS-OWNER N-176).** | `defaultLogo.test.tsx`, spec 125 | Fixed (`93ca674`) |
+
+## F-619 — TRINETRA identifiers omitted from platform encryption rotation (P1)
+
+First PR CI's encrypted-column registry test failed for PAN and identity salt. Both
+columns now join the existing rotation sweep. The new regression rotates a populated
+profile, removes the old key and proves decryption plus identity stability. Targeted
+checks pass; full final-head CI is pending.
+
+## F-620 — Supporting evidence could outlive source erasure (P1)
+
+New erase/purge tests failed: a supporting document's removal left its case/history
+and comparison copies. Source ID lists now use the existing compliance data-map
+JSON-array linkage. Both modes remove dependent evidence. TRINETRA plus registry
+checks: 326 passed. Whole derived comparison snapshots may be removed when an input
+is erased; canonical originals retain their own lifecycle. Full CI pending.
+
+## F-621 — TRINETRA capacity locks did not follow FK-safe lock discipline (P1)
+
+CI's owner-row lock invariant rejected query-style locks and plain FOR UPDATE on
+organizations. Admission now uses explicit select plus FOR NO KEY UPDATE, preserving
+serialization while allowing child FK checks. The lock is documented in the existing
+invariant's reason registry. Concurrency and structural checks pass; full CI pending.
+
+## F-622 — Newly published dependency advisories (P1)
+
+The initial Python audit found filelock 3.29.5 affected by CVE-2026-112940,
+CVE-2026-112913 and CVE-2026-112907, plus setuptools 83.0.0 affected by
+GHSA-xmj3-9gf7-h52w. Full and web pins now use 4.2.1 and 84.1.0 respectively.
+`pip check`, 56 image/extraction contract tests and the repeated audit pass; the
+audit reports no known vulnerabilities. Full final-head CI is pending.

@@ -2509,3 +2509,21 @@ $300 add-on for Starter in dollars.
    credit) is checked in Final session 2B, and recorded `OPEN` with options if Dodo cannot.
 8. N-181 (the cost of AI-read pack checks): kept as it is; each check is a short call on the default model, counted as assistant usage
    and bounded by the token ceilings.
+
+## N-188 — TRINETRA scope and launch gates (DECIDED by the current user request; validation pending)
+
+The Project TRINETRA request authorizes a distinct receiving-business TDS evidence
+workflow on `hardening/trinetra`, composing canonical documents, Helm bank evidence,
+collaboration, jobs and billing. It expressly preserves existing plan names, prices,
+cadence and provider products; the separate Final 2A pricing instructions are not
+part of this task. Business receives bounded core evidence review; Enterprise adds
+scoped organization reporting, independent accountant review and API/webhook access.
+The proposed Business caps (2 profiles, 12 snapshots, 500 cases) are implemented as
+retained-record capacities. Enterprise defaults are 10/60/5,000 with hard ceilings.
+No separate outbound inquiry charge is consumed because sending remains disabled.
+
+Live processing defaults off. Official export fixtures, tax-adviser review and an
+authorized pilot remain required before enabling it. Documented transition guidance
+was reached; that does not validate file layouts or legal eligibility. No deployment,
+merge, live provider action or customer-data processing is authorized by this record.
+See `docs/trinetra/LAUNCH-GATES.md` for the concrete remaining validation.

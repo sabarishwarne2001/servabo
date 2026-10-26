@@ -42,11 +42,37 @@ and shipped-dependency audit. Preserve logs outside tracked source and report ex
 counts/failures. Browser runs use synthetic data and local integration stand-ins;
 they do not validate real OCR/model quality, real tax exports or payment providers.
 
-## Intermediate observations
+## Executed validation, 26 October 2026
 
-The initial 45 TRINETRA tests passed and 286 frontend unit tests passed. Follow-up
-tests found an expired fixture reference in the populated migration test and a
-workspace display-name attribute error in organization reporting; fixes are under
-rerun. A frontend equality lint error was also corrected. The website typecheck
-passes with telemetry disabled and a writable configuration directory. Final
-regression, browser and deployment evidence is still being assembled.
+| Check | Observed result |
+| --- | --- |
+| TRINETRA plus compliance data-map registry | 326 passed; includes supporting-source erasure/retention and populated downgrade/upgrade. |
+| TRINETRA, structural/locking/key-rotation/extraction checks and two engine suites | 153 passed; two engine sweeps stopped at an unconfigured local SMTP relay. Both were rerun with the declared test relay below. |
+| Those engine suites plus existing Helm service regressions | 402 passed. |
+| Image dependency contracts and extraction contracts after security upgrades | 56 passed; `pip check` found no broken requirements. |
+| Existing document console counts/filter contracts | 7 passed. |
+| Frontend units | 291 passed in 19 files. |
+| Frontend build, lint, self-check, generated API contracts | Passed; 12 API contracts agree with the running server. |
+| Live synthetic browser workflow, CSP and axe | 1 passed: actual intake, profile, expectation, preview/import, allocation, accountant review, multiple advice/accounting attachments, withholding projection, shared worker, export and side-by-side sources. |
+| Existing review hub and procurement browser suites (92/96) | 30 passed locally. Both suites had a failing test in the first PR CI run; a complete new CI run is still required. |
+| Migration drift | No new drift; 282 existing baseline operations. One head `tr1a2_review_outcomes`. |
+| Python dependency audit | Initially reported three filelock advisories and one setuptools advisory. Updated pins to 4.2.1 and 84.1.0; the same audit now reports no known vulnerabilities. |
+
+The first PR CI run, `40213665041` on `5581d0bf`, passed frontend, website,
+encoding and migration jobs but failed backend integration checks and two browser
+tests. It exposed missing encryption-rotation registration, unsafe/unrecognized
+organization locks, a missing extraction-reader contract, missing structural
+isolation registration, and the launch gate's 503 conflicting with route sweeps.
+Those findings were reproduced/fixed without removing assertions. The deliberate
+launch gate now returns a structured 409; disabled-feature tests still assert refusal.
+All engine assertions remain intact. The final full-suite CI result is pending.
+
+Earlier local full-suite attempts were interrupted by environment resets or invalid
+test storage/concurrent database setup. They are not passes. An earlier local website
+Lighthouse run missed the home/pricing performance budget under concurrent load;
+the first PR's website CI job subsequently passed. No performance threshold changed.
+
+Reproduce browser 135 with the default-disabled API; browser 136 requires an isolated
+synthetic API with `TRINETRA_LIVE_ENABLED=true` and runner `E2E_TRINETRA_LIVE=1`.
+CI runs these in separate stack phases. Local Chromium is `/usr/bin/chromium` via
+`E2E_CHROMIUM_PATH`. No real provider, tax portal, customer data or recipient was used.

@@ -952,3 +952,34 @@ assistant usage on every document once added (N-181): if a customer is surprised
 **The logo.** Every brand file is generated from one place: `brand/scripts/build_brand_assets.py` writes `brand/assets/*`, `brand/mark.ts` and the app and website copies. To change the logo,
 edit the mark's drawing in that script (its geometry is described in `brand/README.md`) and run it (it needs `fonttools`, `brotli`, `cairosvg`, `pillow`, `shapely`, `svgpathtools`). The current artwork is a
 recreation of the supplied picture (N-176). A workspace with no logo of its own shows the Servabo mark.
+# TRINETRA deployment supplement
+
+TRINETRA remains off by default (`TRINETRA_LIVE_ENABLED=false`). Read
+`docs/trinetra/LAUNCH-GATES.md` before authorizing a pilot; synthetic test success
+does not authorize processing live tax records. No portal credentials are needed.
+
+From the backend environment, inspect and apply the additive migrations with
+`alembic heads` (one head), `alembic upgrade head`, then
+`python scripts/check_migration_drift.py`. The new head is `tr1a2_review_outcomes`.
+Back up first. Rollback to `k1a7_pack_check_dismissals` drops TRINETRA evidence and
+history and removes its API-key scope and event subscriptions; export dossiers first.
+
+Use the existing versioned publisher without changing payment products or prices:
+`python scripts/seed_quota_tiers.py --dry-run`, inspect Business/Enterprise additions,
+then `python scripts/seed_quota_tiers.py`. Existing subscriptions remain pinned.
+Inspect `python scripts/seed_quota_tiers.py --carry-forward --dry-run` before the
+owner-operated `--carry-forward` command; it admits only no-worse, same-price changes.
+Never use `--allow-unpriced` to claim a paid production plan is purchasable.
+
+API and LIGHT workers need the same code/flag version. Reconciliation jobs use the
+existing jobs console and `/trinetra/reconciliation/{job_id}` status route. A 409
+`TRINETRA_SOURCE_REVIEW_REQUIRED` means the deliberate launch gate is still closed.
+Source-change 409s need a fresh preview/review; quota 409s need an administrator.
+Use the platform encryption-rotation sweep before retiring an encryption key;
+both PAN and the per-profile identity salt must be rewritten and verified.
+
+A `HELM_WITHHOLDING_REVIEW` failure means a reviewed deduction holds the gross cash
+reminder. Inspect the case, source freshness and separate advice/accounting amounts.
+Do not mark an invoice paid to bypass this hold. Disabling TRINETRA or downgrading a
+plan does not silently release recorded holds. An authorized review can clear the
+confirmation or withdraw an unsupported expectation with a reason.

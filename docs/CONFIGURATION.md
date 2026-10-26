@@ -65,8 +65,8 @@ guard), and the comment written above it in the code.
 | `EMBEDDING_MODEL_NAME` | `str` | `'all-MiniLM-L6-v2'` | example |  |
 | `EMBEDDING_BATCH_SIZE` | `int` | `32` | example |  |
 | `OCR_LANGUAGE` | `str` | `'en'` | example |  |
-| `TRINETRA_LIVE_ENABLED` | `bool` | `False` | example, production | TEST STUBS, not models: hashed bag-of-words embeddings and labelled placeholder OCR text (app/services/ml_stubs.py). For environments that cannot download the PaddleOCR / SentenceTransformers weights. Refused when ENVIR… |
-| `ML_STUBS` | `bool` | `False` | example |  |
+| `TRINETRA_LIVE_ENABLED` | `bool` | `False` | example, production | Enables reviewed TRINETRA evidence processing only after official-source and tax-adviser launch sign-off. Synthetic examples remain available while off. |
+| `ML_STUBS` | `bool` | `False` | example | TEST STUBS, not models: hashed bag-of-words embeddings and labelled placeholder OCR text (app/services/ml_stubs.py). For environments that cannot download the PaddleOCR / SentenceTransformers weights. Refused when ENVIR… |
 | `PLATFORM_SMTP_HOST` | `str` | `''` | example, production, guard |  |
 | `PLATFORM_SMTP_PORT` | `int` | `587` | example, production |  |
 | `PLATFORM_SMTP_USERNAME` | `str` | `''` | example, production |  |

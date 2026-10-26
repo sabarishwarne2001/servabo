@@ -6,9 +6,9 @@ Do not enable it merely because synthetic tests pass.
 
 ## External evidence still required
 
-- Reach and archive current authoritative ITD/CBDT/TRACES guidance, with access dates.
-  Managed network requests returned CONNECT 403; the saved network draft is not an
-  applied runtime policy. See [LEGAL-SOURCES.md](LEGAL-SOURCES.md).
+- Authoritative commencement, transition and download guidance was reached and
+  reviewed on 25 October 2026. See [LEGAL-SOURCES.md](LEGAL-SOURCES.md). This does
+  not establish the structure or meaning of any particular exported file.
 - Obtain authorized, legally usable historical/current statement exports. Validate
   every supported layout and ambiguous-column rule. No official parser is shipped
   as supported; human transcription must not be marketed as one.
@@ -26,12 +26,14 @@ These are limitations, not external verification already completed:
 - Automatic ERP-derived expectations and verified official CSV/XLSX/TXT/PDF parsers.
 - Full treatment of credit notes, reversals and advances; current unsupported signed
   amounts are refused for allocation and require accountant review.
-- Reviewed net-of-TDS integration with Helm receivable projections. Existing cash and
-  settlement semantics are unchanged; no claim is made that Helm now nets withholding.
+- Pilot validation of the reviewed Helm annotation and reminder hold. Confirmed
+  withholding is shown separately from cash; commercial totals are not silently
+  netted and no bank settlement is rewritten. Unsupported signed adjustments stay gated.
 - Production-ready multi-stage approval policy and an authorized inquiry-send path.
   Current drafts send nothing and consume no outbound-inquiry quota.
-- Verified later credit-gap closure and measured reviewer-time outcomes. Headline
-  exposure is not savings, recovery, a refund or an automatically bookable asset.
+- Real-source validation of later gap-closure metrics and self-reported review time.
+  Synthetic tests prove the comparison rules; no customer savings, recovery, refund
+  or time-saving claim has been established.
 - Pilot validation of document source comparison, source selection at scale, and
   the complete role/plan matrix in a browser.
 
@@ -51,8 +53,11 @@ These are limitations, not external verification already completed:
    only for the authorized deployment/pilot. Confirm sample workspaces remain immutable.
 7. Review job failures in the existing jobs console and scoped run-status API. Check
    stale-source banners, export audit events and compliance export/erasure in staging.
-8. Before rollback, export history; downgrade drops the new evidence tables and removes
-   `trinetra:read` from keys. Disabling the flag is the first rollback step.
+8. Before rollback, export history; `tr1a2_review_outcomes` adds comparison/time/source
+   links and `tr1a1_credit_assurance` adds the tables, key scope and webhook vocabulary.
+   Downgrading both removes TRINETRA data and its key/webhook subscriptions. Disable
+   the flag first. Existing recorded withholding continues to hold gross reminders
+   while its rows remain, even after a flag disable or plan downgrade.
 
 No production deployment, provider product creation, real email, government filing
 or payment was performed during implementation. Validation evidence belongs in

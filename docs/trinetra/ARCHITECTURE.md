@@ -43,6 +43,8 @@ version fingerprint and review metadata. It does not copy invoice/bank ledger
 transactions. Invoice fingerprints cover both WorkItem and DocumentRole versions.
 
 `trinetra_decisions`: append-only API revisions with actor, reason and allocations.
+Each decision may record 0–480 self-reported review minutes. Statement comparisons
+capture the immediately preceding valid snapshot and unchanged expectation versions.
 Only the current decision's allocations affect current figures, and only for the
 selected unchanged snapshot. Database administrators remain trusted; no separate
 cryptographic certificate or database immutability claim is made.
@@ -67,6 +69,20 @@ is bounded at 500 rows; decisions at 100 allocations; supporting evidence at 20
 documents; histories displayed at 200 events (total disclosed); dossiers at 50,000
 events (overflow refused). Single-case lists use bounded offset pagination.
 
+Reviewed receivable confirmation requires current, agreeing advice and accounting
+amounts within the supported expectation. Government posting is a separate fact.
+`helm_adapter` annotates readable INR payment promises without changing their amounts;
+Helm's send-time adapter holds gross reminders until that review is explicitly cleared
+or withdrawn. A stale source removes the verified amount but retains the safety hold.
+This adapter never writes a settlement. Helm API keys do not gain TRINETRA evidence
+through their Helm scope.
+
+Outcome comparison counts current CA-reviewed closure only when the invoice version
+and expected amount match the previous import, and caps it by increased statement
+amounts for the same scoped deductor. First imports, unchanged reimports, reallocations,
+unknown evidence and corrected expectations do not create a measured outcome. It is
+a current comparison, not a cumulative recovery ledger. Review time is recorded effort.
+
 ## API and worker
 
 Workspace prefix: `/api/v1/workspaces/{workspace_id}/trinetra`.
@@ -87,13 +103,21 @@ side effects. No tax/portal network request or AI inference occurs.
 
 ## Migration and lifecycle
 
-`tr1a1_credit_assurance` follows `k1a7_pack_check_dismissals`; no branch head is added.
-It adds the four tables and the `trinetra:read` key vocabulary. Downgrade removes
-TRINETRA tables and that scope from keys; canonical documents, Helm bank evidence
+`tr1a1_credit_assurance` follows `k1a7_pack_check_dismissals` and
+`tr1a2_review_outcomes` follows it: one head. The first adds four tables and the
+`trinetra:read` key and review-event webhook vocabularies. The second adds comparison,
+review-minute and supporting-source fields with backward-compatible defaults.
+Downgrading both removes TRINETRA tables, that scope and event subscriptions;
+canonical documents, Helm bank evidence
 and prices remain. Export before rollback: dropped TRINETRA history is unrecoverable
 without a backup. The migration contains static DDL, not imports of future models.
 
 All tables are registered in `services/compliance/data_map.py` and the existing
 compliance export. Ciphertext/salt/fingerprint are excluded from profile exports;
 keyed deductor identity is excluded from credit exports. Document erasure removes
-dependent views. There is no invented GST statutory-retention exemption for TDS.
+dependent views. Supporting-source lists use the existing compliance JSON-array link
+mechanism for erasure and retention, including copied review history and comparison
+baselines. Erasing an input can delete its whole derived comparison snapshot; the
+canonical uploaded statement remains subject to its own retention/hold policy.
+There is no invented GST statutory-retention exemption for TDS. Both encrypted
+profile columns participate in the platform key-rotation sweep.

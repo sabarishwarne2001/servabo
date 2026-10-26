@@ -12,6 +12,8 @@ Repository-wide searches found no dedicated Indian TDS/TCS/26AS engine. The X12
 | WorkItem / ordinary document intake | Evidence references use composite document/workspace foreign keys | No new OCR, blob store or independent document uploader |
 | Helm bank/service authorization | Case detail reads matched INR lines through viewer, book and restricted-workspace gates | No bank importer or settlement writes; bank gaps never infer TDS |
 | Helm integer money conventions | Micros and Decimal arithmetic | No second cash ledger |
+| Helm ledger and reminder hand | Scoped annotation and send-time withholding review hold | Commercial totals and canonical bank settlements are not rewritten |
+| Platform encryption rotation | Both profile ciphertext columns join its existing target registry | No separate key lifecycle or JWT-derived tax identifier |
 | TruthMesh / procurement matching | Canonical source documents remain available in existing review UI | No duplicate graph or matching engine for procurement |
 | GST export safety | Formula-neutralizing helper | No GSTR-2B rows treated as TDS credit |
 | Capability registry and versioned tier publisher | capability.trinetra on Business/Enterprise | No base prices, cadence, provider or existing subscription pins changed |
@@ -23,3 +25,7 @@ Repository-wide searches found no dedicated Indian TDS/TCS/26AS engine. The X12
 Open integration work is enumerated in LAUNCH-GATES.md. In particular, this
 implementation does not claim ERP-derived expectations, automatic evidence
 extraction, net-of-TDS Helm payment adjustments or official-statement parsing.
+Printed extraction fields appear only as unapproved hints. Later closure and review
+effort are derived from the existing TRINETRA decision/snapshot evidence, not a second
+cross-product recovery ledger. Supporting evidence uses canonical document review,
+discussions and secure-request surfaces.

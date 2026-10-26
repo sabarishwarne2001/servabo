@@ -1,44 +1,43 @@
 # Hardening campaign — STATE
 
-## Current phase — Project TRINETRA (2026-10-25)
+_FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
+
+## Current phase — Project TRINETRA (2026-10-26)
 
 Branch `hardening/trinetra`, based on `main` at
 `bf8f57f691aec7122d9ebaf4a4e13ae9d22ae19c`. Main is unchanged.
-The original 22,988-byte Markdown specification has now been read completely.
-The execution workspace runs commands, reads the attachment, installs dependencies,
-and runs PostgreSQL/Redis/MinIO. The earlier environment blocker is resolved.
+Draft PR: https://github.com/sabarishwarne2001/servabo/pull/40.
+The complete original Markdown specification was read; the attachment, shell,
+PostgreSQL, Redis and object storage work. Official ITD/CBDT guidance was read on
+25 October (HTTP 200); verified official export layouts and adviser sign-off remain
+external gates. The feature still defaults off.
 
-Implementation is **in progress**, not complete. Backend, migration, worker,
-additive entitlements, lifecycle integration, typed APIs, React cockpit and
-organization view, evidence forms/exports and Astro product page are implemented.
-Canonical documents, Helm bank permissions, the transactional outbox and platform
-job infrastructure are reused. Main is unchanged; no PR or deployment yet.
+Implementation and validation remain in progress. Four initial milestones were pushed through `5581d0bf`; subsequent commits are
+`fcad46c4` (dependency advisories), `04aac499` (backend) and `1708ac00` (UI/CI). Further work adds side-by-side document review, source
+search/pagination, multiple supporting documents, shared job controls, explicit
+receivable withholding confirmation and a Helm reminder hold. It does not mutate
+cash receipts or Helm settlements. A second additive migration adds previous-import
+comparison baselines, self-reported review minutes and supporting-source lifecycle
+links. Closure requires current accountant review and increased statement evidence;
+reallocating unchanged evidence does not count as closure.
 
-Latest validation: 62 focused backend tests passed, one new webhook test exposed
-missing database vocabulary constraints; after fixing them, the webhook and
-populated downgrade/upgrade tests both passed. A full backend run is in progress
-(`.dev/trinetra-backend-full.log`, completion `.exit`, JUnit `.xml`). Prior full runs
-were interrupted and are not passes. Frontend: 291 unit tests, build, lint, self-check
-and 12 contract checks passed (some before the latest formatting). Website HTML
-checks found missing column scopes, now corrected and awaiting rerun. Earlier
-production-CSP browser sample matrix: 6 tests passed; live workflows remain to run.
+Executed: 326 TRINETRA plus lifecycle-registry tests passed; frontend 291 unit tests,
+lint, self-check and a prior live browser journey passed. The expanded live journey passed with advice/accounting attachments; 12 generated
+contracts agree with the running server. Helm/engine regressions: 402 passed. The original PR CI run
+`40213665041` failed: encryption-rotation registry, extraction-reader contract,
+organization lock discipline, TRINETRA isolation registration and a disabled-feature
+503 conflicted with the shared isolation sweep. Fixes are under focused rerun in
+`.dev/trinetra-integration-fixes.log`. The intentional release gate now returns 409;
+its tests still assert refusal. The existing browser suites 92 and 96 then passed all 30 tests locally. CI frontend, website and migration jobs passed on that
+older pushed revision. Full-suite success has NOT been established.
 
-Official ITD/CBDT pages are now reachable (HTTP 200 on 25 October) and were read:
-commencement, TDS transition FAQs and annual-statement download instructions.
-The former network blocker is resolved. The pages do not verify exported file
-layouts; authorized samples, adviser sign-off and an authorized pilot remain open.
-Official-format parsers, TCS and external inquiry sending remain disabled;
-`TRINETRA_LIVE_ENABLED=false` remains the default. GitHub API requests still fail
-with a managed-network Forbidden response; git remote access works.
-
-**Resume:** preserve the same branch; inspect current logs/process ownership before
-starting another pytest (one process per test DB). Finish source/Helm projections,
-live browser workflow, broader regression and website checks; update docs and
-commit coherent milestones. Prepare a final reviewable PR with precise remaining
-gates. Do not treat the audit or these intermediate checks as full implementation.
-
-
-_FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
+**Resume:** inspect logs/process ownership before starting services or pytest.
+One pytest per test database. Preserve this branch and PR. Finish current focused
+checks, execute Helm/GST/TruthMesh and browser regressions, regenerate contract and
+coverage records, update feature/runbook/launch docs, commit and push coherent
+milestones, then require CI results on the final head. The preliminary audit is
+not completion. No deployment, merge, real external messages or customer-data
+processing has been performed.
 
 _Last updated: 2026-10-23 (plan change: Final session 2A, the upgrade, comes before 2B, the live session)_
 

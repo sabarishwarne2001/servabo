@@ -22,7 +22,10 @@ Tax portals and customer email destinations are outside TRINETRA's processing pa
 | Prompt injection | Deterministic arithmetic; no LLM or autonomous action is invoked by this module. Existing extraction stays untrusted until review. |
 | Resource exhaustion | Plan-version capacities and hard ceilings; bounded rows/allocations/history; batched summary reads; debounced shared jobs. |
 | Unexpected communication/payment | Inquiry is a draft only. No tax-portal credentials, sending endpoint, payment operation or return submission. |
-| Data left after erasure | Existing data-map purge/export/retention machinery plus canonical-source cascading. No separate blobs. Backups follow the platform retention policy. |
+| Data left after erasure | Existing data-map purge/export/retention machinery follows canonical and supporting source links, including comparison baselines and copied review history. No separate blobs. Backups follow platform retention. |
+| Old encryption key retired prematurely | Both PAN and identity salt participate in the platform rotation sweep; tests remove the old key and check decryption and identity stability. |
+| Chasing confirmed withholding as customer cash | Explicit agreeing advice/accounting review; Helm displays a separate annotation and holds gross reminders, including when evidence is stale or the feature is disabled. No automatic settlement mutation. |
+| Inflated outcome claims | Closure requires a later source increase, unchanged expectation and current accountant review; allocations of unchanged evidence count zero. Time is self-reported effort, not savings. |
 
 Database/server administrators and encryption-key custodians are trusted. Reviewers
 can intentionally enter an inaccurate transcription; the product labels it as such,
