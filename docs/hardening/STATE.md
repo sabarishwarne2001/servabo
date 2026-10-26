@@ -2,25 +2,31 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-26 (TRINETRA merged and reviewed; Final session 2A revised to finish it)_
+_Last updated: 2026-10-26 (TRINETRA to Business and Enterprise: its own session 2T after 2A)_
 
-## Current phase — Final session 2A, revised after TRINETRA (2026-10-26)
-Branch `hardening/final-2a-trinetra-review`, based on `main` at `04620e9` (PR #40 merged; `main` run #478 green on every job). Docs only:
-no code, no migration, one Alembic head `tr1a2_review_outcomes`. Decision N-189 (next free **N-190**); no finding (next free **F-626**);
-browser specs continue at **137** (PR #39's `122-premium-documents-assistant.spec.ts` shares 122 with `122-zoho-and-tally.spec.ts`; 2A renumbers it).
+## Current phase — the final sessions: 2A, then 2T (TRINETRA), then 2B (2026-10-26)
+Branch `hardening/trinetra-to-ga`, based on `main` at `2e0d61c` (PR #41 merged). Docs only: no code, no migration, one Alembic head
+`tr1a2_review_outcomes`. Decision N-190 (next free **N-191**); no finding (next free **F-626**); browser specs continue at **137**.
 
-**Since the 2A prompt was written:** PR #39 redesigned the Documents and AI Assistant consoles (`docs/ui/documents-assistant-upgrade.md`),
-and PR #40 added TRINETRA, a gated TDS evidence workflow (N-188, F-619 to F-625, `docs/trinetra/`). A review of TRINETRA on 2026-10-26
-found it careful and well tested, but with gaps that matter: the Helm reminder hold stops cash reminders for the whole invoice; any touch
-to a document makes its evidence stale; the seller check ignores the GSTIN; plan capacities never free up; one PAN can live in two
-workspaces; there is no way to switch it on for one pilot customer; its recompute job does nothing. HANDOFF "TRINETRA review and the
-revised session 2A" lists them; `docs/sessions/FINAL-2-UPGRADE.md` Phase T fixes them.
+**Plan (N-189, N-190).** TRINETRA (PR #40) is merged and switched off. A review on 2026-10-26 found defects (HANDOFF "TRINETRA review and
+the revised session 2A"), and its original brief is only partly built (`docs/trinetra/ORIGINAL-BRIEF.md`, added here). The owner wants it on
+Business and Enterprise, working like every other feature, with nothing left behind. So finishing it is its own session, 2T, after 2A.
 
-- [ ] **Final session 2A** (cloud, Opus 5.5 High): `docs/sessions/FINAL-2-UPGRADE.md`, now with Phase T (TRINETRA).
-- [ ] **Final session 2B** (the owner's PC): `docs/sessions/FINAL-2-LIVE.md`, rewritten by 2A.
-- [ ] The owner launch checklist (HANDOFF), from step 1.
+- [ ] **Final session 2A** (cloud, Opus 5.5 High): `docs/sessions/FINAL-2-UPGRADE.md`: India prices, safety jobs, prompt injection, the proof
+  kit, the Resolution assessment, Final 1's and PR #39's leftovers, the live prompt rewritten. It touches TRINETRA only for its plan row and copy
+  and the injection map.
+- [ ] **Final session 2T** (cloud, Opus 5.5 High): `docs/sessions/FINAL-2T-TRINETRA.md`: TRINETRA finished for Business and Enterprise, with
+  a completion matrix with no row left missing, three modes (off, pilot, on; ships as "pilot"), statement readers, the full money model,
+  authorized inquiries, approval chains, and every integration the other features have.
+- [ ] **Final session 2B** (the owner's PC): `docs/sessions/FINAL-2-LIVE.md`, rewritten by 2A and 2T; it proves the TRINETRA readers on the
+  owner's own Form 26AS / AIS files.
+- [ ] The owner launch checklist (HANDOFF), from step 1, including TRINETRA's step: the CA's read, then the mode "on".
 
 - **Next action:** the owner merges this PR once CI is green, then starts Final session 2A.
+
+## Plan revision: Final session 2A revised after TRINETRA (2026-10-26, PR #41)
+Docs only. N-189: 2A gained "Phase T" to fix what the TRINETRA review found; STATE was put in order. Superseded the same day by N-190
+(above): Phase T moved into Final session 2T, which also finishes TRINETRA for Business and Enterprise.
 
 ## Project TRINETRA (2026-10-26) — merged as PR #40
 

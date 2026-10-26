@@ -1,8 +1,10 @@
 # Final session 2B: everything, for real, on your own PC
 
-> **Do not run this yet.** Final session 2A (`docs/sessions/FINAL-2-UPGRADE.md`) runs first and **rewrites this prompt** so it
-> matches what exists after it: the rupee prices and Dodo products, the safety-job alerts, the prompt-injection documents, the
-> accuracy report and, if built, the Resolution layer. Its hand-over is HANDOFF "Final session 2A → Final session 2B".
+> **Do not run this yet.** Final sessions 2A (`docs/sessions/FINAL-2-UPGRADE.md`) and 2T (`docs/sessions/FINAL-2T-TRINETRA.md`)
+> run first and **rewrite this prompt** so it matches what exists after them: the rupee prices and Dodo products, the safety-job
+> alerts, the prompt-injection documents, the accuracy report, the Resolution layer if built, and TRINETRA's phase (its statement
+> readers proven on the owner's own Form 26AS / AIS files). 2T removes this note. The hand-overs are HANDOFF "Final session 2A →
+> Final session 2B" and "Final session 2T → Final session 2B".
 
 | | |
 | --- | --- |
