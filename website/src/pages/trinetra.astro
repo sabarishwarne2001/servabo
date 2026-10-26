@@ -3,7 +3,9 @@ import Base from "../layouts/Base.astro";
 import SectionHead from "../components/SectionHead.astro";
 import Shot from "../components/Shot.astro";
 import { APP } from "../config/site";
-import { PLANS, dollars } from "../lib/pricing";
+import CurrencySwitch from "../components/CurrencySwitch.astro";
+import Price from "../components/Price.astro";
+import { PLANS } from "../lib/pricing";
 const stages = ["Invoice", "Bank receipt", "Deductor evidence", "Uploaded statement", "Reviewed resolution"];
 ---
 <Base title="TRINETRA — Credit assurance" description="Trace withheld tax from invoice to uploaded statement. Explore Servabo's synthetic TDS evidence assurance preview." path="/trinetra">
@@ -22,7 +24,8 @@ const stages = ["Invoice", "Bank receipt", "Deductor evidence", "Uploaded statem
   </section>
   <section class="page py-12" aria-labelledby="trinetra-plans">
     <SectionHead id="trinetra-plans" title="Additive capability. Existing plan prices." lede="Every plan can explore synthetic examples. Live processing remains release gated, including on paid plans." />
-    <div class="mt-8 overflow-x-auto"><table class="w-full text-left"><caption class="sr-only">TRINETRA plan availability</caption><thead><tr><th class="p-3" scope="col">Plan</th><th class="p-3" scope="col">Monthly price</th><th class="p-3" scope="col">TRINETRA</th></tr></thead><tbody>{PLANS.map((plan) => <tr class="border-t" ><th class="p-3" scope="row">{plan.name}</th><td class="p-3">{dollars(plan.monthly)}{plan.perSeat ? " / seat" : ""}</td><td class="p-3">{plan.features.includes("capability.trinetra") ? "Synthetic preview; live capability subject to release gates" : "Read-only synthetic preview"}</td></tr>)}</tbody></table></div>
+    <div class="mt-6"><CurrencySwitch /></div>
+    <div class="mt-8 overflow-x-auto"><table class="w-full text-left"><caption class="sr-only">TRINETRA plan availability</caption><thead><tr><th class="p-3" scope="col">Plan</th><th class="p-3" scope="col">Price per user, per month</th><th class="p-3" scope="col">TRINETRA</th></tr></thead><tbody>{PLANS.map((plan) => <tr class="border-t" ><th class="p-3" scope="row">{plan.name}</th><td class="p-3">{plan.monthly ? <Price amounts={plan.month} /> : <><span class="cur-inr">₹0</span><span class="cur-usd">$0</span></>}{plan.perSeat ? <span class="cur-inr">, GST extra</span> : ""}</td><td class="p-3">{plan.features.includes("capability.trinetra") ? "Synthetic preview; live capability subject to release gates" : "Read-only synthetic preview"}</td></tr>)}</tbody></table></div>
   </section>
   <section class="page py-12"><SectionHead title="Evidence assurance, with clear limits" lede="No tax portal credentials, automated portal access, return filing, tax advice, refund promises or autonomous inquiry sending. TCS and unverified statement formats are unsupported. A chartered accountant decides what a business may claim." /><a class="btn-secondary mt-6" href="/security">How Servabo protects your records</a></section>
 </Base>

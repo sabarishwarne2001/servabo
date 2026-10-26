@@ -6,7 +6,9 @@ import PlanBadge from "../components/PlanBadge.astro";
 import ClosingCta from "../components/ClosingCta.astro";
 import engines from "../data/engines.json";
 import { APP, SITE, absolute } from "../config/site";
-import { PLANS, TRIAL_DAYS, dollars, plan } from "../lib/pricing";
+import CurrencySwitch from "../components/CurrencySwitch.astro";
+import Price from "../components/Price.astro";
+import { PLANS, TRIAL_DAYS, plan } from "../lib/pricing";
 
 const business = plan("business");
 
@@ -80,14 +82,14 @@ const softwareApplication = {
   offers: PLANS.filter((p) => p.monthly > 0).map((p) => ({
     "@type": "Offer",
     name: p.name,
-    price: (p.monthly / 100).toFixed(2),
-    priceCurrency: "USD",
+    price: ((p.month.INR ?? 0) / 100).toFixed(2),
+    priceCurrency: "INR",
     url: absolute("/pricing"),
     priceSpecification: {
       "@type": "UnitPriceSpecification",
-      price: (p.monthly / 100).toFixed(2),
-      priceCurrency: "USD",
-      unitText: "per seat per month",
+      price: ((p.month.INR ?? 0) / 100).toFixed(2),
+      priceCurrency: "INR",
+      unitText: "per user per month, GST extra",
       billingDuration: "P1M",
     },
   })),
@@ -239,20 +241,21 @@ const softwareApplication = {
 
   <!-- Pricing teaser -->
   <section class="page mt-28" aria-labelledby="pricing-teaser">
-    <SectionHead eyebrow="Pricing" title="Per seat, per month. Every price on this page is the price you pay." id="pricing-teaser" />
+    <SectionHead eyebrow="Pricing" title="Per user, per month. Every price on this page is the price you pay." id="pricing-teaser" />
+    <div class="mt-6"><CurrencySwitch /></div>
     <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {PLANS.map((p) => (
         <a href="/pricing" class={`sheet block p-6 transition-shadow hover:shadow-elevation-2 ${p.key === "business" ? "ring-2 ring-primary" : ""}`}>
           <p class="font-semibold">{p.name}</p>
           <p class="mt-3">
-            <span class="figure text-3xl font-semibold">{p.monthly ? dollars(p.monthly) : "$0"}</span>
-            <span class="text-sm text-muted-foreground">{p.monthly ? " per seat / month" : ` for ${TRIAL_DAYS} days`}</span>
+            {p.monthly ? <Price amounts={p.month} class="figure text-3xl font-semibold" /> : <span class="figure text-3xl font-semibold"><span class="cur-inr">₹0</span><span class="cur-usd">$0</span></span>}
+            <span class="text-sm text-muted-foreground">{p.monthly ? " per user / month" : ` for ${TRIAL_DAYS} days`}</span>
           </p>
           <p class="mt-3 text-sm leading-relaxed text-muted-foreground">{p.for}</p>
         </a>
       ))}
     </div>
-    <p class="mt-4 text-sm text-muted-foreground">Prices exclude taxes; {SITE.merchantOfRecord}, our merchant of record, calculates and collects tax at checkout. <a href="/pricing" class="link">Compare plans</a></p>
+    <p class="mt-4 text-sm text-muted-foreground">Prices exclude taxes (in India, GST extra); {SITE.merchantOfRecord}, our merchant of record, calculates and collects tax at checkout. <a href="/pricing" class="link">Compare plans</a></p>
   </section>
 
   <!-- FAQ -->

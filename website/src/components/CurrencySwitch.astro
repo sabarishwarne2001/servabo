@@ -1,0 +1,18 @@
+---
+/**
+ * Rupees or dollars (Final session 2A, N-187). India is the target market, so rupees are the default; the site is
+ * static, so there is no geolocation. The choice is a radio pair read by CSS (`:has(#currency-usd:checked)`), the
+ * same way as the Monthly/Yearly switch: no script, nothing stored.
+ */
+interface Props {
+  class?: string;
+}
+const { class: className = "" } = Astro.props;
+---
+<fieldset class={`currency-switch inline-flex rounded-xl border border-border bg-card p-1 shadow-elevation-1 ${className}`}>
+  <legend class="sr-only">Currency</legend>
+  <input type="radio" name="currency" id="currency-inr" value="INR" checked class="sr-only" />
+  <label for="currency-inr" class="cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-muted-foreground">₹ India</label>
+  <input type="radio" name="currency" id="currency-usd" value="USD" class="sr-only" />
+  <label for="currency-usd" class="cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-muted-foreground">$ Elsewhere</label>
+</fieldset>

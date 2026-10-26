@@ -164,6 +164,23 @@
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
   }
+  /* Final session 2A (N-187): rupees by default, dollars when the currency switch says so; no JavaScript. */
+  .cur-usd {
+    display: none;
+  }
+  html:has(#currency-usd:checked) .cur-usd {
+    display: inline;
+  }
+  html:has(#currency-usd:checked) .cur-inr {
+    display: none;
+  }
+  .currency-switch input:checked + label {
+    @apply bg-primary text-primary-foreground shadow-elevation-1;
+  }
+  .currency-switch input:focus-visible + label {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
   /* Screenshots follow the theme: the light one in light mode, the dark one in dark mode. */
   .shot-dark {
     display: none;
