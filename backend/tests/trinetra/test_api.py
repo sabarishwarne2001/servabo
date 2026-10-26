@@ -173,7 +173,7 @@ def test_live_read_and_write_require_capability(
 def test_launch_gate_remains_closed(world, client, tenant, monkeypatch):
     url, _, _ = world
     monkeypatch.setattr(settings, "TRINETRA_LIVE_ENABLED", False)
-    assert client.get(url + "/credits", headers=tenant.owner.headers).status_code == 503
+    assert client.get(url + "/credits", headers=tenant.owner.headers).status_code == 409
     assert client.get(url + "/sample", headers=tenant.owner.headers).status_code == 200
 
 

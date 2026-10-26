@@ -9,6 +9,7 @@ import secrets
 from dataclasses import asdict
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, load_only
+from sqlalchemy import select
 from app.core import encryption
 from app.models.organization import Organization
 from app.models.work_item import WorkItem
@@ -37,6 +38,15 @@ def capacity(db, workspace, kind):
         limit_key="limit.trinetra_" + kind,
     )
     return min(value if value is not None else baseline, ceiling)
+
+
+def lock_capacity(db, workspace):
+    # Serialize admission without blocking FK KEY SHARE checks from child inserts.
+    db.execute(
+        select(Organization)
+        .where(Organization.id == workspace.organization_id)
+        .with_for_update(key_share=True)
+    ).scalar_one()
 
 
 def identity(raw: str, kind: str, salt: str) -> str:
@@ -106,23 +116,20 @@ def invoice_period(fact, year):
 
 
 def profile(db, workspace, id):
-    row = (
-        db.query(Profile)
+    row = db.execute(
+        select(Profile)
         .filter_by(
             id=id, workspace_id=workspace.id, organization_id=workspace.organization_id
         )
         .with_for_update()
-        .first()
-    )
+    ).scalar_one_or_none()
     if row is None:
         raise HTTPException(404, "Tax profile not found.")
     return row
 
 
 def create_profile(db, workspace, name, pan):
-    db.query(Organization).filter_by(
-        id=workspace.organization_id
-    ).with_for_update().one()
+    lock_capacity(db, workspace)
     identity(pan, "PAN", "validation-only")
     for old in db.query(Profile).filter_by(workspace_id=workspace.id).all():
         if hmac.compare_digest(encryption.decrypt_secret(old.pan_ciphertext), pan):
@@ -196,6 +203,17 @@ def allocations(db, p, year):
         .all()
     )
     return [d.Allocation(**a) for dec in decisions for a in dec.allocations]
+
+
+def decision_sources(db, row, p):
+    snapshot = current(db, p, row.year)
+    return sorted(
+        {
+            str(row.work_item_id),
+            *(row.evidence_work_item_ids or []),
+            *([str(snapshot.source_work_item_id)] if snapshot else []),
+        }
+    )
 
 
 def postings(snapshot, workspace, p):
@@ -326,9 +344,7 @@ def import_reviewed(db, workspace, p, source, year, rows, pan, confirmed):
     ):
         raise HTTPException(422, "Entity does not match the source confirmation.")
     source_document = document(db, workspace, source)
-    db.query(Organization).filter_by(
-        id=workspace.organization_id
-    ).with_for_update().one()
+    lock_capacity(db, workspace)
     # Stable content hash, excluding file names and upload time. Identical input is idempotent.
     normalized = [
         dict(
@@ -365,6 +381,19 @@ def import_reviewed(db, workspace, p, source, year, rows, pan, confirmed):
     previous = (
         db.query(Statement).filter_by(profile_id=p.id, year=year, active=True).first()
     )
+    from app.services.trinetra.outcomes import baseline
+
+    comparison = {}
+    if previous:
+        cases = (
+            db.query(CreditRow)
+            .filter_by(profile_id=p.id, workspace_id=workspace.id, year=year)
+            .limit(5001)
+            .all()
+        )
+        if len(cases) > 5000:
+            raise HTTPException(409, "The comparison exceeds the supported case limit.")
+        comparison = baseline(previous, summary(db, workspace)["items"], cases)
     if previous:
         previous.active = False
         db.flush()
@@ -380,13 +409,30 @@ def import_reviewed(db, workspace, p, source, year, rows, pan, confirmed):
         rows=normalized,
         active=True,
         revision=(previous.revision + 1 if previous else 1),
+        comparison=comparison,
+        evidence_work_item_ids=(
+            [str(previous.source_work_item_id)] + [str(c.work_item_id) for c in cases]
+            if previous
+            else []
+        ),
     )
     db.add(row)
     db.flush()
     return row
 
 
-def decide(db, workspace, row, p, user_id, revision, action, reason, requested):
+def decide(
+    db,
+    workspace,
+    row,
+    p,
+    user_id,
+    revision,
+    action,
+    reason,
+    requested,
+    review_minutes=0,
+):
     source = db.get(WorkItem, row.work_item_id)
     role = (
         db.query(DocumentRole)
@@ -477,6 +523,8 @@ def decide(db, workspace, row, p, user_id, revision, action, reason, requested):
             action=action,
             reason=reason,
             allocations=chosen,
+            review_minutes=review_minutes,
+            evidence_work_item_ids=decision_sources(db, row, p),
         )
     )
     db.flush()
@@ -511,6 +559,7 @@ def reconfirm(db, workspace, row, p, user_id, revision, amount, reason):
             actor_id=user_id,
             revision=row.revision,
             action="EXPECTATION_RECONFIRMED",
+            evidence_work_item_ids=decision_sources(db, row, p),
             reason=f"Previous expected micros: {previous}. Reconfirmed micros: {value}. "
             + reason,
             allocations=[],
@@ -595,10 +644,13 @@ def summary(db, workspace):
         view(db, workspace, r, bundles[(r.profile_id, r.year)], sources, roles)
         for r in rows
     ]
+    from app.services.trinetra.outcomes import measure
+
     return dict(
         is_sample=False,
         items=items,
         total=len(items),
+        outcomes=measure(db, workspace, items, rows, list(active.values())),
         as_of=max((r["as_of"] for r in items if r["as_of"]), default=None),
         expected_micros=sum(
             r["expected_micros"] or 0 for r in items if r["review_state"] != "WITHDRAWN"

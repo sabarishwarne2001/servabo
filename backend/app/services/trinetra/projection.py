@@ -1,6 +1,29 @@
 """Read-only receivable explanation. Withholding is never bank cash or a settlement."""
 
 
+def reviewed_withholding(row, value):
+    review = row.review or {}
+    required = [
+        e
+        for e in value.get("review", {}).get("evidence", [])
+        if e["kind"] in ("DEDUCTOR_ADVICE", "ACCOUNTING_RECORD")
+    ]
+    amount = value.get("advice_micros")
+    if (
+        review.get("withholding_confirmed")
+        and review.get("invoice_version") == row.source_version
+        and value.get("source_current")
+        and row.state not in ("WITHDRAWN", "DISPUTED")
+        and required
+        and all(e.get("current") for e in required)
+        and amount is not None
+        and 0 < amount <= row.expected_micros
+        and amount == value.get("booked_micros")
+    ):
+        return amount
+    return None
+
+
 def receivable(gross: int | None, bank: int | None, withholding: int | None) -> dict:
     result = {
         "gross_micros": gross,

@@ -79,6 +79,9 @@ class TrinetraProfile(Scoped, Base):
 
 class TrinetraStatement(Scoped, Base):
     __tablename__ = "trinetra_statements"
+    evidence_work_item_ids: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
+    )
     profile_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     source_work_item_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), nullable=False
@@ -91,6 +94,9 @@ class TrinetraStatement(Scoped, Base):
     rows: Mapped[list] = mapped_column(JSONB, nullable=False)
     active: Mapped[bool] = mapped_column(default=True, nullable=False)
     revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    comparison: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
+    )
     __table_args__ = (
         *scope_constraints("trinetra_statements"),
         ForeignKeyConstraint(
@@ -122,6 +128,9 @@ class TrinetraStatement(Scoped, Base):
 
 class TrinetraCredit(Scoped, Base):
     __tablename__ = "trinetra_credits"
+    evidence_work_item_ids: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
+    )
     profile_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     work_item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -163,6 +172,9 @@ class TrinetraCredit(Scoped, Base):
 
 class TrinetraDecision(Scoped, Base):
     __tablename__ = "trinetra_decisions"
+    evidence_work_item_ids: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
+    )
     credit_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     actor_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
@@ -171,8 +183,14 @@ class TrinetraDecision(Scoped, Base):
     action: Mapped[str] = mapped_column(String(30), nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     allocations: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    review_minutes: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     __table_args__ = (
         *scope_constraints("trinetra_decisions"),
+        CheckConstraint(
+            "review_minutes BETWEEN 0 AND 480", name="ck_trinetra_review_minutes"
+        ),
         ForeignKeyConstraint(
             ["credit_id", "workspace_id"],
             ["trinetra_credits.id", "trinetra_credits.workspace_id"],

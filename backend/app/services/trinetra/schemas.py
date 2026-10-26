@@ -45,7 +45,15 @@ class CasesOut(Wire):
     total: int
 
 
+class OutcomesOut(Wire):
+    confirmed_gap_closure_micros: Micros = 0
+    confirmed_cases: int = 0
+    review_minutes: int = 0
+    note: str = "No measured outcomes for synthetic examples."
+
+
 class SummaryOut(CasesOut):
+    outcomes: OutcomesOut = Field(default_factory=OutcomesOut)
     is_sample: bool
     as_of: str | None
     expected_micros: Micros
@@ -87,6 +95,7 @@ class BankOut(Wire):
 
 
 class EventOut(BaseModel):
+    review_minutes: int = 0
     revision: int
     action: str
     reason: str
@@ -104,7 +113,15 @@ class ProjectionOut(Wire):
     note: str
 
 
+class PrintedEvidenceOut(Wire):
+    amount_micros: Micros | None
+    deductor_tan_masked: str | None
+    section_label: str | None
+    note: str
+
+
 class DetailOut(CaseOut):
+    printed_evidence: PrintedEvidenceOut
     statement_lines: list[PostingOut]
     bank_evidence: list[BankOut]
     events: list[EventOut]

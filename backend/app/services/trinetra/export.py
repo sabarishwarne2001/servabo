@@ -87,6 +87,7 @@ def build(db, workspace, format):
             str(e.actor_id) if e.actor_id else "",
             e.created_at.isoformat(),
             json.dumps(e.allocations, sort_keys=True),
+            e.review_minutes,
         ]
         for e in events
     ]
@@ -98,6 +99,7 @@ def build(db, workspace, format):
         "Reviewer",
         "At",
         "Allocations (micros, exact)",
+        "Recorded review minutes",
     ]
     snapshots = [
         [
@@ -109,6 +111,7 @@ def build(db, workspace, format):
             s.fingerprint,
             str(s.source_work_item_id),
             s.source_version,
+            json.dumps(s.comparison, sort_keys=True),
         ]
         for s in db.query(TrinetraStatement)
         .filter_by(workspace_id=workspace.id)
@@ -123,6 +126,7 @@ def build(db, workspace, format):
         "Fingerprint",
         "Source document",
         "Source version",
+        "Previous import comparison (micros, exact)",
     ]
     if format == "xlsx":
         workbook = Workbook()
@@ -132,6 +136,17 @@ def build(db, workspace, format):
             ["TRINETRA evidence dossier", datetime.now(timezone.utc).isoformat()]
         )
         sheet.append([DISCLAIMER])
+        sheet.append(
+            [
+                "Confirmed closure INR",
+                str(
+                    Decimal(figures["outcomes"]["confirmed_gap_closure_micros"])
+                    / Decimal(1000000)
+                ),
+            ]
+        )
+        sheet.append(["Recorded review minutes", figures["outcomes"]["review_minutes"]])
+        sheet.append([figures["outcomes"]["note"]])
         sheet.append(
             ["Amounts are exact decimal text in INR. No inferred rates or tax basis."]
         )

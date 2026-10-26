@@ -492,10 +492,10 @@ REGISTRY: dict[str, TableRule] = {
 # TRINETRA is evidence content, not a statutory ledger. No GST retention exemption is inferred.
 REGISTRY.update({
     "trinetra_profiles": _config(export="trinetra_profiles", note="Encrypted PAN; ciphertext excluded from export."),
-    "trinetra_statements": _r(Kind.CONTENT, Erasure.DELETE, Sweep.CASCADE, OrgPurge.DELETE,
-        export="trinetra_statements", links=(col("source_work_item_id"),)),
-    "trinetra_credits": _r(Kind.CONTENT, Erasure.DELETE, Sweep.CASCADE, OrgPurge.DELETE,
-        export="trinetra_credits", links=(col("work_item_id"),)),
-    "trinetra_decisions": _r(Kind.CONTENT, Erasure.DELETE, Sweep.CASCADE, OrgPurge.DELETE,
-        export="trinetra_decisions", links=(via("credit_id", "trinetra_credits", "id", col("work_item_id")),)),
+    "trinetra_statements": _r(Kind.CONTENT, Erasure.DELETE, Sweep.DELETE, OrgPurge.DELETE,
+        export="trinetra_statements", links=(col("source_work_item_id"), json_array("evidence_work_item_ids"))),
+    "trinetra_credits": _r(Kind.CONTENT, Erasure.DELETE, Sweep.DELETE, OrgPurge.DELETE,
+        export="trinetra_credits", links=(col("work_item_id"), json_array("evidence_work_item_ids"))),
+    "trinetra_decisions": _r(Kind.CONTENT, Erasure.DELETE, Sweep.DELETE, OrgPurge.DELETE,
+        export="trinetra_decisions", links=(via("credit_id", "trinetra_credits", "id", col("work_item_id")), json_array("evidence_work_item_ids"))),
 })

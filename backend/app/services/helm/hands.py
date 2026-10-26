@@ -265,6 +265,13 @@ def send_reminder(db: Session, *, action: HelmAction, book: HelmBook, snapshot=N
     """Remind a customer of an overdue invoice, at the action's tone level, from the organization's
     own sender settings. Without a contact or a mail path the Guard has already stopped it."""
     from app.templates.emails import helm as mail
+    from app.services.trinetra.helm_adapter import reminder_requires_review
+
+    if book.kind != v.BOOK_SAMPLE and reminder_requires_review(
+        db, organization_id=action.organization_id, workspace_id=action.workspace_id,
+        work_item_id=action.work_item_id,
+    ):
+        raise HandError("HELM_WITHHOLDING_REVIEW", "Reviewed withholding affects this invoice. Review the TRINETRA evidence before sending a cash reminder.")
 
     params = dict(action.params or {})
     counterparty = snapshot.counterparties.get(action.counterparty_key or "") if snapshot else None

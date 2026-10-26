@@ -1,6 +1,7 @@
 """TRINETRA evidence reference views, gated pending source validation.
 
-Only new tables. Downgrade removes TRINETRA data; export before rollback.
+New tables and additive API-key/webhook vocabularies. Downgrade removes TRINETRA
+data and subscriptions to its event; export before rollback.
 """
 
 from alembic import op
@@ -111,18 +112,18 @@ def upgrade():
     _scope_constraint((*SCOPES_BEFORE, "trinetra:read"))
     op.execute("""
 CREATE TABLE trinetra_profiles (
-	name VARCHAR(120) NOT NULL, 
-	pan_ciphertext TEXT NOT NULL, 
-	identity_salt_ciphertext TEXT NOT NULL, 
-	pan_fingerprint VARCHAR(64) NOT NULL, 
-	pan_masked VARCHAR(10) NOT NULL, 
-	id UUID DEFAULT gen_random_uuid() NOT NULL, 
-	organization_id UUID NOT NULL, 
-	workspace_id UUID NOT NULL, 
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
-	CONSTRAINT pk_trinetra_profiles PRIMARY KEY (id), 
-	CONSTRAINT fk_trinetra_profiles_scope FOREIGN KEY(workspace_id, organization_id) REFERENCES workspaces (id, organization_id) ON DELETE CASCADE, 
-	CONSTRAINT uq_trinetra_profiles_scope UNIQUE (id, workspace_id), 
+	name VARCHAR(120) NOT NULL,
+	pan_ciphertext TEXT NOT NULL,
+	identity_salt_ciphertext TEXT NOT NULL,
+	pan_fingerprint VARCHAR(64) NOT NULL,
+	pan_masked VARCHAR(10) NOT NULL,
+	id UUID DEFAULT gen_random_uuid() NOT NULL,
+	organization_id UUID NOT NULL,
+	workspace_id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	CONSTRAINT pk_trinetra_profiles PRIMARY KEY (id),
+	CONSTRAINT fk_trinetra_profiles_scope FOREIGN KEY(workspace_id, organization_id) REFERENCES workspaces (id, organization_id) ON DELETE CASCADE,
+	CONSTRAINT uq_trinetra_profiles_scope UNIQUE (id, workspace_id),
 	CONSTRAINT fk_trinetra_profiles_organization_id_organizations FOREIGN KEY(organization_id) REFERENCES organizations (id) ON DELETE CASCADE
 )
     """)
@@ -134,26 +135,26 @@ CREATE TABLE trinetra_profiles (
     )
     op.execute("""
 CREATE TABLE trinetra_statements (
-	profile_id UUID NOT NULL, 
-	source_work_item_id UUID NOT NULL, 
-	source_version VARCHAR(64) NOT NULL, 
-	year INTEGER NOT NULL, 
-	fingerprint VARCHAR(64) NOT NULL, 
-	parser_version VARCHAR(40) NOT NULL, 
-	rows JSONB NOT NULL, 
-	active BOOLEAN NOT NULL, 
-	revision INTEGER NOT NULL, 
-	id UUID DEFAULT gen_random_uuid() NOT NULL, 
-	organization_id UUID NOT NULL, 
-	workspace_id UUID NOT NULL, 
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
-	CONSTRAINT pk_trinetra_statements PRIMARY KEY (id), 
-	CONSTRAINT fk_trinetra_statements_scope FOREIGN KEY(workspace_id, organization_id) REFERENCES workspaces (id, organization_id) ON DELETE CASCADE, 
-	CONSTRAINT uq_trinetra_statements_scope UNIQUE (id, workspace_id), 
-	CONSTRAINT fk_trinetra_statements_profile_id_trinetra_profiles FOREIGN KEY(profile_id, workspace_id) REFERENCES trinetra_profiles (id, workspace_id) ON DELETE CASCADE, 
-	CONSTRAINT fk_trinetra_statements_source_work_item_id_work_items FOREIGN KEY(source_work_item_id, workspace_id) REFERENCES work_items (id, workspace_id) ON DELETE CASCADE, 
-	CONSTRAINT uq_trinetra_snapshot UNIQUE (profile_id, year, fingerprint), 
-	CONSTRAINT ck_trinetra_statements_ck_trinetra_statement_year CHECK (year BETWEEN 2000 AND 2100 AND revision > 0), 
+	profile_id UUID NOT NULL,
+	source_work_item_id UUID NOT NULL,
+	source_version VARCHAR(64) NOT NULL,
+	year INTEGER NOT NULL,
+	fingerprint VARCHAR(64) NOT NULL,
+	parser_version VARCHAR(40) NOT NULL,
+	rows JSONB NOT NULL,
+	active BOOLEAN NOT NULL,
+	revision INTEGER NOT NULL,
+	id UUID DEFAULT gen_random_uuid() NOT NULL,
+	organization_id UUID NOT NULL,
+	workspace_id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	CONSTRAINT pk_trinetra_statements PRIMARY KEY (id),
+	CONSTRAINT fk_trinetra_statements_scope FOREIGN KEY(workspace_id, organization_id) REFERENCES workspaces (id, organization_id) ON DELETE CASCADE,
+	CONSTRAINT uq_trinetra_statements_scope UNIQUE (id, workspace_id),
+	CONSTRAINT fk_trinetra_statements_profile_id_trinetra_profiles FOREIGN KEY(profile_id, workspace_id) REFERENCES trinetra_profiles (id, workspace_id) ON DELETE CASCADE,
+	CONSTRAINT fk_trinetra_statements_source_work_item_id_work_items FOREIGN KEY(source_work_item_id, workspace_id) REFERENCES work_items (id, workspace_id) ON DELETE CASCADE,
+	CONSTRAINT uq_trinetra_snapshot UNIQUE (profile_id, year, fingerprint),
+	CONSTRAINT ck_trinetra_statements_ck_trinetra_statement_year CHECK (year BETWEEN 2000 AND 2100 AND revision > 0),
 	CONSTRAINT fk_trinetra_statements_organization_id_organizations FOREIGN KEY(organization_id) REFERENCES organizations (id) ON DELETE CASCADE
 )
     """)
@@ -168,30 +169,30 @@ CREATE TABLE trinetra_statements (
     )
     op.execute("""
 CREATE TABLE trinetra_credits (
-	profile_id UUID NOT NULL, 
-	work_item_id UUID NOT NULL, 
-	year INTEGER NOT NULL, 
-	counterparty VARCHAR(120) NOT NULL, 
-	deductor_key VARCHAR(64) NOT NULL, 
-	expected_micros BIGINT NOT NULL, 
-	reference VARCHAR(100) NOT NULL, 
-	source_version VARCHAR(64) NOT NULL, 
-	revision INTEGER NOT NULL, 
-	state VARCHAR(30) NOT NULL, 
-	review JSONB NOT NULL, 
-	id UUID DEFAULT gen_random_uuid() NOT NULL, 
-	organization_id UUID NOT NULL, 
-	workspace_id UUID NOT NULL, 
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
-	CONSTRAINT pk_trinetra_credits PRIMARY KEY (id), 
-	CONSTRAINT fk_trinetra_credits_scope FOREIGN KEY(workspace_id, organization_id) REFERENCES workspaces (id, organization_id) ON DELETE CASCADE, 
-	CONSTRAINT uq_trinetra_credits_scope UNIQUE (id, workspace_id), 
-	CONSTRAINT fk_trinetra_credits_profile_id_trinetra_profiles FOREIGN KEY(profile_id, workspace_id) REFERENCES trinetra_profiles (id, workspace_id) ON DELETE CASCADE, 
-	CONSTRAINT fk_trinetra_credits_work_item_id_work_items FOREIGN KEY(work_item_id, workspace_id) REFERENCES work_items (id, workspace_id) ON DELETE CASCADE, 
-	CONSTRAINT uq_trinetra_credit_source UNIQUE (profile_id, work_item_id, year), 
-	CONSTRAINT ck_trinetra_credits_ck_trinetra_credit_amount CHECK (expected_micros >= 0 AND expected_micros <= 9000000000000000 AND revision > 0), 
-	CONSTRAINT ck_trinetra_credits_ck_trinetra_credit_year CHECK (year BETWEEN 2000 AND 2100), 
-	CONSTRAINT ck_trinetra_credits_ck_trinetra_credit_state CHECK (state IN ('OPEN','DISPUTED','EXPLAINED','WITHDRAWN','CA_REVIEWED')), 
+	profile_id UUID NOT NULL,
+	work_item_id UUID NOT NULL,
+	year INTEGER NOT NULL,
+	counterparty VARCHAR(120) NOT NULL,
+	deductor_key VARCHAR(64) NOT NULL,
+	expected_micros BIGINT NOT NULL,
+	reference VARCHAR(100) NOT NULL,
+	source_version VARCHAR(64) NOT NULL,
+	revision INTEGER NOT NULL,
+	state VARCHAR(30) NOT NULL,
+	review JSONB NOT NULL,
+	id UUID DEFAULT gen_random_uuid() NOT NULL,
+	organization_id UUID NOT NULL,
+	workspace_id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	CONSTRAINT pk_trinetra_credits PRIMARY KEY (id),
+	CONSTRAINT fk_trinetra_credits_scope FOREIGN KEY(workspace_id, organization_id) REFERENCES workspaces (id, organization_id) ON DELETE CASCADE,
+	CONSTRAINT uq_trinetra_credits_scope UNIQUE (id, workspace_id),
+	CONSTRAINT fk_trinetra_credits_profile_id_trinetra_profiles FOREIGN KEY(profile_id, workspace_id) REFERENCES trinetra_profiles (id, workspace_id) ON DELETE CASCADE,
+	CONSTRAINT fk_trinetra_credits_work_item_id_work_items FOREIGN KEY(work_item_id, workspace_id) REFERENCES work_items (id, workspace_id) ON DELETE CASCADE,
+	CONSTRAINT uq_trinetra_credit_source UNIQUE (profile_id, work_item_id, year),
+	CONSTRAINT ck_trinetra_credits_ck_trinetra_credit_amount CHECK (expected_micros >= 0 AND expected_micros <= 9000000000000000 AND revision > 0),
+	CONSTRAINT ck_trinetra_credits_ck_trinetra_credit_year CHECK (year BETWEEN 2000 AND 2100),
+	CONSTRAINT ck_trinetra_credits_ck_trinetra_credit_state CHECK (state IN ('OPEN','DISPUTED','EXPLAINED','WITHDRAWN','CA_REVIEWED')),
 	CONSTRAINT fk_trinetra_credits_organization_id_organizations FOREIGN KEY(organization_id) REFERENCES organizations (id) ON DELETE CASCADE
 )
     """)
@@ -203,22 +204,22 @@ CREATE TABLE trinetra_credits (
     )
     op.execute("""
 CREATE TABLE trinetra_decisions (
-	credit_id UUID NOT NULL, 
-	actor_id UUID, 
-	revision INTEGER NOT NULL, 
-	action VARCHAR(30) NOT NULL, 
-	reason TEXT NOT NULL, 
-	allocations JSONB NOT NULL, 
-	id UUID DEFAULT gen_random_uuid() NOT NULL, 
-	organization_id UUID NOT NULL, 
-	workspace_id UUID NOT NULL, 
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
-	CONSTRAINT pk_trinetra_decisions PRIMARY KEY (id), 
-	CONSTRAINT fk_trinetra_decisions_scope FOREIGN KEY(workspace_id, organization_id) REFERENCES workspaces (id, organization_id) ON DELETE CASCADE, 
-	CONSTRAINT uq_trinetra_decisions_scope UNIQUE (id, workspace_id), 
-	CONSTRAINT fk_trinetra_decisions_credit_id_trinetra_credits FOREIGN KEY(credit_id, workspace_id) REFERENCES trinetra_credits (id, workspace_id) ON DELETE CASCADE, 
-	CONSTRAINT uq_trinetra_decision_revision UNIQUE (credit_id, revision), 
-	CONSTRAINT fk_trinetra_decisions_actor_id_users FOREIGN KEY(actor_id) REFERENCES users (id) ON DELETE SET NULL, 
+	credit_id UUID NOT NULL,
+	actor_id UUID,
+	revision INTEGER NOT NULL,
+	action VARCHAR(30) NOT NULL,
+	reason TEXT NOT NULL,
+	allocations JSONB NOT NULL,
+	id UUID DEFAULT gen_random_uuid() NOT NULL,
+	organization_id UUID NOT NULL,
+	workspace_id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	CONSTRAINT pk_trinetra_decisions PRIMARY KEY (id),
+	CONSTRAINT fk_trinetra_decisions_scope FOREIGN KEY(workspace_id, organization_id) REFERENCES workspaces (id, organization_id) ON DELETE CASCADE,
+	CONSTRAINT uq_trinetra_decisions_scope UNIQUE (id, workspace_id),
+	CONSTRAINT fk_trinetra_decisions_credit_id_trinetra_credits FOREIGN KEY(credit_id, workspace_id) REFERENCES trinetra_credits (id, workspace_id) ON DELETE CASCADE,
+	CONSTRAINT uq_trinetra_decision_revision UNIQUE (credit_id, revision),
+	CONSTRAINT fk_trinetra_decisions_actor_id_users FOREIGN KEY(actor_id) REFERENCES users (id) ON DELETE SET NULL,
 	CONSTRAINT fk_trinetra_decisions_organization_id_organizations FOREIGN KEY(organization_id) REFERENCES organizations (id) ON DELETE CASCADE
 )
     """)

@@ -209,7 +209,39 @@ def test_migration_down_up_with_populated_trinetra_rows(
     command.upgrade(config, "head")
     assert (
         db_session.execute(text("select version_num from alembic_version")).scalar()
-        == "tr1a1_credit_assurance"
+        == "tr1a2_review_outcomes"
     )
     assert db_session.query(TrinetraCredit).count() == 0
     assert db_session.get(Workspace, workspace_id) is not None
+
+
+def test_platform_rotation_preserves_profile_and_identity(
+    client, tenant, world, db_session, monkeypatch
+):
+    from cryptography.fernet import Fernet
+    from app.core import encryption
+    from app.core.config import settings
+    from app.services import encryption_rotation_service
+
+    old, new = Fernet.generate_key().decode(), Fernet.generate_key().decode()
+    monkeypatch.setattr(settings, "_encryption_key_list", [old], raising=False)
+    encryption.reset_encryption()
+    try:
+        _, body, _ = setup_case(client, tenant, world)
+        p = db_session.get(TrinetraProfile, uuid.UUID(body["profile_id"]))
+        original = p.pan_fingerprint
+        salt = encryption.decrypt_secret(p.identity_salt_ciphertext)
+        monkeypatch.setattr(settings, "_encryption_key_list", [new, old])
+        encryption.reset_encryption()
+        reports = encryption_rotation_service.reencrypt_all_smtp_passwords(
+            db_session, dry_run=False
+        )
+        assert not any(r.failed for r in reports)
+        db_session.expire_all()
+        monkeypatch.setattr(settings, "_encryption_key_list", [new])
+        encryption.reset_encryption()
+        assert encryption.decrypt_secret(p.pan_ciphertext) == "ABCDE1234F"
+        assert encryption.decrypt_secret(p.identity_salt_ciphertext) == salt
+        assert p.pan_fingerprint == original
+    finally:
+        encryption.reset_encryption()

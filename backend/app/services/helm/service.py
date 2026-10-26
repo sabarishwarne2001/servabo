@@ -1036,7 +1036,8 @@ def ledger_view(db: Session, who: Viewer, book: HelmBook, *, kind: Optional[str]
                HelmPromise.status.in_((v.STATUS_OPEN, v.STATUS_PARTIAL, v.STATUS_BROKEN)))
         .group_by(HelmPromise.direction, HelmPromise.currency)).all():
         owed.setdefault(direction_key, {})[currency or "?"] = int(amount or 0)
-    return {"total": total, "promises": [promise_json(who, p, names) for p in rows], "counts": counts,
+    from app.services.trinetra.helm_adapter import annotate
+    return {"total": total, "promises": annotate(db, who, [promise_json(who, p, names) for p in rows]), "counts": counts,
             "open_totals": owed}
 
 

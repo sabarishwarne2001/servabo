@@ -109,6 +109,7 @@ class DecisionIn(Strict):
     ]
     reason: str = Field(min_length=10, max_length=1000)
     allocations: list[AllocationIn] = Field(default_factory=list, max_length=100)
+    review_minutes: int = Field(default=0, ge=0, le=480, strict=True)
 
 
 class ReconfirmIn(Strict):
@@ -133,6 +134,7 @@ class ReviewIn(Strict):
     root_cause: str = Field(default="", max_length=300)
     reason: str = Field(min_length=10, max_length=1000)
     evidence: list[EvidenceIn] = Field(default_factory=list, max_length=20)
+    confirm_receivable: bool = False
 
 
 def workspace(db, context, wid, *, live=True):
@@ -162,7 +164,7 @@ def workspace(db, context, wid, *, live=True):
             raise HTTPException(409, "Synthetic examples are read-only.")
         if not settings.TRINETRA_LIVE_ENABLED:
             raise HTTPException(
-                503,
+                409,
                 {
                     "code": "TRINETRA_SOURCE_REVIEW_REQUIRED",
                     "message": "Live access awaits official-source and tax-adviser validation. Explore the synthetic examples.",
@@ -327,9 +329,7 @@ def create_credit(
     p = s.profile(db, w, body.profile_id)
     source, fact = s.receivable(db, w, p, body.work_item_id)
     s.invoice_period(fact, body.year)
-    from app.models.organization import Organization
-
-    db.query(Organization).filter_by(id=w.organization_id).with_for_update().one()
+    s.lock_capacity(db, w)
     old = (
         db.query(Credit)
         .filter_by(profile_id=p.id, work_item_id=body.work_item_id, year=body.year)
@@ -447,6 +447,7 @@ def decision(
         body.action,
         body.reason,
         body.allocations,
+        body.review_minutes,
     )
     announce_review(db, w, r)
     db.commit()
@@ -521,7 +522,18 @@ def update_review(
         "due_on": body.due_on.isoformat() if body.due_on else None,
         "root_cause": body.root_cause,
         "evidence": evidence,
+        "withholding_confirmed": body.confirm_receivable,
+        "invoice_version": row.source_version,
     }
+    row.evidence_work_item_ids = [e["work_item_id"] for e in evidence]
+    if body.confirm_receivable:
+        from app.services.trinetra.projection import reviewed_withholding
+
+        if reviewed_withholding(row, s.view(db, w, row)) is None:
+            raise HTTPException(
+                422,
+                "Confirm withholding only with current, agreeing customer advice and accounting evidence, within the supported expectation.",
+            )
     if row.state == "CA_REVIEWED":
         row.state = "OPEN"
     row.revision += 1
@@ -533,6 +545,7 @@ def update_review(
             actor_id=context.user_id,
             revision=row.revision,
             action="REVIEW_UPDATED",
+            evidence_work_item_ids=s.decision_sources(db, row, p),
             reason=body.reason + "\n" + json.dumps(row.review, sort_keys=True),
             allocations=prior,
         )
@@ -588,7 +601,7 @@ def detail(
         for x in s.postings(snapshot, w, p)
         if x.deductor == row.deductor_key
     ]
-    from app.services.trinetra.projection import receivable
+    from app.services.trinetra.projection import receivable, reviewed_withholding
 
     value = s.view(db, w, row)
     bank = s.bank_evidence(db, w, row, context)
@@ -597,17 +610,14 @@ def detail(
         if bank and all(line["amount_micros"] >= 0 for line in bank)
         else None
     )
-    withholding = (
-        value["advice_micros"]
-        if row.state == "CA_REVIEWED"
-        and value["source_current"]
-        and value["status"] == "POSTED"
-        else None
-    )
-    if value["booked_micros"] is not None and value["booked_micros"] != withholding:
-        withholding = None
+    withholding = reviewed_withholding(row, value)
+    from app.services.trinetra.fields import printed
+
     return {
         **value,
+        "printed_evidence": printed(
+            s.document(db, w, row.work_item_id).extracted_entities
+        ),
         "cash_projection": receivable(value["gross_micros"], cash, withholding),
         "bank_evidence": bank,
         "statement_lines": lines,
@@ -621,6 +631,7 @@ def detail(
                 "reason": x.reason,
                 "at": x.created_at.isoformat(),
                 "actor_id": str(x.actor_id) if x.actor_id else None,
+                "review_minutes": x.review_minutes,
             }
             for x in db.query(Decision)
             .filter_by(credit_id=row.id, workspace_id=w.id)
