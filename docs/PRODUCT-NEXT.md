@@ -66,6 +66,8 @@ hold queue and tests. **Run:** the message fees above. **Do it after** customers
 
 ### 2.3 An annual price and a rupee price for the GST Credit add-on
 
+**Done in Final session 2A (2026-10-26, N-187):** $49 or $490 a year, ₹1,499 or ₹14,990 a year, each its own Dodo product; every plan has rupee prices too. What follows is the original note.
+
 **Status (2026-10-23):** decided (N-187: ₹1,499 a month or ₹14,990 a year; $490 a year beside $49 a month) and scheduled
 in Final session 2A (`docs/sessions/FINAL-2-UPGRADE.md`), together with rupee prices for every plan.
 

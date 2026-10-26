@@ -3695,3 +3695,32 @@ check failed against the sample's displayed 31 March 2026 evidence date. Creatio
 timestamps now agree with each age at that fixed date; money and period labels
 are unchanged. Domain and API tests passed: 31 tests in 23.91 s. The sample help
 explicitly explains that this illustrative age does not advance with today's clock.
+
+## Final session 2A — sellable in India, safe to run, provable (2026-10-26)
+
+Branch `claude/new-session-gbo9ee`, PR #43. Decisions N-191 onwards; the prompt is `docs/sessions/FINAL-2-UPGRADE.md`.
+
+## F-626 — The margin test never checked the yearly prices (P2)
+
+`test_plan_unit_economics.py` checked each plan's dollar **monthly** price only. Business at $2,990 a year ($249 a month)
+kept 54.6% after Dodo's fees at the old allowances, under the 55% rule, and nothing failed. The test now checks every
+published price in every currency (N-187), the rupee ones at ₹90 to the dollar with Dodo's India fee; the old allowances
+failed 17 cases, the resized ones pass all of them (COSTS.md §5). Fixed by resizing allowances, not prices.
+
+## F-627 — A seat or plan change moved a rupee or yearly subscriber onto dollar monthly billing (P1)
+
+`seat_service._write_seats_at_gateway` and `plan_change_service` always sent Dodo the plan's dollar monthly product
+(`quota_tiers.gateway_price_id`). Dodo's change-plan takes the product as the new billing, so a yearly subscriber (C11,
+already sold) who added a seat, or any rupee subscriber, would have been switched to dollar monthly billing. Proven by
+`tests/services/test_dodo_india.py` (the seat write sent `pdt_business` for a rupee subscriber), fixed by sending the
+product Dodo bills now, and for a plan change the target plan's product in the same currency and interval.
+
+## F-628 — A seat increase whose charge failed was applied unpaid; a rupee subscriber was quoted the dollar seat price (P1)
+
+The seat write sent no `on_payment_failure`, so Dodo's default applied the extra seats even when their immediate charge
+failed (above an Indian card or UPI mandate, or declined), leaving the subscription for dunning to chase. And the seat
+price shown before buying came from the dollar usage price book, not from the product Dodo charges. Both proven by tests
+that failed first (`test_a_seat_increase_whose_charge_fails_is_refused_not_applied_unpaid`,
+`test_a_rupee_subscriber_is_quoted_the_rupee_seat_price`); the write now sends `prevent_change`, a refused charge answers
+`MANDATE_APPROVAL_NEEDED` in words with "Approve the new amount", and the quote reads the billed product. Dodo's exact
+refusal wording is **unverified** (Final session 2B, DODO-LOCAL-TEST journey I).

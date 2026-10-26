@@ -2364,7 +2364,7 @@ HSN or SAC code and a tax code looked up in the workspace's `taxes` table (`GST1
 **Zoho's pages could not be opened from the build sandbox**: data-centre hosts, scope names, the token and revoke paths and the bill's GST fields are from
 the documentation as it was known and a search summary on 2026-10-22. Final session 2 runs the connection against a real Zoho Books India trial.
 
-## N-174 — Tally Prime, guided (DECIDED (Final 1)); OPEN: should it come to Developer?
+## N-174 — Tally Prime, guided (DECIDED (Final 1)); CLOSED by N-187: the Tally file is on Starter (Final 2A)
 
 A guided form (company and five ledger names) makes a download target in Tally's format with the shipped mapping: one balanced Purchase voucher per bill, CGST
 and SGST to their own Input ledgers for a supplier in the buyer's state, IGST to one ledger for another state. It is the ERP posting capability, so it is on
@@ -2576,3 +2576,31 @@ hold, so a thin layer named **Recoveries** (Found → Being fixed → Verified) 
 GST credit at risk, duplicates and prices above the order, plus Helm's existing outcomes. Left out: supplier statement differences (not
 stored today; Helm work first) and changed bank accounts (not countable money; a person's call). TRINETRA's cases join through one adapter in
 Final session 2T, as "TDS not yet in the statement", never as cash.
+
+## N-192 — How rupees, the mandate and the tax ID work at checkout (DECIDED (Final 2A))
+
+N-187 rules 7 and 8, built:
+- **Which currency first.** Servabo keeps no billing address (Dodo does), so "billing country India" is read from what it
+  holds: a GSTIN as the billing account's tax ID, or a past checkout in rupees. Without either, an organization whose oldest
+  workspace is in `Asia/Kolkata` sees rupees; an organization already paying in dollars keeps dollars. Anyone can switch on
+  the billing page; the website shows rupees by default with a dollar switch (no geolocation). No migration was needed.
+- **The ₹15,000 mandate floor is not raised at checkout** (`mandate_min_amount_inr_paise` is not sent). A larger mandate asks a
+  customer to authorize more than they buy, which reads as alarming at checkout, and a payment above ₹15,000 still needs the
+  customer's approval each time under India's e-mandate rules. Instead the billing page says so before a monthly rupee total
+  above ₹15,000 with GST and offers yearly; the seat panel warns before a seat change above it; and a seat increase whose
+  charge Dodo refuses is answered "approve the new amount" with the payment method link (never applied unpaid, F-628).
+- **A rupee checkout requires a tax ID** (`require_tax_id`), pre-filled with the organization's GSTIN when known (the billing
+  account's tax ID, else its latest GSTR-2B). Servabo sells to GST-registered businesses; a buyer without a GSTIN can still edit
+  the field. Dodo applies `billing_currency` only with Adaptive Currency on; the rupee products are priced in INR themselves.
+- **Unverified until Final session 2B:** the field names (from Dodo's API reference through search extracts), Dodo's wording
+  when a charge is refused above the mandate, and whether UPI mandates follow the same floor (Dodo's pages disagree).
+
+## N-193 — The buyer's GSTIN on Dodo's invoice (OPEN until Final session 2B)
+
+A business buying in rupees needs a tax invoice with its GSTIN, so it can claim the 18% GST as input credit. Dodo's B2B
+documentation says the buyer's tax ID and business name are printed on the invoice; whether it **splits CGST, SGST and IGST**
+is not documented (docs.dodopayments.com: features/invoice-generation, features/b2b-payments; search extracts, 2026-10-26).
+Final session 2B buys once in rupees with a GSTIN (DODO-LOCAL-TEST journey I) and records what the PDF shows. If it is not a
+valid GST tax invoice, the options are, in order of effort: (1) ask Dodo whether a GST-compliant invoice can be enabled;
+(2) Servabo issues its own GST invoice for rupee sales (needs Servabo's own GST registration and numbering); (3) an Indian
+gateway for rupee sales. Nothing is built for any of them now.
