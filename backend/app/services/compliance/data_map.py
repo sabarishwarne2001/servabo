@@ -477,6 +477,7 @@ REGISTRY: dict[str, TableRule] = {
 
     # ----------------------------------------------------------------- Servabo's own operation
     "operator_alerts": _platform(), "server_error_minutes": _platform(), "dr_drills": _platform(), "dr_heartbeats": _platform(),
+    "safety_job_runs": _platform("Final session 2A: what the host's cron jobs last reported; no tenant data."),
     "slo_definitions": _platform(), "slo_measurements": _platform(), "slo_observations": _platform(),
     "price_books": _platform(), "price_book_entries": _platform(), "plan_price_books": _platform(), "plan_price_book_entries": _platform(),
     "quota_tiers": _platform(), "quota_tier_entries": _platform(), "platform_licences": _platform(), "promo_codes": _platform(),
