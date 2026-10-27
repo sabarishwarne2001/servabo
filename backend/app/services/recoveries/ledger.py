@@ -80,14 +80,17 @@ class Row:
 
 
 def rows(db: Session, workspace_ids: Iterable[uuid.UUID], *, first: Optional[date] = None,
-         last: Optional[date] = None) -> list[Row]:
-    """Every outcome of Recoveries' categories in these workspaces, each counted once (see the module's rules)."""
+         last: Optional[date] = None, all_helm: bool = False) -> list[Row]:
+    """Every outcome of Recoveries' categories in these workspaces, each counted once (see the module's rules).
+    `all_helm`: also Helm's outcomes that are not issues (a discount captured), for the value receipt's one
+    "Recovered, verified" figure."""
     ids = list(workspace_ids)
     if not ids:
         return []
     helm_q = (select(HelmValueEvent).join(HelmBook, HelmBook.id == HelmValueEvent.book_id)
-              .where(HelmValueEvent.workspace_id.in_(ids), HelmValueEvent.category.in_(v.CATEGORIES),
-                     HelmBook.kind != helm_v.BOOK_SAMPLE))
+              .where(HelmValueEvent.workspace_id.in_(ids), HelmBook.kind != helm_v.BOOK_SAMPLE))
+    if not all_helm:
+        helm_q = helm_q.where(HelmValueEvent.category.in_(v.CATEGORIES))
     own_q = select(RecoveryOutcome).where(RecoveryOutcome.workspace_id.in_(ids), RecoveryOutcome.withdrawn_at.is_(None))
     if first:
         helm_q = helm_q.where(HelmValueEvent.occurred_on >= first)

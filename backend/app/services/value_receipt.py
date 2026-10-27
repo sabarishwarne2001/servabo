@@ -353,6 +353,35 @@ def _overcharges(db: Session, ids: list[uuid.UUID], start: datetime, end: dateti
     return out
 
 
+def _recovered(db: Session, workspaces: list[Workspace], start: datetime, end: datetime, zone: ZoneInfo,
+               page) -> list[dict[str, Any]]:
+    """Recoveries (N-191): every outcome evidence proved in the period, Helm's and Recoveries' together and each counted
+    once (`recoveries.ledger`). It replaces "Value Helm held" for an organization that has Recoveries, so one rupee is
+    never shown on two lines; it is never added to what was found."""
+    from app.services.recoveries import ledger
+
+    first = start.astimezone(zone).date()
+    last = (end - timedelta(microseconds=1)).astimezone(zone).date()
+    counted = ledger.rows(db, [w.id for w in workspaces], first=first, last=last, all_helm=True)
+    by_currency: dict[str, list[int]] = {}
+    lead: dict[str, tuple[int, Optional[uuid.UUID]]] = {}
+    for row in counted:
+        entry = by_currency.setdefault(row.currency, [0, 0])
+        entry[0] += 1
+        entry[1] += row.amount_micros
+        if row.amount_micros > lead.get(row.currency, (-1, None))[0]:
+            lead[row.currency] = (row.amount_micros, row.workspace_id)
+    out = []
+    for currency in sorted(by_currency):
+        count, total = by_currency[currency]
+        found = _finding(f"recovered_verified_{currency}", f"Recovered, verified ({_plural(count, 'outcome')} with evidence)",
+                         source=page(lead[currency][1], "recoveries"), count=count, amount_micros=total, currency=currency,
+                         honesty=helm_v.HONESTY_CONFIRMED)
+        if found:
+            out.append(found)
+    return out
+
+
 def _helm_value(db: Session, organization_id: uuid.UUID, sample_ids: list[uuid.UUID], start: datetime, end: datetime,
                 zone: ZoneInfo, path: str) -> list[dict[str, Any]]:
     first = start.astimezone(zone).date()
@@ -395,6 +424,8 @@ def _phrase(finding: dict[str, Any]) -> str:
         return f"flagged {_plural(count, 'supplier bank-account change')} before payment"
     if key.startswith("overcharges_"):
         return f"found {amount} of overcharges against purchase orders"
+    if key.startswith("recovered_verified_"):
+        return f"recovered {amount}, verified with evidence"
     return f"held {amount} with evidence"
 
 
@@ -495,7 +526,9 @@ def receipt(db: Session, organization_id: uuid.UUID, period: str, *, now: Option
             found += _bank_changes(db, ids, start, end, page)
         if has(entitlements.RECONCILIATION_CAPABILITY):
             found += _overcharges(db, ids, start, end, page)
-        if helm_gate.helm_held(db, organization_id):
+        if has(entitlements.RECOVERIES_CAPABILITY):
+            found += _recovered(db, workspaces, start, end, zone, page)
+        elif helm_gate.helm_held(db, organization_id):
             found += _helm_value(db, organization_id, sample_ids, start, end, zone, helm_path)
 
     return {

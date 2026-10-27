@@ -200,7 +200,8 @@ def test_the_figures_come_in_the_stated_order(db_session, world):
         "gst_waiting", "gst_at_risk_180", "gst_claimable",
         "time_machine_confirmed_INR", "time_machine_likely_INR", "time_machine_potential_INR",
         "duplicate_payments_INR", "duplicate_payments_unpriced", "bank_account_changes",
-        "overcharges_INR", "helm_value_held_INR",
+        # N-191 (Final session 2A): on a plan with Recoveries, Helm's value ledger is counted in "Recovered, verified".
+        "overcharges_INR", "recovered_verified_INR",
     ]
     f = found(body)
     assert (f["gst_waiting"]["amount_micros"], f["gst_waiting"]["count"], f["gst_waiting"]["suppliers"]) == (
@@ -215,7 +216,7 @@ def test_the_figures_come_in_the_stated_order(db_session, world):
     assert f["duplicate_payments_unpriced"]["count"] == 1 and f["duplicate_payments_unpriced"]["amount_micros"] is None
     assert f["bank_account_changes"]["count"] == 2
     assert (f["overcharges_INR"]["amount_micros"], f["overcharges_INR"]["count"]) == (1_500 * M, 2)
-    assert (f["helm_value_held_INR"]["amount_micros"], f["helm_value_held_INR"]["honesty"]) == (4_000 * M, "confirmed")
+    assert (f["recovered_verified_INR"]["amount_micros"], f["recovered_verified_INR"]["honesty"]) == (4_000 * M, "confirmed")
     assert body["headline"] == "In your trial Servabo read 5 documents and found ₹720 of GST credit waiting on 1 supplier."
     assert body["also_on_business"] == []
 
@@ -227,7 +228,7 @@ def test_every_money_figure_links_to_the_page_that_holds_its_evidence(db_session
     assert f["time_machine_likely_INR"]["source"] == f"/{org}/helm/time-machine"
     assert f["duplicate_payments_INR"]["source"] == f"/{org}/{ws}/radar" == f["bank_account_changes"]["source"]
     assert f["overcharges_INR"]["source"] == f"/{org}/{ws}/procurement"
-    assert f["helm_value_held_INR"]["source"] == f"/{org}/helm"
+    assert f["recovered_verified_INR"]["source"] == f"/{org}/{ws}/recoveries"   # N-191
     assert all(item["source"].startswith("/") for item in vr.receipt(db_session, world.organization.id, "trial",
                                                                       now=NOW)["found"])
 
@@ -264,8 +265,9 @@ def test_rupees_and_dollars_are_two_findings_and_never_added(db_session, world):
               finished=NOW - DAY / 4)
     db_session.commit()
     f = found(vr.receipt(db_session, world.organization.id, "trial", now=NOW))
-    assert f["helm_value_held_INR"]["amount_micros"] == 4_000 * M
-    assert f["helm_value_held_USD"]["amount_micros"] == 300 * M and f["helm_value_held_USD"]["amount_text"] == "$300"
+    # N-191: Helm's value ledger is part of "Recovered, verified" on a plan with Recoveries; still one finding per currency.
+    assert f["recovered_verified_INR"]["amount_micros"] == 4_000 * M
+    assert f["recovered_verified_USD"]["amount_micros"] == 300 * M and f["recovered_verified_USD"]["amount_text"] == "$300"
     assert f["time_machine_confirmed_INR"]["amount_micros"] == 10 * M
     assert f["time_machine_confirmed_USD"]["amount_micros"] == 25 * M
 

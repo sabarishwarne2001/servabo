@@ -152,4 +152,8 @@ def evaluate(
     money = None
     if organization_role in HELM_ROLES:  # the roles that may read the value receipt (owner, admin, billing)
         money = first_money(db, organization.id)
+        if money is not None:
+            # Recoveries (N-191): the money step links to where found money is followed until it is recovered.
+            money = {**money, "follow_up": "recoveries" if capability_gate.has_capability(
+                db, organization_id=organization.id, capability_key=entitlements.RECOVERIES_CAPABILITY) else None}
     return {"steps": steps, "done": sum(1 for s in steps if s["done"]), "total": len(steps), "money": money}

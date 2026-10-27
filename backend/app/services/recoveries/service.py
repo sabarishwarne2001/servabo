@@ -304,9 +304,33 @@ def reopen(db: Session, issue: RecoveryIssue, *, actor_id: uuid.UUID, version: O
     return issue
 
 
+def needs_owner(db: Session, organization_id: uuid.UUID) -> Optional[dict[str, Any]]:
+    """For the GST digest (N-191): the open issues nobody owns across the organization's own workspaces, in rupees.
+    {"count", "amount_micros", "workspace_slug"} (the workspace with the most), or None when there are none or the plan
+    does not include Recoveries. Reads the issues the hourly sweep keeps; writes nothing."""
+    from sqlalchemy import func
+
+    from app.models.workspace import WorkspaceStatus
+
+    if not entitled(db, organization_id):
+        return None
+    rows = db.execute(
+        select(Workspace.slug, func.count(), func.coalesce(func.sum(RecoveryIssue.exposure_micros).filter(
+            RecoveryIssue.currency == "INR"), 0))
+        .join(Workspace, Workspace.id == RecoveryIssue.workspace_id)
+        .where(RecoveryIssue.organization_id == organization_id, RecoveryIssue.state.in_(v.OPEN_STATES),
+               RecoveryIssue.owner_user_id.is_(None), Workspace.is_sample.is_(False),
+               Workspace.status == WorkspaceStatus.ACTIVE)
+        .group_by(Workspace.slug).order_by(func.count().desc(), Workspace.slug)).all()
+    if not rows:
+        return None
+    return {"count": sum(int(n) for _, n, _ in rows), "amount_micros": sum(int(a) for _, _, a in rows),
+            "workspace_slug": rows[0][0]}
+
+
 def adapter_for(kind: str) -> Adapter:
     return BY_KIND[kind]
 
 
-__all__ = ["RecoveryError", "adapter_for", "assign", "close_not_money", "entitled", "get", "list_issues", "owners",
+__all__ = ["RecoveryError", "adapter_for", "assign", "close_not_money", "entitled", "get", "list_issues", "needs_owner", "owners",
            "preview", "reopen", "set_due_date", "summary", "sweep"]

@@ -217,6 +217,7 @@ def _resolve(case, tenant, status, reason):
 
 def _rerun(db, tenant, case, *, delta, invoiced):
     case.status = "SUPERSEDED"
+    db.flush()   # one live case per invoice: the old one is superseded first, as the matcher does
     fresh = ProcurementCase(organization_id=case.organization_id, workspace_id=case.workspace_id,
                             po_work_item_id=case.po_work_item_id, invoice_work_item_id=case.invoice_work_item_id,
                             status="MATCHED", input_digest=uuid.uuid4().hex * 2, policy_version="1", header_findings=[],
@@ -474,3 +475,77 @@ def test_starter_sees_a_preview_of_counts_and_found_and_cannot_act(client, db_se
     assert body["summary"]["counts"]["FOUND"] == 1 and body["summary"]["found"] == [{"currency": "INR", "amount_micros": 180 * M}]
     assert db_session.execute(select(RecoveryIssue)).first() is None        # a preview writes nothing
     assert client.post(url(tenant, "/check"), headers=tenant.contributor.headers).status_code in (402, 403)
+
+
+# ------------------------------------------------------------------------------------------------------------ where it shows
+
+
+def test_the_receipt_shows_recovered_verified_beside_found_counted_once(db_session, tenant):
+    from app.services import value_receipt as vr
+
+    _business(db_session, tenant)
+    tenant.workspace.timezone = "UTC"
+    book = _book(db_session, tenant.organization.id, tenant.workspace)
+    item = _gst_book(db_session, tenant, tenant.workspace, "W-1", 1000, "WAITING_FOR_SUPPLIER")
+    _gst_book(db_session, tenant, tenant.workspace, "W-2", 3000, "WAITING_FOR_SUPPLIER")
+    work_item_id = _dup_item(db_session, tenant, "D-9", total=5_000, status="CONFIRMED")
+    _promise(db_session, tenant, work_item_id, amount=5_000)
+    _sweep(db_session, tenant)
+    _waiting_to_matched(db_session, tenant, item.id)
+    _sweep(db_session, tenant)
+    # Helm also proved the same blocked duplicate: one outcome, Helm's row.
+    db_session.add(HelmValueEvent(organization_id=book.organization_id, book_id=book.id, workspace_id=tenant.workspace.id,
+                                  category=v.DUPLICATE_BLOCKED, dedupe_key=helm_value.dedupe_key(v.DUPLICATE_BLOCKED, work_item_id),
+                                  currency="INR", amount_micros=5_000 * M, occurred_on=TODAY, month=TODAY.replace(day=1)))
+    db_session.commit()
+    vr.forget(tenant.organization.id)
+    found = {f["key"]: f for f in vr.receipt(db_session, tenant.organization.id, "month")["found"]}
+    recovered = found["recovered_verified_INR"]
+    assert recovered["amount_micros"] == (5_000 + 180) * M and recovered["count"] == 2
+    assert recovered["source"].endswith(f"/{tenant.workspace.slug}/recoveries") and recovered["honesty"] == "confirmed"
+    assert found["gst_waiting"]["amount_micros"] == 540 * M              # found, its own line, never added to it
+    assert "helm_value_held_INR" not in found                           # the same rupees are not shown twice
+
+
+def test_the_monthly_summary_keeps_a_line_for_recovered_verified(db_session, tenant, monkeypatch):
+    from app.services import monthly_receipt_email as monthly
+    from app.services import value_receipt as vr
+
+    found = [{"key": k, "label": k, "amount_text": "₹1", "source": "/x"} for k in
+             ("gst_waiting", "gst_at_risk_180", "gst_claimable", "duplicate_payments_INR", "recovered_verified_INR")]
+    monkeypatch.setattr(vr, "receipt", lambda *a, **k: {"found": found, "headline": "This month Servabo found ₹1."})
+    monkeypatch.setattr(monthly, "owners_to_email", lambda db, org_id: [(uuid.uuid4(), "owner@example.com")])
+    sent = []
+    monkeypatch.setattr("app.core.platform_email.send_platform_email",
+                        lambda **kw: sent.append(kw["text_body"]) or (True, "ok"))
+    monthly.send_for(db_session, tenant.organization, period="2026-09", label="September 2026", now=datetime.now(timezone.utc))
+    assert "recovered_verified_INR" in sent[0] and "gst_waiting" in sent[0] and "duplicate_payments_INR" not in sent[0]
+
+
+def test_the_gst_digest_says_how_many_issues_need_an_owner(db_session, tenant):
+    from app.services.gst import digest
+
+    _business(db_session, tenant)
+    _gst_book(db_session, tenant, tenant.workspace, "W-1", 1000, "WAITING_FOR_SUPPLIER")
+    _gst_book(db_session, tenant, tenant.workspace, "W-2", 3000, "WAITING_FOR_SUPPLIER")
+    _sweep(db_session, tenant)
+    line = digest.needs_owner_finding(db_session, tenant.organization)
+    assert line.label == "2 money issues worth ₹720 need an owner"
+    assert line.url.endswith(f"/{tenant.organization.slug}/{tenant.workspace.slug}/recoveries")
+    for issue in service.list_issues(db_session, tenant.workspace.id):
+        service.assign(db_session, issue, owner_user_id=tenant.owner.user.id, actor_id=tenant.owner.user.id)
+    assert digest.needs_owner_finding(db_session, tenant.organization) is None
+
+
+def test_getting_started_money_step_follows_up_in_recoveries(db_session, tenant, monkeypatch):
+    from app.models.organization import OrganizationRole
+    from app.models.workspace import WorkspaceRole
+    from app.services import getting_started as gs
+
+    monkeypatch.setattr(gs, "first_money", lambda db, org_id: {"text": "Found ₹720", "amount_text": "₹720", "period": "month"})
+    view = lambda: gs.evaluate(db_session, organization=tenant.organization, workspace=tenant.workspace,  # noqa: E731
+                               workspace_role=WorkspaceRole.ADMIN, organization_role=OrganizationRole.OWNER)
+    put_on_plan(db_session, tenant.organization, "developer")
+    assert view()["money"]["follow_up"] is None
+    put_on_plan(db_session, tenant.organization, "business")
+    assert view()["money"]["follow_up"] == "recoveries"
