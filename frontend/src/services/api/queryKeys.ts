@@ -541,6 +541,13 @@ export const procurementKeys = {
     [...procurementKeys.all(workspaceId), "policies"] as const,
 };
 
+// Final session 2A (N-191): Recoveries.
+export const recoveryKeys = {
+  all: (workspaceId: string) => [...workspaceScope(workspaceId), "recoveries"] as const,
+  list: (workspaceId: string) => [...recoveryKeys.all(workspaceId), "list"] as const,
+  detail: (workspaceId: string, issueId: string) => [...recoveryKeys.all(workspaceId), "detail", issueId] as const,
+};
+
 export const gstKeys = {
   all: (workspaceId: string) => [...workspaceScope(workspaceId), "gst"] as const,
   summary: (workspaceId: string, gstin: string | null, period: string | null) =>

@@ -17,6 +17,7 @@ import {
   FileText,
   GitCompareArrows,
   ReceiptIndianRupee,
+  HandCoins,
   GitCompare,
   Handshake,
   History,
@@ -92,6 +93,7 @@ import {
   organizationTrinetraPath,
   procurementPath,
   gstPath,
+  recoveriesPath,
   trinetraPath,
   procurementPoliciesPath,
   radarPath,
@@ -355,6 +357,18 @@ export const buildWorkspaceNavigationGroups = (
         icon: ReceiptIndianRupee,
         description: "Match your purchase invoices with GSTR-2B: credit you can claim, suppliers who have not reported, and what to do in IMS",
         keywords: ["gst", "gstr-2b", "gstr2b", "input tax credit", "itc", "ims", "reconciliation", "supplier", "180 days", "india"],
+      },
+      // Final session 2A (N-191): Recoveries. No `capability` on purpose, like GST credit: the counts and what was found
+      // are a preview on every plan; the page shows the upgrade moment.
+      {
+        id: "recoveries",
+        name: "Recoveries",
+        route: "workspaceRecoveries",
+        path: recoveriesPath(orgSlug, workspaceSlug),
+        icon: HandCoins,
+        description: "Money found in your documents, followed until evidence shows it was recovered: owners, due dates, verified",
+        keywords: ["recoveries", "recovered", "resolution", "money", "credit note", "overcharge", "duplicate", "gst credit",
+          "itc", "owner", "due date", "msme", "statement", "verified"],
       },
       // ARCH47-S2:nav-erp
       {

@@ -15,6 +15,8 @@ export interface GettingStartedMoney {
   readonly text: string;
   readonly amount_text: string;
   readonly period: string;
+  /** Final session 2A (N-191): where found money is followed until it is recovered; null without Recoveries. */
+  readonly follow_up?: "recoveries" | null;
 }
 
 export interface GettingStartedView {

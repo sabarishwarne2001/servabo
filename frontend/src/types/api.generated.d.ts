@@ -3794,6 +3794,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/recoveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Money issues from found to verified, with what was recovered */
+        get: operations["list_recoveries_api_v1_workspaces__workspace_id__recoveries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/recoveries/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Re-read every engine now, supplier statements included */
+        post: operations["check_recoveries_api_v1_workspaces__workspace_id__recoveries_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/recoveries/{issue_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Recovery */
+        get: operations["get_recovery_api_v1_workspaces__workspace_id__recoveries__issue_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/recoveries/{issue_id}/owner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Recovery Owner */
+        put: operations["set_recovery_owner_api_v1_workspaces__workspace_id__recoveries__issue_id__owner_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/recoveries/{issue_id}/due-date": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Recovery Due Date */
+        put: operations["set_recovery_due_date_api_v1_workspaces__workspace_id__recoveries__issue_id__due_date_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/recoveries/{issue_id}/not-money": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Close Recovery Not Money */
+        post: operations["close_recovery_not_money_api_v1_workspaces__workspace_id__recoveries__issue_id__not_money_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/recoveries/{issue_id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reopen Recovery */
+        post: operations["reopen_recovery_api_v1_workspaces__workspace_id__recoveries__issue_id__reopen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/extraction-memory/potential": {
         parameters: {
             query?: never;
@@ -23280,6 +23399,188 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** RecoveriesOut */
+        RecoveriesOut: {
+            /** Included */
+            included: boolean;
+            summary: components["schemas"]["RecoveriesSummary"];
+            /** Items */
+            items: components["schemas"]["RecoveryIssueOut"][];
+            /** Kind Labels */
+            kind_labels: {
+                [key: string]: string;
+            };
+        };
+        /** RecoveriesSummary */
+        RecoveriesSummary: {
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Found */
+            found: components["schemas"]["RecoveryAmount"][];
+            needs_owner: components["schemas"]["RecoveryNeedsOwner"];
+            /** Recovered Verified */
+            recovered_verified: components["schemas"]["RecoveryAmount"][];
+            /** Recovered Count */
+            recovered_count: number;
+        };
+        /** RecoveryAmount */
+        RecoveryAmount: {
+            /** Currency */
+            currency: string;
+            /** Amount Micros */
+            amount_micros: number;
+        };
+        /** RecoveryCheckOut */
+        RecoveryCheckOut: {
+            /** Found */
+            found: number;
+            /** Verified */
+            verified: number;
+            /** Not Money */
+            not_money: number;
+            /** Closed */
+            closed: number;
+            /** Reopened */
+            reopened: number;
+        };
+        /** RecoveryDueDateRequest */
+        RecoveryDueDateRequest: {
+            /** Due Date */
+            due_date?: string | null;
+            /** Version */
+            version?: number | null;
+        };
+        /** RecoveryIssueOut */
+        RecoveryIssueOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "GST_CREDIT" | "DUPLICATE" | "OVERCHARGE" | "STATEMENT_DIFFERENCE" | "PAYMENT_DEADLINE";
+            /** Kind Label */
+            kind_label: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "FOUND" | "BEING_FIXED" | "VERIFIED" | "NOT_MONEY" | "CLOSED";
+            /** Title */
+            title: string;
+            /** Work Item Id */
+            work_item_id?: string | null;
+            /** Document */
+            document?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Exposure Micros */
+            exposure_micros?: number | null;
+            /** Found Exposure Micros */
+            found_exposure_micros?: number | null;
+            /** Due Date */
+            due_date?: string | null;
+            /** Due Basis */
+            due_basis?: string | null;
+            /**
+             * Due Set By Person
+             * @default false
+             */
+            due_set_by_person: boolean;
+            /** Owner User Id */
+            owner_user_id?: string | null;
+            /** Owner Email */
+            owner_email?: string | null;
+            /** Close Reason */
+            close_reason?: string | null;
+            /**
+             * First Found At
+             * Format: date-time
+             */
+            first_found_at: string;
+            /** Verified At */
+            verified_at?: string | null;
+            /** Closed At */
+            closed_at?: string | null;
+            /** Version */
+            version: number;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            };
+            /** Evidence */
+            evidence: {
+                [key: string]: unknown;
+            };
+            /** Next Actions */
+            next_actions: components["schemas"]["RecoveryNextAction"][];
+            /** Outcomes */
+            outcomes?: components["schemas"]["RecoveryOutcomeOut"][];
+        };
+        /** RecoveryNeedsOwner */
+        RecoveryNeedsOwner: {
+            /** Count */
+            count: number;
+            /** Amounts */
+            amounts: components["schemas"]["RecoveryAmount"][];
+        };
+        /** RecoveryNextAction */
+        RecoveryNextAction: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "workspace" | "helm";
+            /** Path */
+            path: string;
+        };
+        /** RecoveryNotMoneyRequest */
+        RecoveryNotMoneyRequest: {
+            /** Reason */
+            reason: string;
+            /** Version */
+            version?: number | null;
+        };
+        /** RecoveryOutcomeOut */
+        RecoveryOutcomeOut: {
+            /** Category */
+            category: string;
+            /** Currency */
+            currency: string;
+            /** Amount Micros */
+            amount_micros: number;
+            /**
+             * Occurred On
+             * Format: date
+             */
+            occurred_on: string;
+            /**
+             * Counted By
+             * @enum {string}
+             */
+            counted_by: "HELM" | "RECOVERIES";
+        };
+        /** RecoveryOwnerRequest */
+        RecoveryOwnerRequest: {
+            /** Owner User Id */
+            owner_user_id?: string | null;
+            /** Version */
+            version?: number | null;
+        };
+        /** RecoveryVersionRequest */
+        RecoveryVersionRequest: {
+            /** Version */
+            version?: number | null;
+        };
         /** RedactionJobResponse */
         RedactionJobResponse: {
             /**
@@ -36306,6 +36607,254 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaymentRiskFlagOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_recoveries_api_v1_workspaces__workspace_id__recoveries_get: {
+        parameters: {
+            query?: {
+                state?: ("FOUND" | "BEING_FIXED" | "VERIFIED" | "NOT_MONEY" | "CLOSED") | null;
+                kind?: ("GST_CREDIT" | "DUPLICATE" | "OVERCHARGE" | "STATEMENT_DIFFERENCE" | "PAYMENT_DEADLINE") | null;
+            };
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveriesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_recoveries_api_v1_workspaces__workspace_id__recoveries_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_recovery_api_v1_workspaces__workspace_id__recoveries__issue_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                issue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryIssueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_recovery_owner_api_v1_workspaces__workspace_id__recoveries__issue_id__owner_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                issue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecoveryOwnerRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryIssueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_recovery_due_date_api_v1_workspaces__workspace_id__recoveries__issue_id__due_date_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                issue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecoveryDueDateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryIssueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_recovery_not_money_api_v1_workspaces__workspace_id__recoveries__issue_id__not_money_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                issue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecoveryNotMoneyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryIssueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reopen_recovery_api_v1_workspaces__workspace_id__recoveries__issue_id__reopen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                issue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecoveryVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryIssueOut"];
                 };
             };
             /** @description Validation Error */

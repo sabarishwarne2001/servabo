@@ -12,6 +12,7 @@ export interface WorkspacePage {
 
 export const WORKSPACE_PAGES: readonly WorkspacePage[] = [
   { id: "/:orgSlug/:workspaceSlug/trinetra", sub: "trinetra", title: /Credit assurance/, plan: "any", navId: "ws:trinetra" },
+  { id: "/:orgSlug/:workspaceSlug/recoveries", sub: "recoveries", title: /Recoveries/, plan: "any", navId: "ws:recoveries" },
   { id: "/:orgSlug/:workspaceSlug", sub: "", title: /Recent Activity/, plan: "any", navId: "ws:overview" },
   { id: "/:orgSlug/:workspaceSlug/notifications", sub: "notifications", title: /Notifications/, plan: "any", navId: "ws:notifications" },
   { id: "/:orgSlug/:workspaceSlug/work-items", sub: "work-items", title: /Documents Database/, plan: "any", navId: "ws:documents" },
