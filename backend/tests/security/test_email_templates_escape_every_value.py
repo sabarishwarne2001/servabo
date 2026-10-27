@@ -109,3 +109,73 @@ def test_markup_in_any_value_is_escaped(render) -> None:
 def test_a_line_break_cannot_add_a_mail_header(render) -> None:
     subject = _call(render, HEADER_BREAK)[0]
     assert "\r" not in subject and "\n" not in subject
+
+
+# ------------------------------------------------------------------------------------------------------------------------
+# Final session 2A (Phase 3, invariant (e) of docs/hardening/PROMPT-INJECTION.md): every value taken from a document is
+# also TRUNCATED. A supplier name, an invoice number, a GSTR-2B trade name or a statement line can be any length a
+# document prints; an outbound email must not carry a page of planted text. These are the templates that carry document
+# values (Helm's supplier and customer emails, the GST supplier reminder, the GST digest); new ones are added here.
+# ------------------------------------------------------------------------------------------------------------------------
+
+#: Each template that carries values read from documents, and which of its parameters those are. The rest (the
+#: organization's own name, the brand, links Servabo builds) are a person's or the platform's.
+DOCUMENT_PARAMS = {
+    "render_dispute": {"supplier_name", "invoice_number", "lines"},
+    "render_reconciliation": {"supplier_name", "differences"},
+    "render_reminder": {"customer_name", "invoice_number"},
+    "render_document_request": {"supplier_name", "document_title"},
+    "render_briefing": {"plan_lines", "risk_lines", "value_line"},
+    "render_missing_invoices": {"supplier_name", "lines"},
+    "render_gst_digest": {"headline", "findings", "unlock_line"},
+}
+DOCUMENT_RENDERERS = set(DOCUMENT_PARAMS)
+LONG = "Planted " + "Z" * 5000
+
+
+def _call_with_document_values(func):
+    import dataclasses
+
+    signature = inspect.signature(func)
+    hints = typing.get_type_hints(func)
+    wanted = DOCUMENT_PARAMS[func.__name__]
+    kwargs = {}
+    for name, parameter in signature.parameters.items():
+        annotation = hints.get(name, parameter.annotation)
+        value = _value_for(name, annotation, LONG if name in wanted else "Acme")
+        if isinstance(value, list) and value and dataclasses.is_dataclass(value[0]) and hasattr(value[0], "url"):
+            value = [dataclasses.replace(v, url="https://app.example/gst") for v in value]  # links are Servabo's own
+        if value is None:
+            if parameter.default is not inspect.Parameter.empty:
+                continue
+            pytest.skip(f"{func.__name__}: cannot build {name} ({annotation})")
+        kwargs[name] = value
+    return func(**kwargs)
+
+
+def test_the_document_carrying_templates_are_known() -> None:
+    names = {f.__name__ for f in RENDERERS}
+    assert DOCUMENT_RENDERERS <= names, DOCUMENT_RENDERERS - names
+
+
+@pytest.mark.parametrize("render", [f for f in RENDERERS if f.__name__ in DOCUMENT_RENDERERS], ids=lambda f: f.__name__)
+def test_a_value_from_a_document_is_truncated(render) -> None:
+    subject, html_body, text_body = _call_with_document_values(render)[:3]
+    for part in (subject, html_body, text_body):
+        assert "Z" * 1000 not in part, f"{render.__name__} carries a 5,000-character value whole"
+
+
+def test_the_gst_supplier_reminder_and_the_reconciliation_bound_their_lines() -> None:
+    """The two templates above whose document values arrive in a list of dicts the generic builder cannot make."""
+    from app.templates.emails.gst import render_missing_invoices
+    from app.templates.emails.helm import render_reconciliation
+
+    reminder = render_missing_invoices(organization_name="Acme", supplier_name="Sahyadri", period_text="September 2026",
+                                       lines=[{"number": LONG, "date": LONG, "amount_micros": 1, "tax_micros": 1}])
+    reconciliation = render_reconciliation(organization_name="Acme", supplier_name="Sahyadri", statement_date="2026-09-30",
+                                           currency="INR", their_balance_micros=1, our_balance_micros=2, differences=[
+                                               {"code": "MISSING_IN_OUR_BOOKS", "their_micros": 1,
+                                                "evidence": [{"side": "theirs", "reference": LONG, "on": "2026-09-01"}]}])
+    for subject, html_body, text_body in (reminder, reconciliation):
+        for part in (subject, html_body, text_body):
+            assert "Z" * 1000 not in part

@@ -90,6 +90,16 @@ class ExpiredInvitationLine:
 # Sanitation
 # ==========================================================================
 
+#: Final session 2A (invariant (e)): the longest value from a document an outbound email carries.
+MAX_DOCUMENT_VALUE_LENGTH = 300
+
+
+def clip(value: object, max_length: int = MAX_DOCUMENT_VALUE_LENGTH) -> str:
+    """A value taken from a document (a supplier name, an invoice number, a statement line), on one line and bounded.
+    Escaping still happens where it is placed; this only stops a document from filling an email with planted text."""
+    return single_line("" if value is None else str(value), max_length=max_length)
+
+
 def single_line(value: str, *, max_length: int = MAX_SUBJECT_LENGTH) -> str:
     """
     Makes a caller-supplied string safe to place in an email header.

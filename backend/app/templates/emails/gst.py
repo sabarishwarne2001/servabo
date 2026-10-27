@@ -7,22 +7,22 @@ from typing import Sequence
 
 from app.services.helm import money
 from app.templates.emails.base import BASE_EMAIL_HTML_LAYOUT
-from app.templates.emails.common import esc, single_line
+from app.templates.emails.common import clip, esc, single_line
 
 
 def render_missing_invoices(*, organization_name: str, supplier_name: str, period_text: str,
                             lines: Sequence[dict]) -> tuple[str, str, str]:
     """`lines`: [{"number", "date", "amount_micros", "tax_micros"}] in rupees."""
+    supplier_name = clip(supplier_name)  # Final session 2A (invariant (e)): a GSTR-2B trade name is the supplier's text
     subject = single_line(f"Please report {len(lines)} invoice(s) in GSTR-1: not in our GSTR-2B")
     rows_text = []
     rows_html = []
     for line in lines:
         amount = money.say(int(line.get("amount_micros") or 0), "INR")
         tax = money.say(int(line.get("tax_micros") or 0), "INR")
-        rows_text.append(f"- {single_line(str(line.get('number') or ''))}, dated {line.get('date') or ''}: "
-                         f"{amount} (GST {tax})")
-        rows_html.append(f"<li>{esc(str(line.get('number') or ''))}, dated {esc(str(line.get('date') or ''))}: "
-                         f"{esc(amount)} (GST {esc(tax)})</li>")
+        number, dated = clip(line.get("number"), 80), clip(line.get("date"), 40)
+        rows_text.append(f"- {number}, dated {dated}: {amount} (GST {tax})")
+        rows_html.append(f"<li>{esc(number)}, dated {esc(dated)}: {esc(amount)} (GST {esc(tax)})</li>")
     text = (f"Dear {supplier_name},\n\nWe cannot find these invoices of yours in our GSTR-2B for {period_text}:\n"
             + "\n".join(rows_text) + "\n\nIf they have not been reported yet, please report them in your GSTR-1 (or "
             "IFF) so that we can claim the input tax credit. If you have already reported them, please tell us the "
