@@ -156,6 +156,7 @@ Free is a **trial of 14 days per owner account** (owner decision N-052). The acc
 | The priority 99.9% SLO (`capability.priority_slo`) | — | — | — | yes |
 | Process intelligence and the exception agent (`capability.process_intelligence`) | — | — | — | yes |
 | Procurement matching (`capability.reconciliation`) | — | — | yes | yes |
+| capability.recoveries (`capability.recoveries`) | — | — | yes | yes |
 | Document redaction (`capability.redaction`) | — | — | — | yes |
 | Clause assertions (`capability.semantic_assertions`) | — | — | — | yes |
 | Table intelligence (`capability.table_intelligence`) | — | — | yes | yes |
