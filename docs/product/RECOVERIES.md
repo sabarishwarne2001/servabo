@@ -53,8 +53,9 @@ Every person's action is in the audit log (review item, kind RECOVERY).
 
 ## When it updates
 
-Opening the page brings it up to date with the engines that are quick to read. The hourly `recoveries.sweep` job re-reads
-all of them, supplier statements included; **Check now** does the same at once.
+Opening the page brings it up to date with the engines that are quick to read. Every hour, `recoveries.sweep` queues one
+small job per workspace that re-reads all of them, supplier statements included (one job per workspace, so a customer's
+documents never wait behind the whole sweep); **Check now** does the same at once.
 
 ## Where else it shows
 

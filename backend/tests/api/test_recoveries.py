@@ -590,3 +590,33 @@ def test_two_radar_findings_on_one_invoice_are_one_issue(db_session, tenant):
     db_session.flush()
     assert _sweep(db_session, tenant)["found"] == 1
     assert len(service.list_issues(db_session, tenant.workspace.id, kind=v.DUPLICATE)) == 1
+
+
+def test_the_hourly_job_queues_one_sweep_per_workspace_and_sweeps_none_itself(db_session, tenant):
+    """CI runs 510 and 511: one hourly job sweeping every workspace in turn held the worker's queue for minutes, and the
+    browser tests waiting on other jobs timed out. It now queues one small job per entitled workspace."""
+    from app.models.job import Job, JobStatus
+    from app.workers.handlers import recoveries as job
+
+    def queued():
+        return [j for j in db_session.execute(select(Job).where(Job.job_type == "recoveries.sweep")).scalars()
+                if (j.payload or {}).get("workspace_id") == str(tenant.workspace.id)]
+
+    put_on_plan(db_session, tenant.organization, "developer")
+    db_session.flush()
+    job.fan_out(db_session)
+    assert queued() == []  # a plan without Recoveries gets none
+    _business(db_session, tenant)
+    _dup_item(db_session, tenant, "D-9", total=3_000)
+    assert job.fan_out(db_session) >= 1
+    job.fan_out(db_session)  # its sweep is still waiting: not queued twice
+    assert len(queued()) == 1
+    assert queued()[0].organization_id == tenant.organization.id
+    assert service.list_issues(db_session, tenant.workspace.id) == []  # the fan-out sweeps nothing itself
+    assert job._sweep_one(db_session, tenant.workspace.id)["found"] == 1  # each queued job sweeps its workspace
+    assert len(service.list_issues(db_session, tenant.workspace.id, kind=v.DUPLICATE)) == 1
+    done = queued()[0]
+    done.status, done.succeeded_at = JobStatus.SUCCEEDED, datetime.now(timezone.utc)
+    db_session.flush()
+    job.fan_out(db_session)  # the next hour, after it ran: queued again
+    assert len(queued()) == 2

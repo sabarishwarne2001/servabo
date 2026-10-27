@@ -3833,3 +3833,17 @@ worker one such job ran after the Rebuild click, so the test's signal that the r
 still a document short, while the rebuild itself was queued. The product was right: the mesh reaches every document.
 **Fix:** the test waits for the stamp and every document; no assertion was removed. **Proof:** spec 75 passes locally
 (11); the CI run on the fix is the check that it holds under load.
+
+## F-640 — The hourly Recoveries sweep held the worker's queue for minutes (P2)
+
+**Found:** CI run 511: three browser specs (86 ERP posting, 87 payment risk, 100 process agent) that wait up to 2 to 3
+minutes for the worker timed out together, about 45 minutes into the run, after the hour turned; run 510 lost spec 75
+the same way at the previous hour (F-639). **Cause:** `recoveries.sweep` (new in this session) swept every Business and
+Enterprise workspace in turn inside one job, supplier statements included. The browser stack has one worker for every
+job type and by then hundreds of such tenants (about 0.75 s each here, more under load), so every document's next step
+waited behind the whole sweep. A production worker would have done the same to customers' documents every hour.
+**Fix:** the hourly run queues one small job per entitled workspace (skipping one whose sweep is still waiting) and
+sweeps nothing itself; each job sweeps its own workspace, so other jobs run in between. **Proof:**
+`test_the_hourly_job_queues_one_sweep_per_workspace_and_sweeps_none_itself` (failed first: the job had no fan-out);
+the Recoveries, worker and scheduler tests pass; the cause is read from the code, the worker's single process and the
+sweep's local timing (6 s for 8 workspaces), and the CI run on the fix is the check that the browser suite holds.

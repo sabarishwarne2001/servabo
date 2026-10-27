@@ -935,10 +935,12 @@ says so, while an audit entry is younger than 400 days: the audit trail is never
 are emailed twice (Final session 2A): at once ("will be erased on <date>; restore until then") and 5 days before the erasure ("last
 chance"), by the hourly `compliance.deletion_notices` job inside the stack; nothing to install.
 
-**Recoveries (Final session 2A, N-191).** The hourly `recoveries.sweep` job inside the stack brings every Business and
-Enterprise workspace's Recoveries up to date with the engines (supplier statements included); nothing to install. A
-workspace that fails is logged (`recoveries.sweep_failed`) and the others carry on. To run it now:
-`python scripts/e2e_stand_in.py run-job --job recoveries.sweep` (development), or "Check now" on the page.
+**Recoveries (Final session 2A, N-191).** The hourly `recoveries.sweep` job inside the stack queues one small sweep per
+Business and Enterprise workspace (skipping one whose sweep is still waiting), and each brings that workspace's
+Recoveries up to date with the engines (supplier statements included); nothing to install. Each workspace is its own
+job, so one that fails is retried and shows in the dead-job alert like any other, and documents never wait behind the
+whole sweep. To run it now: `python scripts/e2e_stand_in.py run-job --job recoveries.sweep` (development), or "Check
+now" on the page.
 
 ### 9.12 GST credit notices, the Monday digest, and Zoho Books Connect (Final session 1)
 
