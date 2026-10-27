@@ -41,7 +41,7 @@ StateName = Literal["FOUND", "BEING_FIXED", "VERIFIED", "NOT_MONEY", "CLOSED"]
 KindName = Literal["GST_CREDIT", "DUPLICATE", "OVERCHARGE", "STATEMENT_DIFFERENCE", "PAYMENT_DEADLINE"]
 
 
-class NextAction(BaseModel):
+class RecoveryNextAction(BaseModel):
     key: str
     label: str
     #: "workspace": a path under the workspace (/{org}/{workspace}/<path>); "helm": under Helm (/{org}/helm/<path>).
@@ -49,7 +49,7 @@ class NextAction(BaseModel):
     path: str
 
 
-class OutcomeOut(BaseModel):
+class RecoveryOutcomeOut(BaseModel):
     category: str
     currency: str
     amount_micros: int
@@ -57,7 +57,7 @@ class OutcomeOut(BaseModel):
     counted_by: Literal["HELM", "RECOVERIES"]
 
 
-class IssueOut(BaseModel):
+class RecoveryIssueOut(BaseModel):
     id: uuid.UUID
     kind: KindName
     kind_label: str
@@ -80,25 +80,25 @@ class IssueOut(BaseModel):
     version: int
     details: dict[str, Any]
     evidence: dict[str, Any]
-    next_actions: list[NextAction]
-    outcomes: list[OutcomeOut] = Field(default_factory=list)
+    next_actions: list[RecoveryNextAction]
+    outcomes: list[RecoveryOutcomeOut] = Field(default_factory=list)
 
 
-class Amount(BaseModel):
+class RecoveryAmount(BaseModel):
     currency: str
     amount_micros: int
 
 
-class NeedsOwner(BaseModel):
+class RecoveryNeedsOwner(BaseModel):
     count: int
-    amounts: list[Amount]
+    amounts: list[RecoveryAmount]
 
 
 class RecoveriesSummary(BaseModel):
     counts: dict[str, int]
-    found: list[Amount]
-    needs_owner: NeedsOwner
-    recovered_verified: list[Amount]
+    found: list[RecoveryAmount]
+    needs_owner: RecoveryNeedsOwner
+    recovered_verified: list[RecoveryAmount]
     recovered_count: int
 
 
@@ -106,30 +106,30 @@ class RecoveriesOut(BaseModel):
     #: False on a plan without Recoveries: `summary` is then a preview (counts and found only) and `items` is empty.
     included: bool
     summary: RecoveriesSummary
-    items: list[IssueOut]
+    items: list[RecoveryIssueOut]
     kind_labels: dict[str, str]
 
 
-class OwnerRequest(BaseModel):
+class RecoveryOwnerRequest(BaseModel):
     owner_user_id: Optional[uuid.UUID] = None
     version: Optional[int] = None
 
 
-class DueDateRequest(BaseModel):
+class RecoveryDueDateRequest(BaseModel):
     due_date: Optional[date] = None
     version: Optional[int] = None
 
 
-class NotMoneyRequest(BaseModel):
+class RecoveryNotMoneyRequest(BaseModel):
     reason: str = Field(min_length=v.MIN_REASON, max_length=2000)
     version: Optional[int] = None
 
 
-class VersionRequest(BaseModel):
+class RecoveryVersionRequest(BaseModel):
     version: Optional[int] = None
 
 
-class CheckOut(BaseModel):
+class RecoveryCheckOut(BaseModel):
     found: int
     verified: int
     not_money: int
@@ -137,14 +137,14 @@ class CheckOut(BaseModel):
     reopened: int
 
 
-def _amounts(by_currency: dict[str, int]) -> list[Amount]:
-    return [Amount(currency=c, amount_micros=int(a)) for c, a in sorted(by_currency.items()) if a]
+def _amounts(by_currency: dict[str, int]) -> list[RecoveryAmount]:
+    return [RecoveryAmount(currency=c, amount_micros=int(a)) for c, a in sorted(by_currency.items()) if a]
 
 
 def _summary(raw: dict[str, Any]) -> RecoveriesSummary:
     return RecoveriesSummary(
         counts=raw["counts"], found=_amounts(raw["found"]),
-        needs_owner=NeedsOwner(count=raw["needs_owner"]["count"], amounts=_amounts(raw["needs_owner"]["amounts"])),
+        needs_owner=RecoveryNeedsOwner(count=raw["needs_owner"]["count"], amounts=_amounts(raw["needs_owner"]["amounts"])),
         recovered_verified=_amounts(raw["recovered_verified"]), recovered_count=raw["recovered_count"])
 
 
@@ -162,32 +162,32 @@ def _require(db: Session, context: TenantContext, operation: str) -> None:
                                        operation=operation)
 
 
-def _next_actions(issue: RecoveryIssue) -> list[NextAction]:
+def _next_actions(issue: RecoveryIssue) -> list[RecoveryNextAction]:
     details = issue.details or {}
     document = details.get("work_item_id")
-    out: list[NextAction] = []
+    out: list[RecoveryNextAction] = []
     if issue.kind == v.GST_CREDIT:
-        out.append(NextAction(key="gst", label="Remind the supplier on the GST page", scope="workspace", path="gst"))
+        out.append(RecoveryNextAction(key="gst", label="Remind the supplier on the GST page", scope="workspace", path="gst"))
     elif issue.kind == v.DUPLICATE:
-        out.append(NextAction(key="radar", label="Confirm or dismiss on the radar", scope="workspace", path="radar"))
-        out.append(NextAction(key="helm_plan", label="Hold the payment in Helm (a person decides)", scope="helm", path="plan"))
+        out.append(RecoveryNextAction(key="radar", label="Confirm or dismiss on the radar", scope="workspace", path="radar"))
+        out.append(RecoveryNextAction(key="helm_plan", label="Hold the payment in Helm (a person decides)", scope="helm", path="plan"))
     elif issue.kind == v.OVERCHARGE:
         if details.get("case_id"):
-            out.append(NextAction(key="case", label="Open the order match and dispute it", scope="workspace",
+            out.append(RecoveryNextAction(key="case", label="Open the order match and dispute it", scope="workspace",
                                   path=f"procurement/{details['case_id']}"))
-        out.append(NextAction(key="helm_plan", label="Hold the payment in Helm (a person decides)", scope="helm", path="plan"))
+        out.append(RecoveryNextAction(key="helm_plan", label="Hold the payment in Helm (a person decides)", scope="helm", path="plan"))
     elif issue.kind == v.STATEMENT_DIFFERENCE:
-        out.append(NextAction(key="helm_plan", label="Review Helm's drafted email to the supplier", scope="helm", path="plan"))
+        out.append(RecoveryNextAction(key="helm_plan", label="Review Helm's drafted email to the supplier", scope="helm", path="plan"))
     elif issue.kind == v.PAYMENT_DEADLINE:
-        out.append(NextAction(key="helm_plan", label="Plan the payment in Helm (a person approves)", scope="helm", path="plan"))
+        out.append(RecoveryNextAction(key="helm_plan", label="Plan the payment in Helm (a person approves)", scope="helm", path="plan"))
     if document:
-        out.append(NextAction(key="document", label="Open the document", scope="workspace", path=f"work-items/{document}"))
+        out.append(RecoveryNextAction(key="document", label="Open the document", scope="workspace", path=f"work-items/{document}"))
     return out
 
 
-def _out(db: Session, issue: RecoveryIssue, emails: dict[uuid.UUID, str], *, outcomes: bool = False) -> IssueOut:
+def _out(db: Session, issue: RecoveryIssue, emails: dict[uuid.UUID, str], *, outcomes: bool = False) -> RecoveryIssueOut:
     details = dict(issue.details or {})
-    return IssueOut(
+    return RecoveryIssueOut(
         id=issue.id, kind=issue.kind, kind_label=v.KIND_LABELS[issue.kind], state=issue.state, title=issue.title,
         work_item_id=issue.work_item_id, document=details.get("document"), currency=issue.currency,
         exposure_micros=issue.exposure_micros, found_exposure_micros=issue.found_exposure_micros,
@@ -196,7 +196,7 @@ def _out(db: Session, issue: RecoveryIssue, emails: dict[uuid.UUID, str], *, out
         close_reason=issue.close_reason, first_found_at=issue.first_found_at, verified_at=issue.verified_at,
         closed_at=issue.closed_at, version=issue.version, details=details, evidence=dict(issue.evidence or {}),
         next_actions=_next_actions(issue),
-        outcomes=[OutcomeOut(category=r.category, currency=r.currency, amount_micros=r.amount_micros,
+        outcomes=[RecoveryOutcomeOut(category=r.category, currency=r.currency, amount_micros=r.amount_micros,
                              occurred_on=r.occurred_on, counted_by=r.source)
                   for r in ledger.for_issue(db, issue)] if outcomes else [])
 
@@ -208,7 +208,7 @@ def _load(db: Session, workspace_id: uuid.UUID, issue_id: uuid.UUID) -> Recovery
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Issue not found.") from None
 
 
-def _one(db: Session, issue: RecoveryIssue) -> IssueOut:
+def _one(db: Session, issue: RecoveryIssue) -> RecoveryIssueOut:
     return _out(db, issue, service.owners(db, [issue.owner_user_id] if issue.owner_user_id else []), outcomes=True)
 
 
@@ -233,33 +233,33 @@ def list_recoveries(
                          items=[_out(db, i, emails) for i in items], kind_labels=dict(v.KIND_LABELS))
 
 
-@router.post("/workspaces/{workspace_id}/recoveries/check", response_model=CheckOut,
+@router.post("/workspaces/{workspace_id}/recoveries/check", response_model=RecoveryCheckOut,
              summary="Re-read every engine now, supplier statements included")
 def check_recoveries(
     workspace_id: uuid.UUID,
     db: Session = Depends(get_db),
     context: TenantContext = Depends(RequireContributor),
-) -> CheckOut:
+) -> RecoveryCheckOut:
     workspace = _workspace(db, context, workspace_id)
     _require(db, context, "recoveries.check")
     counts = service.sweep(db, workspace, heavy=True)
     db.commit()
-    return CheckOut(**{k: counts.get(k, 0) for k in ("found", "verified", "not_money", "closed", "reopened")})
+    return RecoveryCheckOut(**{k: counts.get(k, 0) for k in ("found", "verified", "not_money", "closed", "reopened")})
 
 
-@router.get("/workspaces/{workspace_id}/recoveries/{issue_id}", response_model=IssueOut)
+@router.get("/workspaces/{workspace_id}/recoveries/{issue_id}", response_model=RecoveryIssueOut)
 def get_recovery(
     workspace_id: uuid.UUID,
     issue_id: uuid.UUID,
     db: Session = Depends(get_db),
     context: TenantContext = Depends(RequireViewer),
-) -> IssueOut:
+) -> RecoveryIssueOut:
     _workspace(db, context, workspace_id)
     _require(db, context, "recoveries.get")
     return _one(db, _load(db, workspace_id, issue_id))
 
 
-def _act(db: Session, context: TenantContext, workspace_id: uuid.UUID, issue_id: uuid.UUID, operation: str, fn) -> IssueOut:
+def _act(db: Session, context: TenantContext, workspace_id: uuid.UUID, issue_id: uuid.UUID, operation: str, fn) -> RecoveryIssueOut:
     _workspace(db, context, workspace_id)
     _require(db, context, operation)
     issue = _load(db, workspace_id, issue_id)
@@ -273,40 +273,40 @@ def _act(db: Session, context: TenantContext, workspace_id: uuid.UUID, issue_id:
     return _one(db, issue)
 
 
-@router.put("/workspaces/{workspace_id}/recoveries/{issue_id}/owner", response_model=IssueOut)
+@router.put("/workspaces/{workspace_id}/recoveries/{issue_id}/owner", response_model=RecoveryIssueOut)
 def set_recovery_owner(
-    workspace_id: uuid.UUID, issue_id: uuid.UUID, body: OwnerRequest,
+    workspace_id: uuid.UUID, issue_id: uuid.UUID, body: RecoveryOwnerRequest,
     db: Session = Depends(get_db), context: TenantContext = Depends(RequireContributor),
-) -> IssueOut:
+) -> RecoveryIssueOut:
     return _act(db, context, workspace_id, issue_id, "recoveries.owner",
                 lambda issue: service.assign(db, issue, owner_user_id=body.owner_user_id, actor_id=context.user_id,
                                              version=body.version))
 
 
-@router.put("/workspaces/{workspace_id}/recoveries/{issue_id}/due-date", response_model=IssueOut)
+@router.put("/workspaces/{workspace_id}/recoveries/{issue_id}/due-date", response_model=RecoveryIssueOut)
 def set_recovery_due_date(
-    workspace_id: uuid.UUID, issue_id: uuid.UUID, body: DueDateRequest,
+    workspace_id: uuid.UUID, issue_id: uuid.UUID, body: RecoveryDueDateRequest,
     db: Session = Depends(get_db), context: TenantContext = Depends(RequireContributor),
-) -> IssueOut:
+) -> RecoveryIssueOut:
     return _act(db, context, workspace_id, issue_id, "recoveries.due_date",
                 lambda issue: service.set_due_date(db, issue, due_date=body.due_date, actor_id=context.user_id,
                                                    version=body.version))
 
 
-@router.post("/workspaces/{workspace_id}/recoveries/{issue_id}/not-money", response_model=IssueOut)
+@router.post("/workspaces/{workspace_id}/recoveries/{issue_id}/not-money", response_model=RecoveryIssueOut)
 def close_recovery_not_money(
-    workspace_id: uuid.UUID, issue_id: uuid.UUID, body: NotMoneyRequest,
+    workspace_id: uuid.UUID, issue_id: uuid.UUID, body: RecoveryNotMoneyRequest,
     db: Session = Depends(get_db), context: TenantContext = Depends(RequireContributor),
-) -> IssueOut:
+) -> RecoveryIssueOut:
     return _act(db, context, workspace_id, issue_id, "recoveries.not_money",
                 lambda issue: service.close_not_money(db, issue, reason=body.reason, actor_id=context.user_id,
                                                       version=body.version))
 
 
-@router.post("/workspaces/{workspace_id}/recoveries/{issue_id}/reopen", response_model=IssueOut)
+@router.post("/workspaces/{workspace_id}/recoveries/{issue_id}/reopen", response_model=RecoveryIssueOut)
 def reopen_recovery(
-    workspace_id: uuid.UUID, issue_id: uuid.UUID, body: VersionRequest,
+    workspace_id: uuid.UUID, issue_id: uuid.UUID, body: RecoveryVersionRequest,
     db: Session = Depends(get_db), context: TenantContext = Depends(RequireContributor),
-) -> IssueOut:
+) -> RecoveryIssueOut:
     return _act(db, context, workspace_id, issue_id, "recoveries.reopen",
                 lambda issue: service.reopen(db, issue, actor_id=context.user_id, version=body.version))

@@ -184,9 +184,10 @@ def test_a_dismissed_duplicate_is_not_money_with_the_reviewers_note(db_session, 
 
 
 def _over(db, tenant, delta=1_200, status="NEEDS_REVIEW"):
+    before = set(db.execute(select(ProcurementCase.id).where(ProcurementCase.workspace_id == tenant.workspace.id)).scalars())
     _overcharge(db, tenant, tenant.workspace, delta, status=status)
-    case = db.execute(select(ProcurementCase).where(ProcurementCase.workspace_id == tenant.workspace.id)
-                      .order_by(ProcurementCase.created_at.desc())).scalars().first()
+    case = db.execute(select(ProcurementCase).where(ProcurementCase.workspace_id == tenant.workspace.id,
+                                                    ProcurementCase.id.notin_(before) if before else True)).scalar_one()
     for line in case.lines:
         line.invoice_amount_micros = 10_000 * M
     db.flush()
@@ -549,3 +550,24 @@ def test_getting_started_money_step_follows_up_in_recoveries(db_session, tenant,
     assert view()["money"]["follow_up"] is None
     put_on_plan(db_session, tenant.organization, "business")
     assert view()["money"]["follow_up"] == "recoveries"
+
+
+def test_an_organization_owner_without_a_workspace_grant_can_own_an_issue(client, business, db_session):
+    """Owners and admins reach every workspace as a derived admin, with no membership row (the sample company is one
+    such workspace): they must be able to take an issue, and someone with no access must not."""
+    from app.models.workspace import WorkspaceMember
+
+    t = business
+    item = client.get(url(t), headers=t.viewer.headers).json()["items"][0]
+    granted = db_session.execute(select(WorkspaceMember).where(WorkspaceMember.workspace_id == t.workspace.id,
+                                                               WorkspaceMember.user_id == t.owner.user.id)).scalar_one_or_none()
+    if granted is not None:
+        db_session.delete(granted)
+        db_session.commit()
+    response = client.put(url(t, f"/{item['id']}/owner"), headers=t.contributor.headers,
+                          json={"owner_user_id": str(t.owner.user.id)})
+    assert response.status_code == 200, response.text
+    assert response.json()["owner_email"] == t.owner.user.email
+    nobody = client.put(url(t, f"/{item['id']}/owner"), headers=t.contributor.headers,
+                        json={"owner_user_id": str(t.non_member.user.id)})
+    assert nobody.status_code == 409

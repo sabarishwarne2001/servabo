@@ -234,16 +234,27 @@ def _check_version(issue: RecoveryIssue, version: Optional[int]) -> None:
         raise RecoveryError("Someone else changed this issue. Reload it and try again.")
 
 
+def _can_reach(db: Session, issue: RecoveryIssue, user_id: uuid.UUID) -> bool:
+    """Whether the person can open this workspace: an explicit grant, or an organization owner or admin (a derived
+    workspace admin, with no membership row; `workspace_permissions` is the single authority)."""
+    from app.core.workspace_permissions import has_workspace_access
+    from app.models.organization import MembershipStatus, OrganizationMember
+
+    org_role = db.execute(select(OrganizationMember.role).where(
+        OrganizationMember.organization_id == issue.organization_id, OrganizationMember.user_id == user_id,
+        OrganizationMember.status == MembershipStatus.ACTIVE)).scalar_one_or_none()
+    ws_role = db.execute(select(WorkspaceMember.role).where(WorkspaceMember.workspace_id == issue.workspace_id,
+                                                            WorkspaceMember.user_id == user_id)).scalar_one_or_none()
+    return has_workspace_access(org_role, ws_role)
+
+
 def assign(db: Session, issue: RecoveryIssue, *, owner_user_id: Optional[uuid.UUID], actor_id: uuid.UUID,
            version: Optional[int] = None) -> RecoveryIssue:
     _check_version(issue, version)
     if issue.state not in v.OPEN_STATES:
         raise RecoveryError("Only an open issue can be given an owner.")
-    if owner_user_id is not None:
-        member = db.execute(select(WorkspaceMember.id).where(WorkspaceMember.workspace_id == issue.workspace_id,
-                                                             WorkspaceMember.user_id == owner_user_id)).first()
-        if member is None:
-            raise RecoveryError("The owner must be a member of this workspace.")
+    if owner_user_id is not None and not _can_reach(db, issue, owner_user_id):
+        raise RecoveryError("The owner must be a member of this workspace.")
     issue.owner_user_id = owner_user_id
     issue.assigned_at = _now() if owner_user_id else None
     if issue.state == v.FOUND and owner_user_id:
