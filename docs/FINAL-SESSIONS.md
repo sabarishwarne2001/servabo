@@ -87,9 +87,14 @@ Wherever older documents say "Final session 2", they mean 2B, the live session.
   confirm each supplier's email address once ("Use this address").
 - **A way to prove accuracy:** `backend/scripts/accuracy_report.py` with the truth sheet
   `backend/scripts/accuracy_truth_template.csv`. And `docs/product/PILOT-PLAYBOOK.md` for your first paid pilot.
-- **Not built:** the "Recoveries" page (decided, deferred to after the first pilots).
-- **Decisions waiting for you:** N-193 (the GSTIN on Dodo's invoice, checked in 2B), N-197 (ERP auto-post and outside
-  uploads), N-198 (your pilot price). All in `docs/hardening/NEEDS-OWNER.md`, each with a recommendation.
+- **Recoveries** (Documents → Recoveries, Business and Enterprise): every money issue Servabo finds (GST credit waiting,
+  a duplicate, a price above the order, a supplier statement difference, a payment deadline) with an owner and a due date,
+  closed only when evidence shows the money came back, and "Recovered, verified" beside "Found" on the receipt
+  (`docs/product/RECOVERIES.md`).
+- **Decided for you, with your authority (change any of them):** N-197, ERP auto-post waits for a person when a supplier's
+  upload completed a case; N-198, the pilot is one month on Business for up to 3 seats at ₹9,999 plus GST, credited against
+  the first year.
+- **Still yours, and only checkable for real:** N-193 (whether Dodo's invoice shows your GSTIN and the tax split), in 2B.
 
 ## 3. How to run Final session 2A (the upgrade)
 

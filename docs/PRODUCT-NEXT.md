@@ -41,19 +41,19 @@ workflows, resizable sidebars, the new logo, and a sweep of every organization c
 - **Prompt injection mapped and tested** (docs/hardening/PROMPT-INJECTION.md): six fixes, six invariants walked in the code.
 - **Leftovers:** deletion warning emails, a zip on a conversation's upload tray, the GST speed test's step timings.
 - **The proof kit:** `scripts/accuracy_report.py` and `docs/product/PILOT-PLAYBOOK.md`.
-- **Not built:** the Recoveries layer (N-191 decided to build it; this session's cut line deferred it). It is item 2.0 below.
+- **Recoveries** (N-191, `docs/product/RECOVERIES.md`): money issues from Found to Being fixed to Verified, closed only on
+  evidence, counted once beside what was found. Built in 2A at the owner's request (2026-10-27), with N-197 (ERP auto-post
+  waits for a person on an outside upload) and N-198 (the pilot price) decided.
+- **The email logo** (N-199) and a person's re-plan that waits for a running plan (F-637).
 
 ## 2. A new list, for after the first paying customers
 
-### 2.0 Recoveries: Found → Being fixed → Verified (N-191, decided)
+### 2.0 Recoveries, next kinds (N-191 built the first five)
 
-What the first pilots show about today's flow (RESOLUTION-ASSESSMENT.md, last section) sets its order: GST credit at risk,
-prices above the order, duplicates, then supplier statements. One read model over the engines' tables, closure only on
-evidence, one outcome ledger with Helm's. About 6 to 8 days. No running cost. After the first two pilots, not before.
-
-### 2.0b ERP auto-post and outside uploads (N-197, open)
-
-Decide whether auto-post skips a case completed by a supplier's upload. About half a day once decided.
+Built: GST credit waiting, duplicates, prices above the order, supplier statement differences, payment deadlines. Next, in
+the order the pilots' numbers suggest: TRINETRA's "TDS not yet in the statement" (Final session 2T adds it through one
+adapter), then quantity differences against the goods receipt, then an assignee's email when an issue is given to them.
+About a day each. No running cost.
 
 
 Best first. "Earns money" says how the idea turns into revenue or protects it. Nothing here changes a price, a plan or a trial until the owner decides it.

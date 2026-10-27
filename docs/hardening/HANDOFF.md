@@ -1123,6 +1123,8 @@ Dodo, a model stand-in, an SMTP catcher). **Nothing of it has met the real servi
 | **Accuracy report** (Phase 5) | none | 30 to 50 real invoices in a fresh workspace and the filled truth sheet; `python scripts/accuracy_report.py --workspace <id> --truth truth.csv --out accuracy.md` before any correction | `tests/scripts/test_accuracy_report.py` (synthetic extractions) | A figure per field and for the key fields, the misses listed, how many wrong fields went to review; published in LIVE-VERIFICATION.md and COMMERCIAL-READINESS.md, never rounded up |
 | **Deletion warnings** (N-164) | the mail relay | Delete a throwaway workspace; `python scripts/e2e_stand_in.py run-job --job compliance.deletion_notices`, then again with `--now` 26 days later | `tests/api/test_deletion_notices.py` (fake relay, controlled clock) | Owners and admins get "… will be erased on <date>" once and "Last chance: …" once; Restore ends them; members get nothing |
 | **The real logo in every email** (N-199) | none | Any email in a real inbox (the verification email is the first) | `tests/templates/test_email_logo.py` (the header, the sent message's inline pictures); screenshots in Chromium, light and dark | The ribbon mark and "servabo" at the top, with no "load images?" prompt for it, in Gmail (web and phone), Outlook and Apple Mail; the light-lettered version in dark mode where the client supports it. In Gmail's phone app in dark mode, the logo on its small white panel (N-199) |
+| **Recoveries** (N-191; docs/product/RECOVERIES.md) | none (Business) | Documents → Recoveries, on the owner's real workspace and on the sample company | `tests/api/test_recoveries.py` (every closure rule, the double count, isolation, the Starter preview); browser spec 140 (a payment deadline on the sample company from Found to Verified, axe light and dark) | One real issue walked from Found to Verified on the owner's data (a GST invoice a later GSTR-2B carries, or a credit note against an overcharge); "Recovered, verified" on the receipt equals the issue's outcome; nothing counted for a "Not money" close |
+| **ERP auto-post and outside uploads** (N-197) | auto-post on a target | A case a supplier completes through a request link | `tests/api/test_erp_auto_post_outside_upload.py` | The case waits in the ERP console's "Ready" list for a person; closing it posts it |
 | **A zip in the global upload tray** | none | The upload button in the top bar, on a page other than Documents | Browser spec 138 | The tray shows one archive row, then every document read |
 | **The safety-job checks in `preflight.py --online`** | as above | `python scripts/preflight.py --online` against the rehearsal | `tests/scripts/test_preflight.py` | Late jobs named; none when all report |
 
@@ -1138,18 +1140,19 @@ All in `backend/`; development and test databases only, except where it says pro
 | `python scripts/e2e_stand_in.py run-job --job ops.safety_jobs` | Run the hourly safety-job check now (development) | No (it alerts the operator) |
 | `sudo [SERVABO_ROOT=PATH] backend/deploy/bin/servabo-install-host-jobs [--check] [--venv]` | Install and check the host cron jobs (production or the rehearsal) | n/a |
 | `deploy/bin/servabo-report-run NAME started\|succeeded\|failed [DETAIL]` | What each cron wrapper calls to report a run; never fails the job | n/a |
+| `python scripts/e2e_stand_in.py run-job --job recoveries.sweep` | Bring Recoveries up to date now, supplier statements included (as "Check now" on the page) | No |
 | `python -c "from tests.fixtures.corpus import MANIFEST, build; …"` | Write the red-team documents to a folder (the full line is in FINAL-2-LIVE Phase 3) | n/a |
 
 ### 3. What was not reached, in the order to do it next
 
-1. **The Resolution layer ("Recoveries", N-191)** was declined for 2A by the cut line, after Phases 1 to 5 and the records:
-   it is the first build after the pilots, with RESOLUTION-ASSESSMENT.md as its plan (PRODUCT-NEXT §2.0).
-2. **N-197:** whether ERP auto-post should skip a case that completed because of an outside upload (it posts data, never a
-   payment). The owner decides; until then it posts.
-3. **N-198:** the pilot price. PILOT-PLAYBOOK.md is ready apart from it.
-4. **The sweeps' dry runs (N-194):** some sweeps change data or send email with no dry run, so the installer only sends
-   "install check" reports for them; a real night's run is the first real success.
-5. **The full browser and backend suites** ran on the ready PR's CI, not locally (STATE says whether it was green).
+Everything the brief listed was built in this session, at the owner's request of 2026-10-27: Recoveries (N-191), N-197
+(auto-post waits for a person on an outside upload), N-198 (the pilot price), the email logo (N-199) and F-637 (a
+person's re-plan waits for a running plan). What remains needs the real world, which a cloud session cannot reach:
+
+1. **The real services** in §1 (Dodo, real models, real inboxes, a real server's cron): Final session 2B.
+2. **The sweeps' first real success (N-194, by design):** the installer sends only "install check" reports for sweeps that
+   change data or send email, so the first real success is the first night's run on the server.
+3. **The full browser and backend suites** ran on the ready PR's CI, not all locally (STATE says whether it was green).
 
 ### 4. What is unverified, in plain words
 

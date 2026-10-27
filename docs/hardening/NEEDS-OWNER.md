@@ -2568,7 +2568,7 @@ GST Credit), with nothing left behind. Phase T in Final session 2A would only ha
 Phase T moved from 2A into 2T. 2A keeps only TRINETRA's plan row and copy (prices, rupees, "Starter") and its existing paths in
 the prompt-injection map. 2A's numbers start at N-191.
 
-## N-191 — Evidence-to-Resolution: build a thin "Recoveries" layer (DECIDED (Final 2A))
+## N-191 — Evidence-to-Resolution: build a thin "Recoveries" layer (DECIDED (Final 2A); built)
 
 Phase 0B (`docs/product/RESOLUTION-ASSESSMENT.md`) traced seven money issues through today's product. Three of the first six close on a
 click or not at all, or have no owner and due date (an invoice above its order, a supplier statement difference, GST credit at risk);
@@ -2578,8 +2578,7 @@ hold, so a thin layer named **Recoveries** (Found → Being fixed → Verified) 
 GST credit at risk, duplicates and prices above the order, plus Helm's existing outcomes. Left out: supplier statement differences (not
 stored today; Helm work first) and changed bank accounts (not countable money; a person's call). TRINETRA's cases join through one adapter in
 Final session 2T, as "TDS not yet in the statement", never as cash.
-**Not built in Final session 2A** (its cut line; RESOLUTION-ASSESSMENT.md, last section, says why and what the pilots measure
-meanwhile). The decision stands for a later session.
+**Built in Final session 2A** at the owner's request of 2026-10-27 ("build it in this session"): `docs/product/RECOVERIES.md`.
 
 ## N-192 — How rupees, the mandate and the tax ID work at checkout (DECIDED (Final 2A))
 

@@ -38,9 +38,12 @@ the session scratchpad (outside the repo).
   409) failed once on CI and passed twice locally: watched, not yet explained.
 - [x] 5. The proof kit: `scripts/accuracy_report.py`, `docs/product/PILOT-PLAYBOOK.md`. The report compares a truth sheet
   (`scripts/accuracy_truth_template.csv`) with the extraction: field and document accuracy, the review catch rate, every miss,
-  no document values. Tested with an invented truth sheet; 2B runs it on the owner's invoices. Pilot price: N-198 (open).
-- [x] 6. The Resolution layer (only if 0B says build): **declined for this session** by the prompt's cut line (usage was tight after
-  Phase 5; the session hit its limit once). N-191's decision stands; RESOLUTION-ASSESSMENT.md says what the pilots measure meanwhile.
+  no document values. Tested with an invented truth sheet; 2B runs it on the owner's invoices. Pilot price: N-198 (decided).
+- [x] 6. The Resolution layer: first declined by the cut line, then **built at the owner's request (2026-10-27)**: Recoveries
+  (N-191, docs/product/RECOVERIES.md). Five kinds, closure only on evidence, one outcome ledger with Helm's keys, Business and
+  Enterprise with a preview, the receipt / monthly / digest / Getting started lines, migration `s2a4_recoveries`, the hourly
+  `recoveries.sweep` job, 27 backend tests, 3 unit tests, browser spec 140 (Found to Verified on the sample company, axe light
+  and dark). Found by the walk and fixed test-first: an organization owner could not own an issue (derived admin).
 - [x] 7. Records and the docs customers see: PRODUCT-NEXT, COSTS, RUNBOOK, CONFIGURATION, the env templates, DODO.md and
   DODO-LOCAL-TEST.md (journey I: the rupee journey, the mandate notice, the GSTIN), the website (rupees and dollars, the 14-day
   trial, `/trinetra` per user), CHANGELOG, FINDINGS (F-626 to F-636), COVERAGE, NEEDS-OWNER (N-191 to N-198), FINAL-SESSIONS.
@@ -53,7 +56,15 @@ the session scratchpad (outside the repo).
 
 - **Next action: Final session 2T** (`docs/sessions/FINAL-2T-TRINETRA.md`, TRINETRA for Business and Enterprise), after PR #43
   is merged with CI green. Then Final session 2B (`docs/sessions/FINAL-2-LIVE.md`) on the owner's PC. Next free numbers:
-  **N-200**, **F-637**, browser spec **140**.
+  **N-200**, **F-638**, browser spec **141**.
+- **The owner's request of 2026-10-27, "finish everything in this session":** done. Recoveries (above); N-197 decided and built
+  (ERP auto-post waits for a person on a case an outside upload completed); N-198 decided (the pilot: one month on Business,
+  up to 3 seats, ₹9,999 plus GST, credited against the first year); the Gmail dark-mode logo (a white panel on the light
+  logo); F-637 (spec 78's flake explained and fixed: a person's re-plan waits for a running plan). CI on run 502 was red on
+  two things of this session's own making, both fixed and proven: the storage boundary rule (the logo file) and spec 115
+  (N-195 made the reminder wait for a confirmed contact). The leftovers the owner listed (deletion warnings, a zip in the
+  upload tray, the downgrade with rows, the GST speed test) were done in Phase 4. What only the real world can prove is
+  Final session 2B's (HANDOFF "Final session 2A → Final session 2B").
 - **Owner request during the finish (2026-10-27): the real logo in every email (N-199).** Built test-first: the logo
   (mark and wordmark, light and dark) is a picture carried inside each email (`templates/emails/inline_images.py`).
   Unverified until 2B: real inboxes.

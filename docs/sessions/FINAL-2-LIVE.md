@@ -2,7 +2,7 @@
 
 > **Do not run this yet.** Final session 2A (`docs/sessions/FINAL-2-UPGRADE.md`) has rewritten this prompt for what exists
 > after it: the rupee prices and the fifteen Dodo products, the safety-job reports and alerts, the prompt-injection documents,
-> the accuracy report and the deletion warnings (the Resolution layer was not built). **Final session 2T**
+> the accuracy report, the deletion warnings and Recoveries (the Resolution layer). **Final session 2T**
 > (`docs/sessions/FINAL-2T-TRINETRA.md`) runs next: it adds TRINETRA's phase (Phase 18, its statement readers proven on the
 > owner's own Form 26AS / AIS files) and **removes this note**. The hand-overs are HANDOFF "Final session 2A → Final session 2B"
 > and "Final session 2T → Final session 2B".
@@ -64,8 +64,9 @@ Every feature has passed automated tests in the cloud. **But the cloud can only 
     person decides every Helm payment; an address read from a document is only a suggestion until a person confirms it.
   - **The proof kit:** `backend/scripts/accuracy_report.py` and its truth-sheet template; `docs/product/PILOT-PLAYBOOK.md`.
   - **Leftovers:** deletion warning emails (at once and five days before erasure), a zip in the global upload tray.
-  - **Not built:** the Resolution layer (declined for 2A by the cut line; `docs/product/RESOLUTION-ASSESSMENT.md`). There
-    is nothing of it to try here.
+  - **Recoveries** (the Resolution layer, N-191; `docs/product/RECOVERIES.md`): money issues from Found to Being fixed to
+    Verified, closed only on evidence, with "Recovered, verified" beside "Found" on the receipt. ERP auto-post waits for
+    a person on a case a supplier's upload completed (N-197); the pilot price is decided (N-198).
 - **Final session 2T:** TRINETRA for Business and Enterprise (its hand-over says what).
 
 `docs/hardening/HANDOFF.md` has the tables of exactly what was built and needs a real try. Read them in this order:
@@ -227,14 +228,13 @@ session on one missing account.**
   events and Pillow 13 (all built); the stale-alert check of the safety jobs (Phase 15; before 2A a stopped job was
   silent).
 - **Added:**
-  - **the Resolution layer: Not checked (not built**, declined by 2A's cut line; RESOLUTION-ASSESSMENT.md);
   - the accuracy figure: Not checked (no truth sheet), when the owner has not filled one;
   - UPI in journey I: Not checked (Dodo test mode has no UPI), when that is so; launch-checklist step 9;
   - **N-193 (Dodo's invoice and GST)** stays `OPEN` if Dodo's test invoice cannot be opened; launch-checklist step 11
     (the first live rupee invoice);
   - the host jobs and their alert: Not checked (no Linux host on this PC), without WSL 2; launch-checklist step 10;
-  - **ERP auto-post of a case completed by an outside upload (N-197)** is the owner's decision, not a check: record what
-    happens, do not change it.
+  - **Recoveries on real data:** Not checked (no issue occurred), when the owner's documents raise none in the session;
+    then walk one on the sample company and say so.
 
 ## 4. Phase 1: every automated suite, here
 
@@ -457,6 +457,16 @@ Record the counts (passed, failed, skipped) in LIVE-VERIFICATION.md, Phase 1.
    - the Documents | Helm switch;
    - Night Bridge, also with Windows "Animation effects" turned off (reduced motion).
 3. **Any figure that disagrees with the invoices is a finding.**
+4. **Recoveries, for real** (Final session 2A, N-191; `docs/product/RECOVERIES.md`). On the owner's workspace with the real
+   invoices and GSTR-2B (Business): Documents → Recoveries.
+   - Every issue on the page has the engine's own figure, a due date with its basis, and links that open the right pages.
+   - **Walk one real issue from Found to Verified:** give it an owner (Being fixed), then make the evidence happen the way
+     a customer would: import the later GSTR-2B that carries a waiting invoice, record a credit note against an
+     overcharge, or record a payment before a deadline in Helm. Press **Check now**: Verified, with the reason.
+   - The value receipt (Billing) shows "Recovered, verified" with that outcome, beside "Found", never added to it.
+   - Close another as "Not money" with a reason: nothing is counted.
+   - If the owner's documents raise no issue, walk one on the sample company (a payment deadline: record its payment in
+     Helm) and say so.
 
 ## 10. Phase 7: automation, for real
 

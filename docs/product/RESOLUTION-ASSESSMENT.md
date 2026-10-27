@@ -120,28 +120,17 @@ add "Found" and "Recovered, verified" together; count an outcome Helm already re
 **If it is not reached in this session**, Final session 2B measures, during the first pilot, how many issues of kinds 1, 4 and 5 were
 followed up, by whom, and how many were provably closed (`PILOT-PLAYBOOK.md`, "What to measure").
 
-## Status at the end of Final session 2A: decided, not built yet
+## Status: built (Final session 2A, 2026-10-27)
 
-The decision (N-191) stands: build the thin **Recoveries** layer. It was **not built in this session.** The session prompt's
-cut line put Phases 1, 2, 3 and 8 first and allowed Phase 6 to be skipped if usage was tight after Phase 5; it was (the
-session hit its usage limit once), and the security fixes of Phase 3 took priority. Nothing of it is half-built in the code.
+The owner asked for it to be built in the same session, and it was, as specified above: **Recoveries**
+(`docs/product/RECOVERIES.md`). Five kinds (GST credit waiting, duplicates, prices above the order, supplier statement
+differences, payment deadlines; changed bank accounts stay in the review hub on purpose), one read model over the
+engines' tables with one adapter per kind, closure only on evidence, "Not money" never counted, one outcome ledger that
+shares Helm's keys (every pair of engines counted once, tested), Business and Enterprise with a preview elsewhere, the
+receipt's "Recovered, verified", the digest's line, Getting started's link, and browser spec 140. The two corrections
+above changed: supplier statement differences are now stored as issues by the hourly sweep (through Helm's
+reconciliation). TRINETRA's cases join through one adapter in Final session 2T.
 
-**The build, when it comes** (unchanged from the prompt's Phase 6): one read model over the engines' own tables, like the
-review hub; Found → Being fixed → Verified; each issue with its stored rupee figure, evidence, owner, due date and the
-existing next actions; closure only on evidence, one rule per kind, and "Not money: <reason>" never counted; one outcome
-ledger extending Helm's value ledger, with a test for every pair of engines that could claim the same outcome; Business and
-Enterprise; TRINETRA's cases joining through one adapter in 2T.
-
-**What Final session 2B (and the first pilots) should measure about today's flow meanwhile**, so the build starts from
-real numbers:
-
-- **GST credit at risk:** how many invoices are on the list at day 7 and still on it at day 30, and how many the customer
-  chased (a reminder sent, a supplier call). The gap between "found" and "chased" is what an owner and a due date would close.
-- **Prices above the order:** how many procurement cases opened, how many a person disputed, and how many ended with a
-  credit note. Today a dispute is a click with no evidence of the outcome.
-- **Duplicates:** how many Helm held, and how many were confirmed and never paid (Helm already counts these).
-- **Who looked:** for each kind, whether anyone opened the engine's page in the month (the audit trail shows it). If nobody
-  did, the layer's first job is to put the issue in front of a person.
-
-These go in the pilot notes (docs/product/PILOT-PLAYBOOK.md, the weekly check-in) and in 2B's LIVE-VERIFICATION.md.
-
+**What the first pilots should measure now** (docs/product/PILOT-PLAYBOOK.md): how many issues were found, owned and
+verified at day 7 and day 30, by kind; the rupees recovered and verified; and the issues closed as not money, with their
+reasons (a reason that repeats is an engine to tune).

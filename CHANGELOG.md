@@ -6,6 +6,25 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Added — Recoveries (Final session 2A, N-191; the owner's request of 2026-10-27)
+
+- **Recoveries** (Documents → Recoveries, Business and Enterprise): every money issue Servabo finds (GST credit waiting on a
+  supplier, a probable duplicate, a price above the purchase order, a supplier statement difference, a payment deadline)
+  with its amount, its due date, an owner and the next steps, from Found to Being fixed to **Verified**, which only evidence
+  grants. "Not money: <reason>" is recorded and never counted. Other plans see the counts and what was found.
+- **"Recovered, verified"** on the value receipt and the monthly summary, beside what was found and never added to it; Helm's
+  outcomes are counted in it once. The GST digest says how many issues need an owner; Getting started links to the page.
+
+### Changed — the open decisions, settled with the owner's authority (2026-10-27)
+
+- **ERP auto-post waits for a person** when a supplier's upload through a request link completed a case (N-197).
+- **The pilot offer:** one month on Business for up to 3 seats at ₹9,999 plus GST, credited against the first year (N-198).
+- **The email logo** carries a small white panel, so Gmail's phone apps in dark mode show it clearly (N-199).
+
+### Fixed
+
+- **"Re-plan now" in Helm** waits a moment for a plan already running instead of saying "already planning" (F-637).
+
 ### Changed — Emails show the real Servabo logo (owner request, 2026-10-27; N-199)
 
 - Every email sent as Servabo shows the logo itself (the ribbon mark and the wordmark, light and dark) instead of a plain

@@ -115,7 +115,7 @@ TRINETRA is missing from:
 - automation triggers;
 - the warehouse datasets;
 - the public read API beyond one organization summary;
-- the Resolution layer (if 2A built it);
+- the Resolution layer (Recoveries, built in 2A: docs/product/RECOVERIES.md);
 - a user guide like `docs/automation/README.md`;
 - a performance budget test like `tests/performance/test_gst_budgets.py`;
 - `preflight.py`;
@@ -418,7 +418,7 @@ Follow GST Credit's patterns for each:
 8. **Warehouse dataset (Enterprise):** TRINETRA cases with masked identifiers, following the dataset contract and its tests.
 9. **The organization view (Enterprise):** totals per legal entity across the readable workspaces, never double counting one
    entity.
-10. **The Resolution layer** (if Final 2A built it): TRINETRA's cases join as their own kind through the live helper. Their figure
+10. **The Resolution layer** (Recoveries, built in Final 2A; add one adapter in `services/recoveries/adapters.py`): TRINETRA's cases join as their own kind through the live helper. Their figure
     is a possible credit gap, never cash.
 11. **Helm:** the planner reads the net-of-TDS cash due (Phase 1), and the ledger shows the withheld amount beside the
     commercial balance.

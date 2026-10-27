@@ -59,7 +59,7 @@ company; money in exact integer micros; CI green on `main` (run #482).
 | **Any real outside integration**: Dodo payments in rupees, Postmark email-in, Zoho Books, Tally import, a real GSTR-2B and e-invoice QR | A pilot needs at least the GSTR-2B and one of Tally or Zoho to work for real | Final session 2B (the hand-over table in HANDOFF) |
 | **Any customer** | Nobody buys the first of anything without a reference | Two or three paid 30-day pilots (`PILOT-PLAYBOOK.md`) |
 | **Time saved** | "Hours saved" sells AP tools | Measured in the pilot: invoice received → entered, before and after |
-| **Rupees found, and rupees recovered** | The whole pitch | The value receipt shows found; Phase 6 (Recoveries) adds "Recovered, verified" line by line; the pilot measures both |
+| **Rupees found, and rupees recovered** | The whole pitch | The value receipt shows found and, with Recoveries (built, `RECOVERIES.md`), "Recovered, verified" beside it, line by line on the Recoveries page; the pilot measures both |
 | **Whether Dodo's invoice carries the buyer's GSTIN with CGST/SGST/IGST** | A business cannot claim the 18% GST on Servabo's own invoice without it | Final session 2B buys once in rupees with a GSTIN (Dodo's docs say the tax ID is printed on B2B invoices; the split is **not documented**) |
 | **Production deployment and backups on a real server** | A customer's data must survive | The owner launch checklist, steps 6 to 10, and the rehearsal in Final session 2B |
 
