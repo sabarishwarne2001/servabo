@@ -39,11 +39,12 @@ the session scratchpad (outside the repo).
 - [x] 5. The proof kit: `scripts/accuracy_report.py`, `docs/product/PILOT-PLAYBOOK.md`. The report compares a truth sheet
   (`scripts/accuracy_truth_template.csv`) with the extraction: field and document accuracy, the review catch rate, every miss,
   no document values. Tested with an invented truth sheet; 2B runs it on the owner's invoices. Pilot price: N-198 (open).
-- [ ] 6. The Resolution layer (only if 0B says build)
+- [x] 6. The Resolution layer (only if 0B says build): **declined for this session** by the prompt's cut line (usage was tight after
+  Phase 5; the session hit its limit once). N-191's decision stands; RESOLUTION-ASSESSMENT.md says what the pilots measure meanwhile.
 - [ ] 7. Records and the docs customers see
 - [ ] 8. `docs/sessions/FINAL-2-LIVE.md` rewritten; HANDOFF "Final session 2A → Final session 2B"; PR ready; CI green
 
-- **Next action:** Phase 6 (the Recoveries layer, N-191) if the budget allows; otherwise Phases 7 and 8.
+- **Next action:** Phase 7 (records and customer docs), then Phase 8 (the live prompt, the hand-over), then the finish line.
 
 
 ## Current phase — the final sessions: 2A, then 2T (TRINETRA), then 2B (2026-10-26)

@@ -2578,6 +2578,8 @@ hold, so a thin layer named **Recoveries** (Found → Being fixed → Verified) 
 GST credit at risk, duplicates and prices above the order, plus Helm's existing outcomes. Left out: supplier statement differences (not
 stored today; Helm work first) and changed bank accounts (not countable money; a person's call). TRINETRA's cases join through one adapter in
 Final session 2T, as "TDS not yet in the statement", never as cash.
+**Not built in Final session 2A** (its cut line; RESOLUTION-ASSESSMENT.md, last section, says why and what the pilots measure
+meanwhile). The decision stands for a later session.
 
 ## N-192 — How rupees, the mandate and the tax ID work at checkout (DECIDED (Final 2A))
 
