@@ -1,0 +1,2 @@
+document,invoice_number,invoice_date,vendor_gstin,buyer_gstin,taxable_value,cgst,sgst,igst,total,place_of_supply,due_date,hsn
+INV-2231.pdf,INV-2231,05/09/2026,27AAAAA0000A1Z5,29BBBBB1111B1Z6,100000.00,9000.00,9000.00,,118000.00,Maharashtra,05/10/2026,8708;4819
