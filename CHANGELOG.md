@@ -6,6 +6,17 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Security — Final session 2A, Phase 3: prompt injection, mapped and tested (2026-10-27)
+
+- **The map** (`docs/hardening/PROMPT-INJECTION.md`): every way outside text enters, every model that reads it, every effect,
+  and six invariants enforced by tests that walk the code.
+- **An email address read from an invoice is never written to until a person confirms it** (Helm, Settings, Suppliers and
+  customers). Existing addresses need one confirmation (N-195).
+- **Helm never pays, approves a payment, releases a hold or marks paid on its own**, in any mode (N-196).
+- No automatic approval rests on a document that reads like instructions to the AI (English, Hindi, money commands).
+- Every prompt that reads a document fences it as data; outbound emails bound every value from a document; a QR code whose
+  invoice number is a sentence is not read.
+
 ### Added — Final session 2A, Phase 4: leftovers (2026-10-27)
 
 - **Warning emails after a deletion** (N-164): the owners and admins of a deleted workspace or organization are emailed at once

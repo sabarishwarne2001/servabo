@@ -2657,3 +2657,12 @@ mandate editor; stored caps are kept but no longer let anything pay.
 **If you want it back** for small amounts from suppliers you trust, that is a new decision: it would need a list of trusted
 suppliers and bank accounts a person confirmed, so a document alone could never steer it.
 
+## N-197 — Should ERP auto-post skip a case that completed because of an outside upload? (OPEN)
+
+When an admin turns ERP auto-post on and lets it post completed cases, a case that completes on its own (a supplier's
+upload through a request link) is posted to the accounting system without a person looking (docs/hardening/PROMPT-INJECTION.md,
+section 4). It posts a bill or a payment reference as data, never a payment, and auto-post is off until an admin turns it on.
+**Options:** (1) leave it: the admin chose auto-post for cases; (2) never auto-post a case whose last document came from
+outside (a request link or email-in) until a person opens it; (3) show such cases in the review queue first. Recommendation:
+(2). Nothing is built until you choose.
+

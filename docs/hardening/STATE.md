@@ -25,7 +25,11 @@ the session scratchpad (outside the repo).
   sweeps in the scheduler (or not, recorded), `servabo-install-host-jobs`, preflight, docs, tests. Sweeps stay on cron (N-194);
   readiness adds `safety_jobs: degraded` only when degraded (a healthy answer stays `{"status": "ready"}`, F-042). Unverified until
   2B: a real server's cron, and the stopped-cron email arriving the next day (checklist step 10).
-- [ ] 3. Prompt injection: `docs/hardening/PROMPT-INJECTION.md`, registry-walking invariants (a) to (f), the red-team corpus, fixes test-first
+- [x] 3. Prompt injection: `docs/hardening/PROMPT-INJECTION.md`, registry-walking invariants (a) to (f), the red-team corpus, fixes test-first.
+  Six findings fixed test-first (F-631 to F-636): a learned address is never a recipient until confirmed (N-195, migration `s2a3`);
+  no automatic approval on a document that reads like instructions; Helm never takes a payment decision alone (N-196: the act cap
+  is gone for payments); every prompt fences document text; emails bound document values; a QR "number" that is a sentence is
+  not read. Open: N-197 (ERP auto-post of a case completed by an outside upload). Unverified until 2B: the real models on the corpus.
 - [x] 4. Leftovers: the GST speed test's timings, deletion warning emails, a zip in the upload tray, `k1a6`'s downgrade with rows, PR #39's
   loose ends. GST matching 2.23 s / import 1.80 s, as Session H (no code change, budget unchanged); deletion warnings at once and 5 days
   before (migration `s2a2`); the global tray takes a zip (spec 138); `k1a6` proven safe with rows (no change); spec 122 → 139.
@@ -37,7 +41,7 @@ the session scratchpad (outside the repo).
 - [ ] 7. Records and the docs customers see
 - [ ] 8. `docs/sessions/FINAL-2-LIVE.md` rewritten; HANDOFF "Final session 2A → Final session 2B"; PR ready; CI green
 
-- **Next action:** Phase 3 (prompt injection; the inventory of paths is done, see the map).
+- **Next action:** Phase 5 (accuracy report and pilot playbook; both drafted), then Phase 6 if the budget allows.
 
 
 ## Current phase — the final sessions: 2A, then 2T (TRINETRA), then 2B (2026-10-26)

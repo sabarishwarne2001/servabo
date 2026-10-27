@@ -3778,3 +3778,28 @@ person always takes these decisions. Proven by `tests/security/test_prompt_injec
 first for all four. The Guard now asks a person for every payment decision in every mode (holding a payment, which only
 protects, still runs alone). Three live tests and two Guard tests that expected Act mode to pay alone now expect a person
 (N-196); the mandate editor no longer offers an act cap.
+
+## F-634 — Five prompts pasted the document's text in raw (P2, security)
+
+The classification, extraction and summary prompts, each verification agent's prompt and the assertion check pasted the
+document's text straight after their instructions, and the conversation digest pasted earlier turns (which quote documents)
+the same way. Only the assistant's retrieval and the automation nodes fenced it. A document could therefore end the
+"Document:" section and write its own instructions. Proven by `tests/security/test_prompt_injection_fences.py`, which failed
+first for the five builders. They now use `fenced_context.fence_document`: the text sits between nonce-marked lines after a
+sentence saying it is data, never instructions, and a copy of the marker inside the text is removed. The classifier's answer
+reaches the extractor only when it is a known label. The same test walks the code for every call into a model, so a new
+one fails until someone says what it reads.
+
+## F-635 — Outbound emails carried a document's value at any length (P3)
+
+The GST supplier reminder and digest and Helm's dispute, reconciliation, reminder, document-request and briefing emails
+escaped every value but did not bound the ones read from documents: a 5,000-character "supplier name" went out whole. Proven
+by the length tests added to `tests/security/test_email_templates_escape_every_value.py` (6 failed first). Document values
+are now clipped (`templates/emails/common.clip`, 300 characters, less for numbers and dates).
+
+## F-636 — An e-invoice QR code's "invoice number" could be any sentence (P3)
+
+The code's number filled the extraction's invoice number when the model left it empty, up to 64 characters of whatever the
+code said. A GST invoice number is at most 16 letters, digits, "-" and "/" (CGST Rules 2017, rule 46(b)), so a code
+whose number is a sentence is not a genuine e-invoice: it is now not read at all. Proven by
+`tests/security/test_prompt_injection_corpus.py` (4 failed first); a genuine code is still read.
