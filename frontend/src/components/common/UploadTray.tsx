@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { workItemApi } from "@/services/api/workItem";
 import { uploadArchive } from "@/services/api/ingestion";
 import ArchiveProgress from "@/components/upload/ArchiveProgress";
+import { isZip, ZIP_MAX_MB } from "@/components/upload/zip";
 import { ApiError } from "@/services/api/client";
 import { getDocumentSettings } from "@/services/api/document-settings";
 import { settingsKeys, usageKeys } from "@/services/api/queryKeys";
@@ -36,13 +37,7 @@ import { useActiveWorkspaceId } from "@/hooks/useActiveWorkspace";
 /** What the server accepts when a workspace has not narrowed it (file_validation_service). */
 const DEFAULT_EXTENSIONS = ["pdf", "png", "jpg", "jpeg"] as const;
 const DEFAULT_MAX_MB = 100;
-/**
- * Final session 1 (2A): a zip of documents is accepted on every plan and workspace. The server unpacks it and adds each
- * document through the ordinary intake path, so the workspace's file types and the plan's limits apply to every file in
- * it; the zip itself is only bounded by ZIP_UPLOAD_MAX_MB on the server.
- */
-const ZIP_MAX_MB = 256;
-const isZip = (file: File): boolean => file.name.toLowerCase().endsWith(".zip");
+// Final session 1 (2A): zips are accepted on every plan; the rule is shared with the global tray (zip.ts).
 
 const EXTENSION_ALIASES: Readonly<Record<string, readonly string[]>> = {
   jpg: ["jpg", "jpeg"],

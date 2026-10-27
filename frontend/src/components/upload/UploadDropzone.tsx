@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, FileUp, X } from "lucide-react";
 
+import { isZip, ZIP_MAX_MB } from "@/components/upload/zip";
 import { ApiError } from "@/services/api/errors";
 import { useUploadTrayStore } from "@/store/useUploadTrayStore";
 
@@ -95,7 +96,7 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
   const dragDepth = useRef(0);
   const maxBytes = useMemo(() => maxSizeMb * 1024 * 1024, [maxSizeMb]);
   const acceptAttr = useMemo(
-    () => allowedTypes.map((entry) => (entry.includes("/") || entry.startsWith(".") ? entry : `.${entry}`)).join(","),
+    () => [...allowedTypes.map((entry) => (entry.includes("/") || entry.startsWith(".") ? entry : `.${entry}`)), ".zip"].join(","),
     [allowedTypes],
   );
 
@@ -103,6 +104,10 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
     (file: File): string | null => {
       if (file.size === 0) {
         return "The file is empty.";
+      }
+      if (isZip(file)) {
+        // Final session 2A: a zip is accepted here as on the Documents page; each file in it meets the usual rules.
+        return file.size > ZIP_MAX_MB * 1024 * 1024 ? `"${file.name}" is larger than ${ZIP_MAX_MB} MB. Split it into smaller zips.` : null;
       }
       if (file.size > maxBytes) {
         const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
@@ -309,8 +314,7 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Up to {maxSizeMb}MB ·{" "}
-              {allowedTypes
-                .map((type) => type.split("/")[1]?.toUpperCase() ?? type)
+              {[...allowedTypes.map((type) => type.split("/")[1]?.toUpperCase() ?? type.replace(/^\./, "").toUpperCase()), "ZIP"]
                 .join(", ")}
             </p>
           </>
