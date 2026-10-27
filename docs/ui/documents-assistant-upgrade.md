@@ -32,7 +32,7 @@ Validated with Python 3.12, Node 24 and Chromium. Dependencies and lockfiles are
 | Unit tests | `cd frontend && npm run test:unit` | 283 passed |
 | API contracts | `cd frontend && npm run verify:contracts` | 12 contracts agreed with the live server |
 | Backend | `cd backend && env -u AWS_PROFILE .venv/bin/python -m pytest tests/api/test_document_console.py tests/api/test_work_item_list_filters.py tests/api/test_assistant_session_preview.py tests/security/test_work_item_child_routes_are_workspace_scoped.py -q --maxfail=3` | 19 passed |
-| Browser regressions | Selected Documents/AI Assistant checks from `22-phase1-documents`, `11-assistant-intelligence`, plus `122-premium-documents-assistant` | 19 passed; 1 expected skip |
+| Browser regressions | Selected Documents/AI Assistant checks from `22-phase1-documents`, `11-assistant-intelligence`, plus `139-premium-documents-assistant` | 19 passed; 1 expected skip |
 | Visual/accessibility | Light/dark, 1440/768/390 pixels, no horizontal viewport overflow; axe WCAG A/AA scans on both pages at desktop/phone widths | Passed, including a separate rerun asserting the desktop composer remains in the viewport |
 
 The browser stack uses the separate `servabo_ui_e2e` database, repository ML stubs and the existing deterministic local model (`E2E_LLM=1`). Database persistence, upload/processing orchestration, retrieval, citations, scope, templates and export run through the real application. These results do not establish live Groq/Gemini model quality or credential availability. The skipped existing test expects a genuinely unavailable provider; a new controlled 503 browser test independently verifies composer recovery.
@@ -44,7 +44,7 @@ cd frontend
 E2E_LLM=1 E2E_API_ORIGIN=http://127.0.0.1:8001 \
 E2E_CHROMIUM_PATH=/usr/bin/chromium E2E_WORKERS=1 \
 npx playwright test --config e2e/playwright.config.ts \
-  e2e/tests/122-premium-documents-assistant.spec.ts \
+  e2e/tests/139-premium-documents-assistant.spec.ts \
   e2e/tests/22-phase1-documents.spec.ts \
   e2e/tests/11-assistant-intelligence.spec.ts \
   --grep 'document filters survive|sort and rows|starters fill|scope and templates|unsent drafts|both themes|failed sends|readers are|AI Assistant|Documents list filters|Uploading from|no upload zone|documents read as|link can open'

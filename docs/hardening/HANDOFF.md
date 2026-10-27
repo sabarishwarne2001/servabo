@@ -1032,7 +1032,8 @@ _Decision N-189. Docs-only change; no code, no migration (head `tr1a2_review_out
 
 **What landed after the 2A prompt was written.**
 - **PR #39** redesigned the Documents and AI Assistant consoles (`docs/ui/documents-assistant-upgrade.md`; `GET …/work-items/counts`).
-  Its browser spec reused the number 122, and it wrote no campaign record.
+  Its browser spec reused the number 122, and it wrote no campaign record. **Closed in Final session 2A:** the spec is now
+  `139-premium-documents-assistant.spec.ts`; the counts row in COVERAGE.csv says what its test proves; FINDINGS has the record.
 - **PR #40, TRINETRA** (`docs/trinetra/`, N-188, F-619 to F-625): reviewed TDS evidence for invoices on which a customer withheld tax.
   It has four tables, 20 routes, a LIGHT job, a Helm annotation and reminder hold, a website page, and CI run 40282980125 and
   `main` #478 green. Live processing is off; customers see a synthetic preview.

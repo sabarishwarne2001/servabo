@@ -3700,6 +3700,13 @@ explicitly explains that this illustrative age does not advance with today's clo
 
 Branch `claude/new-session-gbo9ee`, PR #43. Decisions N-191 onwards; the prompt is `docs/sessions/FINAL-2-UPGRADE.md`.
 
+**Record for PR #39 (no finding number; written in Final session 2A).** PR #39 redesigned the Documents console and the AI
+Assistant: workspace-wide status counts from one grouped query (`GET …/work-items/counts`), filters and paging kept in the URL,
+the list request's paging and sorting parameters corrected to what the API reads, starter prompts that fill the composer and never
+answer by themselves, conversation previews of up to 180 characters of the last question, and a citation drawer that keeps focus.
+What it changed and how it was checked is in `docs/ui/documents-assistant-upgrade.md`; its browser spec is
+`139-premium-documents-assistant.spec.ts` (renumbered from a second 122).
+
 ## F-626 — The margin test never checked the yearly prices (P2)
 
 `test_plan_unit_economics.py` checked each plan's dollar **monthly** price only. Business at $2,990 a year ($249 a month)
