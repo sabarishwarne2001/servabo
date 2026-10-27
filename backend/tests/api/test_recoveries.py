@@ -571,3 +571,22 @@ def test_an_organization_owner_without_a_workspace_grant_can_own_an_issue(client
     nobody = client.put(url(t, f"/{item['id']}/owner"), headers=t.contributor.headers,
                         json={"owner_user_id": str(t.non_member.user.id)})
     assert nobody.status_code == 409
+
+
+def test_two_radar_findings_on_one_invoice_are_one_issue(db_session, tenant):
+    """The radar can find one invoice the duplicate of two others (CI, test_process_intel_live): one issue, not a crash."""
+    _business(db_session, tenant)
+    work_item_id = _dup_item(db_session, tenant, "D-7", total=3_000)
+    first = db_session.execute(select(AnomalyFinding).where(AnomalyFinding.subject_work_item_id == work_item_id)).scalar_one()
+    from tests.services.helm import factories
+
+    third = factories.invoice(db_session, workspace=tenant.workspace, organization_id=tenant.organization.id, number="D-7",
+                              supplier="Nilgiri", amount=3_000, on=TODAY - timedelta(days=5))
+    db_session.add(AnomalyFinding(
+        organization_id=first.organization_id, workspace_id=first.workspace_id, kind=first.kind, layer="L2",
+        severity="MEDIUM", subject_work_item_id=work_item_id, counterpart_work_item_id=third.id, score=1,
+        headline="Near-identical text", metrics={}, evidence=[{"kind": "text", "similarity": 0.97}], status="OPEN", dedupe_key=uuid.uuid4().hex * 2,
+        input_digest="f" * 64, engine_version="t"))
+    db_session.flush()
+    assert _sweep(db_session, tenant)["found"] == 1
+    assert len(service.list_issues(db_session, tenant.workspace.id, kind=v.DUPLICATE)) == 1

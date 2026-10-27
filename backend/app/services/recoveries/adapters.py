@@ -227,6 +227,20 @@ class GstCredit:
 # ------------------------------------------------------------------------------------------------------------ duplicates
 
 
+_FINDING_RANK = {radar_v.STATUS_CONFIRMED: 0, radar_v.STATUS_OPEN: 1, radar_v.STATUS_DISMISSED: 2}
+
+
+def _one_per_invoice(findings):
+    """The radar can find one invoice the duplicate of two others: one issue per invoice, read from its strongest finding
+    (confirmed, then open, then dismissed)."""
+    out: dict = {}
+    for finding in findings:
+        kept = out.get(finding.subject_work_item_id)
+        if kept is None or _FINDING_RANK.get(finding.status, 3) < _FINDING_RANK.get(kept.status, 3):
+            out[finding.subject_work_item_id] = finding
+    return out
+
+
 class Duplicate:
     """A probable duplicate invoice the radar found (`DUPLICATE_DOCUMENT`)."""
 
@@ -240,6 +254,8 @@ class Duplicate:
             .outerjoin(DocumentFingerprint, DocumentFingerprint.work_item_id == AnomalyFinding.subject_work_item_id)
             .where(AnomalyFinding.workspace_id == workspace.id, AnomalyFinding.kind == radar_v.KIND_DUPLICATE_DOCUMENT,
                    AnomalyFinding.status.in_((radar_v.STATUS_OPEN, radar_v.STATUS_CONFIRMED)))).all()
+        strongest = _one_per_invoice(f for f, _, _ in rows)
+        rows = [r for r in rows if strongest[r[0].subject_work_item_id] is r[0]]
         promises = _payable_promises(db, workspace.id, [f.subject_work_item_id for f, _, _ in rows])
         names = _names(db, [f.subject_work_item_id for f, _, _ in rows])
         out = []
@@ -259,9 +275,9 @@ class Duplicate:
 
     def judge(self, db: Session, workspace: Workspace, issues: Sequence[RecoveryIssue], today: date) -> list[Verdict]:
         ids = [wid for wid in (_issue_work_item(i) for i in issues) if wid]
-        findings = {f.subject_work_item_id: f for f in db.execute(select(AnomalyFinding).where(
+        findings = _one_per_invoice(db.execute(select(AnomalyFinding).where(
             AnomalyFinding.workspace_id == workspace.id, AnomalyFinding.kind == radar_v.KIND_DUPLICATE_DOCUMENT,
-            AnomalyFinding.subject_work_item_id.in_(ids))).scalars()} if ids else {}
+            AnomalyFinding.subject_work_item_id.in_(ids))).scalars()) if ids else {}
         promises = _payable_promises(db, workspace.id, ids)
         out: list[Verdict] = []
         for issue in issues:

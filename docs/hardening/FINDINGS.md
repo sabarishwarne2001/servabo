@@ -3813,3 +3813,13 @@ up Helm hits the same thing. **Fix:** a person's re-plan waits up to 20 seconds 
 "already planning" (`plan_store.PERSON_WAIT_S`); background runs still skip a busy book, and the plan's recorded duration
 excludes the wait. **Proof:** `test_re_plan_waits_for_a_background_plan_instead_of_refusing` (409 first, 200 now); the Helm
 concurrency, budget and service suites pass (425).
+
+## F-638 — Recoveries crashed when the radar found one invoice the duplicate of two others (P2)
+
+**Found:** CI run 505, `test_process_intel_live` (UniqueViolation on `uq_recovery_issues_subject`). **Cause:** the radar
+can raise two duplicate findings for one invoice (one per counterpart); the Recoveries sweep made an issue for each, and
+the second insert broke the rule of one issue per invoice, so the whole sweep failed for that workspace. **Fix:** the
+duplicate kind reads one finding per invoice, the strongest (confirmed, then open, then dismissed), both when it finds and
+when it judges; the sweep also keeps an issue it has just made, so a repeated subject updates it. **Proof:**
+`test_two_radar_findings_on_one_invoice_are_one_issue` (the UniqueViolation first, passing now); the Recoveries API and
+engine suites, the isolation invariants and `test_process_intel_live` pass (30).

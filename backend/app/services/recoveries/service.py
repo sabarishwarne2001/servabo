@@ -99,14 +99,15 @@ def _open_state(issue: RecoveryIssue, in_progress: bool) -> str:
 def _apply_observation(db: Session, workspace: Workspace, found: dict[str, RecoveryIssue], ob: Observation,
                        now: datetime) -> int:
     issue = found.get(ob.subject_key)
-    if issue is None:
-        db.add(RecoveryIssue(
+    if issue is None:  # kept in `found`: a second observation of one subject updates it, never inserts twice
+        issue = found[ob.subject_key] = RecoveryIssue(
             id=uuid.uuid4(), organization_id=workspace.organization_id, workspace_id=workspace.id, kind=ob.kind,
             subject_key=ob.subject_key, work_item_id=ob.work_item_id,
             state=v.BEING_FIXED if ob.in_progress else v.FOUND, title=ob.title, currency=ob.currency,
             exposure_micros=ob.exposure_micros, found_exposure_micros=ob.exposure_micros, due_date=ob.due_date,
             due_basis=ob.due_basis, details={**ob.details, "in_progress": ob.in_progress}, evidence={},
-            first_found_at=now, last_seen_at=now))
+            first_found_at=now, last_seen_at=now)
+        db.add(issue)
         return 1
     issue.last_seen_at = now
     if issue.state in v.OPEN_STATES or issue.state == v.CLOSED:
