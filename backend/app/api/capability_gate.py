@@ -90,6 +90,7 @@ _DISPLAY_NAMES = {
     # Session F
     entitlements.GST_CREDIT_CAPABILITY: "GST Credit: supplier and invoice lists, IMS recommendations, export",
     entitlements.GST_CREDIT_ALL_WORKSPACES_CAPABILITY: "GST Credit across every workspace",
+    entitlements.RECOVERIES_CAPABILITY: "Recoveries: money issues with an owner, closed only on evidence",
     # PHASE1:capability-display
     entitlements.BATCH_DISPATCH_CAPABILITY: "Batch operations and integrity-verified export packages",
     # PHASE2:capability-display
