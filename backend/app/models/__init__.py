@@ -770,6 +770,7 @@ from app.models.notification_preference import UsageLimitAlert, UserNotification
 from app.models.operator_alert import OperatorAlert, ServerErrorMinute  # noqa: E402,F401
 from app.models.safety_job_run import SafetyJobRun  # noqa: E402,F401  (Final session 2A: safety jobs report in)
 from app.models.deletion_notice_send import DeletionNoticeSend  # noqa: E402,F401  (Final session 2A: N-164 warnings)
+from app.models.recovery import RecoveryIssue, RecoveryOutcome  # noqa: E402,F401  (Final session 2A: N-191 Recoveries)
 from app.models.billing_dispute import BillingDispute  # noqa: E402,F401
 
 # Flagship session: Helm, outcome control (docs/helm/ARCHITECTURE.md).

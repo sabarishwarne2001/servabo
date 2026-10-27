@@ -98,6 +98,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   "capability.helm_api": "Helm through the API and webhooks",
   "capability.gst_credit": "GST credit: purchase invoices matched with GSTR-2B",
   "capability.gst_credit_all_workspaces": "GST credit across every workspace",
+  "capability.recoveries": "Recoveries: money issues with an owner, closed only on evidence",
   "capability.priority_slo": "Priority 99.9% service objective",
 };
 

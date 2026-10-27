@@ -15,6 +15,7 @@ export type PlanFeatureKey = CapabilityKey | AddonFeatureKey;
 export const PLAN_FEATURE_LABELS: Record<PlanFeatureKey, string> = {
   "capability.trinetra_all_workspaces": "TRINETRA across authorized workspaces (release gated)",
   "capability.trinetra": "TRINETRA credit assurance (release gated)",
+  "capability.recoveries": "Recoveries: money issues with an owner, closed only on evidence",
   [CAPABILITY.developerApi]: "Developer API keys",
   [CAPABILITY.outgoingWebhooks]: "Outgoing webhooks",
   [CAPABILITY.customBranding]: "Custom branding",

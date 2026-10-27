@@ -71,6 +71,8 @@ export const CAPABILITY = {
   trinetraAllWorkspaces: "capability.trinetra_all_workspaces",
   trinetra: "capability.trinetra",
   gstCredit: "capability.gst_credit",
+  // Final session 2A (N-191): Recoveries, Business and Enterprise.
+  recoveries: "capability.recoveries",
   gstCreditAllWorkspaces: "capability.gst_credit_all_workspaces",
 } as const;
 

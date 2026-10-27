@@ -73,6 +73,8 @@ GENERIC_SECTIONS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "helm_mandates": ("helm_mandates", "org", ()),
     "helm_mandate_versions": ("helm_mandate_versions", "org", ()),
     "helm_value_events": ("helm_value_events", "org", ()),
+    "recovery_issues": ("recovery_issues", "org", ()),
+    "recovery_outcomes": ("recovery_outcomes", "org", ()),
     "helm_cash_positions": ("helm_cash_positions", "org", ()),
     "helm_bank_accounts": ("helm_bank_accounts", "org", ()),
     "helm_bank_lines": ("helm_bank_lines", "org", ()),

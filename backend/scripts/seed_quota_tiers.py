@@ -139,6 +139,7 @@ BUSINESS_CAPABILITIES = [
     _capability("capability.helm"),  # flagship session: Helm (N-082)
     _capability("capability.trinetra"),
     _capability("capability.gst_credit"),  # Session F: GST Credit (N-135)
+    _capability("capability.recoveries"),  # Final session 2A: Recoveries (N-191)
 ]
 BUSINESS_FEATURES = [*DEVELOPER_FEATURES, *BUSINESS_CAPABILITIES, ADDON_CUSTOM_DOMAIN, ADDON_WAREHOUSE_SYNC,
                      ADDON_GST_CREDIT]
@@ -173,6 +174,7 @@ ENTERPRISE_CAPABILITIES = [
     _capability("capability.trinetra_all_workspaces"),
     _capability("capability.trinetra"),
     _capability("capability.gst_credit"),  # Session F: GST Credit (N-135)
+    _capability("capability.recoveries"),  # Final session 2A: Recoveries (N-191)
     _capability("capability.gst_credit_all_workspaces"),
 ]
 ENTERPRISE_FEATURES = [*DEVELOPER_FEATURES, *ENTERPRISE_CAPABILITIES, ADDON_CUSTOM_DOMAIN, ADDON_WAREHOUSE_SYNC,

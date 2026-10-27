@@ -102,6 +102,8 @@ USAGE_ALERT_JOB_TYPES: frozenset[str] = frozenset({"usage.limit_alerts"})
 OPS_ALERT_JOB_TYPES: frozenset[str] = frozenset({"ops.alerts", "ops.safety_jobs"})  # Final session 2A: safety jobs
 #: Final session 2A (Phase 4, N-164): owners and admins are warned after a deletion, at once and 5 days before the purge.
 DELETION_NOTICE_JOB_TYPES: frozenset[str] = frozenset({"compliance.deletion_notices"})
+#: Final session 2A (Phase 6, N-191): Recoveries brought up to date with the engines, hourly.
+RECOVERIES_JOB_TYPES: frozenset[str] = frozenset({"recoveries.sweep"})
 #: Flagship session: Helm (docs/helm/ARCHITECTURE.md §10). On the LIGHT profile.
 HELM_JOB_TYPES: frozenset[str] = frozenset(
     {"helm.ledger_build", "helm.plan", "helm.backtest", "helm.execute", "helm.briefing", "helm.sample"}
@@ -158,6 +160,7 @@ ALL_PHASE_JOB_TYPES: frozenset[str] = (
     | GST_NOTICE_JOB_TYPES
     | OPS_ALERT_JOB_TYPES
     | DELETION_NOTICE_JOB_TYPES
+    | RECOVERIES_JOB_TYPES
     | HELM_JOB_TYPES
     | GST_JOB_TYPES
     | TRINETRA_JOB_TYPES
@@ -524,6 +527,11 @@ def _deletion_notices(payload: dict[str, Any]) -> dict[str, Any]:
     return handle(payload)
 
 
+def _recoveries(payload: dict[str, Any]) -> dict[str, Any]:
+    from app.workers.handlers.recoveries import handle
+    return handle(payload)
+
+
 def _safety_jobs(payload: dict[str, Any]) -> dict[str, Any]:
     from app.workers.handlers.operator_alerts import handle_safety_jobs
     return handle_safety_jobs(payload)
@@ -651,6 +659,7 @@ _HANDLERS = {
     "ops.alerts": _operator_alerts,
     "ops.safety_jobs": _safety_jobs,  # Final session 2A (Phase 2)
     "compliance.deletion_notices": _deletion_notices,  # Final session 2A (Phase 4, N-164)
+    "recoveries.sweep": _recoveries,  # Final session 2A (Phase 6, N-191)
     # Flagship session: Helm. On the LIGHT profile (app/workers/profiles.py).
     # Session F: GST Credit. On the LIGHT profile; nightly in DEFAULT_SCHEDULE.
     "gst.recompute": _gst_recompute,

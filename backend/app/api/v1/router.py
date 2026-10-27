@@ -32,6 +32,7 @@ from app.api.v1 import (
     byok,
     global_search,
     payment_risk,
+    recoveries,
     document_evidence,
     document_fields,
     compliance,
@@ -163,6 +164,7 @@ api_router.include_router(assertions.router)
 # simply not act on them, which is the product.
 api_router.include_router(anomalies.router)
 api_router.include_router(payment_risk.router)  # PHASE 4 bank-account change / round totals
+api_router.include_router(recoveries.router)  # Final session 2A (N-191): Recoveries
 
 # ARCH41-S3:extraction-memory-router. Every route but /potential is capability-gated.
 api_router.include_router(extraction_memory.router)

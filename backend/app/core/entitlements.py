@@ -137,6 +137,7 @@ __all__ = [
     "HELM_API_CAPABILITY",
     # Session F: GST Credit
     "GST_CREDIT_CAPABILITY",
+    "RECOVERIES_CAPABILITY",
     "GST_CREDIT_ALL_WORKSPACES_CAPABILITY",
     "CANONICAL_MAX_COST_MICROS",
     "CUSTOM_DOMAIN_ADDON",
@@ -334,6 +335,9 @@ HELM_API_CAPABILITY: str = "capability.helm_api"
 #: and supplier reminders (Business, Enterprise). Importing a GSTR-2B and seeing the headline figures, and the
 #: whole reconciliation of the sample company, need no capability (the GST Credit preview, N-135).
 TRINETRA_CAPABILITY: str = "capability.trinetra"
+#: Final session 2A (N-191). Recoveries: money issues with an owner and a due date, closed only on evidence, and the
+#: "Recovered, verified" ledger (Business, Enterprise). Other plans see the counts and what was found, as a preview.
+RECOVERIES_CAPABILITY: str = "capability.recoveries"
 TRINETRA_ALL_WORKSPACES_CAPABILITY: str = "capability.trinetra_all_workspaces"
 GST_CREDIT_CAPABILITY: str = "capability.gst_credit"
 #: Session F. Enterprise: one reconciliation per GSTIN across every workspace, and `gst:read` API keys.
@@ -442,6 +446,7 @@ CAPABILITY_KEYS: tuple[str, ...] = (
     HELM_API_CAPABILITY,
     TRINETRA_CAPABILITY,
     TRINETRA_ALL_WORKSPACES_CAPABILITY,
+    RECOVERIES_CAPABILITY,  # Final session 2A (N-191)
     GST_CREDIT_CAPABILITY,  # Session F
     GST_CREDIT_ALL_WORKSPACES_CAPABILITY,
 )
@@ -452,6 +457,7 @@ ADDON_KEYS: tuple[str, ...] = (CUSTOM_DOMAIN_ADDON, WAREHOUSE_SYNC_ADDON, GST_CR
 
 _ENTITLEMENTS: tuple[Entitlement, ...] = (
     Entitlement(name=TRINETRA_ALL_WORKSPACES_CAPABILITY, description="TRINETRA reports across authorized workspaces; release gated."),
+    Entitlement(name=RECOVERIES_CAPABILITY, description="Recoveries: money issues from found to verified, with an owner, a due date and closure only on evidence. Bundled into a tier."),
     Entitlement(name=TRINETRA_CAPABILITY, description="TRINETRA: reviewed TDS credit evidence assurance; subject to source-validation launch gate."),
     Entitlement(
         name=PLATFORM_KEY,

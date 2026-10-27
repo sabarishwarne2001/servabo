@@ -359,6 +359,13 @@ REGISTRY: dict[str, TableRule] = {
                        note="The record of what Helm proposed, who approved it and the amount."),
     "helm_value_events": _r(Kind.MONEY, Erasure.SCRUB, Sweep.DETACH, OrgPurge.KEEP, export="helm_value_events", links=(_WI,),
                             scrub={"evidence": {}}, note="The receipt's ledger of value found."),
+    # Final session 2A (N-191): Recoveries. The issue's title and details quote the document (a supplier, a number);
+    # the outcome is a money record like Helm's value events.
+    "recovery_issues": _r(Kind.MONEY, Erasure.SCRUB, Sweep.DETACH, OrgPurge.KEEP, export="recovery_issues", links=(_WI,),
+                          scrub={"title": "Erased document", "details": {}, "evidence": {}, "close_reason": None},
+                          note="An issue's state (owner, due date, a person's reason); the facts stay in the engines' tables."),
+    "recovery_outcomes": _r(Kind.MONEY, Erasure.SCRUB, Sweep.DETACH, OrgPurge.KEEP, export="recovery_outcomes", links=(_WI,),
+                            scrub={"evidence": {}}, note="Recovered, verified: the outcomes evidence proved, counted once."),
     "helm_tasks": _r(Kind.CONTENT, Erasure.SCRUB, Sweep.CASCADE, OrgPurge.CASCADE, why=_DERIVED_WHY, links=(_WI,),
                      scrub={"title": "Erased document", "body": "", "decision_note": None},
                      note="Helm's to-do notes quote the document."),

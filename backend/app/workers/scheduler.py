@@ -225,6 +225,15 @@ DEFAULT_SCHEDULE: tuple[ScheduledJob, ...] = (
         ),
     ),
     ScheduledJob(
+        job_type="recoveries.sweep",
+        interval_seconds=3_600,
+        description=(
+            "Bring Recoveries up to date with the engines (GST credit waiting, duplicates, prices above the order, "
+            "supplier statements, payment deadlines): new issues found, closures proved by evidence, outcomes "
+            "counted once (N-191, Final session 2A)."
+        ),
+    ),
+    ScheduledJob(
         job_type="identity.sweep_replay_guard",
         interval_seconds=3_600,
         description="Prune expired SAML replay-guard entries (ARCH-16).",
