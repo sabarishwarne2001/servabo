@@ -113,7 +113,7 @@ def test_business_keeps_accepting_documents_past_the_allowance_and_shows_it(
 ) -> None:
     put_on_plan(db_session, tenant.organization, "business")
     org = tenant.organization.id
-    _use(db_session, org, "document.upload", 5_000)
+    _use(db_session, org, "document.upload", 1_500)  # N-187: Business allows 1,500 a month (5,000 before)
 
     accepted = _upload(client, tenant, _pdf())
     assert accepted.status_code == 201, accepted.text
@@ -126,7 +126,7 @@ def test_business_keeps_accepting_documents_past_the_allowance_and_shows_it(
         f"/api/v1/workspaces/{tenant.workspace.id}/usage/plan-allowance", headers=tenant.viewer.headers
     ).json()
     documents = next(meter for meter in allowance["meters"] if meter["key"] == "document.upload")
-    assert documents["used"] == 5_001 and documents["limit"] == 5_000
+    assert documents["used"] == 1_501 and documents["limit"] == 1_500
     assert documents["state"] == "OVER" and documents["hard_stop"] is False
 
 

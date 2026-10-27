@@ -2,7 +2,7 @@
 
     pytest tests/api/test_free_plan_limits.py -q
 
-Free per period: 25 document uploads, 50 OCR pages, 30 assistant messages; 10 MB per
+Free per period: 100 document uploads, 200 OCR pages (N-187, Final session 2A: the 14-day trial's allowance; 25 and 50 before), 30 assistant messages; 10 MB per
 file; 10 pages per document; 250 MB stored; one workspace. Before session 1 Free
 metered only tokens, OCR pages and (sampled, never enforced) storage: documents and
 file sizes were unlimited, so a Free organization could upload without end.
@@ -93,12 +93,12 @@ def _uploads_recorded(db: Session, organization_id: uuid.UUID) -> int:
 # --- Documents -----------------------------------------------------------------
 
 
-def test_free_allows_25_documents_a_month_and_refuses_the_26th(client, db_session: Session, free) -> None:
-    _use(db_session, free.organization.id, "document.upload", 24)
+def test_free_allows_100_documents_a_month_and_refuses_the_101st(client, db_session: Session, free) -> None:
+    _use(db_session, free.organization.id, "document.upload", 99)  # N-187: 100 a month (25 before)
 
     accepted = _upload(client, free, _pdf())
     assert accepted.status_code == 201, accepted.text
-    assert _uploads_recorded(db_session, free.organization.id) == 25
+    assert _uploads_recorded(db_session, free.organization.id) == 100
 
     refused = _upload(client, free, _pdf(), "one-too-many.pdf")
     assert refused.status_code == 402, refused.text
@@ -144,9 +144,10 @@ def test_a_document_over_10_pages_is_refused_on_free(client, db_session: Session
 
 
 def test_ocr_pages_are_reserved_at_upload_so_nothing_is_stranded_in_processing(client, db_session: Session, free) -> None:
-    """Five 10-page documents wait for OCR: the 50-page allowance is spoken for."""
+    """N-187: 200 pages (50 before). 190 are used; five 2-page documents wait for OCR: the rest is spoken for."""
+    _use(db_session, free.organization.id, "ocr.page", 190)
     for index in range(5):
-        response = _upload(client, free, _pdf(pages=10), f"ten-{index}.pdf")
+        response = _upload(client, free, _pdf(pages=2), f"two-{index}.pdf")
         assert response.status_code == 201, response.text
 
     refused = _upload(client, free, _pdf(pages=1), "one-more-page.pdf")
@@ -194,7 +195,7 @@ def test_a_second_free_organization_shares_the_owners_allowance(client, db_sessi
 
     _grant(db_session, workspace, free.owner, WorkspaceRole.ADMIN)
     put_on_plan(db_session, second, "free")
-    _use(db_session, free.organization.id, "document.upload", 25)  # used up in the first organization
+    _use(db_session, free.organization.id, "document.upload", 100)  # used up in the first organization (N-187)
 
     response = client.post(
         f"/api/v1/workspaces/{workspace.id}/work-items",
@@ -263,7 +264,7 @@ def test_reprocessing_is_refused_up_front_when_the_pages_no_longer_fit(client, d
         item.pipeline_stage = stage
         db_session.flush()
     db_session.commit()
-    _use(db_session, free.organization.id, "ocr.page", 50)
+    _use(db_session, free.organization.id, "ocr.page", 200)  # N-187: Free has 200 pages (50 before)
 
     response = client.post(
         f"/api/v1/workspaces/{free.workspace.id}/work-items/{item.id}/reprocess",
@@ -306,7 +307,7 @@ def test_free_allows_30_assistant_messages_and_refuses_the_31st(client, db_sessi
 
 
 def test_every_member_sees_the_allowance_the_refusals_use(client, db_session: Session, free) -> None:
-    _use(db_session, free.organization.id, "document.upload", 20)
+    _use(db_session, free.organization.id, "document.upload", 80)  # N-187: 80 of 100 is near (20 of 25 before)
     response = client.get(
         f"/api/v1/workspaces/{free.workspace.id}/usage/plan-allowance", headers=free.viewer.headers
     )
@@ -315,7 +316,7 @@ def test_every_member_sees_the_allowance_the_refusals_use(client, db_session: Se
     assert body["plan_key"] == "free"
     assert body["max_file_mb"] == 10 and body["max_pages_per_document"] == 10
     documents = next(meter for meter in body["meters"] if meter["key"] == "document.upload")
-    assert (documents["used"], documents["limit"], documents["state"]) == (20, 25, "NEAR")
+    assert (documents["used"], documents["limit"], documents["state"]) == (80, 100, "NEAR")
     assert body["can_upgrade"] is False, "a viewer cannot change the plan"
     assert body["ask"] == [free.owner.user.email], "the people to ask, by name"
 

@@ -134,11 +134,11 @@ def test_the_numbers_are_the_plan_source_of_truth(client, published) -> None:
     assert [plans[key]["per_seat"] for key in PLAN_KEYS] == [False, True, True, True]
 
     free = {a["key"]: a["limit_quantity"] for a in plans["free"]["allowances"]}
-    assert free["document.upload"] == 25
+    assert free["document.upload"] == 100  # N-187 (25 before)
     assert free["storage.gb_month"] == 0.25  # 256 MB: a fraction, never truncated to 0
     assert free["limit.seats"] == 2
     developer = {a["key"]: a["limit_quantity"] for a in plans["developer"]["allowances"]}
-    assert developer["document.upload"] == 500 and developer["limit.workspaces"] == 3
+    assert developer["document.upload"] == 300 and developer["limit.workspaces"] == 3  # N-187: Starter 300 (500 before)
     assert "limit.seats" not in developer  # a paid plan's seats are bought
     enterprise = {a["key"]: a["limit_quantity"] for a in plans["enterprise"]["allowances"]}
     assert enterprise["assistant.message"] is None  # "no ceiling"
@@ -191,7 +191,7 @@ def test_the_public_list_and_the_in_app_plan_cards_agree(client, db_session: Ses
 def test_the_trial_is_the_length_the_product_enforces(client, published, monkeypatch) -> None:
     trial = client.get(PRICING).json()["trial"]
     assert trial == {"plan_key": "free", "days": trial_service.trial_length().days}
-    assert trial["days"] == 7  # N-052: one week
+    assert trial["days"] == 14  # N-187: two weeks (N-052 had one)
 
     monkeypatch.setattr(settings, "FREE_TRIAL_DAYS", 10)
     assert client.get(PRICING).json()["trial"]["days"] == 10
