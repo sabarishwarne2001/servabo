@@ -41,6 +41,8 @@ NOT_TENANT_STORAGE: dict[tuple[str, str], str] = {
         "reads the operator's labelled golden-set JSON for offline evaluation",
     ("app/services/erp/formats/xsd.py", 'text = path.read_text(encoding="utf-8")'):
         "reads the UBL 2.1 XSD schemas bundled with the application",
+    ("app/templates/emails/inline_images.py", 'return (ASSETS / f"{name}.png").read_bytes()'):
+        "reads the Servabo logo PNGs bundled with the application for emails (N-199)",
     ("app/services/ml_stubs.py", "fingerprint = hashlib.sha256(path.read_bytes()).hexdigest()[:12]"):
         "development/test OCR stub hashing a temp file the OCR handler made; refuses in production",
     ("app/services/redaction/leakcheck.py", "raw = obj.read_bytes()"):
