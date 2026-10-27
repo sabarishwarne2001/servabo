@@ -64,7 +64,7 @@ Branch `hardening/trinetra-to-ga`, based on `main` at `2e0d61c` (PR #41 merged).
 the revised session 2A"), and its original brief is only partly built (`docs/trinetra/ORIGINAL-BRIEF.md`, added here). The owner wants it on
 Business and Enterprise, working like every other feature, with nothing left behind. So finishing it is its own session, 2T, after 2A.
 
-- [ ] **Final session 2A** (cloud, Opus 5.5 High): `docs/sessions/FINAL-2-UPGRADE.md`: India prices, safety jobs, prompt injection, the proof
+- [x] **Final session 2A** (cloud, Opus 5.5 High; done 2026-10-27, PR #43): `docs/sessions/FINAL-2-UPGRADE.md`: India prices, safety jobs, prompt injection, the proof
   kit, the Resolution assessment, Final 1's and PR #39's leftovers, the live prompt rewritten. It touches TRINETRA only for its plan row and copy
   and the injection map.
 - [ ] **Final session 2T** (cloud, Opus 5.5 High): `docs/sessions/FINAL-2T-TRINETRA.md`: TRINETRA finished for Business and Enterprise, with
