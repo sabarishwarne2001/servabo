@@ -7,7 +7,7 @@ tests that walk the code's own registries, so a new path fails the build until s
 
 Findings fixed in this session: F-631 (a learned address emailed), F-632 (autonomy moved by document text), F-633 (Helm
 paid or released alone), F-634 (prompts pasted documents raw), F-635 (emails carried unbounded document text), F-636 (a
-QR code's sentence became a field). Decisions: N-195, N-196; open: N-197.
+QR code's sentence became a field). Decisions: N-195, N-196, N-197 (auto-post waits for a person on an outside upload).
 
 Written 2026-10-27 from the code at the time (an inventory of the code, then each claim checked by hand). Paths are under
 `backend/app/` unless they say otherwise. "Proven" means a test in the right-hand column; anything else is said plainly.
@@ -65,7 +65,7 @@ The list is `MODEL_CALLS` in `tests/security/test_prompt_injection_fences.py`; a
 | Calibrated autonomy (verification, `autonomy.decide`) | Held on injected text (d); calibration and unresolved conflicts as before | (d) |
 | The process agent | Calls no model; auto-applies only two document decisions, never on injected evidence (`HOLD_INJECTION`) | (a), `tests/services/process_intel` |
 | Email, chat and webhook content | Templates escape and bound document values (e); chat and webhook carry the author's fields as data | (e), template test |
-| ERP postings | Posted from approved procurement cases, reviewed tables and completed cases. **A case can complete on its own** (a supplier's upload through a request link), so with auto-post on, a completed case is posted to the accounting system without a person. It posts a bill or a payment reference as data, never a payment. Recorded as N-197: whether auto-post should exclude cases completed by an outside upload | Live corpus test: a request-link upload with auto-post off moves nothing else |
+| ERP postings | Posted from approved procurement cases, reviewed tables and completed cases. A case can complete on its own (a supplier's upload through a request link): **auto-post never posts such a case** until a person posts it by hand or closes it (N-197, decided and built). It posts a bill or a payment reference as data, never a payment | `tests/api/test_erp_auto_post_outside_upload.py`; live corpus test: a request-link upload moves nothing else |
 | TRINETRA expectations, allocations, withholding confirmations, inquiry draft, exports, and the Helm reminder hold | Only a person's API calls write them (f); the inquiry draft is never sent (`requires_human_approval`); exports neutralise formula cells | (f), `tests/trinetra/` |
 
 ## 5. The corpus
@@ -97,4 +97,3 @@ before and after), and the injection is flagged.
   is why the invariants above do not rely on the model behaving.
 - **Pattern coverage.** The injection patterns are a list; a new phrasing in a new language is not flagged until added.
   The invariants (a), (b), (e), (f) do not depend on the flag; (d) does, and holds only what the list recognises.
-- **ERP auto-post of a case completed by an outside upload** (N-197): posts data, never a payment, but without a person.

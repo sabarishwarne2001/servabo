@@ -1372,7 +1372,7 @@ def sweep(db: Session, *, apply: bool = True) -> SweepSummary:
         seen_ws.add(target.workspace_id)
         if target.auto_post and target.auto_post_since is not None:
             for outcome in S.eligible(db, target.workspace_id, since=target.auto_post_since,
-                                      kinds=tuple(target.auto_sources or v.SOURCE_KINDS)):
+                                      kinds=tuple(target.auto_sources or v.SOURCE_KINDS), for_auto=True):
                 for kind in outcome.objects:
                     if (target.auto_objects and kind not in target.auto_objects) or \
                             kind not in PR.supported_objects(target.format, target.preset):

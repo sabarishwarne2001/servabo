@@ -9,9 +9,9 @@ The best pilot customer is a **distributor or trader with 200 to 2,000 purchase 
 
 ## 1. The offer
 
-- **One month, on Business, for a pilot price** you set and record as an owner decision (NEEDS-OWNER N-198). A paid pilot,
-  even a small one, gets attention a free trial does not. Suggested shape: the first month at a fixed pilot price, credited
-  against the first year if they stay.
+- **One month on Business, up to 3 seats, for ₹9,999 plus GST** (decision N-198; the list price for 3 seats is ₹14,997),
+  paid in advance through the ordinary checkout and **credited in full against the first yearly plan** if they continue
+  within 30 days. A paid pilot, even a small one, gets attention a free trial does not.
 - **What they get:** their invoices read, GST credit checked against their GSTR-2B every month, Helm's payment plan and
   reminders, and a written result at day 30.
 - **What you promise:** a measured accuracy figure on their own documents, and every rupee of credit at risk named with
@@ -37,7 +37,7 @@ Fill the truth sheet **with** the customer's accountant: it takes about an hour 
 | **Accuracy** | `python scripts/accuracy_report.py --workspace <id> --truth truth.csv --out accuracy.md`, run after processing and **before** anyone corrects fields | Day 3 |
 | **Time from invoice received to entered** | Their old way (ask them) against the time on Servabo's document list | Day 7 and day 30 |
 | **Rupees found** | GST Credit: credit at risk (not in GSTR-2B, amount differences, the 180-day rule), with each invoice | Day 7 and day 30 |
-| **Rupees verified recovered** | Only if the Recoveries layer is built (Phase 6): each recovery a person marked closed, with its evidence | Day 30 |
+| **Rupees recovered, verified** | The Recoveries page (Documents → Recoveries): each issue closed by evidence, with what it proved; "Found" beside it, never added | Day 7 and day 30 |
 | **The review queue** | How many documents waited for a person, and why | Weekly |
 
 ## 4. The weekly check-in (30 minutes)
@@ -75,4 +75,5 @@ Ask permission first, in writing. Then:
 - **They continue:** offer the yearly plan. A monthly charge above ₹15,000 (with GST) needs the payer's approval every
   month under the RBI's e-mandate rule; a yearly plan is one payment a year, approved once.
 - **They stop:** ask why, write it in the pilot notes, and fix what you can before the next pilot.
-- **Either way:** ask the CA for two more introductions.
+- **Either way:** ask the CA for two more introductions. A CA who introduces a pilot gets a free Starter seat for as long as
+  the customer stays, never a fee (N-198).

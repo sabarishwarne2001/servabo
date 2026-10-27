@@ -2659,7 +2659,7 @@ mandate editor; stored caps are kept but no longer let anything pay.
 **If you want it back** for small amounts from suppliers you trust, that is a new decision: it would need a list of trusted
 suppliers and bank accounts a person confirmed, so a document alone could never steer it.
 
-## N-197 — Should ERP auto-post skip a case that completed because of an outside upload? (OPEN)
+## N-197 — Should ERP auto-post skip a case that completed because of an outside upload? (DECIDED (owner, delegated, 2026-10-27): option 2; built)
 
 When an admin turns ERP auto-post on and lets it post completed cases, a case that completes on its own (a supplier's
 upload through a request link) is posted to the accounting system without a person looking (docs/hardening/PROMPT-INJECTION.md,
@@ -2668,12 +2668,24 @@ section 4). It posts a bill or a payment reference as data, never a payment, and
 outside (a request link or email-in) until a person opens it; (3) show such cases in the review queue first. Recommendation:
 (2). Nothing is built until you choose.
 
-## N-198 — The pilot offer: price and terms of a 30-day paid pilot (OPEN)
+**Decided and built (Final session 2A, under the owner's delegated authority of 2026-10-27): option (2).** Auto-post never
+posts a case that completed while it holds a document an outside party uploaded through a request link; it waits for a
+person, who posts it by hand from the ERP console or closes the case (a closed case auto-posts as before). Email-in is not
+counted as "outside": it accepts only senders an admin allowed. `erp/sources.eligible(for_auto=True)`;
+`tests/api/test_erp_auto_post_outside_upload.py`.
+
+## N-198 — The pilot offer: price and terms of a 30-day paid pilot (DECIDED (owner, delegated, 2026-10-27))
 
 `docs/product/PILOT-PLAYBOOK.md` describes a 30-day paid pilot on Business. **You decide:** the pilot price (suggested shape:
 a fixed first-month price, credited against the first year if they stay), how many seats it covers, and whether a CA who
 introduces a customer gets anything. Nothing in the product changes for a pilot: it is an ordinary Business subscription.
 
+**Decided (Final session 2A, under the owner's delegated authority of 2026-10-27).** One month on **Business for up to 3
+seats at ₹9,999 plus GST** (the list price for 3 seats is ₹14,997), paid in advance through the ordinary checkout, and
+**credited in full against the first yearly plan** if the customer continues within 30 days of the pilot's end. A CA who
+introduces a pilot customer gets nothing in money (no referral fee: it keeps the CA's advice independent); they get a free
+Starter seat for as long as the customer stays. Change any of these freely: nothing in the product depends on them (a pilot
+is an ordinary Business subscription; the credit is applied by hand in Dodo when the yearly plan is bought).
 
 ## N-199 — Every email shows the real Servabo logo (DECIDED (owner, 2026-10-27); built by Final session 2A)
 
