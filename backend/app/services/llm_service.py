@@ -24,8 +24,13 @@ from app.prompts.prompt_builder import PromptBuilder
 from app.schemas.assistant import TokenUsage
 from app.services import llm_resilience
 from app.services.llm_resilience import LLMPermanentError, LLMUnavailable
+from app.services.fenced_context import fence_document
 
 logger = logging.getLogger("app.services.llm_service")
+
+#: What the classification prompt may answer (plus the note kinds the extraction rules name). Anything else is "Other".
+KNOWN_CLASSIFICATIONS = frozenset({"Invoice", "Resume", "Contract", "Purchase Order", "Receipt", "Credit Note",
+                                   "Debit Note", "Other"})
 
 CLASSIFICATION_PROMPT_TEMPLATE = """
 You are an expert document classifier.
@@ -897,7 +902,8 @@ class LLMService:
         return PromptIntent.QUESTION_ANSWERING
 
     def _build_classification_prompt(self, text: str) -> str:
-        return CLASSIFICATION_PROMPT_TEMPLATE.format(text=self._truncate_document(text))
+        # Final session 2A (invariant (c)): the document is fenced as data, never pasted in as instructions.
+        return CLASSIFICATION_PROMPT_TEMPLATE.format(text=fence_document(self._truncate_document(text)).render_for_prompt())
 
     def _build_entity_prompt(
         self,
@@ -907,9 +913,12 @@ class LLMService:
         memory_context: str | None = None,
         preset_context: str | None = None,
     ) -> str:
+        # Final session 2A (invariant (c)): the classifier read the document, so its answer is only used when it is one of
+        # the known labels; the document itself is fenced as data.
+        known = document_classification if document_classification in KNOWN_CLASSIFICATIONS else "Other"
         prompt = ENTITY_EXTRACTION_PROMPT_TEMPLATE.format(
-            document_classification=document_classification,
-            text=self._truncate_document(text),
+            document_classification=known,
+            text=fence_document(self._truncate_document(text)).render_for_prompt(),
         )
         # ARCH42-S1:preset-prompt. An enabled ARCH-38 preset's fields, as
         # extra keys, just before the output instruction. None for a
@@ -924,7 +933,7 @@ class LLMService:
         return f"{memory_context}\n\n{prompt}" if memory_context else prompt
 
     def _build_summary_prompt(self, text: str) -> str:
-        return SUMMARIZATION_PROMPT_TEMPLATE.format(text=self._truncate_document(text))
+        return SUMMARIZATION_PROMPT_TEMPLATE.format(text=fence_document(self._truncate_document(text)).render_for_prompt())
 
     def enrichment_prompts(
         self, *, text: str, document_classification: str = "Other"

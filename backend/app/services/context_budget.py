@@ -192,6 +192,18 @@ def trim_results_to_budget(
     return kept, dropped
 
 
+def summary_prompt(*, existing: str, turns: Sequence[dict[str, str]], max_words: int) -> str:
+    """The digest prompt. Final session 2A (invariant (c)): the turns quote documents (a question pasting an invoice, an
+    answer quoting one), so they are fenced as data like any document text."""
+    from app.services.fenced_context import fence_document
+
+    return SUMMARY_PROMPT_TEMPLATE.format(
+        max_words=max_words,
+        existing=existing or "(none yet)",
+        turns=fence_document(_format_turns(turns), what="the conversation so far").render_for_prompt(),
+    )
+
+
 def _format_turns(messages: Sequence[dict[str, str]]) -> str:
     return "\n\n".join(
         f"{message.get('role', 'user')}: {message.get('content', '')}"
@@ -351,11 +363,7 @@ class ContextBudgetService:
         from app.services.llm_service import llm_service
 
         max_words = max(60, int(max_tokens * 0.7))
-        prompt = SUMMARY_PROMPT_TEMPLATE.format(
-            max_words=max_words,
-            existing=existing or "(none yet)",
-            turns=_format_turns(overflow),
-        )
+        prompt = summary_prompt(existing=existing, turns=overflow, max_words=max_words)
 
         scope = f"llm:{conversation_id}:summary:{turn}"
         if llm_metering.already_recorded(
