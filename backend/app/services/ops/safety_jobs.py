@@ -198,9 +198,14 @@ def _post_webhook(subject: str) -> None:
     if not url:
         return
     try:
-        import httpx
+        import json
 
-        httpx.post(url, json={"severity": "page", "summary": subject}, timeout=10)
+        from app.core.ssrf_client import SSRFSafeHTTPClient
+
+        # Through the egress gate like every outbound call (https only, no private ranges): the address is the operator's.
+        SSRFSafeHTTPClient(total_timeout=10).request(
+            "POST", url, headers={"Content-Type": "application/json"},
+            body=json.dumps({"severity": "page", "summary": subject}).encode("utf-8"))
     except Exception:  # noqa: BLE001 - the email still goes; a webhook outage never stops the check
         logger.warning("ops.safety_jobs_webhook_failed", exc_info=True)
 

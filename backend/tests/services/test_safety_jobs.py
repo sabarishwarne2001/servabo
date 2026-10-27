@@ -160,9 +160,12 @@ def _alerts(db) -> list[OperatorAlert]:
 def test_a_stale_job_is_one_alert_a_day_and_the_webhook_hears_it_once(db, monkeypatch) -> None:
     posted = []
     monkeypatch.setattr(settings, "ALERT_WEBHOOK", "https://hc-ping.example/abc/fail")
-    import httpx
+    import json
 
-    monkeypatch.setattr(httpx, "post", lambda url, json, timeout: posted.append((url, json)))
+    from app.core import ssrf_client
+
+    monkeypatch.setattr(ssrf_client.SSRFSafeHTTPClient, "request",
+                        lambda self, method, url, headers=None, body=b"": posted.append((url, json.loads(body))))
     safety_jobs.watching_since(db, now=T0)
     _all_succeed(db, T0)
     safety_jobs.record(db, name="compliance", outcome="succeeded", now=T0 + timedelta(hours=1))
