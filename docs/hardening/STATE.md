@@ -26,14 +26,18 @@ the session scratchpad (outside the repo).
   readiness adds `safety_jobs: degraded` only when degraded (a healthy answer stays `{"status": "ready"}`, F-042). Unverified until
   2B: a real server's cron, and the stopped-cron email arriving the next day (checklist step 10).
 - [ ] 3. Prompt injection: `docs/hardening/PROMPT-INJECTION.md`, registry-walking invariants (a) to (f), the red-team corpus, fixes test-first
-- [ ] 4. Leftovers: the GST speed test's timings, deletion warning emails, a zip in the upload tray, `k1a6`'s downgrade with rows, PR #39's
-  loose ends
+- [x] 4. Leftovers: the GST speed test's timings, deletion warning emails, a zip in the upload tray, `k1a6`'s downgrade with rows, PR #39's
+  loose ends. GST matching 2.23 s / import 1.80 s, as Session H (no code change, budget unchanged); deletion warnings at once and 5 days
+  before (migration `s2a2`); the global tray takes a zip (spec 138); `k1a6` proven safe with rows (no change); spec 122 → 139.
+  CI on the PR was red after Phases 1-2 and is fixed in code: F-630 (ERP plan check before lookup), the safety-job webhook through the
+  egress gate, the data map, N-187 expected values, the website's fonts (Lighthouse 97 again). Spec 78 (Helm "already planning",
+  409) failed once on CI and passed twice locally: watched, not yet explained.
 - [ ] 5. The proof kit: `scripts/accuracy_report.py`, `docs/product/PILOT-PLAYBOOK.md`
 - [ ] 6. The Resolution layer (only if 0B says build)
 - [ ] 7. Records and the docs customers see
 - [ ] 8. `docs/sessions/FINAL-2-LIVE.md` rewritten; HANDOFF "Final session 2A → Final session 2B"; PR ready; CI green
 
-- **Next action:** Phase 3 (prompt injection).
+- **Next action:** Phase 3 (prompt injection; the inventory of paths is done, see the map).
 
 
 ## Current phase — the final sessions: 2A, then 2T (TRINETRA), then 2B (2026-10-26)

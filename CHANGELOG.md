@@ -6,6 +6,18 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Added — Final session 2A, Phase 4: leftovers (2026-10-27)
+
+- **Warning emails after a deletion** (N-164): the owners and admins of a deleted workspace or organization are emailed at once
+  ("will be erased on <date>; restore until then") and 5 days before the erasure ("last chance").
+- **The upload tray on a conversation takes a zip**, by the same path as the Documents page.
+- The GST speed test names the slow step when it fails (the budget is unchanged); migration `k1a6`'s downgrade is proven with rows.
+
+### Fixed — Final session 2A, Phases 1 to 4 (CI)
+
+- ERP pages answered a Free organization "not found" instead of naming the plans that include ERP posting (F-630).
+- The website's pages showing rupees loaded 100 KB of extra fonts for the ₹ sign; only the Latin fonts load now.
+
 ### Added — Final session 2A, Phase 2: safety jobs that cannot stop silently (2026-10-26)
 
 - **Every server cron job reports its runs to the app** (sweeps, backups, restore drill, uptime check). When one has not
