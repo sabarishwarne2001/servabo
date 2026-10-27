@@ -6,6 +6,18 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Changed — Final session 2A, Phases 6 to 8: the decision, the records, the live prompt (2026-10-27)
+
+- **The Resolution layer ("Recoveries", N-191) was not built in this session**: declined by the session's cut line after
+  the must-haves; it is the first build after the pilots (`docs/product/RESOLUTION-ASSESSMENT.md`).
+- **The live session's prompt (`docs/sessions/FINAL-2-LIVE.md`) rewritten** for what exists now: the fifteen Dodo products in
+  both currencies and the rupee journey, the safety jobs' stale alert in the production rehearsal, the red-team documents
+  through real models, the accuracy report on real invoices, the deletion warnings in a real inbox. Final session 2T adds
+  TRINETRA's phase.
+- **The deletion-warning job honours `run-job --now` outside production**, so the "last chance" email can be seen without
+  waiting 25 days.
+- The hand-over to Final session 2B (`docs/hardening/HANDOFF.md`) and the owner's guide (`docs/FINAL-SESSIONS.md`).
+
 ### Added — Final session 2A, Phase 5: the proof kit (2026-10-27)
 
 - **`scripts/accuracy_report.py`** measures extraction accuracy on real documents against a truth sheet the customer fills

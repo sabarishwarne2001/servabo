@@ -2,7 +2,7 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-26 (Final session 2A started)_
+_Last updated: 2026-10-27 (Final session 2A finished; next: Final session 2T)_
 
 ## Current phase — Final session 2A (FINAL-2-UPGRADE) (2026-10-26)
 Branch `claude/new-session-gbo9ee` (the session's assigned branch; CLAUDE.md says `hardening/<topic>`, the brief says "use the session's
@@ -41,10 +41,19 @@ the session scratchpad (outside the repo).
   no document values. Tested with an invented truth sheet; 2B runs it on the owner's invoices. Pilot price: N-198 (open).
 - [x] 6. The Resolution layer (only if 0B says build): **declined for this session** by the prompt's cut line (usage was tight after
   Phase 5; the session hit its limit once). N-191's decision stands; RESOLUTION-ASSESSMENT.md says what the pilots measure meanwhile.
-- [ ] 7. Records and the docs customers see
-- [ ] 8. `docs/sessions/FINAL-2-LIVE.md` rewritten; HANDOFF "Final session 2A → Final session 2B"; PR ready; CI green
+- [x] 7. Records and the docs customers see: PRODUCT-NEXT, COSTS, RUNBOOK, CONFIGURATION, the env templates, DODO.md and
+  DODO-LOCAL-TEST.md (journey I: the rupee journey, the mandate notice, the GSTIN), the website (rupees and dollars, the 14-day
+  trial, `/trinetra` per user), CHANGELOG, FINDINGS (F-626 to F-636), COVERAGE, NEEDS-OWNER (N-191 to N-198), FINAL-SESSIONS.
+- [x] 8. `docs/sessions/FINAL-2-LIVE.md` rewritten (2T adds TRINETRA's phase and removes the note); HANDOFF "Final session 2A →
+  Final session 2B". One small code change for it, test-first: the deletion-warning job honours `run-job --now` outside
+  production, so 2B sees the "last chance" email. Finish-line checks run here: frontend typecheck, lint, `check:self`,
+  `test:unit` (299) and build; the website's typecheck, build and checks; `campaign_slices.py --check all` 0; one Alembic head
+  `s2a3_counterparty_contact_source`, up, down three (to `tr1a2_review_outcomes`) and up on an empty database. The full backend
+  and browser suites: on the ready PR's CI (sabarishwarne2001/servabo#43).
 
-- **Next action:** Phase 7 (records and customer docs), then Phase 8 (the live prompt, the hand-over), then the finish line.
+- **Next action: Final session 2T** (`docs/sessions/FINAL-2T-TRINETRA.md`, TRINETRA for Business and Enterprise), after PR #43
+  is merged with CI green. Then Final session 2B (`docs/sessions/FINAL-2-LIVE.md`) on the owner's PC. Next free numbers:
+  **N-199**, **F-637**, browser spec **140**.
 
 
 ## Current phase — the final sessions: 2A, then 2T (TRINETRA), then 2B (2026-10-26)
