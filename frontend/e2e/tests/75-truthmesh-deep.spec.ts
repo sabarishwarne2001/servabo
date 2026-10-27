@@ -93,8 +93,13 @@ test.describe("TruthMesh in depth — a tenant of its own", () => {
     const accepted = page.waitForResponse((r) => /\/truthmesh\/rebuild$/.test(r.url()) && r.request().method() === "POST");
     await rebuild.click();
     expect((await accepted).status()).toBe(202);
-    await expect.poll(async () => new Date((await overview()).state.last_built_at ?? 0).getTime(), { timeout: 120_000 })
-      .toBeGreaterThanOrEqual(started - 5_000);
+    // Indexing one document (queued after its enrichment) also stamps last_built_at, and on a busy worker
+    // it can land after the click with the mesh still a document short (CI run 510): wait for the
+    // stamp and every document, not the stamp alone.
+    await expect.poll(async () => {
+      const now = await overview();
+      return new Date(now.state.last_built_at ?? 0).getTime() >= started - 5_000 && now.documents === SAMPLES.length;
+    }, { timeout: 120_000 }).toBe(true);
     await expect(page.getByTestId("mesh-state")).toContainText(/^\s*Built/, { timeout: 120_000 });
     const built = await overview();
     expect(built.state.status).toBe("READY");

@@ -3823,3 +3823,13 @@ duplicate kind reads one finding per invoice, the strongest (confirmed, then ope
 when it judges; the sweep also keeps an issue it has just made, so a repeated subject updates it. **Proof:**
 `test_two_radar_findings_on_one_invoice_are_one_issue` (the UniqueViolation first, passing now); the Recoveries API and
 engine suites, the isolation invariants and `test_process_intel_live` pass (30).
+
+## F-639 — Spec 75 took one document's indexing for the finished rebuild (P3, test only)
+
+**Found:** CI run 510, spec 75 "Rebuild on the page builds the mesh": the overview said 4 documents, not 5; the same
+code passed 11 of 11 locally. **Cause (read from the code, not reproduced: it needs a busy worker):** indexing one
+document (`truthmesh.index_document`, queued after its enrichment) also stamps the mesh's `last_built_at`. On a busy CI
+worker one such job ran after the Rebuild click, so the test's signal that the rebuild had finished fired with the mesh
+still a document short, while the rebuild itself was queued. The product was right: the mesh reaches every document.
+**Fix:** the test waits for the stamp and every document; no assertion was removed. **Proof:** spec 75 passes locally
+(11); the CI run on the fix is the check that it holds under load.
