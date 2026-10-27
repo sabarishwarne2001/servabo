@@ -2694,6 +2694,6 @@ email. **Built:** every email sent as Servabo now shows the logo itself (the rib
 light and a dark version. It travels **inside the email** as a small picture (about 19 KB each), not as a link to a web
 address, so Gmail, Outlook and Apple Mail show it without "load images?" and security emails still carry no web address.
 Mail an organization sends under its own brand shows its own name, as before. **Not yet seen in a real inbox:** Final
-session 2B looks at it in Gmail, Outlook and Apple Mail, light and dark. One known limit: dark mode in the Gmail phone apps
-ignores the stylesheet, so there the light logo (dark lettering) sits on a darkened card; if that looks wrong, the fallback
-is to put the logo on a small white rounded panel.
+session 2B looks at it in Gmail, Outlook and Apple Mail, light and dark. Dark mode in the Gmail phone apps ignores the
+stylesheet that swaps the two pictures, so the light picture carries its own small white rounded panel: its dark lettering
+stays readable on a darkened card (checked in a browser with the card darkened and the stylesheet removed).

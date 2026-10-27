@@ -61,11 +61,24 @@ def test_white_label_mail_carries_no_servabo_logo() -> None:
 def test_the_logo_pictures_are_the_brand_logo_at_three_times_email_size(name: str) -> None:
     data = (ASSETS / f"{name}.png").read_bytes()
     width, height = _png_size(data)
-    assert height == inline_images.LOGO_HEIGHT * 3
+    assert height == inline_images.LOGO_HEIGHT * 3 and inline_images.LOGO_WIDTH == round(width / 3)
     svg = (Path(__file__).resolve().parents[3] / "brand/assets" / f"{name}.svg").read_text()
     view_w, view_h = (float(v) for v in re.search(r'viewBox="0 0 ([\d.]+) ([\d.]+)"', svg).groups())
-    assert abs(width / height - view_w / view_h) < 0.02, "the picture is not the brand logo's shape"
-    assert inline_images.LOGO_WIDTH == round(inline_images.LOGO_HEIGHT * view_w / view_h)
+    pad = inline_images.LOGO_PAD * 3   # the panel around the logo, on each side
+    assert abs((width - 2 * pad) / (height - 2 * pad) - view_w / view_h) < 0.02, "the picture is not the brand logo's shape"
+
+
+def test_the_light_logo_carries_its_own_white_panel_and_the_dark_one_none() -> None:
+    """Gmail's phone apps darken the card in dark mode but ignore the stylesheet that swaps the pictures: the light
+    logo's dark lettering stays readable on its own white panel (N-199)."""
+    from PIL import Image
+
+    light = Image.open(ASSETS / "servabo-logo-light.png").convert("RGBA")
+    dark = Image.open(ASSETS / "servabo-logo-dark.png").convert("RGBA")
+    edge = (3, light.height // 2)                       # inside the panel's padding, beside the mark
+    assert light.getpixel(edge) == (255, 255, 255, 255)
+    assert dark.getpixel(edge)[3] == 0
+    assert light.getpixel((0, 0))[3] < 255               # rounded corners
 
 
 def _send(html: str) -> EmailMessage:

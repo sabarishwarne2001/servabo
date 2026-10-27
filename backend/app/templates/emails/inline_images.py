@@ -17,9 +17,12 @@ from pathlib import Path
 
 ASSETS = Path(__file__).parent / "assets"
 LIGHT, DARK = "servabo-logo-light", "servabo-logo-dark"
-#: The logo's size in the email, in CSS pixels (the brand logo's shape: 125.74 x 32).
-LOGO_HEIGHT = 40
-LOGO_WIDTH = 157
+#: The picture's size in the email, in CSS pixels: the logo 40 px tall (its shape is 125.74 x 32) with 4 px of panel
+#: around it. The light picture's panel is white and opaque, so a client that darkens the card without reading the
+#: stylesheet (Gmail's phone apps) still shows dark lettering on white; the dark picture's is transparent.
+LOGO_PAD = 4
+LOGO_HEIGHT = 48
+LOGO_WIDTH = 165
 
 
 @cache
@@ -40,4 +43,4 @@ def attach(message: EmailMessage, html_body: str) -> None:
                               disposition="inline")
 
 
-__all__ = ["DARK", "LIGHT", "LOGO_HEIGHT", "LOGO_WIDTH", "attach"]
+__all__ = ["DARK", "LIGHT", "LOGO_HEIGHT", "LOGO_PAD", "LOGO_WIDTH", "attach"]
