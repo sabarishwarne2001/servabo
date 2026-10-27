@@ -6,6 +6,14 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Added — Final session 2A, Phase 5: the proof kit (2026-10-27)
+
+- **`scripts/accuracy_report.py`** measures extraction accuracy on real documents against a truth sheet the customer fills
+  (`scripts/accuracy_truth_template.csv`): accuracy by field, documents with every key field right, how many wrong fields
+  went to review, and every miss. A Markdown report fit to show a customer.
+- **`docs/product/PILOT-PLAYBOOK.md`**: how to run a 30-day paid pilot with a distributor, from day-1 documents to the case
+  study.
+
 ### Security — Final session 2A, Phase 3: prompt injection, mapped and tested (2026-10-27)
 
 - **The map** (`docs/hardening/PROMPT-INJECTION.md`): every way outside text enters, every model that reads it, every effect,

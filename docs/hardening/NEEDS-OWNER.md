@@ -2666,3 +2666,9 @@ section 4). It posts a bill or a payment reference as data, never a payment, and
 outside (a request link or email-in) until a person opens it; (3) show such cases in the review queue first. Recommendation:
 (2). Nothing is built until you choose.
 
+## N-198 — The pilot offer: price and terms of a 30-day paid pilot (OPEN)
+
+`docs/product/PILOT-PLAYBOOK.md` describes a 30-day paid pilot on Business. **You decide:** the pilot price (suggested shape:
+a fixed first-month price, credited against the first year if they stay), how many seats it covers, and whether a CA who
+introduces a customer gets anything. Nothing in the product changes for a pilot: it is an ordinary Business subscription.
+

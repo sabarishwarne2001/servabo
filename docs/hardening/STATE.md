@@ -36,12 +36,14 @@ the session scratchpad (outside the repo).
   CI on the PR was red after Phases 1-2 and is fixed in code: F-630 (ERP plan check before lookup), the safety-job webhook through the
   egress gate, the data map, N-187 expected values, the website's fonts (Lighthouse 97 again). Spec 78 (Helm "already planning",
   409) failed once on CI and passed twice locally: watched, not yet explained.
-- [ ] 5. The proof kit: `scripts/accuracy_report.py`, `docs/product/PILOT-PLAYBOOK.md`
+- [x] 5. The proof kit: `scripts/accuracy_report.py`, `docs/product/PILOT-PLAYBOOK.md`. The report compares a truth sheet
+  (`scripts/accuracy_truth_template.csv`) with the extraction: field and document accuracy, the review catch rate, every miss,
+  no document values. Tested with an invented truth sheet; 2B runs it on the owner's invoices. Pilot price: N-198 (open).
 - [ ] 6. The Resolution layer (only if 0B says build)
 - [ ] 7. Records and the docs customers see
 - [ ] 8. `docs/sessions/FINAL-2-LIVE.md` rewritten; HANDOFF "Final session 2A → Final session 2B"; PR ready; CI green
 
-- **Next action:** Phase 5 (accuracy report and pilot playbook; both drafted), then Phase 6 if the budget allows.
+- **Next action:** Phase 6 (the Recoveries layer, N-191) if the budget allows; otherwise Phases 7 and 8.
 
 
 ## Current phase — the final sessions: 2A, then 2T (TRINETRA), then 2B (2026-10-26)
