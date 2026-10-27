@@ -93,6 +93,14 @@ def perform(state: Any, spec: Any) -> ActionOutcome:
         "has_score": score is not None,
         "decision": decision.as_details() if decision is not None else None,
     }
+    # Final session 2A (Phase 3, invariant (d)): the score was produced by models that read the document; a document whose
+    # text reads like instructions to the AI is held for a person whatever the score says.
+    from app.services.injection_guard import document_flags
+
+    injected = document_flags(work_item)
+    if injected:
+        allowed = False
+        details["injection"] = injected
     if allowed:
         return ActionOutcome(
             summary="calibrated autonomy allowed the document",
@@ -101,7 +109,9 @@ def perform(state: Any, spec: Any) -> ActionOutcome:
         )
 
     reason = config.hold_reason
-    if decision is not None and decision.reason:
+    if injected:
+        reason = f"{reason} (the document's text reads like instructions to the AI: {', '.join(injected)})"[:240]
+    elif decision is not None and decision.reason:
         reason = f"{reason} ({decision.reason})"[:240]
     elif score is None:
         reason = f"{reason} (no score available)"[:240]

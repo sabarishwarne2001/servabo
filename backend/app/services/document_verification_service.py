@@ -366,6 +366,20 @@ def triage(
                 "extraction_memory": {"review_all_fields": True, "reason": hold},
             }
 
+    # Final session 2A (Phase 3, invariant (d)): the agents all read the document, so a document whose own text reads like
+    # instructions to the AI can move their agreement and confidence. It is never auto-approved: a person reviews every field.
+    if verification.auto_approved:
+        from app.services.injection_guard import document_flags
+
+        flags = document_flags(work_item)
+        if flags:
+            verification.status = VerificationStatus.DISAGREED
+            verification.auto_approved = False
+            verification.details = {
+                **(verification.details or {}),
+                "injection": {"categories": flags, "review_all_fields": True},
+            }
+
     if verification.auto_approved:
         work_item.extracted_entities = {
             **(work_item.extracted_entities or {}),
