@@ -93,6 +93,10 @@ def _amount(raw: Any) -> Optional[Decimal]:
     return value if value.is_finite() and value >= 0 else None
 
 
+#: CGST Rules 2017, rule 46(b): a serial number of at most sixteen characters: letters, digits, "-" and "/".
+_DOC_NUMBER = re.compile(r"[A-Za-z0-9/-]{1,16}")
+
+
 def parse_token(token: str, *, public_key_pem: Optional[str] = None) -> Optional[EInvoiceQr]:
     """The e-invoice fields in a QR code's text, or None when it is not an e-invoice QR code (or is unreadable).
     `public_key_pem`: verify the RS256 signature with it; without a key `signature_verified` is False."""
@@ -113,7 +117,10 @@ def parse_token(token: str, *, public_key_pem: Optional[str] = None) -> Optional
     irn = str(data.get("Irn") or "").strip().lower()
     number = str(data.get("DocNo") or "").strip()[:64]
     # A real code has a valid supplier GSTIN, a 64-hex IRN and a number; anything less is not trusted as an e-invoice.
-    if seller is None or not _IRN.match(irn) or not number:
+    # Final session 2A (Phase 3): the number must also be one a GST invoice can carry, at most 16 letters, digits,
+    # "-" and "/" (CGST Rules 2017, rule 46(b)); a code whose "number" is a sentence is not a genuine e-invoice, and its
+    # text must not become a field.
+    if seller is None or not _IRN.match(irn) or not _DOC_NUMBER.fullmatch(number):
         return None
     verified = bool(public_key_pem) and verify_signature(text, public_key_pem or "")
     state = (SIGNATURE_CHECKED if verified else SIGNATURE_DOES_NOT_MATCH) if public_key_pem else SIGNATURE_NOT_CHECKED
