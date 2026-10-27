@@ -3731,3 +3731,10 @@ After paying for Starter, the checkout return page said "You're on the developer
 key, not the name customers buy (N-187 shows `developer` as Starter). Found by browser spec 60; proven by
 `tests/api/test_starter_packaging.py::test_the_billing_state_names_the_plan_starter`, which failed first (the billing
 state carried no name). The state now carries `plan_name` and the page uses it; spec 60 checks "starter plan with 1 seat".
+
+## F-630 — ERP routes told a Free organization "not found" before "not on your plan" (P3)
+
+Phase 1's Tally-on-Starter change looked the ERP target or posting up before checking the plan, so a Free organization got 404
+on eleven ERP routes instead of the 402 that names the plans including ERP posting (the upgrade moment was lost). Found by CI;
+proven by `tests/security/test_plan_gating_server_side.py`, which failed locally first. The plan is now checked before the
+lookup; the Tally tests still pass.

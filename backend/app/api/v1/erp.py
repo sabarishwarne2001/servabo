@@ -6,7 +6,7 @@ tables ADMIN. Credentials are write-only: no route returns one (only its fingerp
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, or_, select
@@ -96,10 +96,14 @@ def _tally_only(db: Session, context: TenantContext, operation: str) -> bool:
     return False  # unreachable: _gate raised
 
 
-def _gate_target(db: Session, context: TenantContext, operation: str, target: ErpTarget) -> None:
-    """ERP posting, or the Tally file on a Tally download target (N-187)."""
-    if _tally_only(db, context, operation) and not _is_tally_file(target):
+def _gate_target(db: Session, context: TenantContext, operation: str, load: Callable[[], ErpTarget]) -> ErpTarget:
+    """ERP posting, or the Tally file on a Tally download target (N-187). The plan is checked BEFORE the target is
+    looked up, so an organization with neither is refused for its plan (402), never told "not found" first."""
+    tally_only = _tally_only(db, context, operation)
+    target = load()
+    if tally_only and not _is_tally_file(target):
         _gate(db, context, operation)
+    return target
 
 
 def _tally_targets(workspace_id: uuid.UUID):
@@ -285,8 +289,7 @@ def _detail(db: Session, t: ErpTarget) -> TargetDetail:
 def get_target(workspace_id: uuid.UUID, target_id: uuid.UUID, db: Session = Depends(get_db),
                context: TenantContext = Depends(RequireViewer)) -> TargetDetail:
     _ws(context, workspace_id)
-    t = _target(db, workspace_id, target_id)
-    _gate_target(db, context, "erp.targets.get", t)
+    t = _gate_target(db, context, "erp.targets.get", lambda: _target(db, workspace_id, target_id))
     return _detail(db, t)
 
 
@@ -309,8 +312,7 @@ def update_target(workspace_id: uuid.UUID, target_id: uuid.UUID, body: TargetUpd
 def delete_target(workspace_id: uuid.UUID, target_id: uuid.UUID, db: Session = Depends(get_db),
                   context: TenantContext = Depends(RequireAdmin)) -> Response:
     _ws(context, workspace_id)
-    t = _target(db, workspace_id, target_id)
-    _gate_target(db, context, "erp.targets.delete", t)
+    t = _gate_target(db, context, "erp.targets.delete", lambda: _target(db, workspace_id, target_id))
     try:
         service.delete_target(db, target=t, actor_user_id=context.user_id)
     except service.ErpError as exc:
@@ -353,8 +355,7 @@ def test_target(workspace_id: uuid.UUID, target_id: uuid.UUID, db: Session = Dep
 def get_mappings(workspace_id: uuid.UUID, target_id: uuid.UUID, object_kind: str, db: Session = Depends(get_db),
                  context: TenantContext = Depends(RequireViewer)) -> MappingVersions:
     _ws(context, workspace_id)
-    t = _target(db, workspace_id, target_id)
-    _gate_target(db, context, "erp.mappings.get", t)
+    t = _gate_target(db, context, "erp.mappings.get", lambda: _target(db, workspace_id, target_id))
     _kind(object_kind, PR.supported_objects(t.format, t.preset), "object kind for this target")
     rows = list(db.execute(select(ErpMapping).where(ErpMapping.target_id == t.id, ErpMapping.object_kind == object_kind)
                            .order_by(ErpMapping.version.desc())).scalars())
@@ -534,8 +535,7 @@ def list_postings(workspace_id: uuid.UUID, state: Optional[str] = Query(default=
 def create_postings(workspace_id: uuid.UUID, body: PostRequest, db: Session = Depends(get_db),
                     context: TenantContext = Depends(RequireAdmin)) -> PostResponse:
     _ws(context, workspace_id)
-    t = _target(db, workspace_id, body.target_id)
-    _gate_target(db, context, "erp.postings.create", t)
+    t = _gate_target(db, context, "erp.postings.create", lambda: _target(db, workspace_id, body.target_id))
     _kind(body.source_kind, v.SOURCE_KINDS, "source kind")
     results = []
     for kind in body.object_kinds:
@@ -557,8 +557,7 @@ def create_postings(workspace_id: uuid.UUID, body: PostRequest, db: Session = De
 def preview_posting(workspace_id: uuid.UUID, body: PreviewRequest, db: Session = Depends(get_db),
                     context: TenantContext = Depends(RequireContributor)) -> PreviewResponse:
     _ws(context, workspace_id)
-    t = _target(db, workspace_id, body.target_id)
-    _gate_target(db, context, "erp.postings.preview", t)
+    t = _gate_target(db, context, "erp.postings.preview", lambda: _target(db, workspace_id, body.target_id))
     _kind(body.source_kind, v.SOURCE_KINDS, "source kind")
     _kind(body.object_kind, v.OBJECT_KINDS, "object kind")
     try:
@@ -593,7 +592,7 @@ def preview_posting(workspace_id: uuid.UUID, body: PreviewRequest, db: Session =
 def get_posting(workspace_id: uuid.UUID, posting_id: uuid.UUID, db: Session = Depends(get_db),
                 context: TenantContext = Depends(RequireViewer)) -> PostingDetail:
     _ws(context, workspace_id)
-    _gate_target(db, context, "erp.postings.get", _posting_target(db, workspace_id, posting_id))
+    _gate_target(db, context, "erp.postings.get", lambda: _posting_target(db, workspace_id, posting_id))
     p = _posting(db, workspace_id, posting_id)
     return _posting_detail(db, p)
 
@@ -629,7 +628,7 @@ def _posting_detail(db: Session, p: ErpPosting) -> PostingDetail:
 def download_posting(workspace_id: uuid.UUID, posting_id: uuid.UUID, db: Session = Depends(get_db),
                      context: TenantContext = Depends(RequireContributor)) -> Response:
     _ws(context, workspace_id)
-    _gate_target(db, context, "erp.postings.download", _posting_target(db, workspace_id, posting_id))
+    _gate_target(db, context, "erp.postings.download", lambda: _posting_target(db, workspace_id, posting_id))
     p = _posting(db, workspace_id, posting_id)
     if p.rendered is None:
         raise HTTPException(status_code=404, detail="This posting has no file (it was not rendered, or was erased).")
@@ -662,7 +661,7 @@ def _review(db: Session, context: TenantContext, workspace_id: uuid.UUID, postin
 def retry_posting(workspace_id: uuid.UUID, posting_id: uuid.UUID, body: Optional[ReviewAction] = None,
                   db: Session = Depends(get_db), context: TenantContext = Depends(RequireAdmin)) -> PostingDetail:
     _ws(context, workspace_id)
-    _gate_target(db, context, "erp.postings.retry", _posting_target(db, workspace_id, posting_id))
+    _gate_target(db, context, "erp.postings.retry", lambda: _posting_target(db, workspace_id, posting_id))
     return _review(db, context, workspace_id, posting_id, v.VERDICT_RETRY, body)
 
 
@@ -670,7 +669,7 @@ def retry_posting(workspace_id: uuid.UUID, posting_id: uuid.UUID, body: Optional
 def accept_posting(workspace_id: uuid.UUID, posting_id: uuid.UUID, body: Optional[ReviewAction] = None,
                    db: Session = Depends(get_db), context: TenantContext = Depends(RequireAdmin)) -> PostingDetail:
     _ws(context, workspace_id)
-    _gate_target(db, context, "erp.postings.accept", _posting_target(db, workspace_id, posting_id))
+    _gate_target(db, context, "erp.postings.accept", lambda: _posting_target(db, workspace_id, posting_id))
     return _review(db, context, workspace_id, posting_id, v.VERDICT_ACCEPT, body)
 
 
@@ -678,7 +677,7 @@ def accept_posting(workspace_id: uuid.UUID, posting_id: uuid.UUID, body: Optiona
 def cancel_posting(workspace_id: uuid.UUID, posting_id: uuid.UUID, body: Optional[ReviewAction] = None,
                    db: Session = Depends(get_db), context: TenantContext = Depends(RequireAdmin)) -> PostingDetail:
     _ws(context, workspace_id)
-    _gate_target(db, context, "erp.postings.cancel", _posting_target(db, workspace_id, posting_id))
+    _gate_target(db, context, "erp.postings.cancel", lambda: _posting_target(db, workspace_id, posting_id))
     return _review(db, context, workspace_id, posting_id, v.VERDICT_CANCEL, body)
 
 
@@ -687,7 +686,7 @@ def acknowledge_posting(workspace_id: uuid.UUID, posting_id: uuid.UUID, body: Ac
                         db: Session = Depends(get_db),
                         context: TenantContext = Depends(RequireAdmin)) -> PostingDetail:
     _ws(context, workspace_id)
-    _gate_target(db, context, "erp.postings.acknowledge", _posting_target(db, workspace_id, posting_id))
+    _gate_target(db, context, "erp.postings.acknowledge", lambda: _posting_target(db, workspace_id, posting_id))
     p = _posting(db, workspace_id, posting_id)
     try:
         service.acknowledge(db, posting=p, actor_user_id=context.user_id, accepted=body.accepted,
