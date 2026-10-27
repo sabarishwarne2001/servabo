@@ -62,7 +62,7 @@ the session scratchpad (outside the repo).
   up to 3 seats, ₹9,999 plus GST, credited against the first year); the Gmail dark-mode logo (a white panel on the light
   logo); F-637 (spec 78's flake explained and fixed: a person's re-plan waits for a running plan). CI on run 502 was red on
   two things of this session's own making, both fixed and proven: the storage boundary rule (the logo file) and spec 115
-  (N-195 made the reminder wait for a confirmed contact). Run 505 found four more, all fixed: the isolation rule (Recoveries had no isolation test: `tests/engines/test_recoveries_live.py`), F-638 (two radar findings on one invoice crashed the sweep) the generated TENANCY-AND-PLANS.md (regenerated) and the capability's name in a plan refusal (it showed its key). The leftovers the owner listed (deletion warnings, a zip in the
+  (N-195 made the reminder wait for a confirmed contact). Run 505 found four more, all fixed: the isolation rule (Recoveries had no isolation test: `tests/engines/test_recoveries_live.py`), F-638 (two radar findings on one invoice crashed the sweep) the generated TENANCY-AND-PLANS.md (regenerated) and the capability's name in a plan refusal (it showed its key). A dnspython advisory published that day (CVE-2026-114605) was fixed by 2.9.0, a minor bump. The leftovers the owner listed (deletion warnings, a zip in the
   upload tray, the downgrade with rows, the GST speed test) were done in Phase 4. What only the real world can prove is
   Final session 2B's (HANDOFF "Final session 2A → Final session 2B").
 - **Owner request during the finish (2026-10-27): the real logo in every email (N-199).** Built test-first: the logo
