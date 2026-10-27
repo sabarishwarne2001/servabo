@@ -74,6 +74,23 @@ Wherever older documents say "Final session 2", they mean 2B, the live session.
   - you switch it "on" for everyone on Business and Enterprise.
   - TCS, payroll TDS, filing and tax advice stay out on purpose.
 
+## 2b. What Final session 2A did, in plain words (2026-10-27)
+
+- **Prices in rupees.** Starter ₹1,499, Business ₹4,999, Enterprise ₹14,999 per user a month (GST extra), and yearly
+  prices. Indian businesses pay in rupees by UPI or card with their GSTIN; dollars stay for everyone else. The trial is now
+  14 days, and "Developer" is called **Starter**.
+- **The server's scheduled jobs can no longer stop silently.** If cron stops, you get an email the next day and the admin
+  page turns red. One command installs them: `servabo-install-host-jobs` (RUNBOOK 9.6).
+- **A malicious invoice cannot make Servabo pay or email anyone.** An email address read from an invoice is never used
+  until you confirm it; Helm never takes a payment decision on its own; documents are fenced as data in every AI prompt.
+  `docs/hardening/PROMPT-INJECTION.md` has the full map. **One thing for you:** Helm, Settings, Suppliers and customers:
+  confirm each supplier's email address once ("Use this address").
+- **A way to prove accuracy:** `backend/scripts/accuracy_report.py` with the truth sheet
+  `backend/scripts/accuracy_truth_template.csv`. And `docs/product/PILOT-PLAYBOOK.md` for your first paid pilot.
+- **Not built:** the "Recoveries" page (decided, deferred to after the first pilots).
+- **Decisions waiting for you:** N-193 (the GSTIN on Dodo's invoice, checked in 2B), N-197 (ERP auto-post and outside
+  uploads), N-198 (your pilot price). All in `docs/hardening/NEEDS-OWNER.md`, each with a recommendation.
+
 ## 3. How to run Final session 2A (the upgrade)
 
 1. **Merge the pull request that added this guide's update,** once its CI is green.
@@ -141,12 +158,22 @@ them into the chat.** If you do by accident, rotate that key afterwards.
 | *Optional:* **Microsoft Teams** | In a channel: **Workflows** → "Post to a channel when a webhook request is received" → copy the URL. | Typed into Servabo's Webhooks page |
 | *Optional:* **Okta** or **Entra ID** | An Okta Integrator (free) or an Entra ID test tenant, for one enterprise sign-in test. | Typed into Servabo during the session |
 
+### 4.2b New since Final session 2A
+
+- **The GSTIN you will buy with** (yours, or a friendly business's with permission): 2B buys Servabo once in rupees in Dodo's
+  test mode and checks what Dodo's invoice shows (N-193).
+- **A Dodo test-mode UPI ID or Indian test card**, if Dodo's test-mode documentation offers one (2B looks it up with you).
+- **A long random secret for the server's safety jobs:** 2B generates it with you
+  (`python -c "import secrets; print(secrets.token_urlsafe(32))"`); it goes in `.env.production` and
+  `/etc/servabo/sweepers.env` as `SAFETY_JOB_REPORT_TOKEN`. Never paste it into a chat.
+
 ### 4.3 Real files, in `C:\servabo-live\` (never inside the `servabo` folder)
 
 - **Five to ten real GST tax invoices** (PDF or scans). Your own online-shopping tax invoices (Amazon, Flipkart and the like)
   are real GST invoices and are fine. A friendly distributor's invoices are fine **with their permission**.
-- **If you can, 30 to 50 real purchase invoices with their truth sheet** (the template comes from session 2A: one row per
-  invoice, the correct invoice number, date, GSTINs, tax amounts and total). 2B turns them into a **measured accuracy
+- **If you can, 30 to 50 real purchase invoices with their truth sheet** (the template is
+  `backend/scripts/accuracy_truth_template.csv`: one row per invoice, the correct invoice number, date, GSTINs, tax amounts
+  and total; dates as on the invoice, for example 05/09/2026). 2B turns them into a **measured accuracy
   figure** you can show customers. It is the single most convincing number for a first sale.
 - **One printed page photographed at a slight angle**, and **one handwritten bill** (photos from your phone).
 - **One zip** of 20 or more invoices (copies are fine).

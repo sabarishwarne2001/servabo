@@ -32,7 +32,29 @@ AI model lists and libraries, the GST Monday email and notices, upgrade moments 
 events for GST and workflow runs (docs/product/WEBHOOK-EVENTS.md), warehouse datasets for GST matches and the Helm ledger (Enterprise), global search for GST and
 workflows, resizable sidebars, the new logo, and a sweep of every organization console tab.
 
+## 1b. What Final session 2A did (2026-10-27)
+
+- **Sellable in India** (N-187): prices in rupees and yearly for every plan, rupee checkout with GSTIN, the ₹15,000 mandate
+  notice, a 14-day trial, "Developer" renamed Starter, custom domains in Business and Enterprise, the Tally Prime file on
+  Starter. Margins checked in every currency (COSTS.md §4).
+- **Safety jobs report and alert** (N-194): every cron job on the server reports its runs; a stopped one is emailed once a day.
+- **Prompt injection mapped and tested** (docs/hardening/PROMPT-INJECTION.md): six fixes, six invariants walked in the code.
+- **Leftovers:** deletion warning emails, a zip on a conversation's upload tray, the GST speed test's step timings.
+- **The proof kit:** `scripts/accuracy_report.py` and `docs/product/PILOT-PLAYBOOK.md`.
+- **Not built:** the Recoveries layer (N-191 decided to build it; this session's cut line deferred it). It is item 2.0 below.
+
 ## 2. A new list, for after the first paying customers
+
+### 2.0 Recoveries: Found → Being fixed → Verified (N-191, decided)
+
+What the first pilots show about today's flow (RESOLUTION-ASSESSMENT.md, last section) sets its order: GST credit at risk,
+prices above the order, duplicates, then supplier statements. One read model over the engines' tables, closure only on
+evidence, one outcome ledger with Helm's. About 6 to 8 days. No running cost. After the first two pilots, not before.
+
+### 2.0b ERP auto-post and outside uploads (N-197, open)
+
+Decide whether auto-post skips a case completed by a supplier's upload. About half a day once decided.
+
 
 Best first. "Earns money" says how the idea turns into revenue or protects it. Nothing here changes a price, a plan or a trial until the owner decides it.
 
