@@ -3,7 +3,8 @@
  *
  * A Business customer of its own (GST Credit is part of the plan) has two purchase invoices that its suppliers have not
  * reported in their GSTR-2B:
- *   B-2002 from Sahyadri Packaging, whose invoice carries an email address (Helm learns it as the supplier's contact);
+ *   B-2002 from Sahyadri Packaging, whose invoice carries an email address (Helm suggests it as the supplier's contact
+ *   and the owner confirms it: N-195, an address read from a document is never used until a person confirms it);
  *   C-3003 from Deccan Plastics, for which no email address is known anywhere.
  * The owner builds the rule in the browser. The hourly job (`automation.sweep`, played here by the stand-in's run-job)
  * announces each invoice that has waited longer than the workspace's limit, and the rule runs for each:
@@ -162,12 +163,19 @@ test.describe("A rule that reminds a GST supplier", () => {
     expect(book.status, book.text.slice(0, 300)).toBe(201);
     const planned = await api(owner.session, "POST", `/organizations/${owner.orgId}/helm/books/${book.body.id}/plan`, {});
     expect(planned.status, planned.text.slice(0, 300)).toBeLessThan(300);
-    const people = await api<{ counterparties: Array<{ name: string; contact_email: string | null }> }>(
+    const people = await api<{ counterparties: Array<{ id: string; name: string; contact_email: string | null; contact_confirmed: boolean }> }>(
       owner.session, "GET", `/organizations/${owner.orgId}/helm/books/${book.body.id}/counterparties`);
     expect(people.status, people.text.slice(0, 300)).toBe(200);
     const contacts = Object.fromEntries(people.body.counterparties.map((c) => [c.name, c.contact_email]));
     expect(contacts["Sahyadri Packaging"], JSON.stringify(contacts)).toBe(CONTACT);
     expect(contacts["Deccan Plastics"] ?? null).toBeNull();
+    // N-195 (Final session 2A): an address read from an invoice is only a suggestion; nothing is sent to it until a
+    // person confirms it (Helm, Settings, Suppliers and customers: "Use this address"). The owner confirms it here.
+    const sahyadri = people.body.counterparties.find((c) => c.name === "Sahyadri Packaging");
+    expect(sahyadri?.contact_confirmed).toBe(false);
+    const confirmed = await api(owner.session, "PATCH",
+      `/organizations/${owner.orgId}/helm/books/${book.body.id}/counterparties/${sahyadri!.id}`, { contact_email: CONTACT });
+    expect(confirmed.status, confirmed.text.slice(0, 300)).toBe(200);
     // Nothing is written by hand: Helm's own sync records the supplier's GSTIN (F-545), which is how the reminder finds its contact.
     const rows = sql(`select display_name, tax_id from helm_counterparties where organization_id = '${owner.orgId}'`);
     taxIdAfterHelmSync = String(rows.find((r) => r.display_name === "Sahyadri Packaging")?.tax_id ?? "");
