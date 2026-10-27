@@ -2633,3 +2633,16 @@ gateway for rupee sales. Nothing is built for any of them now.
 
 **Revisit** if the deployment moves off a single server (Kubernetes CronJobs would replace cron, with the same reports).
 
+## N-195 — An email address read from a document is used only after a person confirms it (DECIDED (Final 2A))
+
+**Why:** a document can print any address (F-631). Servabo now keeps a learned address as a suggestion and emails only
+addresses an owner or admin typed or confirmed (Helm, Settings, Suppliers and customers: "Use this address"). This is the
+brief's invariant (b), decided by the brief itself.
+
+**The cost, in plain words:** every supplier and customer address Servabo had already learned is treated as unconfirmed,
+because the old data cannot tell a typed address from a learned one. GST reminders, supplier document requests and Helm's
+emails to those contacts wait until you confirm each one once. The sample company is set up as confirmed.
+
+**Your choice later (optional):** if you would rather trust addresses on documents from suppliers you already pay, say so;
+it would be a per-supplier switch, not a return to trusting every document.
+

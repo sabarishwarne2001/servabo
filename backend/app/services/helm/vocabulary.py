@@ -114,6 +114,12 @@ MSME_SOURCE_CERTIFICATE: Final = "CERTIFICATE"  # a Udyam certificate document s
 MSME_SOURCE_PERSON: Final = "PERSON"  # an admin confirmed the category
 MSME_SOURCES: Final = (MSME_SOURCE_DOCUMENT, MSME_SOURCE_CERTIFICATE, MSME_SOURCE_PERSON)
 
+# Final session 2A (Phase 3, invariant (b), N-195): where a counterparty's email address came from. Only a PERSON's address
+# is ever a recipient; one read from a DOCUMENT is a suggestion until an owner or admin confirms it.
+CONTACT_SOURCE_DOCUMENT: Final = "DOCUMENT"
+CONTACT_SOURCE_PERSON: Final = "PERSON"
+CONTACT_SOURCES: Final = (CONTACT_SOURCE_DOCUMENT, CONTACT_SOURCE_PERSON)
+
 # --- mandates ---------------------------------------------------------------------------------
 MANDATE_DRAFT: Final = "DRAFT"
 MANDATE_ACTIVE: Final = "ACTIVE"

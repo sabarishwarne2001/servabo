@@ -156,6 +156,8 @@ class HelmCounterparty(Base):
                         name="ck_helm_counterparties_msme_category"),
         CheckConstraint(f"msme_source IS NULL OR msme_source IN ({v.sql_in(v.MSME_SOURCES)})",
                         name="ck_helm_counterparties_msme_source"),
+        CheckConstraint(f"contact_source IS NULL OR contact_source IN ({v.sql_in(v.CONTACT_SOURCES)})",
+                        name="ck_helm_counterparties_contact_source"),
     )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
@@ -175,6 +177,11 @@ class HelmCounterparty(Base):
     msme_confirmed_by_user_id: Mapped[Optional[uuid.UUID]] = _user()
     msme_confirmed_at: Mapped[Optional[datetime]] = _ts(nullable=True)
     contact_email: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
+    #: Final session 2A (N-195): PERSON (typed or confirmed by an owner or admin: a recipient) or DOCUMENT (read from an
+    #: invoice: shown as a suggestion, never a recipient). NULL with no address.
+    contact_source: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
+    contact_confirmed_by_user_id: Mapped[Optional[uuid.UUID]] = _user()
+    contact_confirmed_at: Mapped[Optional[datetime]] = _ts(nullable=True)
     contact_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     behaviour: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
     created_at: Mapped[datetime] = _ts()

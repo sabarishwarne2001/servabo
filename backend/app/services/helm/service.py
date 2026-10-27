@@ -385,6 +385,9 @@ def list_counterparties(db: Session, who: Viewer, book: HelmBook) -> list[dict[s
             "role": row.role, "udyam_number": row.udyam_number if readable else None,
             "msme_category": row.msme_category, "msme_source": row.msme_source, "msme_label": status.label,
             "msme_protected": status.protected, "contact_email": row.contact_email if readable else None,
+            # N-195: only a confirmed address is ever a recipient; one read from a document waits for an owner or admin.
+            "contact_confirmed": row.contact_source == v.CONTACT_SOURCE_PERSON,
+            "contact_source": row.contact_source,
             "behaviour": row.behaviour if readable else {},
         })
     return out
@@ -411,6 +414,10 @@ def update_counterparty(db: Session, who: Viewer, book: HelmBook, counterparty_i
         if email and ("@" not in email or len(email) > 320):
             raise HelmInvalid("That is not an email address.", reason="EMAIL")
         row.contact_email = email
+        # Typing or re-saving an address is a person confirming it (N-195): from now on it is a recipient.
+        row.contact_source = v.CONTACT_SOURCE_PERSON if email else None
+        row.contact_confirmed_by_user_id = who.user_id if email else None
+        row.contact_confirmed_at = now if email else None
     if "contact_name" in changes:
         row.contact_name = (changes["contact_name"] or "").strip()[:200] or None
     row.updated_at = now

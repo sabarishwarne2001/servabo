@@ -361,7 +361,8 @@ def known_supplier(engines: Engines, monkeypatch):
                                headers=engines.tenant.owner.headers).json()
     engines.db.add(HelmCounterparty(organization_id=engines.org, book_id=uuid.UUID(book["id"]), key=f"gstin:{SUPPLIER_A}",
                                     role="SUPPLIER", display_name="Sahyadri Packaging", tax_id=SUPPLIER_A,
-                                    contact_email="accounts@sahyadri.example.com"))
+                                    contact_email="accounts@sahyadri.example.com",
+                                    contact_source="PERSON"))  # N-195: a known contact is one a person confirmed
     engines.db.commit()
     sent: list[dict[str, Any]] = []
 
@@ -484,7 +485,8 @@ def test_a_contact_helm_derived_from_documents_is_known_by_its_gstin_key(engines
                                headers=engines.tenant.owner.headers).json()
     for key, email in ((f"gstin:{SUPPLIER_A}", "accounts@sahyadri.example.com"), (f"gstin:{SUPPLIER_B}", None)):
         engines.db.add(HelmCounterparty(organization_id=engines.org, book_id=uuid.UUID(book["id"]), key=key, role="SUPPLIER",
-                                        display_name="Derived by sync", tax_id=None, contact_email=email))
+                                        display_name="Derived by sync", tax_id=None, contact_email=email,
+                                        contact_source="PERSON" if email else None))  # N-195
     engines.db.commit()
     workspace = engines.db.get(Workspace, engines.ws)
     assert reminder.known_contact(engines.db, workspace, SUPPLIER_A) == "accounts@sahyadri.example.com"
@@ -494,7 +496,8 @@ def test_a_contact_helm_derived_from_documents_is_known_by_its_gstin_key(engines
 
 def test_helms_own_sync_records_the_suppliers_gstin_so_its_contact_is_found(engines: Engines) -> None:
     """The whole path, with nothing written by hand: an invoice naming a supplier, its GSTIN and its email is read; Helm
-    derives the supplier; the reminder then finds its contact (F-545)."""
+    derives the supplier; the reminder then finds it by its GSTIN (F-545), and uses its address once a person confirmed it
+    (N-195, Final session 2A)."""
     from app.models.helm import HelmCounterparty
     from app.models.workspace import Workspace
     from app.services.gst import reminder
@@ -521,4 +524,12 @@ def test_helms_own_sync_records_the_suppliers_gstin_so_its_contact_is_found(engi
     assert rows, "Helm derived no supplier from the invoice"
     assert [r.contact_email for r in rows] == ["accounts@sahyadri.example.com"]
     workspace = engines.db.get(Workspace, engines.ws)
+    # N-195 (Final session 2A, invariant (b)): the GSTIN that sync records still finds the supplier, but an address read
+    # from an invoice is only a suggestion; once an owner confirms it, the reminder uses it.
+    assert reminder.known_contact(engines.db, workspace, SUPPLIER_A) is None
+    confirmed = engines.client.patch(f"/api/v1/organizations/{engines.org}/helm/books/{book}/counterparties/{rows[0].id}",
+                                     json={"contact_email": "accounts@sahyadri.example.com"},
+                                     headers=engines.tenant.owner.headers)
+    assert confirmed.status_code == 200, confirmed.text
+    engines.refresh()
     assert reminder.known_contact(engines.db, workspace, SUPPLIER_A) == "accounts@sahyadri.example.com"

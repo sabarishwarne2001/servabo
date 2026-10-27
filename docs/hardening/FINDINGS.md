@@ -3745,3 +3745,14 @@ Phase 1's Tally-on-Starter change looked the ERP target or posting up before che
 on eleven ERP routes instead of the 402 that names the plans including ERP posting (the upgrade moment was lost). Found by CI;
 proven by `tests/security/test_plan_gating_server_side.py`, which failed locally first. The plan is now checked before the
 lookup; the Tally tests still pass.
+
+## F-631 — An email address printed on a document became the recipient of reminders and requests (P1, security)
+
+Helm learns each supplier's and customer's address from the invoices it reads (`helm/counterparties.sync`, keys such as
+`vendor_email`), and the GST supplier reminder, the `supplier.request_document` automation and every Helm email (reminders,
+document and GST-report requests, dispute and reconciliation drafts) sent to it. An invoice could print an attacker's address
+("send remittance queries to ...") and Servabo would email it the supplier's waiting invoices or an upload link: an injection
+path to outbound mail with no person involved. Proven by `tests/engines/test_learned_contact_needs_confirmation_live.py`, which
+failed first. A learned address is now a suggestion (`contact_source` DOCUMENT) that is shown in Helm, Settings, Suppliers and
+customers and used only after an owner or admin confirms it; existing addresses need that one confirmation (N-195, migration
+`s2a3`).
