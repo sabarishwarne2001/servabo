@@ -6,8 +6,9 @@ proposes actions in the plan, and, when it is a **limit**, is checked by the Gua
 action, so an action that would break it never passes.
 
 Every mandate starts in **Propose** mode: Helm proposes, a person approves. **Act** mode runs actions
-by itself, but only up to the **act cap** (₹0 until an owner or admin sets it) and only when the
-Guard passes. **Watch** mode only shows the instrument. Editing a mandate makes a new version; plans
+by itself when the Guard passes: holds, reminders, document and GST requests, tasks and notices. **A payment decision
+(schedule, approve, release a hold, mark paid) always waits for a person**, in every mode (Final session 2A, N-196:
+what Helm reads from documents can be wrong or planted). The act cap that once let Act mode pay alone no longer does. **Watch** mode only shows the instrument. Editing a mandate makes a new version; plans
 and certificates record the version they used. Nothing in Helm moves money: a "payment" is a line on
 the payment run that a person pays from their bank.
 
@@ -36,7 +37,7 @@ The library (Business and Enterprise; Helm preview shows them read-only):
 
 - **The Guard's checks**, each pass, fail or needs approval, with its evidence: in the mandate's
   scope, every limit, the facts verified (or calibrated), no open conflicts, no fraud or duplicate
-  flag, cash above the floor, the act cap, the destination allowed (for emails and webhooks), not
+  flag, cash above the floor, a person for every payment decision, the destination allowed (for emails and webhooks), not
   already run, the account in good standing.
 - **A certificate**: the action, the facts it relied on, the mandate versions in force and every
   check, with its SHA-256 fingerprint. Certificates are never changed.

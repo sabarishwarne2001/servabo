@@ -182,8 +182,9 @@ def test_enterprise_approval_rule_asks_a_person_before_paying(client, db_session
     actions = client.post(_url(tenant, f"/books/{book['id']}/plan"), headers=headers).json()["actions"]
     pay = next(a for a in actions if a["kind"] == "schedule_payment" and a["work_item_id"] == str(item.id))
     checks = {c["id"]: c["result"] for c in pay["guard"]["checks"]}
-    # Act mode within its cap would pay alone; the custom rule makes a person approve it.
-    assert checks["autonomy"] == "pass"
+    # The custom rule makes a person approve it. (N-196, Final session 2A: Act mode no longer pays alone at all, so the
+    # autonomy check asks too; before, within its cap, it passed.)
+    assert checks["autonomy"] == "needs_approval"
     assert checks[f"limit:custom_condition:{created.json()['id']}"] == "needs_approval"
     assert pay["guard_passed"] and pay["needs_approval"]
 

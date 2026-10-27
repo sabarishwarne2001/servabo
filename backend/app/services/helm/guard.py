@@ -32,6 +32,8 @@ PAYMENT_APPROVER_ROLES = {"OWNER", "ADMIN", "BILLING"}
 FACT_ACTIONS = (v.ACTION_SCHEDULE_PAYMENT, v.ACTION_APPROVE_PAYMENT, v.ACTION_SEND_REMINDER, v.ACTION_DRAFT_DISPUTE,
                 v.ACTION_REQUEST_DOCUMENT)
 PAYING_ACTIONS = (v.ACTION_SCHEDULE_PAYMENT, v.ACTION_APPROVE_PAYMENT)
+#: Final session 2A (invariant (a), N-196): payment decisions a person always takes, in every mode.
+PERSON_DECIDES = (v.ACTION_SCHEDULE_PAYMENT, v.ACTION_APPROVE_PAYMENT, v.ACTION_RELEASE_HOLD, v.ACTION_MARK_PAID)
 OUTBOUND_ACTIONS = (v.ACTION_SEND_REMINDER, v.ACTION_DRAFT_DISPUTE, v.ACTION_DRAFT_RECONCILIATION,
                     v.ACTION_REQUEST_DOCUMENT, v.ACTION_WEBHOOK)
 
@@ -283,6 +285,12 @@ def guard(action: ActionView, snapshot: Snapshot, mandates: Sequence[base.Active
     if own is None:
         checks.append(base.Check("autonomy", "Allowed to run without a person", v.CHECK_APPROVAL,
                                  "Helm's own suggestion: a person approves."))
+    elif own.mode == v.AUTONOMY_ACT and action.kind in PERSON_DECIDES:
+        # Final session 2A (Phase 3, invariant (a), N-196): a payment decision is a person's, in every mode and whatever
+        # the act cap. What Helm reads from documents can be wrong or planted; paying, approving, releasing a hold and
+        # marking paid never run on Helm's own say-so. Holding a payment (protective) still may.
+        checks.append(base.Check("autonomy", "Allowed to run without a person", v.CHECK_APPROVAL,
+                                 "A payment decision: a person approves it, always, even in Act mode."))
     elif own.mode == v.AUTONOMY_ACT:
         cap = own.spec.autonomy.act_cap
         cap_amount = cap.amount_micros if cap else 0

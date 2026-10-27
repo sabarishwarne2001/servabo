@@ -4,7 +4,8 @@
  * The owner of a new Business customer writes "Keep at least ₹5 lakh in the bank". The model
  * stand-in reads it as "Keep cash above a floor" with a floor of 5 lakh; Helm checks it and reads it
  * back with the amount as a chip. The owner changes the chip to 7.5 lakh and adds it: it starts in
- * Propose mode. Editing it sets Act mode with an act cap, saved as version 2. A sentence Helm cannot
+ * Propose mode. Editing it sets Act mode, saved as version 2 (Final session 2A, N-196: Act mode no longer has an act cap;
+ * every payment decision waits for a person). A sentence Helm cannot
  * map offers the gallery; a sentence with no amount shows the example as an example and cannot be
  * saved until the owner sets it; a gallery mandate whose value has no default ("Every invoice above
  * an amount has a matching PO") asks for the person's own number before it can be added.
@@ -33,7 +34,7 @@ test.describe("Helm mandates — a sentence, the readback, the chips, the modes"
     bookId = book.body.id;
   });
 
-  test("a sentence becomes a checked mandate the owner adjusts, adds and then lets act within a cap", async ({ page }) => {
+  test("a sentence becomes a checked mandate the owner adjusts, adds and then lets act", async ({ page }) => {
     test.skip(process.env.E2E_LLM !== "1", NEEDS_MODEL);
     await signInAs(page, customer.email);
     await page.goto(`/${customer.orgSlug}/helm/mandates?book=${bookId}`);
@@ -74,13 +75,14 @@ test.describe("Helm mandates — a sentence, the readback, the chips, the modes"
     await expect(card).toContainText("₹7.5 lakh");
     await expect(page.getByTestId("helm-draft")).toHaveCount(0);
 
-    // Editing writes a new version: Act mode, with a cap on what Helm may run alone.
+    // Editing writes a new version: Act mode. N-196: payments still ask a person, and the editor says so.
     await card.getByRole("button", { name: "Edit Keep cash above a floor" }).click();
     const edit = page.getByTestId("helm-mandate-editor");
     await expect(edit.getByRole("heading", { name: "Edit Keep cash above a floor" })).toBeFocused();
     await edit.getByRole("radio", { name: "Act" }).check();
-    await expect(edit.getByText("Helm runs actions on its own up to the act cap; anything above it asks.")).toBeVisible();
-    await edit.getByRole("textbox", { name: "Act cap" }).fill("25000");
+    await expect(edit.getByText(/Paying, approving, releasing a hold and marking paid always ask a person/)).toBeVisible();
+    await expect(edit.getByTestId("helm-act-note")).toContainText("Every payment decision waits for a person");
+    await expect(edit.getByRole("textbox", { name: "Act cap" })).toHaveCount(0);
     const saved = page.waitForResponse((r) => /\/mandates\/[^/]+$/.test(r.url()) && r.request().method() === "PATCH");
     await edit.getByRole("button", { name: "Save as version 2" }).click();
     expect((await saved).status()).toBe(200);

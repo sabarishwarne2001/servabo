@@ -31,7 +31,7 @@ INR, GST invoices, the MSMED Act and income-tax section 43B(h); any currency wor
    cannot see enough), the cash flight path for the coming weeks with your floor, and the plan: pay
    this on Tuesday, hold that, chase this customer, reconcile that supplier.
 4. **The Guard.** Every action is checked before you see it and again before it runs: your limits,
-   the facts checked, no open fraud or duplicate flag, cash above the floor, the act cap. Each
+   the facts checked, no open fraud or duplicate flag, cash above the floor, a person for every payment. Each
    action gets a **certificate** with every check and its evidence, sealed so it can never change.
 5. **You stay in charge.** Everything starts in Propose mode: Helm proposes, a person approves.
    Act mode runs actions by itself only up to an amount the owner sets (₹0 by default). Holds,

@@ -180,7 +180,9 @@ def test_unverified_facts_need_approval_and_verified_ones_do_not():
     r1 = guard(action(extracted, m=m), book([extracted]), [m], SYSTEM, GuardContext())
     r2 = guard(action(verified, m=m), book([verified]), [m], SYSTEM, GuardContext())
     assert result_of(r1.checks, "facts") == v.CHECK_APPROVAL and not r1.can_run_alone
-    assert result_of(r2.checks, "facts") == v.CHECK_PASS and r2.can_run_alone
+    # N-196 (Final session 2A): a payment always waits for a person, so the verified one is asked only by autonomy.
+    assert result_of(r2.checks, "facts") == v.CHECK_PASS
+    assert [c.id for c in r2.checks if c.result == v.CHECK_APPROVAL] == ["autonomy"]
 
 
 def test_open_conflicts_need_a_person():
@@ -270,7 +272,9 @@ def test_the_cash_floor_is_checked_on_the_cautious_path_after_this_payment():
     assert result_of(over.checks, "cash") == v.CHECK_APPROVAL
 
 
-def test_act_mode_runs_payments_alone_only_within_the_cap():
+def test_act_mode_never_runs_a_payment_alone_and_still_holds_alone():
+    """N-196 (Final session 2A, invariant (a)): until then Act mode paid alone within its cap; a payment now always waits
+    for a person, whatever the cap. Holding a payment is protective and still runs alone."""
     p = payable(1, amount_micros=40_000 * M, confidence=v.CONFIDENCE_VERIFIED)
     s = book([p])
     default = mandate("pay_on_time", mode="act")
@@ -278,7 +282,7 @@ def test_act_mode_runs_payments_alone_only_within_the_cap():
     small_cap = mandate("pay_on_time", mode="act", cap=10_000 * M)
     propose = mandate("pay_on_time", mode="propose")
     assert not guard(action(p, m=default), s, [default], SYSTEM, GuardContext()).can_run_alone  # cap 0
-    assert guard(action(p, m=capped), s, [capped], SYSTEM, GuardContext()).can_run_alone
+    assert not guard(action(p, m=capped), s, [capped], SYSTEM, GuardContext()).can_run_alone  # N-196: within the cap too
     assert not guard(action(p, m=small_cap), s, [small_cap], SYSTEM, GuardContext()).can_run_alone
     assert not guard(action(p, m=propose), s, [propose], SYSTEM, GuardContext()).can_run_alone
     # No money moves on a hold: Act mode may hold on its own.

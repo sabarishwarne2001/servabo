@@ -3768,3 +3768,13 @@ injection patterns knew only English: Hindi, and orders about money ("mark the c
 which failed first (7 of 10). A document whose text or file name reads like instructions is now held for a person on
 both paths, and the patterns cover Hindi overrides and four kinds of money command; an ordinary "please pay within 30
 days" is not flagged.
+
+## F-633 — Helm's Act mode could release a payment hold, mark an invoice paid, or pay within its cap, without a person (P1, security)
+
+The Guard let a mandate in Act mode run `release_hold` and `mark_paid` on Helm's own say-so ("no money moves") and
+`schedule_payment` / `approve_payment` within the act cap. Each rests on facts Helm read from documents, so a planted
+document could steer a hold released or an invoice marked paid with nobody looking. The brief's invariant (a) says a
+person always takes these decisions. Proven by `tests/security/test_prompt_injection_no_money_moves_alone.py`, which failed
+first for all four. The Guard now asks a person for every payment decision in every mode (holding a payment, which only
+protects, still runs alone). Three live tests and two Guard tests that expected Act mode to pay alone now expect a person
+(N-196); the mandate editor no longer offers an act cap.

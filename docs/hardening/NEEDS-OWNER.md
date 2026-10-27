@@ -2646,3 +2646,14 @@ emails to those contacts wait until you confirm each one once. The sample compan
 **Your choice later (optional):** if you would rather trust addresses on documents from suppliers you already pay, say so;
 it would be a per-supplier switch, not a return to trusting every document.
 
+## N-196 — Helm never takes a payment decision alone, in any mode (DECIDED (Final 2A))
+
+The brief's invariant (a): no action "can approve a payment, pay, release a hold on a payment ... or mark an invoice paid on
+its own. A person always does." Helm's Act mode used to pay alone within an **act cap** (₹0 by default) and to release holds
+and mark invoices paid alone (F-633). Now scheduling, approving, releasing a hold and marking paid always wait for a person;
+Act mode still holds payments, sends reminders and requests, and creates tasks alone. The act cap is no longer shown in the
+mandate editor; stored caps are kept but no longer let anything pay.
+
+**If you want it back** for small amounts from suppliers you trust, that is a new decision: it would need a list of trusted
+suppliers and bank accounts a person confirmed, so a document alone could never steer it.
+
