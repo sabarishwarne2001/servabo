@@ -331,6 +331,14 @@ def main() -> None:
         png(mark, 192, public / "icon-192.png")
         png(mark, 512, public / "icon-512.png")
 
+    # Emails carry the logo as a picture inside the message (N-199; backend/app/templates/emails/inline_images.py),
+    # at three times its 40 px email height.
+    for suffix, ink in (("light", INK), ("dark", PAPER)):
+        logo = logo_svg(text=ink)
+        view_w = float(logo.split('viewBox="0 0 ', 1)[1].split(" ", 1)[0])
+        png(logo, 0, ROOT / f"backend/app/templates/emails/assets/servabo-logo-{suffix}.png",
+            width=round(120 * view_w / 32), height=120)
+
     # The browser tests upload a real PNG as a sample image document and as an organization logo.
     png(mark, 256, ROOT / "frontend/e2e/support/servabo-mark.png")
 

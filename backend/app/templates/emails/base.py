@@ -34,6 +34,8 @@ _LAYOUT = """<!DOCTYPE html>
             .inner, .content, .content p, .content td, .content li {{ color: #e6e6e6 !important; }}
             .footer, .footer p {{ color: #a8b0b8 !important; border-color: #30363d !important; }}
             .logo {{ color: #8ab4f8 !important; }}
+            .logo-light {{ display: none !important; }}
+            .logo-dark {{ display: inline-block !important; max-height: none !important; }}
             .content a:not(.button) {{ color: #8ab4f8 !important; }}
         }}
     </style>
@@ -88,33 +90,33 @@ def _bulletproof_buttons(html: str) -> str:
     return _BUTTON.sub(one, html)
 
 
-# The mark at email size: the logo's navy tile and the ribbon's bright blue (brand/tokens.json).
-_MARK_TILE = "#0b1a3a"
-_MARK_S = "#4f9bff"
 _WORDMARK = '<span class="logo" style="font-size:24px;font-weight:bold;color:{color};vertical-align:middle;">{name}</span>'
 
 
 def _brand_header(brand_name: str) -> str:
-    """The email's header: the Servabo mark and name, or a white-label brand's name alone.
+    """The email's header: the Servabo logo, or a white-label brand's name alone.
 
-    The mark is drawn in HTML (a deep-navy rounded tile with a bright blue "S", the app's mark at
-    email size; mail clients cannot draw gradients), not loaded as an image: mail clients hold remote images until the reader allows them,
-    and an email that must carry no web address (a revocation notice, a completed transfer)
-    stays that way. Outlook for Windows ignores the rounded corners and shows a square tile.
-    An organization sending under its own brand never gets Servabo's mark in its mail.
+    The logo (the ribbon mark and the "servabo" wordmark) is a picture carried inside the message and referred to as
+    `cid:` (`inline_images.attach` adds it when the message is sent; owner request, N-199), not loaded from the web:
+    mail clients hold remote images until the reader allows them, and an email that must carry no web address (a
+    revocation notice, a completed transfer) stays that way. The dark version is hidden unless a dark-mode client
+    reads the stylesheet (`.logo-dark`); Outlook for Windows never shows it (`mso-hide`). An organization sending
+    under its own brand never gets Servabo's logo in its mail.
     """
     from app.core.config import settings
+    from app.templates.emails.inline_images import DARK, LIGHT, LOGO_HEIGHT, LOGO_WIDTH
 
-    name_html = _WORDMARK.format(color=_BRAND_BLUE, name=brand_name)
     if brand_name != html_escape(str(settings.PROJECT_NAME)):
-        return name_html
-    tile = (
-        f'<span class="mark" aria-hidden="true" style="display:inline-block;width:30px;height:30px;'
-        f"border-radius:8px;background-color:{_MARK_TILE};color:{_MARK_S};font-family:{_FONT};"
-        'font-size:19px;font-weight:700;line-height:30px;text-align:center;vertical-align:middle;'
-        'margin-right:10px;">S</span>'
+        return _WORDMARK.format(color=_BRAND_BLUE, name=brand_name)
+    size = f'width="{LOGO_WIDTH}" height="{LOGO_HEIGHT}"'
+    return (
+        f'<img class="logo-light" src="cid:{LIGHT}" {size} alt="{brand_name}" '
+        f'style="display:inline-block;width:{LOGO_WIDTH}px;height:{LOGO_HEIGHT}px;border:0;outline:none;'
+        f'text-decoration:none;color:{_BRAND_BLUE};font-size:24px;font-weight:bold;">'
+        f'<!--[if !mso]><!--><img class="logo-dark" src="cid:{DARK}" {size} alt="{brand_name}" '
+        f'style="display:none;max-height:0;overflow:hidden;mso-hide:all;width:{LOGO_WIDTH}px;height:{LOGO_HEIGHT}px;'
+        'border:0;outline:none;"><!--<![endif]-->'
     )
-    return tile + name_html
 
 
 def _legal_links(brand_name: str, content_html: str) -> str:

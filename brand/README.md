@@ -15,9 +15,10 @@ company and cannot drift:
 ring and a glowing dot, on a deep navy rounded tile. Servabo is Latin for "I will keep", from
 *pacta sunt servanda*, agreements must be kept; the ring is the promise being kept in orbit around
 your documents. Built on a 32-unit grid, it reads at 16 px. It carries its own colours and tile, so
-it looks the same on a light or a dark page and under every tenant's colour scheme. In emails it is
-drawn in HTML (a navy tile with a bright blue "S"; mail clients hold remote images and cannot draw
-gradients). **It is also the default workspace logo**: a workspace that has not uploaded a logo of
+it looks the same on a light or a dark page and under every tenant's colour scheme. In emails the
+whole logo (mark and wordmark, light and dark) is a PNG carried inside the message
+(`backend/app/templates/emails/assets/`, referred to as `cid:`), so mail clients show it without
+loading anything from the web (N-199). **It is also the default workspace logo**: a workspace that has not uploaded a logo of
 its own (every new workspace), or whose logo cannot be loaded, shows this mark, never initials.
 
 **The wordmark.** Lowercase "servabo" in Inter (SIL Open Font License, the app's own typeface) at
@@ -25,7 +26,7 @@ weight 640, as outlines, so it looks the same everywhere without loading a font.
 small blue leaf. The tagline is "AUTOMATE • EXTRACT • ACCELERATE".
 
 **Rebuilding.** The favicons, app icons and Open Graph cards in `frontend/public` and
-`website/public` are generated, and committed so neither build needs these tools:
+`website/public`, and the email logo pictures, are generated, and committed so neither build needs these tools:
 
 ```bash
 python -m venv /tmp/brand && /tmp/brand/bin/pip install fonttools brotli cairosvg pillow shapely svgpathtools
