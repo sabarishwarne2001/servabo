@@ -3803,3 +3803,13 @@ The code's number filled the extraction's invoice number when the model left it 
 code said. A GST invoice number is at most 16 letters, digits, "-" and "/" (CGST Rules 2017, rule 46(b)), so a code
 whose number is a sentence is not a genuine e-invoice: it is now not read at all. Proven by
 `tests/security/test_prompt_injection_corpus.py` (4 failed first); a genuine code is still read.
+
+## F-637 — A person's "Re-plan now" was refused while a background plan was running (P3)
+
+**Found:** browser spec 78 failed once on CI with "Helm is already planning this book" (409), and passed when re-run.
+**Cause:** a mandate change starts a plan in the background; a person pressing "Re-plan now" a moment later found the
+organization's planning lock held and was refused at once, though that run finishes in seconds. A real customer setting
+up Helm hits the same thing. **Fix:** a person's re-plan waits up to 20 seconds for the running plan before saying
+"already planning" (`plan_store.PERSON_WAIT_S`); background runs still skip a busy book, and the plan's recorded duration
+excludes the wait. **Proof:** `test_re_plan_waits_for_a_background_plan_instead_of_refusing` (409 first, 200 now); the Helm
+concurrency, budget and service suites pass (425).

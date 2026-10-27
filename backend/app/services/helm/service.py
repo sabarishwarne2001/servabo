@@ -793,7 +793,7 @@ def replan(db: Session, who: Viewer, book: HelmBook) -> dict[str, Any]:
     # In the same order as a snapshot takes the ledger locks (snapshot_store.take).
     for wid in sorted(ledger_store.book_workspace_ids(db, book), key=str):
         ledger_store.rebuild_workspace(db, workspace_id=wid)
-    plan = plan_store.run(db, book, triggered_by=v.TRIGGER_PERSON, force=True)
+    plan = plan_store.run(db, book, triggered_by=v.TRIGGER_PERSON, force=True, wait_s=plan_store.PERSON_WAIT_S)
     if plan is None:
         raise HelmError("Helm is already planning this book; try again in a moment.", reason="PLAN_IN_PROGRESS")
     return cockpit(db, who, book)
