@@ -53,7 +53,10 @@ the session scratchpad (outside the repo).
 
 - **Next action: Final session 2T** (`docs/sessions/FINAL-2T-TRINETRA.md`, TRINETRA for Business and Enterprise), after PR #43
   is merged with CI green. Then Final session 2B (`docs/sessions/FINAL-2-LIVE.md`) on the owner's PC. Next free numbers:
-  **N-199**, **F-637**, browser spec **140**.
+  **N-200**, **F-637**, browser spec **140**.
+- **Owner request during the finish (2026-10-27): the real logo in every email (N-199).** Built test-first: the logo
+  (mark and wordmark, light and dark) is a picture carried inside each email (`templates/emails/inline_images.py`).
+  Unverified until 2B: real inboxes.
 
 
 ## Current phase — the final sessions: 2A, then 2T (TRINETRA), then 2B (2026-10-26)

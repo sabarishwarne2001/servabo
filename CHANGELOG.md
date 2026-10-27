@@ -6,6 +6,11 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Changed — Emails show the real Servabo logo (owner request, 2026-10-27; N-199)
+
+- Every email sent as Servabo shows the logo itself (the ribbon mark and the wordmark, light and dark) instead of a plain
+  "S" tile. The picture travels inside the email, so it shows without "load images?" and no email gains a web address.
+
 ### Changed — Final session 2A, Phases 6 to 8: the decision, the records, the live prompt (2026-10-27)
 
 - **The Resolution layer ("Recoveries", N-191) was not built in this session**: declined by the session's cut line after

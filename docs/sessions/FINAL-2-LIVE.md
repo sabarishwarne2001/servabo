@@ -295,7 +295,9 @@ Record the counts (passed, failed, skipped) in LIVE-VERIFICATION.md, Phase 1.
 4. **Look at every email for:**
    - the sender name;
    - the subject;
-   - the Servabo branding;
+   - the Servabo branding: **the real logo** (the ribbon mark and "servabo", N-199) at the top, in light and in dark mode
+     (phone and desktop; Gmail, and Outlook or Apple Mail if the owner has them), never a plain "S" tile and never a
+     "load images?" prompt for it;
    - plain words;
    - no broken image;
    - no `localhost` link where a real address belongs (in local development `localhost` is expected; note it for production);

@@ -2674,3 +2674,14 @@ outside (a request link or email-in) until a person opens it; (3) show such case
 a fixed first-month price, credited against the first year if they stay), how many seats it covers, and whether a CA who
 introduces a customer gets anything. Nothing in the product changes for a pilot: it is an ordinary Business subscription.
 
+
+## N-199 — Every email shows the real Servabo logo (DECIDED (owner, 2026-10-27); built by Final session 2A)
+
+**Your request:** incoming emails showed the old logo (a navy tile with a plain "S"); the current logo should be in every
+email. **Built:** every email sent as Servabo now shows the logo itself (the ribbon mark and the "servabo" wordmark), in a
+light and a dark version. It travels **inside the email** as a small picture (about 19 KB each), not as a link to a web
+address, so Gmail, Outlook and Apple Mail show it without "load images?" and security emails still carry no web address.
+Mail an organization sends under its own brand shows its own name, as before. **Not yet seen in a real inbox:** Final
+session 2B looks at it in Gmail, Outlook and Apple Mail, light and dark. One known limit: dark mode in the Gmail phone apps
+ignores the stylesheet, so there the light logo (dark lettering) sits on a darkened card; if that looks wrong, the fallback
+is to put the logo on a small white rounded panel.
