@@ -638,7 +638,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--signature", choices=["not_checked", "checked", "does_not_match"], default="not_checked",
                         help="einvoice-qr: the state of the QR code's signature on the document")
     parser.add_argument("--now", help="run-job: the clock the job sees (ISO 8601 with an offset), for the jobs that read it "
-                                      "(gst.digest, gst.notices); ignored in production")
+                                      "(gst.digest, gst.notices, compliance.deletion_notices); ignored in production")
     parser.add_argument("--addon", default="addon.gst_credit", help="cancel-addon, addon-grace-ends: the add-on key")
     parser.add_argument("--backdate-days", type=int, default=0,
                         help="trial-ends: also move this organization's usage events that many days back, so the "

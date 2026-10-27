@@ -130,3 +130,15 @@ def test_the_job_is_scheduled_hourly_and_claimed_by_a_worker() -> None:
     entry = next(e for e in DEFAULT_SCHEDULE if e.job_type == deletion_notices.JOB_TYPE)
     assert entry.interval_seconds == 3_600
     assert any(p.job_types and deletion_notices.JOB_TYPE in p.job_types for p in PROFILES.values())
+
+
+def test_run_job_now_moves_the_clock_outside_production_only(monkeypatch) -> None:
+    # Final session 2B sees the "last chance" email in a real inbox with `e2e_stand_in.py run-job --job
+    # compliance.deletion_notices --now <25 days after the deletion>`; a job payload must never move production's clock.
+    seen: list = []
+    monkeypatch.setattr(deletion_notices, "run", lambda db, *, now=None: seen.append(now) or {"warnings": 0, "emails": 0})
+    deletion_notices.handle({"now": "2026-10-26T10:00:00+00:00"})
+    assert seen == [datetime(2026, 10, 26, 10, 0, tzinfo=timezone.utc)]
+    monkeypatch.setattr("app.core.config.settings.ENVIRONMENT", "production")
+    deletion_notices.handle({"now": "2026-10-26T10:00:00+00:00"})
+    assert seen[-1] is None

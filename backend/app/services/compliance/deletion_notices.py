@@ -166,9 +166,12 @@ def run(db: Session, *, now: Optional[datetime] = None) -> dict[str, int]:
 
 def handle(payload: dict[str, Any]) -> dict[str, Any]:
     from app.db.session import SessionLocal
+    from app.services.gst.notices import payload_now
 
+    # `now` in the payload (`e2e_stand_in.py run-job --now`) lets a rehearsal see the LAST_CHANCE email without waiting
+    # 25 days; it is ignored in production.
     with SessionLocal() as db:
-        return {"outcome": "COMPLETED", **run(db)}
+        return {"outcome": "COMPLETED", **run(db, now=payload_now(payload))}
 
 
 __all__ = ["ARCHIVED", "JOB_TYPE", "LAST_CHANCE", "due", "handle", "recipients", "run"]
