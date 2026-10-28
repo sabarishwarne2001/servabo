@@ -13,9 +13,9 @@ Local stack: Postgres 16.15 (Ubuntu) with pgvector 0.8.0 (the files from the `pi
 extension folders after the owner allowed it; the Ubuntu 0.6.0 backed up in `/dev/shm/vector06-backup`) on :5434 (backend tests, cluster
 in `/dev/shm/pgdata2`), Redis, backend venv Python 3.12 in the session scratchpad (`backend/.venv` is not git-ignored). Env block:
 `testenv.sh` in the scratchpad. After a container restart recreate the cluster (initdb, role `servabo`, database `servabo_test`).
-Decisions so far: **N-200** (TRINETRA's data lifecycle). Findings reserved: F-641 Helm hold, F-642 touch means changed, F-643 seller
+Decisions so far: **N-200** to **N-209** (written in NEEDS-OWNER.md). Findings reserved: F-641 Helm hold, F-642 touch means changed, F-643 seller
 check (a 500), F-644 capacities (Phase 2), F-645 one PAN two workspaces, F-646 no pilot mode (Phase 2), F-647 recompute does nothing
-(Phase 7), F-648 case list queries, F-649 write forms (not a defect). Next free after these: **N-201**, **F-650**.
+(Phase 7), F-648 case list queries, F-649 write forms (not a defect). Next free after these: **N-210**, **F-650**.
 UI work owed to Phase 8 by Phase 1: a checkbox for `seller_name_confirmed` (create and reconfirm), the cockpit's
 `withholding_holds` list on the Helm page, `cash_due_micros` / `reminder_held` in the ledger note.
 

@@ -14,7 +14,10 @@ DUPLICATE: Final = "DUPLICATE"                         # a probable duplicate in
 OVERCHARGE: Final = "OVERCHARGE"                       # an invoice priced above its purchase order
 STATEMENT_DIFFERENCE: Final = "STATEMENT_DIFFERENCE"   # a supplier statement that disagrees with our books (Helm)
 PAYMENT_DEADLINE: Final = "PAYMENT_DEADLINE"           # a legal or stated payment deadline (MSME 45 days, GST 180, a fee)
-KINDS: Final = (GST_CREDIT, DUPLICATE, OVERCHARGE, STATEMENT_DIFFERENCE, PAYMENT_DEADLINE)
+#: Final session 2T (Phase 7.10): tax a customer withheld that is not yet in the imported tax statement. Its figure is a possible
+#: gap to check, kept in the issue's details; it is NEVER an exposure in cash and never a recovered outcome.
+TDS_CREDIT: Final = "TDS_CREDIT"
+KINDS: Final = (GST_CREDIT, DUPLICATE, OVERCHARGE, STATEMENT_DIFFERENCE, PAYMENT_DEADLINE, TDS_CREDIT)
 
 KIND_LABELS: Final = {
     GST_CREDIT: "GST credit waiting on a supplier",
@@ -22,6 +25,7 @@ KIND_LABELS: Final = {
     OVERCHARGE: "Price above the purchase order",
     STATEMENT_DIFFERENCE: "Supplier statement difference",
     PAYMENT_DEADLINE: "Payment deadline",
+    TDS_CREDIT: "TDS not yet in your statement",
 }
 
 FOUND: Final = "FOUND"

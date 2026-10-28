@@ -1685,6 +1685,8 @@ def organization_summary(
         db, organization_id=organization_id, user_id=context.user_id, role=context.role
     )
     results = []
+    profile_items: dict = {}
+    page = []
     for w in (
         db.query(Workspace)
         .filter(
@@ -1696,9 +1698,14 @@ def organization_summary(
         .offset(offset)
         .limit(limit)
     ):
+        page.append(w.id)
         if inactive_reason(db, organization_id=organization_id, workspace_id=w.id):
             continue
         result = s.summary(db, w)
+        by_profile = {}
+        for item in result["items"]:
+            by_profile.setdefault(item["profile_id"], []).append(item)
+        profile_items.update(by_profile)
         results.append(
             {
                 "workspace_id": str(w.id),
@@ -1716,8 +1723,12 @@ def organization_summary(
                 },
             }
         )
+    entities = s.entities(db, organization_id, page, profile_items)
     return {
         "workspaces": results,
-        "scope": "Only workspaces readable by the current reviewer. Entities remain separate.",
+        "entities": entities,
+        "totals": s.entity_totals(entities),
+        "scope": "Only workspaces readable by the current reviewer. A legal entity is counted once, however many profiles hold its "
+        "PAN; the totals add the entities, never the workspaces twice.",
         "is_sample": False,
     }

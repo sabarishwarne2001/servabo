@@ -66,6 +66,9 @@ def _adapters(db: Session, organization_id: uuid.UUID, *, heavy: bool) -> list[A
         if adapter.capability and not capability_gate.has_capability(db, organization_id=organization_id,
                                                                      capability_key=adapter.capability):
             continue
+        live = getattr(adapter, "live", None)       # an engine that is also gated by a mode (TRINETRA: off, pilot, on)
+        if live is not None and not live(db, organization_id):
+            continue
         out.append(adapter)
     return out
 
@@ -331,6 +334,7 @@ def needs_owner(db: Session, organization_id: uuid.UUID) -> Optional[dict[str, A
             RecoveryIssue.currency == "INR"), 0))
         .join(Workspace, Workspace.id == RecoveryIssue.workspace_id)
         .where(RecoveryIssue.organization_id == organization_id, RecoveryIssue.state.in_(v.OPEN_STATES),
+               RecoveryIssue.kind != v.TDS_CREDIT,       # a possible tax-statement gap is never one of the "money issues"
                RecoveryIssue.owner_user_id.is_(None), Workspace.is_sample.is_(False),
                Workspace.status == WorkspaceStatus.ACTIVE)
         .group_by(Workspace.slug).order_by(func.count().desc(), Workspace.slug)).all()

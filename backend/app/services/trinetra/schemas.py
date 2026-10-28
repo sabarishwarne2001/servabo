@@ -227,8 +227,31 @@ class WorkspaceSummaryOut(Wire):
     as_of: str | None
 
 
+class EntitySummaryOut(Wire):
+    """One legal entity across the readable workspaces: counted once. Its name, never its PAN."""
+
+    entity_id: str
+    name: str
+    workspace_ids: list[str]
+    total: int
+    unresolved: int
+    expected_micros: Micros
+    posted_micros: Micros
+    gap_micros: Micros
+
+
+class EntityTotalsOut(Wire):
+    total: int
+    unresolved: int
+    expected_micros: Micros
+    posted_micros: Micros
+    gap_micros: Micros
+
+
 class OrganizationSummaryOut(BaseModel):
     workspaces: list[WorkspaceSummaryOut]
+    entities: list[EntitySummaryOut] = Field(default_factory=list)
+    totals: EntityTotalsOut | None = None
     scope: str
     is_sample: bool
 

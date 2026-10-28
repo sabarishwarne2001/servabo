@@ -186,3 +186,111 @@ def test_enterprise_keys_read_cases_and_nothing_else_with_amounts_as_strings_and
     assert client.post(path, headers=headers, json={}).status_code in (403, 405)
     assert client.get(world[0] + "/credits", headers=headers).status_code == 403
     assert client.get(path, headers=tenant.viewer.headers).status_code == 403
+
+
+# --- 9. The organization view: one legal entity, counted once ------------------------------------------------------------------
+
+
+def test_the_organization_view_totals_each_legal_entity_once_and_names_no_pan(client, tenant, world, db_session):
+    from tests.security.test_non_human_principals_default_deny import _key  # noqa: F401
+    from tests.trinetra.test_money_model import statement
+
+    url, body, case = setup_case(client, tenant, world, reference="TR-ORG-1")
+    client.post(url + "/credits", headers=tenant.owner.headers, json={**body, "work_item_id": str(world[2].id), "reference": "TR-ORG-2"})
+    statement(client, tenant, url, body, ["MUMB54321K,10.00,x0,194C,15-Jun-2025,F,FY 2025-26 / AY 2026-27"])
+    put_on_plan(db_session, tenant.organization, "enterprise")
+    db_session.commit()
+    org = client.get(f"/api/v1/organizations/{tenant.organization.id}/trinetra/summary", headers=tenant.owner.headers)
+    assert org.status_code == 200, org.text
+    data = org.json()
+    [entity] = data["entities"]
+    assert entity["name"] == "Synthetic Ltd" and entity["total"] == 2 and entity["workspace_ids"] == [str(tenant.workspace.id)]
+    assert entity["expected_micros"] == "4000000000" and entity["gap_micros"] == "4000000000" and entity["posted_micros"] == "0"
+    assert data["totals"] == {k: entity[k] for k in ("total", "unresolved", "expected_micros", "posted_micros", "gap_micros")}
+    assert data["totals"]["total"] == sum(w["total"] for w in data["workspaces"])
+    assert "ABCDE1234F" not in org.text and "******" not in org.text and entity["entity_id"]
+
+
+def test_a_legacy_duplicate_profile_for_one_pan_is_one_entity_in_the_organization_view(client, tenant, world, db_session):
+    """Profiles made before the one-entity rule can hold the same PAN twice; the view must not count the entity twice."""
+    from app.core import encryption
+    from app.models.trinetra import TrinetraProfile
+    from app.models.workspace import Workspace, WorkspaceStatus
+
+    url, body, case = setup_case(client, tenant, world)
+    first = db_session.query(TrinetraProfile).one()
+    other = Workspace(organization_id=tenant.organization.id, slug="branch", workspace_name="Branch", status=WorkspaceStatus.ACTIVE)
+    db_session.add(other)
+    db_session.flush()
+    first.org_pan_fingerprint = None                                  # a legacy row, as the migration left it
+    db_session.add(TrinetraProfile(organization_id=tenant.organization.id, workspace_id=other.id, name="Synthetic Ltd (branch)",
+                                   pan_ciphertext=first.pan_ciphertext, identity_salt_ciphertext=first.identity_salt_ciphertext,
+                                   pan_fingerprint="legacy-" + "0" * 57, pan_masked=first.pan_masked, org_pan_fingerprint=None))
+    put_on_plan(db_session, tenant.organization, "enterprise")
+    db_session.commit()
+    data = client.get(f"/api/v1/organizations/{tenant.organization.id}/trinetra/summary", headers=tenant.owner.headers).json()
+    [entity] = data["entities"]                                       # one entity, however many profiles hold its PAN
+    assert sorted(entity["workspace_ids"]) == sorted([str(tenant.workspace.id), str(other.id)])
+    assert entity["total"] == 1 and data["totals"]["total"] == 1 and encryption is not None
+
+
+# --- 12. Enterprise controls: legal holds and egress lockdown ------------------------------------------------------------------
+
+
+def _url(tenant, item_id) -> str:
+    return f"/api/v1/workspaces/{tenant.workspace.id}/work-items/{item_id}"
+
+
+def test_a_legal_hold_keeps_the_invoice_and_so_the_case_and_its_history_until_it_is_released(client, tenant, world, db_session):
+    from app.models.trinetra import TrinetraCredit, TrinetraDecision
+    from app.services.ingestion import retention_service
+
+    url, body, case = setup_case(client, tenant, world)
+    invoice = world[1]
+    hold = retention_service.place_hold(db_session, organization_id=tenant.organization.id, workspace_id=None, work_item_id=invoice.id,
+                                        reason="Litigation hold - Acme v. Example", reference="CASE-1", user_id=tenant.owner.user.id)
+    db_session.commit()
+    refused = client.delete(_url(tenant, invoice.id), headers=tenant.owner.headers)
+    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "RETENTION_HOLD"
+    assert db_session.query(TrinetraCredit).count() == 1 and db_session.query(TrinetraDecision).count() >= 1
+    retention_service.release_hold(db_session, organization_id=tenant.organization.id, hold_id=hold.id, user_id=tenant.owner.user.id)
+    db_session.commit()
+    assert client.delete(_url(tenant, invoice.id), headers=tenant.owner.headers).status_code in (200, 204)
+    db_session.expire_all()
+    assert db_session.query(TrinetraCredit).count() == 0                  # without a hold the case goes with its document
+
+
+def test_a_workspace_wide_hold_keeps_every_document_a_case_rests_on(client, tenant, world, db_session):
+    from app.models.trinetra import TrinetraCredit
+    from app.services.ingestion import retention_service
+
+    setup_case(client, tenant, world)
+    retention_service.place_hold(db_session, organization_id=tenant.organization.id, workspace_id=tenant.workspace.id, work_item_id=None,
+                                 reason="Regulatory hold for the 2025-26 inspection", reference=None, user_id=tenant.owner.user.id)
+    db_session.commit()
+    for item in (world[1], world[2]):
+        assert client.delete(_url(tenant, item.id), headers=tenant.owner.headers).status_code == 409
+    assert db_session.query(TrinetraCredit).count() == 1
+
+
+def test_an_inquiry_is_refused_in_words_when_the_organizations_egress_policy_blocks_its_mail_server(client, tenant, world, db_session,
+                                                                                                    monkeypatch):
+    from types import SimpleNamespace
+
+    from app.core import egress
+    from app.services.helm import hands
+    from tests.trinetra.test_resolution import customer, draft, step
+
+    url, body, case = setup_case(client, tenant, world)
+    customer(db_session, tenant)
+    made = draft(client, tenant, url, case).json()
+    assert step(client, tenant, url, made, "approve").status_code == 200
+    sent = []
+    monkeypatch.setattr(hands, "_identity", lambda *a, **k: SimpleNamespace(
+        transport_layer="TENANT", smtp=SimpleNamespace(smtp_host="mail.example.invalid", smtp_port=587), from_address="a@b.example",
+        sender_name="Acme", reply_to=None))
+    monkeypatch.setattr(egress, "decide", lambda *a, **k: SimpleNamespace(allowed=False, explanation="the organization's lockdown has no rule for it"))
+    monkeypatch.setattr(hands, "send_mail", lambda *a, **k: sent.append(1))
+    refused = step(client, tenant, url, made, "send")
+    assert refused.status_code == 422 and "TRINETRA_DESTINATION_REFUSED" in refused.text and "lockdown" in refused.text
+    assert sent == []                                                     # nothing left, and the draft stays approved for a retry

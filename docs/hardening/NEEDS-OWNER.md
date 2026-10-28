@@ -2709,3 +2709,75 @@ yet confirmed by your lawyer**: the duty to keep books of account (Income-tax Ac
 equivalent) applies to the books and supporting vouchers, which stay where you keep them. If your lawyer says the reviewed outcomes must be
 kept for a fixed period, the change is one line in the data map (`Erasure.KEEP`); no code elsewhere depends on it.
 
+
+## N-201 — TRINETRA has three modes and ships as a pilot (DECIDED (Final 2T))
+
+`TRINETRA_MODE` is `off`, `pilot` or `on`; it ships as **pilot**. In `pilot`, only organizations a platform administrator enrols
+(with a written reason, audited) can use live TRINETRA; everyone else sees the synthetic examples and the plain sentence "TRINETRA is in
+a pilot and your organization is not enrolled yet". In `on`, every Business and Enterprise organization can. `off` shows examples
+only. The older `TRINETRA_LIVE_ENABLED` still works (true means `on`, false means `off`). **Why:** the official statement readers
+cannot be called verified until Final session 2B has checked them against real documents, so opening it to everybody on day one would
+be a promise we cannot keep. **To launch to everybody:** after 2B, set `TRINETRA_MODE=on`. Helm's reminder safety hold keeps working
+in every mode.
+
+## N-202 — TRINETRA's plan capacities (DECIDED (Final 2T); change the numbers freely)
+
+Business: 2 legal-entity profiles, 12 active statement snapshots, 500 open cases, 50 sent inquiries a month. Enterprise: 10, 60, 5,000
+and 500. They count what is active or open (a closed case or a replaced snapshot frees its place), and the plain message says what to
+do next. The figures are in `app/core/plan_limits.py` and `docs/product/TENANCY-AND-PLANS.md`; they are a product choice, so they are
+yours to change.
+
+## N-203 — The official statement readers are built but unverified (DECIDED (Final 2T); needs Final session 2B)
+
+TRINETRA can read a **Servabo template** (CSV or Excel), the **text of Form 26AS / Form 168** and the **AIS CSV** without typing. The
+two official readers were built strictly from secondary descriptions because the official TRACES and e-filing hosts could not be
+reached while building. They are marked **unverified** everywhere a person sees them, they check the file's own totals, and they refuse
+rather than guess when a file does not look right. **Final session 2B must open real downloaded statements and confirm each reader**;
+only then can the registry mark them verified. A statement read from a file is stored as a snapshot with no document attached, so the
+retention sweep does not age it; if you want a "remove a superseded snapshot" button, say so.
+
+## N-204 — Suggested expectations are only ever accepted by a person (DECIDED (Final 2T))
+
+TDS amounts printed on invoices, a Servabo template of expectations, and the "tax amount withheld" Zoho Books records show as
+**suggestions**; a case exists only when a person accepts one. A customer's TAN is kept only as a masked key in the deductor directory
+(proposed, confirmed or flagged); a flagged TAN blocks acceptance. The Zoho field names are **unverified** until Final session 2B has
+looked at a real Zoho Books organization.
+
+## N-205 — The money model: what is netted, and by whom (DECIDED (Final 2T))
+
+A credit note reduces the invoice's gross the expectation can rest on. A reversal in a statement nets against a posting **only after a
+person pairs them** (and can unpair them); an unpaired reversal stays an exception. Advances, a sourced taxable basis (read from a
+document, never typed) and several remittances for one invoice are all supported; a statement amount is never spent twice. New
+statuses are named in plain words. Nothing is inferred, and a gap is an item to check, never a refund.
+
+## N-206 — Inquiries to customers: who may be asked, how often (DECIDED (Final 2T))
+
+An inquiry goes only to a **confirmed** contact (one a person confirmed in Helm, never one read from a document), is drafted, approved
+and **sent by a person pressing Send**; nothing is ever sent by itself, not even by an automation. One inquiry per case per week unless
+a person gives a reason. The customer gets a one-time secure link to upload a document; the address is not stored on the inquiry and
+the email never contains a PAN or a TAN. The monthly allowance is the plan's (50 / 500).
+
+## N-207 — Approval chains for closing cases (DECIDED (Final 2T); Enterprise)
+
+An Enterprise organization may require that closing a case worth at least an amount, in the ways it lists, needs the approval of an
+organization administrator or owner **other than the person who asked**. An approval is valid only for the case revision it was asked
+on. A closed-out case is never silently reopened.
+
+## N-208 — What "TDS now visible in your statement" means (DECIDED (Final 2T))
+
+The closure ledger records, once per case and confirming statement, the tax of cases that **had a gap in an earlier import** and that an
+accountant then confirmed as posted. It is evidence that a credit appears in the statement. It is **never cash, never a refund and
+never added to a GST or cash figure**, and a case that was never a gap does not count. Cycle time (days from opening to closing) is
+measured from the case history and kept apart from the minutes reviewers type.
+
+## N-209 — TDS notices, the Monday line, rules and webhooks (DECIDED (Final 2T))
+
+Notices: owners and administrators, a "TDS credit" category on by default (they can switch it off); one notice per case revision when
+a confirmed withholding loses its evidence, an import leaves a possible missing posting, or a case is still open **30 days** after it
+was opened ("past its due date"; one constant, `notices.DUE_AFTER_DAYS`, which is yours to change); more than five at once are one
+notice that counts them. The Monday line goes at 09:00 in the organization's zone, once a week, only when there is something to say;
+Starter organizations have no live TDS data, so they get none (the Getting started step and the plan page say what Business adds).
+Rules (Business and up) can be triggered by a gap found, evidence going stale and a case closed, and may notify, assign a reviewer, tag
+the invoice and post to chat, **never send an inquiry, an email or a webhook**. Enterprise webhooks (`gap_found`, `closed`, with
+`reviewed`) and the read-only cases API carry ids, states and amounts only. In Recoveries, a TDS gap is its own kind whose figure is
+a possible gap kept out of every "found money" total and every digest line; verifying it records no recovered outcome.

@@ -1250,6 +1250,67 @@ def create_case(
     return r
 
 
+def totals_of(items):
+    """The headline figures of these case views: one rule for a workspace, a legal entity and an organization."""
+    return dict(
+        total=len(items),
+        unresolved=sum(r["status"] not in RESOLVED_STATUSES for r in items),
+        expected_micros=sum(
+            r["expected_micros"] or 0 for r in items if r["review_state"] != "WITHDRAWN"
+        ),
+        posted_micros=sum(
+            r["posted_micros"] for r in items if r["review_state"] != "WITHDRAWN"
+        ),
+        gap_micros=sum(
+            r["gap_micros"] or 0
+            for r in items
+            if r["review_state"] not in ("WITHDRAWN", "EXPLAINED", "UNRESOLVED")
+        ),
+    )
+
+
+def entities(db, organization_id, workspace_ids, profile_items):
+    """The legal entities behind these workspaces, each counted once. A profile made before the one-entity rule can hold the
+    same PAN as another: those are grouped by the PAN (compared in memory, never stored or shown). `profile_items` maps a
+    profile id (as text) to its case views."""
+    profiles = (
+        db.query(Profile)
+        .filter(Profile.organization_id == organization_id, Profile.workspace_id.in_(workspace_ids))
+        .order_by(Profile.id)
+        .all()
+        if workspace_ids
+        else []
+    )
+    groups = {}
+    for p in profiles:
+        key = p.org_pan_fingerprint or "legacy:" + hashlib.sha256(
+            encryption.decrypt_secret(p.pan_ciphertext).encode("ascii")
+        ).hexdigest()
+        groups.setdefault(key, []).append(p)
+    out = []
+    for members in groups.values():
+        items = [i for p in members for i in profile_items.get(str(p.id), [])]
+        out.append(
+            dict(
+                entity_id=str(members[0].id),
+                name=members[0].name,
+                workspace_ids=sorted({str(p.workspace_id) for p in members}),
+                **totals_of(items),
+            )
+        )
+    return sorted(out, key=lambda e: (e["name"].casefold(), e["entity_id"]))
+
+
+def entity_totals(entities_):
+    return dict(
+        total=sum(e["total"] for e in entities_),
+        unresolved=sum(e["unresolved"] for e in entities_),
+        expected_micros=sum(e["expected_micros"] for e in entities_),
+        posted_micros=sum(e["posted_micros"] for e in entities_),
+        gap_micros=sum(e["gap_micros"] for e in entities_),
+    )
+
+
 def summary(db, workspace):
     rows = (
         working_set(db.query(CreditRow).filter_by(workspace_id=workspace.id))
@@ -1268,25 +1329,10 @@ def summary(db, workspace):
     return dict(
         is_sample=False,
         items=items,
-        total=len(items),
         outcomes=measure(db, workspace, items, rows, list(active.values())),
         as_of=max((r["as_of"] for r in items if r["as_of"]), default=None),
-        expected_micros=sum(
-            r["expected_micros"] or 0 for r in items if r["review_state"] != "WITHDRAWN"
-        ),
-        posted_micros=sum(
-            r["posted_micros"] for r in items if r["review_state"] != "WITHDRAWN"
-        ),
-        gap_micros=sum(
-            r["gap_micros"] or 0
-            for r in items
-            if r["review_state"] not in ("WITHDRAWN", "EXPLAINED", "UNRESOLVED")
-        ),
-        unresolved=sum(
-            r["status"] not in RESOLVED_STATUSES
-            for r in items
-        ),
         note="Human-confirmed transcription; not a verified official-format import. Unknown gaps excluded.",
+        **totals_of(items),
     )
 
 
