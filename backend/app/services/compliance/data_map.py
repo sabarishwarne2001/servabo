@@ -521,6 +521,7 @@ REGISTRY.update({
     "trinetra_outcomes": _r(Kind.CONTENT, Erasure.DELETE, Sweep.DELETE, OrgPurge.DELETE,
         note="Working paper (N-200): a confirmed closure, erased with its case.",
         export="trinetra_outcomes", links=(via("credit_id", "trinetra_credits", "id", col("work_item_id")),)),
+    "trinetra_notice_sends": _r(Kind.MONEY, Erasure.KEEP, Sweep.NONE, OrgPurge.KEEP, why=_NO + "a send record: a kind, a key made of ids, a count"),
     "trinetra_policies": _config(export="trinetra_policies", note="An Enterprise organization's approval chain for closing cases."),
     "trinetra_deductors": _config(export="trinetra_deductors", note="A customer's masked TAN mapped to the customer; no TAN is stored."),
     "trinetra_pilot": _config(note="Which organizations the operator enrolled in the TRINETRA pilot, and why (platform setting)."),

@@ -16,6 +16,8 @@ What matches:
 * GST suppliers - by GSTIN or name, and GST invoices - by invoice number, from
   the reconciliation of the workspaces whose plan (or GST Credit add-on) opens
   the supplier and invoice lists; a workspace on the preview shows nothing here;
+* TDS credit cases (TRINETRA) - by invoice reference or customer name, never by PAN or TAN, only while TRINETRA is open for the
+  organization (mode and plan) and never in the sample workspace;
 * automation rules - by name, only in workspaces where the person may see
   workflows (a contributor or more; a viewer is not shown them anywhere).
 
@@ -36,6 +38,7 @@ from app.models.automation import AutomationRule
 from app.models.cases import Case
 from app.models.entity_graph import Entity
 from app.models.gst import GstMatch
+from app.models.trinetra import TrinetraCredit
 from app.models.organization import MembershipStatus, Organization, OrganizationRole
 from app.models.work_item import WorkItem
 from app.models.workspace import Workspace, WorkspaceMember, WorkspaceRole
@@ -53,7 +56,7 @@ class SearchQueryError(ValueError):
 
 @dataclass(frozen=True)
 class SearchHit:
-    kind: str  # DOCUMENT | ENTITY | CASE | GST_SUPPLIER | GST_INVOICE | RULE
+    kind: str  # DOCUMENT | ENTITY | CASE | GST_SUPPLIER | GST_INVOICE | TDS_CASE | RULE
     id: uuid.UUID
     title: str
     subtitle: Optional[str]
@@ -73,6 +76,7 @@ class SearchResults:
     cases: list[SearchHit] = field(default_factory=list)
     suppliers: list[SearchHit] = field(default_factory=list)
     gst_invoices: list[SearchHit] = field(default_factory=list)
+    tds_cases: list[SearchHit] = field(default_factory=list)
     rules: list[SearchHit] = field(default_factory=list)
 
 
@@ -176,6 +180,7 @@ def search(
 
     results.suppliers, results.gst_invoices = _gst_hits(db, organization=organization, workspaces=workspaces,
                                                        pattern=pattern, limit=limit, hit=hit)
+    results.tds_cases = _tds_hits(db, organization=organization, workspaces=workspaces, pattern=pattern, limit=limit, hit=hit)
     results.rules = _rule_hits(db, organization=organization, user_id=user_id, organization_role=organization_role,
                                workspaces=workspaces, pattern=pattern, limit=limit, hit=hit)
     return results
@@ -248,6 +253,36 @@ def _gst_hits(db: Session, *, organization: Organization, workspaces: dict[uuid.
         for row in invoice_rows
     ]
     return suppliers, invoices
+
+
+def _tds_hits(db: Session, *, organization: Organization, workspaces: dict[uuid.UUID, Workspace], pattern: str, limit: int,
+              hit: Any) -> list[SearchHit]:
+    """TDS credit cases by invoice reference or customer name. Silent unless TRINETRA is live for the organization (the same
+    `live_for` as every other gate), so a search never shows what the page itself would lock. Identifiers (PAN, TAN) are not
+    columns of a case and are never searched."""
+    from app.services.trinetra import mode
+
+    if not mode.live_for(db, organization.id):
+        return []
+    open_workspaces = [wid for wid, ws in workspaces.items() if not ws.is_sample]
+    if not open_workspaces:
+        return []
+    rows = db.execute(
+        select(TrinetraCredit.id, TrinetraCredit.workspace_id, TrinetraCredit.reference, TrinetraCredit.counterparty,
+               TrinetraCredit.state, TrinetraCredit.year)
+        .where(
+            TrinetraCredit.organization_id == organization.id,
+            TrinetraCredit.workspace_id.in_(open_workspaces),
+            or_(TrinetraCredit.reference.ilike(pattern, escape="\\"), TrinetraCredit.counterparty.ilike(pattern, escape="\\")),
+        )
+        .order_by(TrinetraCredit.created_at.desc())
+        .limit(limit)
+    ).all()
+    return [
+        hit("TDS_CASE", row.id, row.reference,
+            " \u00b7 ".join((row.counterparty, row.state.replace("_", " ").title(), f"TDS {row.year}")), row.workspace_id, row.reference)
+        for row in rows
+    ]
 
 
 #: Seeing workflows is a contributor's right (N-019): a viewer is offered none, so search offers none either.

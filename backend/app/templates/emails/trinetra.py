@@ -34,3 +34,27 @@ def render_inquiry(*, organization_name: str, customer_name: str, invoice_number
                f"<p>Thank you,<br>{esc(organization_name)}</p>")
     return subject, _wrap(subject, organization_name, content,
                           f"Sent by {organization_name} about invoice {invoice_number}."), text
+
+
+NOT_ADVICE = "Figures come from your own invoices and the statements you imported into Servabo. A gap is an item to check, not a conclusion, and not cash."
+
+
+def render_trinetra_digest(*, organization_name: str, week_label: str, headline: str, lines: list[str], trinetra_url: str,
+                           preferences_url: str, brand_name: str) -> tuple[str, str, str]:
+    """The Monday TDS line (Final 2T, Phase 7.4): where the TDS cases stand. `ValueError` when there is nothing to say."""
+    headline = clip(single_line(headline or ""))
+    lines = [clip(single_line(line)) for line in lines if single_line(line)]
+    if not headline:
+        raise ValueError("a TDS digest with nothing to say is never sent")
+    organization = single_line(organization_name)
+    subject = single_line(f"Your TDS credit this week: {organization}")
+    lead = f"Here is where the tax your customers withheld stands for {organization} in the week of {single_line(week_label)}."
+    footer = (f"{brand_name} sends this on Mondays to owners and administrators, and only when there is something to report. "
+              'Turn it off under "TDS credit" in your notification settings.')
+    text = (f"Hello,\n\n{lead}\n\n{headline}\n" + "".join(f"- {line}\n" for line in lines)
+            + f"\n{NOT_ADVICE}\n\nOpen TDS credit: {trinetra_url}\n\n{footer}\nNotification settings: {preferences_url}\n")
+    items = "".join(f"<li>{esc(line)}</li>" for line in lines)
+    content = (f"<p>Hello,</p><p>{esc(lead)}</p><p><strong>{esc(headline)}</strong></p>" + (f"<ul>{items}</ul>" if items else "")
+               + f"<p>{esc(NOT_ADVICE)}</p><div class=\"button-container\"><a class=\"button\" href=\"{esc_attr(trinetra_url)}\">Open TDS credit</a></div>"
+               f"<p><a href=\"{esc_attr(preferences_url)}\">Notification settings</a></p>")
+    return subject, _wrap(subject, brand_name, content, footer), text

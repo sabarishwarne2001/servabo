@@ -15,7 +15,6 @@ def document_changed(
         return
     try:
         from app.models.workspace import Workspace
-        from app.models.trinetra import TrinetraProfile
         from app.services import job_service
 
         with db.begin_nested():
@@ -24,9 +23,13 @@ def document_changed(
                 return
             if not mode.live_for(db, workspace.organization_id):
                 return
+            # Something to compare: a case that is still open. Otherwise a changed document queues nothing.
+            from app.services.trinetra.service import OPEN_STATES
+            from app.models.trinetra import TrinetraCredit
+
             if (
-                not db.query(TrinetraProfile.id)
-                .filter_by(workspace_id=workspace_id)
+                not db.query(TrinetraCredit.id)
+                .filter(TrinetraCredit.workspace_id == workspace_id, TrinetraCredit.state.in_(OPEN_STATES))
                 .first()
             ):
                 return

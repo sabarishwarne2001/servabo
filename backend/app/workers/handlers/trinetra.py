@@ -1,4 +1,6 @@
-"""Bounded, read-only recompute against current snapshots; replay has no side effects."""
+"""Bounded recompute against current snapshots. It changes no case. Its one effect is to say what is new about the cases (a
+confirmation that lost its evidence, a possible missing posting, a passed due date): each once per case revision, so a replay says
+nothing again (Final 2T, Phase 7.3)."""
 
 import uuid
 from app.db.session import SessionLocal
@@ -6,6 +8,7 @@ from app.services.trinetra import mode
 from app.models.workspace import Workspace
 from app.workers.tenant_gate import inactive_reason, unpaid_reason
 from app.services.trinetra.service import summary
+from app.services.trinetra import notices
 
 
 def handle_recompute(payload):
@@ -22,6 +25,8 @@ def handle_recompute(payload):
         if w.is_sample or not mode.live_for(db, organization_id):
             return {"status": "blocked"}
         result = summary(db, w)
+        if notices.announce(db, w, result["items"]):
+            db.commit()
         return {
             "status": "complete",
             "cases": result["total"],

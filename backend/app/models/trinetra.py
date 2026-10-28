@@ -120,6 +120,29 @@ class TrinetraPilot(Base):
     )
 
 
+class TrinetraNoticeSend(Base):
+    """One row per TDS-credit notice or digest already said (Final 2T, Phase 7), so a retried or doubled job never says a thing
+    twice. `kind` is `stale` (a confirmed withholding lost its evidence), `missing` (an import turned a case into a possible
+    missing posting), `due` (a case passed its due date), `digest` (key: the ISO week) or `bundle` (many at once). For the three
+    case kinds the key is "<case id>:<case revision>": ONE notice per case revision. The primary key IS the claim."""
+
+    __tablename__ = "trinetra_notice_sends"
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True
+    )
+    kind: Mapped[str] = mapped_column(String(10), primary_key=True)
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    sent_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    recipients: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('stale', 'missing', 'due', 'digest', 'bundle')", name="ck_trinetra_notice_sends_kind"
+        ),
+    )
+
+
 class TrinetraStatement(Scoped, Base):
     __tablename__ = "trinetra_statements"
     evidence_work_item_ids: Mapped[list] = mapped_column(

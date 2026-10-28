@@ -198,6 +198,14 @@ DEFAULT_SCHEDULE: tuple[ScheduledJob, ...] = (
         ),
     ),
     ScheduledJob(
+        job_type="trinetra.sweep",
+        interval_seconds=3_600,
+        description=(
+            "Tell owners and administrators in the app when a TDS case passes its due date, and on Mondays from 09:00 in the "
+            "organization's zone email where TDS credit stands, each once and only when there is something to say (Final session 2T)."
+        ),
+    ),
+    ScheduledJob(
         job_type="usage.limit_alerts",
         interval_seconds=3_600,
         description="Tell owners at 80% and at 100% of a monthly plan limit, once per period (N-062).",

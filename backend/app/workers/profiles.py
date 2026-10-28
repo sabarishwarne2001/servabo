@@ -163,6 +163,8 @@ LIGHT = WorkerProfile(
             # Final session 1 (3A): the GST credit digest and notices. Queries, the notification outbox and SMTP only.
             "gst.digest",
             "gst.notices",
+            # Final session 2T (Phase 7): the TDS-credit due-date notices and the Monday line. Queries, the outbox and SMTP only.
+            "trinetra.sweep",
             # Campaign session 4 (§C.4): alerts for the deployment's owner. Queries and SMTP only.
             "ops.alerts",
             # Final session 2A (Phase 2): the host's safety jobs checked against their deadlines. Queries only.

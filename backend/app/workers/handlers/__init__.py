@@ -111,7 +111,7 @@ HELM_JOB_TYPES: frozenset[str] = frozenset(
 
 #: Session F: GST Credit (docs/product/GST-CREDIT.md). On the LIGHT profile.
 GST_JOB_TYPES: frozenset[str] = frozenset({"gst.recompute"})
-TRINETRA_JOB_TYPES: frozenset[str] = frozenset({"trinetra.recompute"})
+TRINETRA_JOB_TYPES: frozenset[str] = frozenset({"trinetra.recompute", "trinetra.sweep"})
 
 #: Session J: the hourly sweep that announces what the clock makes true (schedules, the GST clocks). LIGHT profile.
 AUTOMATION_SWEEP_JOB_TYPES: frozenset[str] = frozenset({"automation.sweep"})
@@ -496,6 +496,11 @@ def _usage_limit_alerts(payload: dict[str, Any]) -> dict[str, Any]:
     return handle_limit_alerts(payload)
 
 
+def _trinetra_sweep(payload: dict[str, Any]) -> dict[str, Any]:
+    from app.services.trinetra.notices import handle_sweep
+    return handle_sweep(payload)
+
+
 def _trinetra_recompute(payload):
     from app.workers.handlers.trinetra import handle_recompute
     return handle_recompute(payload)
@@ -664,6 +669,7 @@ _HANDLERS = {
     # Session F: GST Credit. On the LIGHT profile; nightly in DEFAULT_SCHEDULE.
     "gst.recompute": _gst_recompute,
     "trinetra.recompute": _trinetra_recompute,
+    "trinetra.sweep": _trinetra_sweep,
     "helm.ledger_build": _helm("handle_ledger_build"),
     "helm.plan": _helm("handle_plan"),
     "helm.backtest": _helm("handle_backtest"),
