@@ -74,3 +74,19 @@ def test_withheld_tax_changes_the_plan_digest_so_the_book_is_replanned():
     withheld = full_book(receivables=[_receivable(4, withheld_micros=2_000 * M, withholding_case_id=CASE)],
                          counterparties=CUSTOMER)
     assert plain.digest != withheld.digest
+
+
+def test_the_cockpit_lists_blocked_reminders_held_for_withholding_with_the_case_that_releases_them():
+    from types import SimpleNamespace as NS
+
+    from app.services.helm.service import withholding_holds
+
+    plan, found = _reminder(_receivable(4, withheld_micros=150_000 * M, withholding_case_id=CASE))
+    guard = found[0].result.as_json()
+    blocked = NS(id="a1", kind=v.ACTION_SEND_REMINDER, state=v.ACTION_BLOCKED, guard=guard, title="Remind", workspace_id=None)
+    other = NS(id="a2", kind=v.ACTION_SEND_REMINDER, state=v.ACTION_BLOCKED, guard={"checks": []}, title="No contact",
+               workspace_id=None)
+    paying = NS(id="a3", kind=v.ACTION_SCHEDULE_PAYMENT, state=v.ACTION_BLOCKED, guard=guard, title="Pay", workspace_id=None)
+    [held] = withholding_holds([blocked, other, paying])
+    assert held["action_id"] == "a1" and held["case_id"] == CASE
+    assert "TRINETRA" in held["release"] and "TDS" in held["reason"]

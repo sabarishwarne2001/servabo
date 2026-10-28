@@ -192,19 +192,24 @@ def render_reconciliation(*, organization_name: str, supplier_name: str, stateme
 
 
 def render_reminder(*, organization_name: str, customer_name: str, invoice_number: str, currency: str,
-                    amount_micros: int, due_date: str, days_overdue: int, level: int) -> tuple[str, str, str]:
+                    amount_micros: int, due_date: str, days_overdue: int, level: int,
+                    withheld_micros: int = 0) -> tuple[str, str, str]:
     customer_name, invoice_number = clip(customer_name), clip(invoice_number, 80)  # Final session 2A (invariant (e))
     tone_title, tone = REMINDER_TONES.get(max(1, min(3, level)), REMINDER_TONES[1])
     amount = money.say(amount_micros, currency)
+    # TRINETRA (Final 2T): the amount is the cash still owed; one line says what was withheld as TDS and is not asked for.
+    withheld = (f"{money.say(withheld_micros, currency)} withheld as TDS is not included in this amount."
+                if withheld_micros > 0 else "")
     subject = single_line(f"{tone_title}: invoice {invoice_number} ({amount}) is overdue")
     text = (f"Dear {customer_name},\n\n{tone}\n\nInvoice: {invoice_number}\nAmount: {amount}\nDue: {due_date} "
-            f"({days_overdue} days ago)\n\nRegards,\n{organization_name}\n")
+            f"({days_overdue} days ago)\n{(withheld + chr(10)) if withheld else ''}\nRegards,\n{organization_name}\n")
     content = (f"<p>Dear {esc(customer_name)},</p><p>{esc(tone)}</p>"
                "<table role=\"presentation\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\">"
                f"<tr><td>Invoice</td><td><strong>{esc(invoice_number)}</strong></td></tr>"
                f"<tr><td>Amount</td><td><strong>{esc(amount)}</strong></td></tr>"
                f"<tr><td>Due</td><td>{esc(due_date)} ({days_overdue} days ago)</td></tr></table>"
-               f"<p>Regards,<br>{esc(organization_name)}</p>")
+               + (f"<p>{esc(withheld)}</p>" if withheld else "")
+               + f"<p>Regards,<br>{esc(organization_name)}</p>")
     return subject, _wrap(subject, organization_name, content,
                           f"Sent by {organization_name} about invoice {invoice_number}."), text
 

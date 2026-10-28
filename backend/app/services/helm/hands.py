@@ -265,13 +265,14 @@ def send_reminder(db: Session, *, action: HelmAction, book: HelmBook, snapshot=N
     """Remind a customer of an overdue invoice, at the action's tone level, from the organization's
     own sender settings. Without a contact or a mail path the Guard has already stopped it."""
     from app.templates.emails import helm as mail
-    from app.services.trinetra.helm_adapter import reminder_requires_review
+    from app.services.trinetra.helm_adapter import reminder_ceiling
 
-    if book.kind != v.BOOK_SAMPLE and reminder_requires_review(
-        db, organization_id=action.organization_id, workspace_id=action.workspace_id,
-        work_item_id=action.work_item_id,
-    ):
-        raise HandError("HELM_WITHHOLDING_REVIEW", "Reviewed withholding affects this invoice. Review the TRINETRA evidence before sending a cash reminder.")
+    if book.kind != v.BOOK_SAMPLE:
+        # Belt and braces behind the Guard's "withholding" check: a reminder never asks for the tax a customer withheld.
+        ceiling = reminder_ceiling(db, organization_id=action.organization_id, workspace_id=action.workspace_id,
+                                   work_item_id=action.work_item_id)
+        if ceiling is not None and int(action.amount_micros or 0) > ceiling:
+            raise HandError("HELM_WITHHOLDING_REVIEW", "Reviewed withholding affects this invoice. Review the TRINETRA evidence before sending a cash reminder.")
 
     params = dict(action.params or {})
     counterparty = snapshot.counterparties.get(action.counterparty_key or "") if snapshot else None
@@ -281,7 +282,8 @@ def send_reminder(db: Session, *, action: HelmAction, book: HelmBook, snapshot=N
         organization_name=_organization_name(db, action.organization_id), customer_name=customer,
         invoice_number=str(params.get("document_number") or ""), currency=action.currency or "",
         amount_micros=int(action.amount_micros or 0), due_date=money.day(params.get("due_date")),
-        days_overdue=int(params.get("days_overdue") or 0), level=int(params.get("level") or 1))
+        days_overdue=int(params.get("days_overdue") or 0), level=int(params.get("level") or 1),
+        withheld_micros=int(params.get("withheld_micros") or 0))
     draft = {"subject": subject, "text": text_body, "to": to}
     if book.kind == v.BOOK_SAMPLE:
         return {"draft": draft, "sent": None, "note": "The sample company sends no email."}
