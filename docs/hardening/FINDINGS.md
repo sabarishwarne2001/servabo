@@ -3911,3 +3911,12 @@ batches, so the number of queries does not grow with the number of cases (a test
 **Checked:** the screens showed the write forms to roles the server refuses. The server was already right (a workspace administrator
 writes; a viewer reads); the screens now follow it and a test pins that the two agree. **Proof:**
 `tests/trinetra/test_write_forms_match_the_server.py`.
+
+## F-650 — The summary slowed down quadratically with the number of cases (P1)
+
+**Found:** with 5,000 cases the summary took 28 s, because each case searched its statement's rows and allocations again. A large
+business would have seen a spinner instead of its list. **Fix:** one index of postings and one of allocations per summary, looked
+up per case; 2.6 s at 5,000 cases, with the same figures as before. **Proof:** `tests/performance/test_trinetra_budgets.py` (failed
+first at 28 s against a 5 s budget), `tests/trinetra/test_case_list_batches.py` (the batched list equals the one-case path).
+Also found by the isolation sweep: a case's inquiries for an unknown case answered an empty list; it now answers 404 like every
+other case route (`tests/trinetra/test_isolation_sweep.py`).

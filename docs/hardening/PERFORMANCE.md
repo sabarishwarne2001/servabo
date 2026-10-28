@@ -410,3 +410,27 @@ The worker runs one job at a time, so every second spent there is a second every
 - **Not covered by these figures:** a document with a picture on every page still pays 1.6 s a page (3 pages at most). That
   is the cost of looking for a code that is not there, and the next step if it matters would be reading only the region of
   the page where the picture is.
+
+## TRINETRA at its working-set limit (Final session 2T, 2026-10-28; F-650)
+
+- **What was measured:** the three places a large business would feel the feature: the summary over 5,000 cases (the working-set
+  limit), importing a full 5,000-row annual statement over a workspace that already holds those 5,000 cases and an earlier
+  snapshot (so the comparison with the previous statement is included), and the organization view over 100 workspaces.
+  `tests/performance/test_trinetra_budgets.py`; every budget is 5 s on this sandbox, times `PERF_BUDGET_MULTIPLIER` (default 2
+  for a shared CI machine; `TRINETRA_PERF_CASES` sets the case count).
+- **What was wrong:** the first measurement of the summary at 5,000 cases took 28 s. Every case searched every row of its
+  statement for its own postings and allocations (a scan per case, so the time grew with cases times rows).
+- **The change:** `service.views` builds one index of the statement's postings and one of the allocations, and each case looks
+  itself up (`_PostingIndex`, `_AllocationIndex`). The figures are unchanged (`test_case_list_batches.py` compares the batched
+  list with the one-case path on the same data).
+- **Figures** (idle machine, `PERF_BUDGET_MULTIPLIER=1`):
+
+| Measure | Before | After | Budget |
+|---|---|---|---|
+| Summary, 5,000 cases | 28 s | 2.58 s | 5 s |
+| Read a 5,000-row annual statement | not measured | 0.06 s | 5 s |
+| Import it (baseline comparison over 5,000 cases) | not measured | 3.98 s | 5 s |
+| Organization view, 100 workspaces | not measured | 1.68 s | 5 s |
+
+- **Honest note:** the import is the tight one (80% of its budget). It is one transaction over 5,000 postings; the next step, if
+  a customer reaches it, is to compare the new statement with the previous one in the database rather than in memory.

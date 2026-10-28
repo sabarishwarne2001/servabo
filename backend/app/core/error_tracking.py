@@ -8,7 +8,7 @@ Sentry's free plan in its EU region, or a self-hosted GlitchTip (the same protoc
   * (the web app has its own: `frontend/src/monitoring.ts`).
 
 Nothing else. Expected 4xx are not sent; breadcrumbs, local variables, request bodies, cookies and the user are not collected. Whatever is
-left is scrubbed a second time in `scrub_event` (`before_send`) before it leaves the process: emails, tokens, API keys, GSTINs, PANs, IRNs,
+left is scrubbed a second time in `scrub_event` (`before_send`) before it leaves the process: emails, tokens, API keys, GSTINs, PANs, TANs, IRNs,
 bank-account-like numbers, amounts, query-string values, document text and field values. Organization and workspace ids are kept as tags:
 they are opaque UUIDs, and "which customer" is the question the owner asks first.
 
@@ -41,6 +41,8 @@ _PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"(?i)(?:api[_-]?key|secret|password|passwd|token|authorization)(\"?\s*[:=]\s*\"?)[^\s\"',;&]{4,}"), r"[secret]"),
     (re.compile(r"\b[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]\b"), "[gstin]"),
     (re.compile(r"\b[A-Z]{5}[0-9]{4}[A-Z]\b"), "[pan]"),
+    # Final session 2T: a deductor's TAN (four letters, five digits, a letter), before the generic reference pattern can half-read it.
+    (re.compile(r"\b[A-Z]{4}[0-9]{5}[A-Z]\b"), "[tan]"),
     (re.compile(r"\b[0-9a-fA-F]{64}\b"), "[irn]"),
     (re.compile(r"(?:₹|\bINR\b|\bRs\.?|\$|\bUSD\b|\bEUR\b|€)\s?-?\d[\d,]*(?:\.\d+)?"), "[amount]"),
     (re.compile(r"\b\d[\d,]*\.\d{2}\b"), "[amount]"),

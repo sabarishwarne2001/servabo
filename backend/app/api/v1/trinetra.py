@@ -868,7 +868,11 @@ def case_inquiries(
 ):
     from app.models.trinetra import TrinetraInquiry
 
+    from app.models.trinetra import TrinetraCredit
+
     w = workspace(db, context, workspace_id)
+    if db.query(TrinetraCredit.id).filter_by(id=credit_id, workspace_id=w.id).first() is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
     rows = db.query(TrinetraInquiry).filter_by(credit_id=credit_id, workspace_id=w.id).order_by(TrinetraInquiry.created_at.desc()).limit(50)
     return {"items": [iq.view(r) for r in rows]}
 

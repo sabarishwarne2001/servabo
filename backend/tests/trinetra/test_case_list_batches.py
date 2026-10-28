@@ -67,3 +67,28 @@ def test_the_summary_query_count_is_the_same_for_one_case_and_for_a_hundred(clie
     one = count()
     add_cases(db_session, tenant, profile, 99, "SUMQ")
     assert count() == one
+
+
+def test_the_indexed_list_gives_every_case_exactly_the_answer_it_gets_alone(client, tenant, world, db_session):
+    """A case is compared with the statement rows that can matter (its deductor's, and another deductor's row that prints
+    its reference), not with every row. That must change nothing: the list and the single-case read agree on every field."""
+    from tests.trinetra.test_money_model import allocate, decide, get, statement
+
+    url, body, first = setup_case(client, tenant, world, reference="TR-1")
+    second = client.post(url + "/credits", headers=tenant.owner.headers,
+                         json={**body, "work_item_id": str(world[2].id), "reference": "TR-2", "tan": "MUMB54321K"}).json()
+    snap = statement(client, tenant, url, body, [
+        "ABCD12345E,2000.00,r0,194C,15-Jun-2025,F,FY 2025-26 / AY 2026-27",
+        "ABCD12345E,2000.00,r1,194C,16-Jun-2025,F,FY 2025-26 / AY 2026-27",       # a second row for the same deductor: ambiguous
+        "MUMB54321K,2000.00,TR-1,194C,17-Jun-2025,F,FY 2025-26 / AY 2026-27",      # another deductor printing TR-1's reference
+        "ZZZZ99999Z,300.00,z0,194C,18-Jun-2025,F,FY 2025-26 / AY 2026-27"])
+    decide(client, tenant, url, get(client, tenant, url, second), "ALLOCATE", allocations=[allocate(snap, 2, "2000")])
+    rows = db_session.query(TrinetraCredit).order_by(TrinetraCredit.reference).all()
+    listed, _ = service.views(db_session, tenant.workspace, rows)
+    alone = [service.view(db_session, tenant.workspace, r) for r in rows]
+    assert len(listed) == len(alone) == 2
+    for a, b in zip(listed, alone):
+        assert a == b
+    by_ref = {x["reference"]: x for x in listed}
+    assert by_ref["TR-1"]["status"] in ("DUPLICATE_SUSPECTED", "AMBIGUOUS", "TAN_MISMATCH_SUSPECTED")
+    assert by_ref["TR-2"]["posted_micros"] == 2_000_000_000

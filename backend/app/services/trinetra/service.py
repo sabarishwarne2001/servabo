@@ -1121,13 +1121,64 @@ def views(db, workspace, rows):
             bundles[key] = (
                 p,
                 snapshot,
-                postings(snapshot, workspace, p, pairings.get(snapshot.id, ()) if snapshot else ()),
-                by_group.get(key, []),
+                _PostingIndex(postings(snapshot, workspace, p, pairings.get(snapshot.id, ()) if snapshot else ())),
+                _AllocationIndex(by_group.get(key, [])),
             )
-    return [
-        view(db, workspace, r, bundles[(r.profile_id, r.year)], facts, roles)
-        for r in rows
-    ], active
+    out = []
+    for r in rows:
+        p, snapshot, posting_index, allocation_index = bundles[(r.profile_id, r.year)]
+        narrowed = posting_index.for_case(r.deductor_key, r.reference)
+        out.append(
+            view(
+                db,
+                workspace,
+                r,
+                (p, snapshot, narrowed, allocation_index.for_case(str(r.id), narrowed)),
+                facts,
+                roles,
+            )
+        )
+    return out, active
+
+
+class _PostingIndex:
+    """The statement's postings by deductor and by reference, so a case compares itself with the rows that can matter
+    (its own deductor's, and any other deductor's row that prints the same reference) and not with every row of the
+    statement: the cost of a case no longer grows with the size of the statement."""
+
+    def __init__(self, rows):
+        self.by_deductor = {}
+        self.by_reference = {}
+        for row in rows:
+            self.by_deductor.setdefault(row.deductor, []).append(row)
+            if row.reference:
+                self.by_reference.setdefault(row.reference.casefold().strip(), []).append(row)
+
+    def for_case(self, deductor, reference):
+        found = list(self.by_deductor.get(deductor, []))
+        if reference:
+            found += [
+                r for r in self.by_reference.get(reference.casefold().strip(), []) if r.deductor != deductor
+            ]
+        return found
+
+
+class _AllocationIndex:
+    """The reviewed allocations by case and by statement row: a case needs its own and those on the rows it may use."""
+
+    def __init__(self, allocations):
+        self.by_credit = {}
+        self.by_posting = {}
+        for a in allocations:
+            self.by_credit.setdefault(a.credit, []).append(a)
+            self.by_posting.setdefault((a.snapshot, a.posting), []).append(a)
+
+    def for_case(self, credit_id, postings):
+        found = {id(a): a for a in self.by_credit.get(credit_id, [])}
+        for posting in postings:
+            for a in self.by_posting.get((posting.snapshot, posting.id), []):
+                found[id(a)] = a
+        return list(found.values())
 
 
 def create_case(
