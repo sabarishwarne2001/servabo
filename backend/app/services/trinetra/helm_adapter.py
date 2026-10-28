@@ -143,20 +143,15 @@ def reminder_requires_review(db, *, organization_id, workspace_id, work_item_id)
 
 
 def annotate(db, who, promises):
-    from app.core.config import settings
-    from app.api.capability_gate import has_capability
     from app.workers.tenant_gate import inactive_reason, unpaid_reason
     from app.services.helm.gate import through_api_key
+    from app.services.trinetra import mode
 
+    # This only decorates the ledger; the safety hold on reminders does not use the mode (see withholding_for).
     if (
         through_api_key()
-        or not settings.TRINETRA_LIVE_ENABLED
         or unpaid_reason(db, organization_id=who.organization_id)
-        or not has_capability(
-            db,
-            organization_id=who.organization_id,
-            capability_key="capability.trinetra",
-        )
+        or not mode.live_for(db, who.organization_id)
     ):
         return promises
     eligible = [

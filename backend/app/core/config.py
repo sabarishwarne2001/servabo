@@ -186,9 +186,14 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL_NAME: str = "all-MiniLM-L6-v2"
     EMBEDDING_BATCH_SIZE: int = 32
     OCR_LANGUAGE: str = "en"
-    # Enables reviewed TRINETRA evidence processing only after official-source and
-    # tax-adviser launch sign-off. Synthetic examples remain available while off.
-    TRINETRA_LIVE_ENABLED: bool = False
+    # TRINETRA (Final 2T, N-201): who gets LIVE evidence processing. "off": nobody (a synthetic preview only).
+    # "pilot" (the shipped default): only organizations a platform administrator enrolled. "on": every organization whose
+    # plan includes capability.trinetra (Business and Enterprise). The owner sets "on" after Final session 2B has proved
+    # the statement readers on real files and the CA has read the wording.
+    TRINETRA_MODE: Literal["off", "pilot", "on"] = "pilot"
+    # DEPRECATED alias of TRINETRA_MODE, kept so an old deployment file still means what it said: true is "on", false
+    # is "off". Leave it unset; when set it wins over TRINETRA_MODE.
+    TRINETRA_LIVE_ENABLED: Optional[bool] = None
     # TEST STUBS, not models: hashed bag-of-words embeddings and labelled
     # placeholder OCR text (app/services/ml_stubs.py). For environments that
     # cannot download the PaddleOCR / SentenceTransformers weights. Refused

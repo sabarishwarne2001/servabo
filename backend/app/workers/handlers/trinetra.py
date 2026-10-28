@@ -2,8 +2,7 @@
 
 import uuid
 from app.db.session import SessionLocal
-from app.core.config import settings
-from app.api.capability_gate import has_capability
+from app.services.trinetra import mode
 from app.models.workspace import Workspace
 from app.workers.tenant_gate import inactive_reason, unpaid_reason
 from app.services.trinetra.service import summary
@@ -16,17 +15,11 @@ def handle_recompute(payload):
         w = db.get(Workspace, workspace_id)
         if not w or w.organization_id != organization_id:
             return {"status": "unavailable"}
-        if (
-            not settings.TRINETRA_LIVE_ENABLED
-            or inactive_reason(
-                db, organization_id=organization_id, workspace_id=workspace_id
-            )
-            or unpaid_reason(db, organization_id=organization_id)
-        ):
+        if inactive_reason(
+            db, organization_id=organization_id, workspace_id=workspace_id
+        ) or unpaid_reason(db, organization_id=organization_id):
             return {"status": "blocked"}
-        if w.is_sample or not has_capability(
-            db, organization_id=organization_id, capability_key="capability.trinetra"
-        ):
+        if w.is_sample or not mode.live_for(db, organization_id):
             return {"status": "blocked"}
         result = summary(db, w)
         return {

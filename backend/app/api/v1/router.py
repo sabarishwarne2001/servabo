@@ -220,10 +220,12 @@ api_router.include_router(identity_admin.router)
 from app.api.v1 import egress as egress_api  # noqa: E402
 from app.api.v1.admin import revops as admin_revops  # noqa: E402
 from app.api.v1.admin import sovereign as admin_sovereign  # noqa: E402
+from app.api.v1.admin import trinetra as admin_trinetra  # noqa: E402
 
 api_router.include_router(egress_api.router)
 api_router.include_router(admin_sovereign.router)
 api_router.include_router(admin_revops.router)
+api_router.include_router(admin_trinetra.router)
 
 # Campaign session 2: the operator's Background jobs console and the dead-letter
 # queue (require_superadmin on the router; 404 for anyone else).

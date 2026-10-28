@@ -2,7 +2,6 @@
 
 import logging
 from datetime import datetime, timezone, timedelta
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +9,9 @@ logger = logging.getLogger(__name__)
 def document_changed(
     db, *, workspace_id, organization_id=None, reason="document_changed"
 ):
-    if not settings.TRINETRA_LIVE_ENABLED or workspace_id is None:
+    from app.services.trinetra import mode
+
+    if mode.deployment_mode() == mode.OFF or workspace_id is None:
         return
     try:
         from app.models.workspace import Workspace
@@ -20,6 +21,8 @@ def document_changed(
         with db.begin_nested():
             workspace = db.get(Workspace, workspace_id)
             if not workspace or workspace.is_sample:
+                return
+            if not mode.live_for(db, workspace.organization_id):
                 return
             if (
                 not db.query(TrinetraProfile.id)

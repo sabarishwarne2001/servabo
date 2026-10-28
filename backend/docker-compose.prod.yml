@@ -29,7 +29,7 @@
 name: servabo-prod
 
 x-app-env: &app-env
-  TRINETRA_LIVE_ENABLED: ${TRINETRA_LIVE_ENABLED:-false}
+  TRINETRA_MODE: ${TRINETRA_MODE:-pilot}
   ENVIRONMENT: production
   SERVICE_ROLE: ${SERVICE_ROLE:-web}
 

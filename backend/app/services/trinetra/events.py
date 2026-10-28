@@ -1,12 +1,12 @@
 """Opt-in Enterprise event through the existing transactional public outbox."""
 
 from app.api.capability_gate import has_capability
-from app.core.config import settings
+from app.services.trinetra import mode
 from app.services.automation.public_events import emit_once
 
 
 def reviewed(db, workspace, row):
-    if not settings.TRINETRA_LIVE_ENABLED or workspace.is_sample:
+    if workspace.is_sample or not mode.live_for(db, workspace.organization_id):
         return None
     if not has_capability(
         db,

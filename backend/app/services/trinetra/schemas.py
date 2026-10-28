@@ -131,6 +131,9 @@ class DetailOut(CaseOut):
 
 class AccessOut(BaseModel):
     live_enabled: bool
+    mode: str
+    enrolled: bool
+    enrolled_since: str | None = None
     entitled: bool
     official_formats: list[str]
     transcription_format: str
@@ -168,6 +171,8 @@ class RunStatusOut(RunOut):
 
 class OrganizationAccessOut(BaseModel):
     live_enabled: bool
+    mode: str
+    enrolled: bool
     entitled: bool
 
 

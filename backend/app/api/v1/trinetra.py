@@ -22,7 +22,7 @@ from app.models.trinetra import (
     TrinetraCredit as Credit,
     TrinetraDecision as Decision,
 )
-from app.services.trinetra import service as s, domain as d
+from app.services.trinetra import service as s, domain as d, mode
 from app.services.trinetra.events import reviewed as announce_review
 from app.services.trinetra.schemas import (
     AccessOut,
@@ -149,15 +149,9 @@ class ReviewIn(Strict):
     confirm_receivable: bool = False
 
 
-def require_source_validation():
-    if not settings.TRINETRA_LIVE_ENABLED:
-        raise HTTPException(
-            409,
-            {
-                "code": "TRINETRA_SOURCE_REVIEW_REQUIRED",
-                "message": "Live access awaits official-source and tax-adviser validation. Explore the synthetic examples.",
-            },
-        )
+def require_source_validation(db, organization_id):
+    """The launch gate: the deployment's mode (off, pilot, on) decides, through the one helper."""
+    mode.require_mode(db, organization_id)
 
 
 def workspace(db, context, wid, *, live=True):
@@ -185,7 +179,7 @@ def workspace(db, context, wid, *, live=True):
         )
         if w.is_sample:
             raise HTTPException(409, "Synthetic examples are read-only.")
-        require_source_validation()
+        require_source_validation(db, w.organization_id)
     return w
 
 
@@ -196,13 +190,13 @@ def access(
     context: TenantContext = Depends(Read),
 ):
     workspace(db, context, workspace_id, live=False)
+    live = mode.state(db, context.organization_id)
     return {
-        "live_enabled": settings.TRINETRA_LIVE_ENABLED,
-        "entitled": capability_gate.has_capability(
-            db,
-            organization_id=context.organization_id,
-            capability_key="capability.trinetra",
-        ),
+        "live_enabled": live.live,
+        "mode": live.mode,
+        "enrolled": live.enrolled,
+        "enrolled_since": live.enrolled_since.isoformat() if live.enrolled_since else None,
+        "entitled": live.entitled,
         "official_formats": [],
         "transcription_format": "human-transcription-v1",
         "tcs_supported": False,
@@ -795,8 +789,11 @@ def organization_access(
         )
     ),
 ):
+    live = mode.state(db, organization_id)
     return {
-        "live_enabled": settings.TRINETRA_LIVE_ENABLED,
+        "live_enabled": live.live,
+        "mode": live.mode,
+        "enrolled": live.enrolled,
         "entitled": capability_gate.has_capability(
             db,
             organization_id=organization_id,
@@ -829,7 +826,7 @@ def organization_summary(
         capability_key="capability.trinetra_all_workspaces",
         operation="trinetra.org.summary",
     )
-    require_source_validation()
+    require_source_validation(db, organization_id)
     if inactive_reason(db, organization_id=organization_id) or unpaid_reason(
         db, organization_id=organization_id
     ):

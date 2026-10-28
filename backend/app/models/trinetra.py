@@ -104,6 +104,22 @@ class TrinetraOrgKey(Base):
     )
 
 
+class TrinetraPilot(Base):
+    """An organization a platform administrator enrolled in the TRINETRA pilot (mode "pilot"). The reason is required."""
+
+    __tablename__ = "trinetra_pilot"
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True
+    )
+    enrolled_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class TrinetraStatement(Scoped, Base):
     __tablename__ = "trinetra_statements"
     evidence_work_item_ids: Mapped[list] = mapped_column(
