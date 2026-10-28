@@ -219,7 +219,7 @@ class TrinetraCredit(Scoped, Base):
         ),
         CheckConstraint("year BETWEEN 2000 AND 2100", name="ck_trinetra_credit_year"),
         CheckConstraint(
-            "state IN ('OPEN','DISPUTED','EXPLAINED','WITHDRAWN','CA_REVIEWED')",
+            "state IN ('OPEN','DISPUTED','EXPLAINED','WITHDRAWN','CA_REVIEWED','UNRESOLVED')",
             name="ck_trinetra_credit_state",
         ),
     )
@@ -325,4 +325,34 @@ class TrinetraDeductor(Scoped, Base):
         ),
         UniqueConstraint("profile_id", "deductor_key", name="uq_trinetra_deductor"),
         CheckConstraint("status IN ('PROPOSED','CONFIRMED','FLAGGED')", name="ck_trinetra_deductor_status"),
+    )
+
+
+class TrinetraPairing(Scoped, Base):
+    """A reviewed pairing of a reversal (a negative statement row) with the row it reverses (Final 2T, Phase 5). Rows are
+    netted per deductor ONLY through a pairing a person made; an unpaired reversal stays an exception."""
+
+    __tablename__ = "trinetra_pairings"
+    profile_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    statement_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    positive_line: Mapped[int] = mapped_column(Integer, nullable=False)
+    negative_line: Mapped[int] = mapped_column(Integer, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    active: Mapped[bool] = mapped_column(default=True, nullable=False)
+    withdrawn_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    __table_args__ = (
+        *scope_constraints("trinetra_pairings"),
+        ForeignKeyConstraint(
+            ["profile_id", "workspace_id"],
+            ["trinetra_profiles.id", "trinetra_profiles.workspace_id"],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["statement_id", "workspace_id"],
+            ["trinetra_statements.id", "trinetra_statements.workspace_id"],
+            ondelete="CASCADE",
+        ),
+        CheckConstraint("positive_line >= 0 AND negative_line >= 0 AND positive_line <> negative_line", name="ck_trinetra_pairing_lines"),
+        Index("uq_trinetra_pairing_negative", "statement_id", "negative_line", unique=True, postgresql_where=text("active")),
     )

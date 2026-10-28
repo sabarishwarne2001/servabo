@@ -37,7 +37,7 @@ def baseline(snapshot, items, credits):
             and item["snapshot_id"] == str(snapshot.id)
             and item["gap_micros"] is not None
             and item["expected_micros"] is not None
-            and item["review_state"] not in ("WITHDRAWN", "EXPLAINED", "DISPUTED")
+            and item["review_state"] not in ("WITHDRAWN", "EXPLAINED", "DISPUTED", "UNRESOLVED")
         },
     }
 

@@ -59,6 +59,7 @@ GENERIC_SECTIONS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "trinetra_statements": ("trinetra_statements", "org", ()),
     "trinetra_suggestions": ("trinetra_suggestions", "org", ("deductor_key",)),
     "trinetra_deductors": ("trinetra_deductors", "org", ("deductor_key",)),
+    "trinetra_pairings": ("trinetra_pairings", "org", ()),
     "trinetra_credits": ("trinetra_credits", "org", ("deductor_key",)),
     "trinetra_decisions": ("trinetra_decisions", "org", ()),
     "gst_returns": ("gst_returns", "org", ()),

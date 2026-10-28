@@ -172,3 +172,58 @@ def test_a_posting_dated_in_another_tax_year_is_never_matched():
     assert reconcile(credit(), [inside], [], statement_available=True)["candidate_ids"] == ["in"]
     with pytest.raises(ValueError, match="tax year"):
         allocate(credit(), outside, 2000000000, [])
+
+
+# --- Final 2T, Phase 5: the statuses the brief names, and reject ------------------------------------------------------
+
+
+def test_identical_candidate_rows_are_a_suspected_duplicate_not_just_ambiguous():
+    twin = dict(section="194C", on=date(2025, 6, 15), booked_on=date(2025, 7, 30))
+    out = reconcile(credit(), [posting("a", **twin), posting("b", **twin)], [], statement_available=True)
+    assert out["status"] == "DUPLICATE_SUSPECTED" and sorted(out["candidate_ids"]) == ["a", "b"]
+    # Rows that differ in what they print are merely ambiguous: a person chooses.
+    other = reconcile(credit(), [posting("a", section="194C"), posting("b", section="194J")], [], statement_available=True)
+    assert other["status"] == "AMBIGUOUS"
+
+
+def test_a_posting_booked_after_its_year_is_a_late_posting():
+    late = posting("late", on=date(2026, 2, 10), booked_on=date(2026, 5, 20))      # transaction in FY 2025-26, booked in Tax Year 2026-27
+    on_time = posting("ok", on=date(2026, 2, 10), booked_on=date(2026, 3, 20))
+    amount = 2000000000
+    for line, status in ((late, "LATE_POSTING"), (on_time, "POSTED")):
+        c = credit()
+        allocation = [Allocation(c.id, line.id, amount, line.snapshot)]
+        assert reconcile(c, [line], allocation, statement_available=True)["status"] == status
+
+
+def test_a_correction_response_followed_by_a_later_posting_is_verified_corrected():
+    c = credit(corrected=True)
+    line = posting("p", on=date(2026, 2, 10), booked_on=date(2026, 3, 20))
+    out = reconcile(c, [line], [Allocation(c.id, "p", 2000000000, "snapshot")], statement_available=True)
+    assert out["status"] == "VERIFIED_CORRECTED"
+    # Without a posting it is still a gap, whatever correction was requested.
+    assert reconcile(credit(corrected=True), [], [], statement_available=True)["status"] == "POSSIBLE_MISSING_POSTING"
+
+
+def test_a_rejected_candidate_is_not_offered_again_for_that_snapshot():
+    out = reconcile(credit(rejected=frozenset({("snapshot", "a")})), [posting("a")], [], statement_available=True)
+    assert out["candidate_ids"] == [] and out["status"] != "SUGGESTED"
+    again = reconcile(credit(rejected=frozenset({("older-snapshot", "a")})), [posting("a")], [], statement_available=True)
+    assert again["candidate_ids"] == ["a"]       # a rejection is for that snapshot only
+
+
+def test_a_credit_note_that_drops_the_gross_below_the_expectation_makes_the_expectation_unsupported():
+    c = credit(gross_micros=118_000_000_000, credit_notes_micros=117_999_000_000)       # gross left: 1,000,000 micros
+    out = reconcile(c, [posting()], [], statement_available=True)
+    assert out["status"] == "EVIDENCE_NEEDED" and out["adjusted_gross_micros"] == 1_000_000
+    fine = reconcile(credit(gross_micros=118_000_000_000, credit_notes_micros=10_000_000_000), [posting()], [], statement_available=True)
+    assert fine["adjusted_gross_micros"] == 108_000_000_000 and fine["status"] == "SUGGESTED"
+
+
+def test_the_taxable_basis_is_a_dimension_only_when_sourced_and_is_never_computed():
+    assert reconcile(credit(), [posting()], [], statement_available=True)["basis_micros"] is None
+    sourced = reconcile(credit(basis_micros=100_000_000_000, basis_source="ACCOUNTING_RECORD"), [posting()], [], statement_available=True)
+    assert sourced["basis_micros"] == 100_000_000_000 and sourced["basis_source"] == "ACCOUNTING_RECORD"
+    # A bank shortfall or GST value never produces one.
+    gap = reconcile(credit(gross_micros=118_000_000_000, bank_micros=116_000_000_000), [posting()], [], statement_available=True)
+    assert gap["basis_micros"] is None

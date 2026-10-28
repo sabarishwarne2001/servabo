@@ -1,7 +1,7 @@
 """TRINETRA workspace API. Live access follows the deployment mode (off, pilot, on) through services/trinetra/mode.py."""
 
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Literal, Annotated
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, AfterValidator, BeforeValidator
@@ -97,6 +97,13 @@ class ImportIn(Strict):
     rows: list[LineIn] = Field(min_length=1, max_length=500)
 
 
+class TriggeringEventIn(Strict):
+    """An advance or earlier event, placed in its own tax year by a person (never inferred)."""
+
+    reason: str = Field(min_length=20, max_length=500)
+    evidence_work_item_id: uuid.UUID
+
+
 class CreditIn(Strict):
     profile_id: uuid.UUID
     work_item_id: uuid.UUID
@@ -107,6 +114,7 @@ class CreditIn(Strict):
     amount: Money
     source_confirmation: str = Field(min_length=10, max_length=1000)
     seller_name_confirmed: bool = False
+    triggering_event: TriggeringEventIn | None = None
 
 
 class AllocationIn(Strict):
@@ -118,11 +126,23 @@ class AllocationIn(Strict):
 class DecisionIn(Strict):
     revision: int = Field(ge=1)
     action: Literal[
-        "ALLOCATE", "DISPUTED", "EXPLAINED", "WITHDRAWN", "CA_REVIEWED", "REOPEN"
+        "ALLOCATE",
+        "DISPUTED",
+        "EXPLAINED",
+        "WITHDRAWN",
+        "CA_REVIEWED",
+        "REOPEN",
+        "UNRESOLVED",
+        "REJECT_MATCH",
+        "ANNOTATE",
     ]
     reason: str = Field(min_length=10, max_length=1000)
     allocations: list[AllocationIn] = Field(default_factory=list, max_length=100)
     review_minutes: int = Field(default=0, ge=0, le=480, strict=True)
+    #: REJECT_MATCH and ANNOTATE: the statement row concerned, and the annotation's text.
+    snapshot_id: uuid.UUID | None = None
+    line_id: str | None = Field(default=None, pattern=r"^\d{1,4}$")
+    note: str | None = Field(default=None, max_length=500)
 
 
 class ReconfirmIn(Strict):
@@ -135,9 +155,22 @@ class ReconfirmIn(Strict):
 class EvidenceIn(Strict):
     work_item_id: uuid.UUID
     kind: Literal[
-        "DEDUCTOR_ADVICE", "ACCOUNTING_RECORD", "CERTIFICATE", "CORRECTION_RESPONSE"
+        "DEDUCTOR_ADVICE",
+        "ACCOUNTING_RECORD",
+        "CERTIFICATE",
+        "CORRECTION_RESPONSE",
+        "CREDIT_NOTE",
+        "TRIGGERING_EVENT",
     ]
     amount: Money | None = None
+
+
+class BasisIn(Strict):
+    """The amount the tax was computed on, ONLY when a document states it. Never computed by Servabo."""
+
+    amount: Money
+    source: Literal["INVOICE", "ACCOUNTING_RECORD", "DEDUCTOR_ADVICE"]
+    evidence_work_item_id: uuid.UUID
 
 
 class ReviewIn(Strict):
@@ -149,6 +182,8 @@ class ReviewIn(Strict):
     reason: str = Field(min_length=10, max_length=1000)
     evidence: list[EvidenceIn] = Field(default_factory=list, max_length=20)
     confirm_receivable: bool = False
+    basis: BasisIn | None = None
+    clear_basis: bool = False
 
 
 def require_source_validation(db, organization_id):
@@ -709,6 +744,73 @@ def confirm_deductor(
     return dr.view(row)
 
 
+class PairIn(Strict):
+    snapshot_id: uuid.UUID
+    positive_line: int = Field(ge=0, le=100000)
+    negative_line: int = Field(ge=0, le=100000)
+    reason: str = Field(min_length=10, max_length=1000)
+    profile_id: uuid.UUID
+
+
+class UnpairIn(Strict):
+    reason: str = Field(min_length=10, max_length=1000)
+
+
+@router.post(P + "/pairings")
+def pair_reversal(
+    workspace_id: uuid.UUID,
+    body: PairIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    """Pair a reversal (a negative statement row) with the row it reverses. Netting happens only through a pairing a person made."""
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, body.profile_id)
+    row = s.pair_reversal(db, w, p, context.user_id, body.snapshot_id, body.positive_line, body.negative_line, body.reason)
+    db.commit()
+    return {"id": str(row.id), "snapshot_id": str(row.statement_id), "positive_line": row.positive_line,
+            "negative_line": row.negative_line, "active": row.active}
+
+
+@router.post(P + "/pairings/{pairing_id}/withdraw")
+def unpair_reversal(
+    workspace_id: uuid.UUID,
+    pairing_id: uuid.UUID,
+    body: UnpairIn,
+    profile_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, profile_id)
+    row = s.unpair_reversal(db, w, p, context.user_id, pairing_id, body.reason)
+    db.commit()
+    return {"id": str(row.id), "active": row.active}
+
+
+@router.get(P + "/exceptions")
+def statement_exceptions(
+    workspace_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    """Reversals in the active statements that nobody has paired: exceptions, never netted on their own."""
+    from app.models.trinetra import TrinetraStatement
+
+    w = workspace(db, context, workspace_id)
+    snaps = db.query(TrinetraStatement).filter_by(workspace_id=w.id, active=True).limit(200).all()
+    pairs = s.active_pairings(db, [x.id for x in snaps])
+    items = []
+    for snap in snaps:
+        for i in s.unpaired_reversals(snap, pairs.get(snap.id, [])):
+            r = snap.rows[i]
+            items.append({"profile_id": str(snap.profile_id), "snapshot_id": str(snap.id), "line_id": str(i),
+                          "year": snap.year, "section": r.get("section") or None, "on": r.get("on"),
+                          "amount_micros": str(r["amount_micros"]), "reference": r.get("reference")})
+    return {"items": items[:500], "total": len(items),
+            "note": "A reversal or correction stays an exception until a person pairs it with the row it reverses."}
+
+
 @router.post(P + "/official-statements")
 def unsupported_statement(
     workspace_id: uuid.UUID,
@@ -747,6 +849,11 @@ def create_credit(
         amount=body.amount,
         source_confirmation=body.source_confirmation,
         seller_name_confirmed=body.seller_name_confirmed,
+        triggering_event=(
+            {"reason": body.triggering_event.reason, "evidence_work_item_id": body.triggering_event.evidence_work_item_id}
+            if body.triggering_event
+            else None
+        ),
     )
     db.commit()
     return s.view(db, w, r)
@@ -798,6 +905,7 @@ def decision(
         body.reason,
         body.allocations,
         body.review_minutes,
+        {"snapshot_id": body.snapshot_id, "line_id": body.line_id, "note": body.note},
     )
     announce_review(db, w, r)
     db.commit()
@@ -857,18 +965,50 @@ def update_review(
     evidence = []
     if len({item.work_item_id for item in body.evidence}) != len(body.evidence):
         raise HTTPException(422, "Attach each evidence document only once.")
+    previous = {(e.get("work_item_id"), e["kind"]): e for e in (row.review or {}).get("evidence", [])}
+    now_iso = datetime.now(timezone.utc).isoformat()
     for item in body.evidence:
         source = s.document(db, w, item.work_item_id)
+        amount = d.money(item.amount) if item.amount is not None else None
+        if item.kind == "CREDIT_NOTE":
+            note_role = (
+                db.query(s.DocumentRole)
+                .filter_by(work_item_id=source.id, workspace_id=w.id)
+                .first()
+            )
+            if (
+                note_role is None
+                or note_role.role != "CREDIT_NOTE"
+                or note_role.currency != "INR"
+                or not note_role.total_micros
+                or note_role.total_micros <= 0
+            ):
+                raise HTTPException(
+                    422,
+                    "Attach a classified INR credit note with a positive amount. Its amount is read from the document, not typed.",
+                )
+            amount = note_role.total_micros
         evidence.append(
             {
                 "work_item_id": str(source.id),
                 "kind": item.kind,
                 "source_version": s.versions.one(db, w.id, source.id).evidence,
-                "amount_micros": (
-                    d.money(item.amount) if item.amount is not None else None
-                ),
+                "amount_micros": amount,
+                "added_at": (previous.get((str(source.id), item.kind)) or {}).get("added_at") or now_iso,
             }
         )
+    credit_notes = sum(e["amount_micros"] for e in evidence if e["kind"] == "CREDIT_NOTE")
+    if credit_notes:
+        invoice_facts = s.document(db, w, row.work_item_id)
+        gross = (
+            db.query(s.DocumentRole)
+            .filter_by(work_item_id=invoice_facts.id, workspace_id=w.id)
+            .first()
+        )
+        if gross is None or credit_notes > (gross.total_micros or 0):
+            raise HTTPException(
+                422, "Credit notes cannot be worth more than the invoice they reduce."
+            )
     # A record read from an accounting system (Zoho Books) is not a document the person attaches; it stays.
     evidence = [e for e in (row.review or {}).get("evidence", []) if not e.get("work_item_id")] + evidence
     prior = [
@@ -888,6 +1028,24 @@ def update_review(
         "withholding_confirmed": body.confirm_receivable,
         "invoice_version": row.source_version,
     }
+    if body.clear_basis:
+        row.review.pop("basis", None)
+    if body.basis is not None:
+        allowed = {str(row.work_item_id)} | {e["work_item_id"] for e in evidence if e["work_item_id"]}
+        if str(body.basis.evidence_work_item_id) not in allowed:
+            raise HTTPException(
+                422, "The amount must be stated by the invoice or by a document attached to this case."
+            )
+        micros = d.money(body.basis.amount)
+        if micros <= 0:
+            raise HTTPException(422, "The basis must be positive.")
+        row.review["basis"] = {
+            "micros": micros,
+            "source": body.basis.source,
+            "evidence_work_item_id": str(body.basis.evidence_work_item_id),
+            "by": str(context.user_id),
+            "at": now_iso,
+        }
     row.evidence_work_item_ids = [e["work_item_id"] for e in evidence if e["work_item_id"]]
     if body.confirm_receivable:
         from app.services.trinetra.projection import reviewed_withholding
@@ -961,7 +1119,7 @@ def detail(
                 and a.credit != str(row.id)
             ),
         }
-        for x in s.postings(snapshot, w, p)
+        for x in s.postings(snapshot, w, p, s.active_pairings(db, [snapshot.id] if snapshot else []).get(snapshot.id, ()) if snapshot else ())
         if x.deductor == row.deductor_key
     ]
     from app.services.trinetra.projection import receivable, reviewed_withholding

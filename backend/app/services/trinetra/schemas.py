@@ -28,6 +28,10 @@ class CaseOut(Wire):
     bank_micros: Micros | None
     booked_micros: Micros | None
     advice_micros: Micros | None
+    adjusted_gross_micros: Micros | None = None
+    credit_notes_micros: Micros = 0
+    basis_micros: Micros | None = None
+    basis_source: str | None = None
     candidate_ids: list[str]
     rule_version: str
     note: str

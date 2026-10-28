@@ -58,6 +58,15 @@ class Credit:
     reference: str | None = None
     #: The section or table item as the invoice or accounting record prints it (never converted).
     section: str | None = None
+    #: Credit notes a person attached, in micros: they reduce the gross the expectation can rest on.
+    credit_notes_micros: int = 0
+    #: The amount the tax was computed on, ONLY when an invoice, an accounting record or an advice states it (never computed).
+    basis_micros: int | None = None
+    basis_source: str | None = None
+    #: A correction response was recorded before the active statement was imported.
+    corrected: bool = False
+    #: (snapshot id, posting id) pairs a reviewer rejected: not offered again for that snapshot.
+    rejected: frozenset = frozenset()
 
 
 @dataclass(frozen=True)
@@ -72,6 +81,8 @@ class Posting:
     section: str | None = None
     #: The statement row's transaction date, when it prints one.
     on: date | None = None
+    #: The date the row was booked, when the statement prints it.
+    booked_on: date | None = None
 
 
 @dataclass(frozen=True)
@@ -91,6 +102,29 @@ def section_conflict(credit: Credit, posting: Posting) -> bool:
     are different labels and are never converted into one another."""
     a, b = _label(credit.section), _label(posting.section)
     return bool(a and b and a != b)
+
+
+def adjusted_gross(credit: Credit) -> int | None:
+    """The invoice's gross less the credit notes a person attached (None when the gross is not known)."""
+    if credit.gross_micros is None:
+        return None
+    return max(0, credit.gross_micros - credit.credit_notes_micros)
+
+
+def _prints_alike(a: Posting, b: Posting) -> bool:
+    """Two rows print the same section and dates (and print at least one of them: typed rows that print nothing can only
+    be called ambiguous, never duplicates)."""
+    same = (_label(a.section), a.on, a.booked_on) == (_label(b.section), b.on, b.booked_on)
+    return same and bool(a.section or a.on or a.booked_on)
+
+
+def booked_late(posting: Posting) -> bool:
+    """Booked in a later tax year than the transaction it belongs to."""
+    return (
+        posting.on is not None
+        and posting.booked_on is not None
+        and tax_period(posting.booked_on)[0] > tax_period(posting.on)[0]
+    )
 
 
 def outside_year(credit: Credit, posting: Posting) -> bool:
@@ -158,6 +192,10 @@ def reconcile(
         and a.snapshot == relevant[a.posting].snapshot
     )
     expected = credit.expected
+    gross_left = adjusted_gross(credit)
+    # A credit note can leave less gross than the expectation rests on: it is unsupported until a person reconfirms it.
+    if expected is not None and gross_left is not None and expected > gross_left:
+        expected = None
     available = {
         p.id: p.amount
         - sum(
@@ -167,11 +205,15 @@ def reconcile(
         )
         for p in relevant.values()
     }
-    candidates = [
-        p.id
+    candidate_rows = [
+        p
         for p in relevant.values()
-        if expected is not None and available[p.id] > 0 and available[p.id] == expected
+        if expected is not None
+        and available[p.id] > 0
+        and available[p.id] == expected
+        and (p.snapshot, p.id) not in credit.rejected
     ]
+    candidates = [p.id for p in candidate_rows]
     wrong_identity = any(
         p.scope == credit.scope
         and p.deductor != credit.deductor
@@ -180,6 +222,11 @@ def reconcile(
         and p.reference.casefold().strip() == credit.reference.casefold().strip()
         for p in postings
     )
+    allocated_rows = [
+        relevant[a.posting]
+        for a in allocations
+        if a.credit == credit.id and a.posting in relevant and a.snapshot == relevant[a.posting].snapshot
+    ]
     if credit.disputed:
         status = "DISPUTED"
     elif expected is None or not credit.source:
@@ -187,11 +234,20 @@ def reconcile(
     elif not statement_available:
         status = "PENDING_REPORT"
     elif posted == expected and expected > 0:
-        status = "POSTED"
+        if credit.corrected:
+            status = "VERIFIED_CORRECTED"
+        elif allocated_rows and all(booked_late(p) for p in allocated_rows):
+            status = "LATE_POSTING"
+        else:
+            status = "POSTED"
     elif posted:
         status = "AMOUNT_MISMATCH"
     elif len(candidates) > 1:
-        status = "AMBIGUOUS"
+        status = (
+            "DUPLICATE_SUSPECTED"
+            if all(_prints_alike(candidate_rows[0], p) for p in candidate_rows[1:])
+            else "AMBIGUOUS"
+        )
     elif candidates:
         status = "SUGGESTED"
     elif wrong_identity:
@@ -212,8 +268,12 @@ def reconcile(
         candidate_ids=candidates,
         rule_version=VERSION,
         gross_micros=credit.gross_micros,
+        adjusted_gross_micros=gross_left,
+        credit_notes_micros=credit.credit_notes_micros,
         bank_micros=credit.bank_micros,
         booked_micros=credit.booked_micros,
         advice_micros=credit.advice_micros,
+        basis_micros=credit.basis_micros,
+        basis_source=credit.basis_source,
         note="Evidence comparison only; absence does not establish claimability or misconduct.",
     )

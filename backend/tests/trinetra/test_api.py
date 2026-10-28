@@ -51,7 +51,7 @@ def test_sample_has_consistent_totals_and_no_live_write(client, tenant):
     r = client.get(url, headers=tenant.viewer.headers)
     assert r.status_code == 200, r.text
     data = r.json()
-    assert len(data["items"]) == 9
+    assert len(data["items"]) == 13            # nine from M0-M6, four more for the whole money model (Final 2T)
     assert int(data["expected_micros"]) == sum(
         int(i["expected_micros"] or 0) for i in data["items"]
     )

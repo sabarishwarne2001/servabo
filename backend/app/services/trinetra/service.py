@@ -6,7 +6,7 @@ import json
 import re
 import uuid
 import secrets
-from datetime import date
+from datetime import date, datetime, timezone
 from dataclasses import asdict
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -22,6 +22,7 @@ from app.models.trinetra import (
     TrinetraCredit as CreditRow,
     TrinetraDecision as Decision,
     TrinetraOrgKey as OrgKey,
+    TrinetraPairing as Pairing,
 )
 from app.services.trinetra import domain as d
 from app.services.trinetra import versions
@@ -59,7 +60,9 @@ RETENTION_MULTIPLIER = {"snapshots": 20, "cases": 40}
 #: in the database (and in the dossier, by year) but out of the working set, so a real year never hits a wall.
 WORKING_SET_LIMIT = 5000
 OPEN_STATES = ("OPEN", "DISPUTED")
-CLOSED_STATES = ("EXPLAINED", "WITHDRAWN", "CA_REVIEWED")
+#: Statuses that need no more work from a reviewer: the credit is in the statement, or the case is closed.
+RESOLVED_STATUSES = ("POSTED", "LATE_POSTING", "VERIFIED_CORRECTED", "WITHDRAWN", "CLOSED_WITH_EXCEPTION", "UNRESOLVED")
+CLOSED_STATES = ("EXPLAINED", "WITHDRAWN", "CA_REVIEWED", "UNRESOLVED")
 #: A closed case this many tax years old (or older) leaves the working set.
 CLOSED_RETENTION_YEARS = 3
 
@@ -187,6 +190,27 @@ def receivable(db, workspace, p, source_id, *, seller_name_confirmed=False):
             },
         )
     return source, fact, verdict
+
+
+def check_triggering_event(db, workspace, fact, year, event):
+    """A person places the expectation in the tax year of an EARLIER triggering event (an advance received before the invoice),
+    with a reason and the document that shows it. Never inferred from dates or amounts."""
+    if fact.document_date is None:
+        raise HTTPException(422, "The invoice has no date, so an earlier period cannot be compared.")
+    invoice_year = d.tax_period(fact.document_date)[0]
+    if not 2000 <= int(year) < invoice_year:
+        raise HTTPException(
+            422,
+            "A triggering event must fall in a tax year before the invoice's. For the invoice's own year, leave it out.",
+        )
+    reason = (event.get("reason") or "").strip()
+    if len(reason) < 20:
+        raise HTTPException(422, "Say why this period applies (at least 20 characters).")
+    evidence_id = event.get("evidence_work_item_id")
+    if not evidence_id:
+        raise HTTPException(422, "Attach the document that shows the earlier event, such as the advance receipt.")
+    document(db, workspace, uuid.UUID(str(evidence_id)))
+    return {"year": int(year), "reason": reason[:500], "evidence_work_item_id": str(evidence_id)}
 
 
 def invoice_period(fact, year):
@@ -348,19 +372,43 @@ def decision_sources(db, row, p):
     )
 
 
-def postings(snapshot, workspace, p):
+def active_pairings(db, snapshot_ids):
+    """The reviewed reversal pairings of these snapshots: {snapshot id: [pairing, ...]}."""
+    if not snapshot_ids:
+        return {}
+    out = {}
+    for row in db.query(Pairing).filter(
+        Pairing.statement_id.in_(list(snapshot_ids)), Pairing.active.is_(True)
+    ):
+        out.setdefault(row.statement_id, []).append(row)
+    return out
+
+
+def net_amounts(rows, pairings):
+    """Each row's amount after the reversals a person paired with it. A paired reversal nets out to zero; an unpaired one
+    keeps its negative amount (an exception no allocation can use)."""
+    net = [r["amount_micros"] for r in rows]
+    for pair in pairings:
+        net[pair.positive_line] += net[pair.negative_line]
+        net[pair.negative_line] = 0
+    return net
+
+
+def postings(snapshot, workspace, p, pairings=()):
     if not snapshot:
         return []
+    net = net_amounts(snapshot.rows, pairings)
     return [
         d.Posting(
             str(i),
             scope(workspace, p, snapshot.year),
             r["deductor_key"],
-            r["amount_micros"],
+            net[i],
             str(snapshot.id),
             r["reference"],
             r.get("section") or None,
             date.fromisoformat(r["on"]) if r.get("on") else None,
+            date.fromisoformat(r["booked_on"]) if r.get("booked_on") else None,
         )
         for i, r in enumerate(snapshot.rows)
     ]
@@ -388,7 +436,12 @@ def view(db, workspace, row, bundle=None, facts=None, roles=None):
         bundle = (
             p,
             snapshot,
-            postings(snapshot, workspace, p),
+            postings(
+                snapshot,
+                workspace,
+                p,
+                active_pairings(db, [snapshot.id] if snapshot else []).get(snapshot.id, ()) if snapshot else (),
+            ),
             allocations(db, p, row.year),
         )
     p, snapshot, posting_rows, allocated = bundle
@@ -428,6 +481,34 @@ def view(db, workspace, row, bundle=None, facts=None, roles=None):
         ]
         if values:
             expectation = replace(expectation, **{field: sum(values)})
+    credit_notes = sum(
+        item["amount_micros"] or 0
+        for item in reviewed["evidence"]
+        if item["current"] and item["kind"] == "CREDIT_NOTE"
+    )
+    basis = (row.review or {}).get("basis") or {}
+    sourced_basis = bool(basis) and any(
+        e["current"] and (e.get("work_item_id") or "") == (basis.get("evidence_work_item_id") or "")
+        for e in reviewed["evidence"]
+    )
+    corrected = bool(snapshot) and any(
+        item["current"]
+        and item["kind"] == "CORRECTION_RESPONSE"
+        and (item.get("added_at") or "9999") < snapshot.created_at.isoformat()
+        for item in reviewed["evidence"]
+    )
+    rejected = frozenset(
+        (r["snapshot_id"], r["line_id"])
+        for r in (row.review or {}).get("rejected_candidates", [])
+    )
+    expectation = replace(
+        expectation,
+        credit_notes_micros=credit_notes,
+        basis_micros=basis.get("micros") if sourced_basis else None,
+        basis_source=basis.get("source") if sourced_basis else None,
+        corrected=corrected,
+        rejected=rejected,
+    )
     if source_current:
         if role:
             expectation = replace(expectation, gross_micros=role.total_micros)
@@ -441,10 +522,12 @@ def view(db, workspace, row, bundle=None, facts=None, roles=None):
         expectation, posting_rows, allocated, statement_available=snapshot is not None
     )
     value["source_current"] = source_current
-    if row.state in ("WITHDRAWN", "EXPLAINED"):
-        value["status"] = (
-            "WITHDRAWN" if row.state == "WITHDRAWN" else "CLOSED_WITH_EXCEPTION"
-        )
+    if row.state in ("WITHDRAWN", "EXPLAINED", "UNRESOLVED"):
+        value["status"] = {
+            "WITHDRAWN": "WITHDRAWN",
+            "EXPLAINED": "CLOSED_WITH_EXCEPTION",
+            "UNRESOLVED": "UNRESOLVED",
+        }[row.state]
     from datetime import date, datetime, timezone
 
     age = max(0, (datetime.now(timezone.utc) - row.created_at).days)
@@ -690,8 +773,10 @@ def decide(
     reason,
     requested,
     review_minutes=0,
+    extra=None,
 ):
-    if action != "WITHDRAWN" and (
+    # Closing out, withdrawing and annotating never wait for a changed invoice to be reconfirmed.
+    if action not in ("WITHDRAWN", "UNRESOLVED", "ANNOTATE") and (
         invoice_version(db, workspace, row.work_item_id) != row.source_version
     ):
         raise HTTPException(
@@ -709,7 +794,12 @@ def decide(
             raise HTTPException(409, "Import a statement first.")
         if not requested:
             raise HTTPException(422, "Choose at least one supported posting amount.")
-        ps = {x.id: x for x in postings(snapshot, workspace, p)}
+        ps = {
+            x.id: x
+            for x in postings(
+                snapshot, workspace, p, active_pairings(db, [snapshot.id]).get(snapshot.id, ())
+            )
+        }
         for item in requested:
             if item.snapshot_id != snapshot.id or item.line_id not in ps:
                 raise HTTPException(
@@ -738,9 +828,32 @@ def decide(
         chosen = []
     else:
         chosen = [asdict(a) for a in existing if a.credit == str(row.id)]
+    if action in ("REJECT_MATCH", "ANNOTATE"):
+        extra = extra or {}
+        review = dict(row.review or {})
+        now = datetime.now(timezone.utc).isoformat()
+        if action == "REJECT_MATCH":
+            if snapshot is None or str(extra.get("snapshot_id")) != str(snapshot.id):
+                raise HTTPException(409, "Statement changed; review the active version.")
+            line = extra.get("line_id")
+            if line is None or not str(line).isdigit() or int(line) >= len(snapshot.rows):
+                raise HTTPException(422, "Choose the statement row to reject.")
+            rejected = list(review.get("rejected_candidates", []))
+            if not any(r["snapshot_id"] == str(snapshot.id) and r["line_id"] == str(line) for r in rejected):
+                rejected.append({"snapshot_id": str(snapshot.id), "line_id": str(line), "by": str(user_id), "at": now,
+                                 "reason": reason[:300]})
+            review["rejected_candidates"] = rejected[-200:]
+        else:
+            note = (extra.get("note") or "").strip()
+            if not note:
+                raise HTTPException(422, "Write the annotation.")
+            review["annotations"] = (list(review.get("annotations", [])) + [
+                {"text": note[:500], "by": str(user_id), "at": now, "reason": reason[:300],
+                 "line_id": extra.get("line_id"), "snapshot_id": str(snapshot.id) if snapshot else None}])[-200:]
+        row.review = review
     if action == "CA_REVIEWED":
         result = view(db, workspace, row)
-        if result["status"] != "POSTED":
+        if result["status"] not in ("POSTED", "LATE_POSTING", "VERIFIED_CORRECTED"):
             raise HTTPException(
                 409, "A fully allocated active posting is required before CA review."
             )
@@ -771,7 +884,8 @@ def decide(
                     "Enterprise accountant review requires a different reviewer from the allocator and most recent decision author.",
                 )
     row.revision += 1
-    row.state = "OPEN" if action in ("ALLOCATE", "REOPEN") else action
+    if action not in ("REJECT_MATCH", "ANNOTATE"):      # these keep the case where it is
+        row.state = "OPEN" if action in ("ALLOCATE", "REOPEN") else action
     db.add(
         Decision(
             organization_id=workspace.organization_id,
@@ -789,13 +903,83 @@ def decide(
     db.flush()
 
 
+def pair_reversal(db, workspace, p, user_id, snapshot_id, positive_line, negative_line, reason):
+    """A person pairs a reversal (a negative row) with the row it reverses. Netting happens only through this. Refused unless
+    both rows are the same deductor's, one positive and one negative, the reversal does not exceed the row, and the net
+    still covers what is already allocated: amounts are conserved, a statement amount is never spent twice."""
+    lock_capacity(db, workspace)
+    snapshot = db.query(Statement).filter_by(id=snapshot_id, profile_id=p.id, workspace_id=workspace.id).first()
+    if snapshot is None or not snapshot.active:
+        raise HTTPException(409, "Pair rows of the active statement only.")
+    rows = snapshot.rows
+    if not (0 <= positive_line < len(rows) and 0 <= negative_line < len(rows)):
+        raise HTTPException(422, "That statement row does not exist.")
+    plus, minus = rows[positive_line], rows[negative_line]
+    if plus["deductor_key"] != minus["deductor_key"]:
+        raise HTTPException(422, "A reversal is paired with a row of the same deductor only.")
+    if plus["amount_micros"] <= 0 or minus["amount_micros"] >= 0:
+        raise HTTPException(422, "Pair one positive row with one negative row (the reversal).")
+    existing = active_pairings(db, [snapshot.id]).get(snapshot.id, [])
+    if any(x.negative_line == negative_line for x in existing):
+        raise HTTPException(409, "This reversal is already paired.")
+    net = net_amounts(rows, existing)
+    if net[positive_line] + minus["amount_micros"] < 0:
+        raise HTTPException(422, "The reversal is larger than the row it is paired with.")
+    allocated = sum(
+        a.amount
+        for a in allocations(db, p, snapshot.year)
+        if a.posting == str(positive_line) and a.snapshot == str(snapshot.id)
+    )
+    if net[positive_line] + minus["amount_micros"] < allocated:
+        raise HTTPException(
+            409,
+            "That row is already allocated to cases for more than it would be worth after the reversal. Reallocate those "
+            "cases first.",
+        )
+    row = Pairing(
+        organization_id=workspace.organization_id, workspace_id=workspace.id, profile_id=p.id, statement_id=snapshot.id,
+        positive_line=positive_line, negative_line=negative_line, reason=reason, created_by=user_id,
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
+def unpair_reversal(db, workspace, p, user_id, pairing_id, reason):
+    row = db.query(Pairing).filter_by(id=pairing_id, profile_id=p.id, workspace_id=workspace.id, active=True).first()
+    if row is None:
+        raise HTTPException(404, "Pairing not found.")
+    snapshot = db.get(Statement, row.statement_id)
+    others = [x for x in active_pairings(db, [snapshot.id]).get(snapshot.id, []) if x.id != row.id]
+    # Un-netting only ever raises a row, but a row that had absorbed this reversal must still cover its allocations.
+    net = net_amounts(snapshot.rows, others)
+    for line in {row.positive_line}:
+        used = sum(
+            a.amount
+            for a in allocations(db, p, snapshot.year)
+            if a.posting == str(line) and a.snapshot == str(snapshot.id)
+        )
+        if used > net[line]:
+            raise HTTPException(409, "Cases are allocated against this row; reallocate them first.")
+    row.active, row.withdrawn_reason = False, reason
+    db.flush()
+    return row
+
+
+def unpaired_reversals(snapshot, pairings):
+    """Negative rows of the active statement nobody paired: exceptions, never netted on their own."""
+    paired = {x.negative_line for x in pairings}
+    return [i for i, r in enumerate(snapshot.rows) if r["amount_micros"] < 0 and i not in paired] if snapshot else []
+
+
 def reconfirm(db, workspace, row, p, user_id, revision, amount, reason, seller_name_confirmed=False):
     if revision != row.revision:
         raise HTTPException(409, "This case changed. Reload before confirming.")
     source, fact, seller = receivable(
         db, workspace, p, row.work_item_id, seller_name_confirmed=seller_name_confirmed
     )
-    invoice_period(fact, row.year)
+    if not (row.review or {}).get("triggering_event"):
+        invoice_period(fact, row.year)
     value = d.money(amount)
     if value <= 0 or value > fact.total_micros:
         raise HTTPException(
@@ -888,6 +1072,7 @@ def views(db, workspace, rows):
         by_group.setdefault((profile_id, year), []).extend(
             d.Allocation(**a) for a in decision.allocations
         )
+    pairings = active_pairings(db, [snap.id for snap in active.values()])
     bundles = {}
     for row in rows:
         key = (row.profile_id, row.year)
@@ -897,7 +1082,7 @@ def views(db, workspace, rows):
             bundles[key] = (
                 p,
                 snapshot,
-                postings(snapshot, workspace, p),
+                postings(snapshot, workspace, p, pairings.get(snapshot.id, ()) if snapshot else ()),
                 by_group.get(key, []),
             )
     return [
@@ -924,6 +1109,7 @@ def create_case(
     section_text=None,
     evidence=None,
     deductor_key=None,
+    triggering_event=None,
 ):
     """Confirm one expected withholding on an invoice. Every way in (typed, an accepted suggestion) ends here, so every case
     has the same checks: the invoice is a classified INR invoice of this entity, the period contains its date, the amount is
@@ -932,7 +1118,11 @@ def create_case(
     source, fact, seller = receivable(
         db, workspace, p, work_item_id, seller_name_confirmed=seller_name_confirmed
     )
-    invoice_period(fact, year)
+    event = None
+    if triggering_event:
+        event = check_triggering_event(db, workspace, fact, year, triggering_event)
+    else:
+        invoice_period(fact, year)
     lock_capacity(db, workspace)
     old = (
         db.query(CreditRow)
@@ -964,11 +1154,23 @@ def create_case(
     review = {"origin": origin}
     if section_text:
         review["section_text"] = section_text[:100]
+    if event:
+        # An advance or earlier triggering event: placed in its own period by a person, with a reason and evidence. Never inferred.
+        review["triggering_event"] = event
+        review["evidence"] = [
+            {
+                "work_item_id": event["evidence_work_item_id"],
+                "kind": "TRIGGERING_EVENT",
+                "source_version": versions.one(db, workspace.id, uuid.UUID(event["evidence_work_item_id"])).evidence,
+                "amount_micros": None,
+                "added_at": datetime.now(timezone.utc).isoformat(),
+            }
+        ]
     if evidence:
         review["origin_evidence"] = evidence
         if evidence.get("accounting_record") and evidence.get("withheld_micros"):
             # A record read from the accounting system (Zoho Books): evidence of the booked withholding, not a document.
-            review["evidence"] = [
+            review["evidence"] = review.get("evidence", []) + [
                 {
                     "work_item_id": None,
                     "kind": "ACCOUNTING_RECORD",
@@ -1039,10 +1241,10 @@ def summary(db, workspace):
         gap_micros=sum(
             r["gap_micros"] or 0
             for r in items
-            if r["review_state"] not in ("WITHDRAWN", "EXPLAINED")
+            if r["review_state"] not in ("WITHDRAWN", "EXPLAINED", "UNRESOLVED")
         ),
         unresolved=sum(
-            r["status"] not in ("POSTED", "WITHDRAWN", "CLOSED_WITH_EXCEPTION")
+            r["status"] not in RESOLVED_STATUSES
             for r in items
         ),
         note="Human-confirmed transcription; not a verified official-format import. Unknown gaps excluded.",
@@ -1070,13 +1272,14 @@ def bank_evidence(db, workspace, row, context):
                 workspace_id=workspace.id,
                 work_item_id=row.work_item_id,
                 status="MATCHED",
-                currency="INR",
             )
             .limit(101)
             .all()
         )
         if len(candidates) > 100:
             return []  # Unknown is safer than a silently truncated cash total.
+        if any(c.currency != "INR" for c in candidates):
+            return []  # A receipt in another currency would be silently left out of the total: unknown instead.
         for candidate in candidates:
             line, _ = bank._line(db, who, candidate.id)
             bank._require_line(who, line)
