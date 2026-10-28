@@ -56,6 +56,8 @@ class Credit:
     booked_micros: int | None = None
     advice_micros: int | None = None
     reference: str | None = None
+    #: The section or table item as the invoice or accounting record prints it (never converted).
+    section: str | None = None
 
 
 @dataclass(frozen=True)
@@ -66,6 +68,10 @@ class Posting:
     amount: int
     snapshot: str
     reference: str | None = None
+    #: As the statement prints it: an old-Act section (194C) or a new-Act Section 393 table item.
+    section: str | None = None
+    #: The statement row's transaction date, when it prints one.
+    on: date | None = None
 
 
 @dataclass(frozen=True)
@@ -76,11 +82,36 @@ class Allocation:
     snapshot: str
 
 
+def _label(text: str | None) -> str:
+    return re.sub(r"\s+", " ", (text or "").strip()).casefold()
+
+
+def section_conflict(credit: Credit, posting: Posting) -> bool:
+    """Both sides print a section or table item and they differ as printed. An old-Act section and a new-Act table item
+    are different labels and are never converted into one another."""
+    a, b = _label(credit.section), _label(posting.section)
+    return bool(a and b and a != b)
+
+
+def outside_year(credit: Credit, posting: Posting) -> bool:
+    """The posting's transaction date falls in another tax year than the credit's: cross-year contamination."""
+    return posting.on is not None and tax_period(posting.on)[0] != credit.scope.year
+
+
 def allocate(
     credit: Credit, posting: Posting, amount: int, allocations: list[Allocation]
 ) -> list[Allocation]:
     if credit.scope != posting.scope:
         raise ValueError("Allocation scope differs.")
+    if outside_year(credit, posting):
+        raise ValueError(
+            "The statement row is dated in another tax year than this case. Years are never mixed."
+        )
+    if section_conflict(credit, posting):
+        raise ValueError(
+            "The statement row's section or table item differs from the case's as printed. Servabo never converts an "
+            "old-Act section into a new-Act table item or back; resolve it with the accountant."
+        )
     if credit.deductor != posting.deductor or not credit.deductor:
         raise ValueError("Deductor identity requires review.")
     if credit.disputed or credit.expected is None or not credit.source:
@@ -114,7 +145,10 @@ def reconcile(
     relevant = {
         p.id: p
         for p in postings
-        if p.scope == credit.scope and p.deductor == credit.deductor
+        if p.scope == credit.scope
+        and p.deductor == credit.deductor
+        and not outside_year(credit, p)
+        and not section_conflict(credit, p)
     }
     posted = sum(
         a.amount

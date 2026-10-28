@@ -1,0 +1,14 @@
+^File Creation Date^Permanent Account Number (PAN)^Current Status of PAN^Tax Year^Assessment Year^Name of Assessee^
+^28-10-2026^ABCDE1234F^Active^2026-27^-^SYNTHETIC DISTRIBUTORS PRIVATE LIMITED^
+^PART-A - Details of Tax Deducted at Source^
+^Sr. No.^Name of Deductor^TAN of Deductor^Total Amount Paid/ Credited(Rs.)^Total Tax Deducted(Rs.)^Total TDS Deposited(Rs.)^
+^1^FIRST SYNTHETIC CUSTOMER LIMITED^ABCD12345E^150000.00^3000.00^3000.00^
+^^Sr. No.^Section^Transaction Date^Status of Booking^Date of Booking^Remarks^Amount Paid / Credited(Rs.)^Tax Deducted(Rs.)^TDS Deposited(Rs.)^
+^^1^393(1) [Sl. No. 6(iii)]^15-Jun-2026^F^30-Jul-2025^-^100000.00^2000.00^2000.00^
+^^2^393(1) [Sl. No. 6(iii)]^15-Sep-2026^F^30-Oct-2025^-^50000.00^1000.00^1000.00^
+^2^SECOND SYNTHETIC CUSTOMER^MUMB54321K^1,25,000.00^1250.00^1250.00^
+^^Sr. No.^Section^Transaction Date^Status of Booking^Date of Booking^Remarks^Amount Paid / Credited(Rs.)^Tax Deducted(Rs.)^TDS Deposited(Rs.)^
+^^1^393(1) [Sl. No. 8(ii)]^20-Dec-2026^F^31-Jan-2026^-^1,25,000.00^1250.00^1250.00^
+^PART-B - Details of Tax Collected at Source^
+^Sr. No.^Name of Collector^TAN of Collector^Section^Transaction Date^Amount Paid / Debited^Tax Collected^
+^1^SOME COLLECTOR^PUNC11111A^206C(1H)^10-Jan-2026^100000.00^100.00^

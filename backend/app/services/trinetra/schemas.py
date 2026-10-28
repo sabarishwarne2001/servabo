@@ -33,6 +33,7 @@ class CaseOut(Wire):
     note: str
     work_item_id: str | None = None
     statement_work_item_id: str | None = None
+    statement_reader: dict | None = None
     snapshot_id: str | None = None
     source_current: bool = True
     created_at: str
@@ -136,6 +137,7 @@ class AccessOut(BaseModel):
     enrolled_since: str | None = None
     entitled: bool
     official_formats: list[str]
+    statement_readers: list[dict] = []
     transcription_format: str
     tcs_supported: bool
 
@@ -158,6 +160,31 @@ class PreviewOut(Wire):
     total_micros: Micros
     parser_version: str
     official_format_verified: bool
+
+
+class FilePreviewOut(Wire):
+    """What a statement file would import, for the reviewer to confirm before anything is saved."""
+
+    reader: str
+    reader_label: str
+    official: bool
+    verified: bool
+    parser_version: str
+    sha256: str
+    tax_year_label: str | None = None
+    tax_year_kind: str | None = None
+    year: int
+    year_matches: bool
+    file_pan_matches: bool | None = None
+    rows: int
+    total_micros: Micros
+    deductors: list[dict]
+    mapping: list[dict]
+    columns: dict | None = None
+    checks: list[dict]
+    ignored: list[str]
+    sample: list[dict]
+    notice: str
 
 
 class RunOut(BaseModel):

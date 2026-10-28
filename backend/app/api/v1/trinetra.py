@@ -3,7 +3,7 @@
 import uuid
 from datetime import date
 from typing import Literal, Annotated
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, AfterValidator, BeforeValidator
 from sqlalchemy.orm import Session
 from app.api.deps import (
@@ -22,7 +22,7 @@ from app.models.trinetra import (
     TrinetraCredit as Credit,
     TrinetraDecision as Decision,
 )
-from app.services.trinetra import service as s, domain as d, mode
+from app.services.trinetra import service as s, domain as d, mode, readers
 from app.services.trinetra.events import reviewed as announce_review
 from app.services.trinetra.schemas import (
     AccessOut,
@@ -35,6 +35,7 @@ from app.services.trinetra.schemas import (
     DetailOut,
     DraftOut,
     PreviewOut,
+    FilePreviewOut,
     RunOut,
     RunStatusOut,
     OrganizationAccessOut,
@@ -197,7 +198,12 @@ def access(
         "enrolled": live.enrolled,
         "enrolled_since": live.enrolled_since.isoformat() if live.enrolled_since else None,
         "entitled": live.entitled,
-        "official_formats": [],
+        # Official layouts proven on a real file (Final session 2B fills this); every reader is listed below with its state.
+        "official_formats": [r.key for r in readers.REGISTRY.values() if r.official and r.verified],
+        "statement_readers": [
+            {"key": r.key, "label": r.label, "official": r.official, "verified": r.verified}
+            for r in readers.REGISTRY.values()
+        ],
         "transcription_format": "human-transcription-v1",
         "tcs_supported": False,
     }
@@ -312,6 +318,170 @@ def preview_statement(
     }
 
 
+def _statement_file(upload: UploadFile) -> tuple[str, bytes]:
+    """The uploaded statement, read no further than the size bound (the platform's spooling, never the whole body)."""
+    from app.services.file_validation_service import FileValidationError, spool_upload_file
+    from app.services.trinetra.statements.common import MAX_BYTES
+
+    try:
+        handle, _ = spool_upload_file(upload, max_bytes=MAX_BYTES)
+    except FileValidationError as exc:
+        code = "TRINETRA_EMPTY_FILE" if exc.reason.value == "EMPTY" else "TRINETRA_FILE_TOO_LARGE"
+        raise HTTPException(
+            422, {"code": code, "message": f"The file could not be read: {exc}"}
+        ) from exc
+    try:
+        handle.seek(0)
+        return (upload.filename or "statement")[:255], handle.read()
+    finally:
+        handle.close()
+
+
+def _read_statement(upload: UploadFile, reader: str | None, mapping: str | None):
+    import json as _json
+
+    from app.services.trinetra.statements import detect
+    from app.services.trinetra.statements.common import StatementRefused
+
+    filename, data = _statement_file(upload)
+    chosen = None
+    if mapping:
+        try:
+            chosen = _json.loads(mapping)
+            if not isinstance(chosen, dict) or len(chosen) > 16:
+                raise ValueError
+        except ValueError as exc:
+            raise HTTPException(422, "The column mapping could not be read.") from exc
+    try:
+        return detect.read(filename, data, reader=reader, mapping=chosen)
+    except StatementRefused as exc:
+        raise HTTPException(
+            422, {"code": exc.code, "message": exc.message, "row": exc.row}
+        ) from exc
+
+
+@router.get(P + "/statement-template.{format}")
+def statement_template(
+    workspace_id: uuid.UUID,
+    format: Literal["csv", "xlsx"],
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    """The Servabo template: your own transcription of a statement, never an official format."""
+    from app.services.trinetra.statements import template
+
+    workspace(db, context, workspace_id, live=False)
+    if format == "csv":
+        body, media = template.csv_bytes(), "text/csv"
+    else:
+        body = template.xlsx_bytes()
+        media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return Response(
+        body,
+        media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="servabo-statement-template.{format}"'},
+    )
+
+
+@router.post(P + "/statement-files/preview", response_model=FilePreviewOut)
+def preview_statement_file(
+    workspace_id: uuid.UUID,
+    file: UploadFile = File(...),
+    profile_id: uuid.UUID = Form(...),
+    year: int = Form(..., ge=2000, le=2100),
+    pan: str = Form(...),
+    reader: str | None = Form(default=None, max_length=40),
+    mapping: str | None = Form(default=None, max_length=2000),
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    """What the file would import: the reader, the tax-year label as the file states it, the mapping of each column, every
+    check against the file's own totals, and the rows. Nothing is saved."""
+    from app.services.trinetra import readers
+
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, profile_id)
+    s.check_entity(p, _pan(pan))
+    parsed = _read_statement(file, reader, mapping)
+    info = readers.get(parsed.reader)
+    entity_pan = s.encryption.decrypt_secret(p.pan_ciphertext)
+    totals: dict[str, list[int]] = {}
+    for r in parsed.rows:
+        entry = totals.setdefault(r.tan, [0, 0])
+        entry[0] += 1
+        entry[1] += r.amount_micros
+    unverified = bool(info and info.official and not info.verified)
+    return {
+        "reader": parsed.reader,
+        "reader_label": info.label if info else parsed.reader,
+        "official": bool(info and info.official),
+        "verified": bool(info and info.verified),
+        "parser_version": parsed.parser_version,
+        "sha256": parsed.sha256,
+        "tax_year_label": parsed.label.text if parsed.label else None,
+        "tax_year_kind": parsed.label.kind if parsed.label else None,
+        "year": year,
+        "year_matches": parsed.label is None or parsed.label.year == year,
+        "file_pan_matches": (parsed.file_pan == entity_pan) if parsed.file_pan else None,
+        "rows": len(parsed.rows),
+        "total_micros": str(parsed.total_micros),
+        "deductors": [
+            {"tan_masked": "******" + tan[-4:], "rows": n, "total_micros": str(total)}
+            for tan, (n, total) in sorted(totals.items())
+        ],
+        "mapping": [{"column": c, "meaning": m} for c, m in parsed.mapping],
+        "columns": parsed.columns_info,
+        "checks": [{"name": c.name, "ok": c.ok, "detail": c.detail} for c in parsed.checks],
+        "ignored": parsed.ignored,
+        "sample": [
+            {
+                "line_no": r.line_no,
+                "tan_masked": "******" + r.tan[-4:],
+                "section": r.section,
+                "on": r.on.isoformat() if r.on else None,
+                "status": r.status,
+                "amount_micros": str(r.amount_micros),
+            }
+            for r in parsed.rows[:25]
+        ],
+        "notice": (
+            "Unverified reader: this layout has not yet been proven on a real downloaded file. Check the rows against your "
+            "statement before confirming." if unverified else
+            "Your own transcription: Servabo reads it as you typed it; it is not an official format."
+            if not (info and info.official) else "Official download, read by a verified reader."
+        ),
+    }
+
+
+@router.post(P + "/statement-files", response_model=StatementOut)
+def import_statement_file(
+    workspace_id: uuid.UUID,
+    file: UploadFile = File(...),
+    profile_id: uuid.UUID = Form(...),
+    year: int = Form(..., ge=2000, le=2100),
+    pan: str = Form(...),
+    confirmed: bool = Form(...),
+    expected_sha256: str = Form(..., min_length=64, max_length=64),
+    reader: str | None = Form(default=None, max_length=40),
+    mapping: str | None = Form(default=None, max_length=2000),
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    """Import the previewed file: the same confirm and import path as typed rows, to the same immutable snapshots."""
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, profile_id)
+    parsed = _read_statement(file, reader, mapping)
+    r = s.import_parsed(db, w, p, year, parsed, _pan(pan), confirmed, expected_sha256)
+    db.commit()
+    return {
+        "id": str(r.id),
+        "revision": r.revision,
+        "fingerprint": r.fingerprint,
+        "source_kind": r.parser_version,
+        "active": r.active,
+    }
+
+
 @router.post(P + "/official-statements")
 def unsupported_statement(
     workspace_id: uuid.UUID,
@@ -323,7 +493,7 @@ def unsupported_statement(
         422,
         {
             "code": "TRINETRA_UNSUPPORTED_FORMAT",
-            "message": "No official file layout has passed source validation. Use Documents for evidence intake and explicitly reviewed transcription; no file was parsed.",
+            "message": "Upload the statement through the statement-file preview (the Servabo template, the Form 26AS / Form 168 text download or the AIS CSV). Nothing was parsed here.",
         },
     )
 

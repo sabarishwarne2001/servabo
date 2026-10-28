@@ -1,0 +1,8 @@
+Annual Information Statement for FY 2025-26
+TDS/TCS Information
+Sr. No.,Information Source,Information Code,Information Description,Transaction Date,Amount Paid or Credited,Tax Deducted,Status
+1,FIRST SYNTHETIC CUSTOMER LIMITED (ABCD12345E),TDS-194C,Payments to contractors,15-Jun-2025,"1,00,000.00","2,000.00",F
+2,FIRST SYNTHETIC CUSTOMER LIMITED (ABCD12345E),TDS-194C,Payments to contractors,15-Sep-2025,50000.00,1000.00,F
+3,SECOND SYNTHETIC CUSTOMER (MUMB54321K),TDS-194Q,Purchase of goods,20-Dec-2025,125000.00,1250.00,F
+4,SOME COLLECTOR (PUNC11111A),TCS-206C(1H),Sale of goods,10-Jan-2026,100000.00,100.00,F
+Total,,,,,,"4,250.00",

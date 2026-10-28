@@ -6,6 +6,7 @@ import json
 import re
 import uuid
 import secrets
+from datetime import date
 from dataclasses import asdict
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -282,6 +283,7 @@ def credit(row, workspace):
         str(row.work_item_id),
         disputed=row.state == "DISPUTED",
         reference=row.reference,
+        section=(row.review or {}).get("section_text") or None,
     )
 
 
@@ -291,11 +293,11 @@ def current(db, p, year):
         .filter_by(profile_id=p.id, workspace_id=p.workspace_id, year=year, active=True)
         .first()
     )
-    if snapshot:
+    if snapshot and snapshot.source_work_item_id is not None:
         facts = versions.one(db, p.workspace_id, snapshot.source_work_item_id)
         if facts is None or facts.statement != snapshot.source_version:
             return None
-    return snapshot
+    return snapshot  # a file-sourced snapshot is identified by its file's SHA-256 and cannot go stale
 
 
 def allocations(db, p, year):
@@ -322,7 +324,7 @@ def decision_sources(db, row, p):
         {
             str(row.work_item_id),
             *(row.evidence_work_item_ids or []),
-            *([str(snapshot.source_work_item_id)] if snapshot else []),
+            *([str(snapshot.source_work_item_id)] if snapshot and snapshot.source_work_item_id else []),
         }
     )
 
@@ -338,9 +340,26 @@ def postings(snapshot, workspace, p):
             r["amount_micros"],
             str(snapshot.id),
             r["reference"],
+            r.get("section") or None,
+            date.fromisoformat(r["on"]) if r.get("on") else None,
         )
         for i, r in enumerate(snapshot.rows)
     ]
+
+
+def _reader_of(snapshot):
+    """How the active statement was read, for the case: the reader, the file's own tax-year label and whether the reader
+    is verified (an unverified reader is labelled as such on the snapshot)."""
+    if snapshot is None:
+        return None
+    meta = snapshot.source_meta or {}
+    return dict(
+        key=meta.get("reader") or snapshot.parser_version,
+        label=meta.get("reader_label") or "Rows typed by hand",
+        official=bool(meta.get("official", False)),
+        verified=bool(meta.get("verified", True)),
+        tax_year_label=meta.get("label"),
+    )
 
 
 def view(db, workspace, row, bundle=None, facts=None, roles=None):
@@ -428,7 +447,10 @@ def view(db, workspace, row, bundle=None, facts=None, roles=None):
         period=d.tax_period(date(row.year, 4, 1))[1],
         age_days=age,
         review=reviewed,
-        statement_work_item_id=str(snapshot.source_work_item_id) if snapshot else None,
+        statement_work_item_id=(
+            str(snapshot.source_work_item_id) if snapshot and snapshot.source_work_item_id else None
+        ),
+        statement_reader=_reader_of(snapshot),
         created_at=row.created_at.isoformat(),
         snapshot_id=str(snapshot.id) if snapshot else None,
         as_of=snapshot.created_at.isoformat() if snapshot else None,
@@ -436,38 +458,142 @@ def view(db, workspace, row, bundle=None, facts=None, roles=None):
     )
 
 
-def import_reviewed(db, workspace, p, source, year, rows, pan, confirmed):
-    if not confirmed:
-        raise HTTPException(
-            422, "Confirm the entity, year and transcription against the source."
-        )
+def check_entity(p, pan):
     if (
         identity(pan, "PAN", encryption.decrypt_secret(p.identity_salt_ciphertext))
         != p.pan_fingerprint
     ):
         raise HTTPException(422, "Entity does not match the source confirmation.")
+
+
+def import_reviewed(db, workspace, p, source, year, rows, pan, confirmed):
+    """Typed rows read from a document the person points at (the original path)."""
+    if not confirmed:
+        raise HTTPException(
+            422, "Confirm the entity, year and transcription against the source."
+        )
+    check_entity(p, pan)
     source_document = document(db, workspace, source)
     lock_capacity(db, workspace)
+    salt = encryption.decrypt_secret(p.identity_salt_ciphertext)
     # Stable content hash, excluding file names and upload time. Identical input is idempotent.
     normalized = [
         dict(
-            deductor_key=identity(
-                r.tan, "TAN", encryption.decrypt_secret(p.identity_salt_ciphertext)
-            ),
+            deductor_key=identity(r.tan, "TAN", salt),
             amount_micros=d.money(r.amount),
             reference=r.reference,
         )
         for r in rows
     ]
+    return store_snapshot(
+        db,
+        workspace,
+        p,
+        year,
+        normalized,
+        source_work_item_id=source,
+        source_version=versions.one(db, workspace.id, source_document.id).statement,
+        parser_version="human-transcription-v1",
+    )
+
+
+def import_parsed(db, workspace, p, year, parsed, pan, confirmed, expected_sha256):
+    """Rows read from an uploaded statement file by a reader (template, Form 26AS / 168 text, AIS CSV): the same preview,
+    confirm and import path as typed rows. The reviewer confirmed the file's fingerprint, the entity and the year."""
+    from app.services.trinetra import readers
+
+    if not confirmed or parsed.sha256 != expected_sha256:
+        raise HTTPException(
+            422,
+            "Confirm the entity, year and the file shown in the preview. This file is not the one that was previewed.",
+        )
+    check_entity(p, pan)
+    entity_pan = encryption.decrypt_secret(p.pan_ciphertext)
+    if parsed.file_pan and not hmac.compare_digest(
+        parsed.file_pan.encode("ascii"), entity_pan.encode("ascii")
+    ):
+        raise HTTPException(
+            422,
+            {
+                "code": "TRINETRA_FILE_PAN_DIFFERS",
+                "message": "The PAN printed in the file is not this entity's PAN. Nothing was imported.",
+            },
+        )
+    if parsed.label is not None and parsed.label.year != year:
+        raise HTTPException(
+            422,
+            {
+                "code": "TRINETRA_FILE_YEAR_DIFFERS",
+                "message": f"The file states {parsed.label.text}, which is not the year you chose "
+                f"({d.tax_period(date(year, 4, 1))[1]}). Years are never mixed or converted; choose the file's own year.",
+            },
+        )
+    lock_capacity(db, workspace)
+    salt = encryption.decrypt_secret(p.identity_salt_ciphertext)
+    normalized = [
+        dict(
+            deductor_key=identity(r.tan, "TAN", salt),
+            amount_micros=r.amount_micros,
+            reference=r.reference or f"row {r.line_no}",
+            section=r.section,
+            on=r.on.isoformat() if r.on else None,
+            status=r.status,
+            booked_on=r.booked_on.isoformat() if r.booked_on else None,
+            remarks=r.remarks,
+            paid_micros=r.paid_micros,
+            deducted_micros=r.deducted_micros,
+            line_no=r.line_no,
+        )
+        for r in parsed.rows
+    ]
+    reader = readers.get(parsed.reader)
+    meta = dict(
+        reader=parsed.reader,
+        reader_label=reader.label if reader else parsed.reader,
+        official=bool(reader and reader.official),
+        verified=bool(reader and reader.verified),
+        label=parsed.label.text if parsed.label else None,
+        label_kind=parsed.label.kind if parsed.label else None,
+        checks=[dict(name=c.name, ok=c.ok, detail=c.detail) for c in parsed.checks],
+        ignored=parsed.ignored,
+        rows_read=len(parsed.rows),
+    )
+    return store_snapshot(
+        db,
+        workspace,
+        p,
+        year,
+        normalized,
+        source_work_item_id=None,
+        source_version=versions.file_statement_version(parsed.sha256),
+        parser_version=parsed.parser_version,
+        source_sha256=parsed.sha256,
+        source_meta=meta,
+    )
+
+
+def store_snapshot(
+    db,
+    workspace,
+    p,
+    year,
+    normalized,
+    *,
+    source_work_item_id,
+    source_version,
+    parser_version,
+    source_sha256=None,
+    source_meta=None,
+):
     keys = {(r["deductor_key"], r["amount_micros"], r["reference"]) for r in normalized}
     if len(keys) != len(normalized):
         raise HTTPException(
             422, "Duplicate posting rows require distinct source-row references."
         )
-    source_version = versions.one(db, workspace.id, source_document.id).statement
     fp = hashlib.sha256(
         json.dumps(
-            [str(source), source_version, year, normalized], sort_keys=True
+            [str(source_work_item_id or source_sha256), source_version, year, normalized],
+            sort_keys=True,
         ).encode()
     ).hexdigest()
     old = (
@@ -515,17 +641,22 @@ def import_reviewed(db, workspace, p, source, year, rows, pan, confirmed):
         organization_id=workspace.organization_id,
         workspace_id=workspace.id,
         profile_id=p.id,
-        source_work_item_id=source,
+        source_work_item_id=source_work_item_id,
+        source_sha256=source_sha256,
+        source_meta=source_meta or {},
         source_version=source_version,
         year=year,
         fingerprint=fp,
-        parser_version="human-transcription-v1",
+        parser_version=parser_version,
         rows=normalized,
         active=True,
         revision=(previous.revision + 1 if previous else 1),
         comparison=comparison,
         evidence_work_item_ids=(
-            [str(previous.source_work_item_id)] + [str(c.work_item_id) for c in cases]
+            (
+                ([str(previous.source_work_item_id)] if previous.source_work_item_id else [])
+                + [str(c.work_item_id) for c in cases]
+            )
             if previous
             else []
         ),
@@ -570,6 +701,13 @@ def decide(
             if item.snapshot_id != snapshot.id or item.line_id not in ps:
                 raise HTTPException(
                     409, "Statement changed; review the active version."
+                )
+            booking = (snapshot.rows[int(item.line_id)].get("status") or "").upper()
+            if booking not in ("", "F"):
+                raise HTTPException(
+                    422,
+                    f"This statement row's booking status is '{booking}', not final ('F'), exactly as the statement prints "
+                    "it. Wait for the final booking in a later statement, or record an explanation instead.",
                 )
             try:
                 retained = d.allocate(
@@ -696,7 +834,7 @@ def views(db, workspace, rows):
         else []
     )
     ids = {row.work_item_id for row in rows} | {
-        snap.source_work_item_id for snap in snapshots
+        snap.source_work_item_id for snap in snapshots if snap.source_work_item_id
     }
     ids.update(
         uuid.UUID(e["work_item_id"])
@@ -714,8 +852,11 @@ def views(db, workspace, rows):
     active = {
         (snap.profile_id, snap.year): snap
         for snap in snapshots
-        if snap.source_work_item_id in facts
-        and facts[snap.source_work_item_id].statement == snap.source_version
+        if snap.source_work_item_id is None
+        or (
+            snap.source_work_item_id in facts
+            and facts[snap.source_work_item_id].statement == snap.source_version
+        )
     }
     latest = (
         db.query(Decision, CreditRow.profile_id, CreditRow.year)

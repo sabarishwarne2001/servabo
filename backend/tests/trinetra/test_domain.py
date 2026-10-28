@@ -135,3 +135,40 @@ def test_sample_aging_uses_its_displayed_evidence_date():
     for item in sample["items"]:
         created = datetime.fromisoformat(item["created_at"]).date()
         assert item["age_days"] == (as_of - created).days
+
+
+# --- Final 2T, Phase 3: matching uses the section or table item as printed, and the transaction date, when present -------
+
+
+def test_a_section_printed_on_both_sides_must_agree_as_printed():
+    c = credit(section="194C")
+    same = posting("a", section="194C ")
+    other = posting("b", section="194Q")
+    assert reconcile(c, [same], [], statement_available=True)["candidate_ids"] == ["a"]
+    out = reconcile(c, [other], [], statement_available=True)
+    assert out["candidate_ids"] == [] and out["status"] != "SUGGESTED"
+    with pytest.raises(ValueError, match="section"):
+        allocate(c, other, 2000000000, [])
+
+
+def test_an_old_act_section_is_never_converted_into_a_new_act_table_item():
+    c = credit(section="194Q")
+    new_act = posting("n", section="393(1) [Sl. No. 8(ii)]")
+    assert reconcile(c, [new_act], [], statement_available=True)["candidate_ids"] == []
+    with pytest.raises(ValueError, match="never converts"):
+        allocate(c, new_act, 2000000000, [])
+
+
+def test_a_missing_section_on_either_side_does_not_block_a_match():
+    assert reconcile(credit(), [posting("a", section="194C")], [], statement_available=True)["candidate_ids"] == ["a"]
+    assert reconcile(credit(section="194C"), [posting("a")], [], statement_available=True)["candidate_ids"] == ["a"]
+
+
+def test_a_posting_dated_in_another_tax_year_is_never_matched():
+    inside = posting("in", on=date(2026, 3, 31))      # FY 2025-26: the credit's year (2025)
+    outside = posting("out", on=date(2026, 4, 1))     # Tax Year 2026-27: another year
+    out = reconcile(credit(), [outside], [], statement_available=True)
+    assert out["candidate_ids"] == [] and out["status"] in ("POSSIBLE_MISSING_POSTING", "AMOUNT_MISMATCH")
+    assert reconcile(credit(), [inside], [], statement_available=True)["candidate_ids"] == ["in"]
+    with pytest.raises(ValueError, match="tax year"):
+        allocate(credit(), outside, 2000000000, [])

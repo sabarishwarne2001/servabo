@@ -21,7 +21,7 @@ from pathlib import Path
 
 APP = Path(__file__).resolve().parents[2] / "app"
 KEYS = {"tds_amount", "deductor_tan", "tds_section"}
-WRITERS = {"create_profile", "decide", "import_reviewed", "reconfirm"}
+WRITERS = {"create_profile", "decide", "import_reviewed", "import_parsed", "store_snapshot", "reconfirm"}
 
 
 def _modules():

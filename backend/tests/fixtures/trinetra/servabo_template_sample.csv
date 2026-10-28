@@ -1,0 +1,4 @@
+Deductor TAN,Tax credited (INR),Row reference,Section or table item (as printed),Transaction date,Booking status,Amount paid or credited (INR),Tax deducted (INR),Remarks,Tax year label (as printed)
+ABCD12345E,2000.00,Q1-1,194C,15-Jun-2025,F,100000.00,2000.00,,FY 2025-26 / AY 2026-27
+ABCD12345E,1000.00,Q2-1,194C,15-Sep-2025,F,50000.00,1000.00,,FY 2025-26 / AY 2026-27
+MUMB54321K,1250.00,Q3-1,194Q,20-Dec-2025,F,125000.00,1250.00,,FY 2025-26 / AY 2026-27

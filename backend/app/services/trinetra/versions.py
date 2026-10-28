@@ -110,3 +110,8 @@ def load(db: Session, workspace_ids, ids: Iterable[uuid.UUID]) -> dict[uuid.UUID
 
 def one(db: Session, workspace_id: uuid.UUID, item_id: uuid.UUID) -> Optional[Facts]:
     return load(db, workspace_id, [item_id]).get(item_id)
+
+
+def file_statement_version(sha256: str) -> str:
+    """The version of a statement read from an uploaded file: the file's own SHA-256 (nothing else is kept)."""
+    return _hash("statement-file", sha256)

@@ -31,10 +31,33 @@ class Reader:
         return self.verified_on is not None or not self.official
 
 
+_SECONDARY = (
+    "The official TRACES / e-filing pages could not be reached from the build environment (their hosts are outside the "
+    "session's allowed network). The layout was written from secondary sources found by web search on 2026-10-28 "
+    "(a KDK Software support article on the Form 26AS text download and import, taxheal.com's text-to-Excel guide, "
+    "tdsman.com's 2014 conversion guide) and is checked only against synthetic fixtures of the same shape. Final session "
+    "2B must compare it with the owner's own downloaded file. See docs/trinetra/LEGAL-SOURCES.md."
+)
+
 REGISTRY: dict[str, Reader] = {
     "human-transcription-v1": Reader(
         "human-transcription-v1", "Rows typed by hand", False, "human-transcription-v1",
         "Typed by a person from a statement they hold; not an official format.", None),
+    "servabo-template-v1": Reader(
+        "servabo-template-v1", "Servabo template (your transcription)", False, "servabo-template-v1",
+        "Servabo's own CSV / Excel template, filled in by the customer; not an official format.", None),
+    "form26as-text-v1": Reader(
+        "form26as-text-v1", "Form 26AS text download (financial year / assessment year)", True, "form26as-text-v1",
+        _SECONDARY, "2026-10-28"),
+    "form168-text-v1": Reader(
+        "form168-text-v1", "Form 168 text download (Tax Year, Income-tax Act 2025)", True, "form26as-text-v1",
+        _SECONDARY + " Form 168's text layout was assumed to follow Form 26AS's; the reader refuses any difference.",
+        "2026-10-28"),
+    "ais-csv-v1": Reader(
+        "ais-csv-v1", "AIS TDS/TCS information CSV (TDS rows only)", True, "ais-csv-v1",
+        "AIS user guide and FAQ (incometax.gov.in) could not be reached; only the on-screen field names (information code, "
+        "description, value, source) were confirmed by web search on 2026-10-28. Columns are found by heading and "
+        "confirmed by the reviewer in a mapping preview.", "2026-10-28"),
 }
 
 

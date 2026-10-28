@@ -126,8 +126,16 @@ class TrinetraStatement(Scoped, Base):
         JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
     )
     profile_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    source_work_item_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False
+    #: The document the typed rows were read from. NULL for a snapshot read from an uploaded statement file
+    #: (Final 2T, Phase 3): that snapshot is identified by the file's SHA-256 instead, and no file name is kept.
+    source_work_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    source_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: Which reader, its tax-year label exactly as the file states it, whether the reader was verified, the file's own
+    #: totals check, and what was left out. Never a PAN or a file name.
+    source_meta: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
     )
     source_version: Mapped[str] = mapped_column(String(64), nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -165,6 +173,10 @@ class TrinetraStatement(Scoped, Base):
         CheckConstraint(
             "year BETWEEN 2000 AND 2100 AND revision > 0",
             name="ck_trinetra_statement_year",
+        ),
+        CheckConstraint(
+            "source_work_item_id IS NOT NULL OR source_sha256 IS NOT NULL",
+            name="ck_trinetra_statement_source",
         ),
     )
 
