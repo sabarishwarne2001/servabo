@@ -29,7 +29,7 @@ UI work owed to Phase 8 by Phase 1: a checkbox for `seller_name_confirmed` (crea
 - [x] 4. Phase 3 (backend DONE; screens in Phase 8; hostile-file corpus and speed budget in Phase 9; unverified readers wait for 2B; N-203): Servabo template (CSV/XLSX) and the readers for Form 26AS / Form 168 text and the AIS CSV; reader registry; limits
 - [x] 5. Phase 4 DONE (printed hints, expectations template, deductor directory, Zoho customer payments; N-204; Zoho fields unverified until 2B): printed hints to suggestions; expectations template; Zoho customer-payment TDS; deductor directory
 - [x] 6. Phase 5 DONE (credit notes, reviewed reversal pairings, advances, sourced basis, split remittances, statuses, reject and annotate; N-205; sample company has 13 scenarios): credit notes; reversals; advances; sourced taxable basis; split remittances; new statuses; reject and annotate
-- [ ] 7. Phase 6: authorized inquiries (secure link, allowance, reply); approval chains (Enterprise); closure ledger; measured time
+- [x] 7. Phase 6 DONE (authorized inquiries with a secure link and a monthly allowance, reply hook; Enterprise approval chains; closure ledger that never counts cash; measured cycle time; migration tr2t7): authorized inquiries (secure link, allowance, reply); approval chains (Enterprise); closure ledger; measured time
 - [ ] 8. Phase 7: Getting started; search; notifications + `trinetra.recompute` doing real work; digest; value receipt and monthly; automation
   triggers; webhooks and API; warehouse dataset; organization view; Recoveries; Helm ledger; egress and legal holds
 - [ ] 9. Phase 8: the screens (selector, filters, KPIs by confidence, waterfall, tutorial, import, inquiry, approvals, held reminders, states),

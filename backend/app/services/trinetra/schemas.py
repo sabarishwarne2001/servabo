@@ -55,6 +55,15 @@ class OutcomesOut(Wire):
     confirmed_cases: int = 0
     review_minutes: int = 0
     note: str = "No measured outcomes for synthetic examples."
+    now_visible_this_month_micros: Micros = 0
+    now_visible_this_year_micros: Micros = 0
+    now_visible_total_micros: Micros = 0
+    now_visible_cases: int = 0
+    ledger_note: str = ""
+    measured_cycle_cases: int = 0
+    measured_cycle_days_median: float | None = None
+    measured_cycle_days_mean: float | None = None
+    cycle_note: str = ""
 
 
 class SummaryOut(CasesOut):

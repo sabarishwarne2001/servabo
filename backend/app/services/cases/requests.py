@@ -10,6 +10,7 @@ it, and a used, expired or revoked token is refused before any file is read.
 from __future__ import annotations
 
 import hashlib
+import logging
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -120,6 +121,15 @@ def fulfil_upload(db: Session, *, token: str, handle: Any, size: int, filename: 
     from app.services.automation import emitters
 
     emitters.document_received_by_link(db, request=request, work_item_id=item.id, case_title=case.title)
+    # Final 2T (Phase 6): a reply to a TRINETRA inquiry is attached to THAT case as evidence. Best effort: the customer's upload
+    # is already safe, and a failure here never fails it.
+    try:
+        from app.services.trinetra import inquiries as trinetra_inquiries
+
+        with db.begin_nested():
+            trinetra_inquiries.reply_received(db, request, item)
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).warning("trinetra.reply_attach_failed")
     return {"received": True, "document_type": request.document_type, "work_item_id": str(item.id)}
 
 

@@ -4,7 +4,9 @@ import uuid
 from datetime import date, datetime, timezone
 from typing import Literal, Annotated
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, AfterValidator, BeforeValidator
+from sqlalchemy import select as _select
 from sqlalchemy.orm import Session
 from app.api.deps import (
     RequireWorkspaceRole,
@@ -23,6 +25,7 @@ from app.models.trinetra import (
     TrinetraDecision as Decision,
 )
 from app.services.trinetra import service as s, domain as d, mode, readers, suggestions as sg, directory as dr
+from app.services.trinetra import approvals as ap, inquiries as iq
 from app.services.trinetra.events import reviewed as announce_review
 from app.services.trinetra.schemas import (
     AccessOut,
@@ -811,6 +814,262 @@ def statement_exceptions(
             "note": "A reversal or correction stays an exception until a person pairs it with the row it reverses."}
 
 
+class InquiryIn(Strict):
+    document_kind: Literal["CERTIFICATE", "DEDUCTOR_ADVICE", "CORRECTION_RESPONSE"] = "CERTIFICATE"
+    subject: str | None = Field(default=None, min_length=5, max_length=200)
+    body: str | None = Field(default=None, min_length=10, max_length=2000)
+
+
+class InquiryEditIn(Strict):
+    subject: str | None = Field(default=None, min_length=5, max_length=200)
+    body: str | None = Field(default=None, min_length=10, max_length=2000)
+
+
+class InquirySendIn(Strict):
+    override_reason: str | None = Field(default=None, min_length=10, max_length=500)
+
+
+def _inquiry(db, w, inquiry_id):
+    from app.models.trinetra import TrinetraInquiry
+
+    row = db.execute(
+        _select(TrinetraInquiry).filter_by(id=inquiry_id, workspace_id=w.id).with_for_update()
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "Inquiry not found.")
+    return row
+
+
+@router.get(P + "/inquiries/allowance")
+def inquiry_allowance(
+    workspace_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    w = workspace(db, context, workspace_id)
+    return {"used": iq.sent_this_month(db, w.organization_id), "limit": iq.allowance(db, w),
+            "note": "Sent inquiries this calendar month, against your plan's monthly allowance."}
+
+
+@router.get(P + "/credits/{credit_id}/inquiries")
+def case_inquiries(
+    workspace_id: uuid.UUID,
+    credit_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    from app.models.trinetra import TrinetraInquiry
+
+    w = workspace(db, context, workspace_id)
+    rows = db.query(TrinetraInquiry).filter_by(credit_id=credit_id, workspace_id=w.id).order_by(TrinetraInquiry.created_at.desc()).limit(50)
+    return {"items": [iq.view(r) for r in rows]}
+
+
+@router.post(P + "/credits/{credit_id}/inquiries")
+def draft_inquiry(
+    workspace_id: uuid.UUID,
+    credit_id: uuid.UUID,
+    body: InquiryIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    case, _ = locked_case(db, w, credit_id)
+    row = iq.create_draft(db, w, case, context.user_id, document_kind=body.document_kind, subject=body.subject, body=body.body)
+    db.commit()
+    return iq.view(row)
+
+
+@router.patch(P + "/inquiries/{inquiry_id}")
+def edit_inquiry(
+    workspace_id: uuid.UUID,
+    inquiry_id: uuid.UUID,
+    body: InquiryEditIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    row = iq.edit_draft(db, _inquiry(db, w, inquiry_id), context.user_id, subject=body.subject, body=body.body)
+    db.commit()
+    return iq.view(row)
+
+
+@router.post(P + "/inquiries/{inquiry_id}/approve")
+def approve_inquiry(
+    workspace_id: uuid.UUID,
+    inquiry_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    row = iq.approve(db, w, _inquiry(db, w, inquiry_id), context.user_id)
+    db.commit()
+    return iq.view(row)
+
+
+@router.post(P + "/inquiries/{inquiry_id}/send")
+def send_inquiry(
+    workspace_id: uuid.UUID,
+    inquiry_id: uuid.UUID,
+    body: InquirySendIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    """Press Send: a person, on an approved draft, to the confirmed contact. Never automatic."""
+    w = workspace(db, context, workspace_id)
+    row = _inquiry(db, w, inquiry_id)
+    case, _ = locked_case(db, w, row.credit_id)
+    sent = iq.send(db, w, case, row, context.user_id, override_reason=body.override_reason)
+    db.commit()
+    return iq.view(sent)
+
+
+@router.post(P + "/inquiries/{inquiry_id}/withdraw")
+def withdraw_inquiry(
+    workspace_id: uuid.UUID,
+    inquiry_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    row = iq.withdraw(db, _inquiry(db, w, inquiry_id), context.user_id)
+    db.commit()
+    return iq.view(row)
+
+
+class PolicyIn(Strict):
+    threshold: Money
+    actions: list[Literal["CA_REVIEWED", "EXPLAINED", "UNRESOLVED"]] = Field(min_length=1, max_length=3)
+    approver_role: Literal["ADMIN", "OWNER"]
+
+
+class ApprovalDecisionIn(Strict):
+    reason: str = Field(min_length=10, max_length=1000)
+
+
+@router.get(P + "/policy")
+def closure_policy(
+    workspace_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    w = workspace(db, context, workspace_id)
+    return {"policy": ap.view_policy(ap.policy_for(db, w.organization_id)),
+            "available": capability_gate.has_capability(db, organization_id=w.organization_id,
+                                                       capability_key="capability.trinetra_all_workspaces")}
+
+
+@router.put("/organizations/{organization_id}/trinetra/policy")
+def set_closure_policy(
+    organization_id: uuid.UUID,
+    body: PolicyIn,
+    db: Session = Depends(get_db),
+    context: OrganizationContext = Depends(RequireOrgRole([OrganizationRole.OWNER, OrganizationRole.ADMIN])),
+):
+    """Enterprise: which closures need a second person's approval, above what amount, by which role."""
+    mode.require_mode(db, organization_id)
+    row = ap.save_policy(db, organization_id, context.user_id, threshold_micros=d.money(body.threshold),
+                         actions=list(body.actions), approver_role=body.approver_role)
+    db.commit()
+    return ap.view_policy(row)
+
+
+@router.get(P + "/approvals")
+def approvals_list(
+    workspace_id: uuid.UUID,
+    status: Literal["PENDING", "APPROVED", "REJECTED", "STALE"] | None = None,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    from app.models.trinetra import TrinetraApproval
+
+    w = workspace(db, context, workspace_id)
+    q = db.query(TrinetraApproval).filter_by(workspace_id=w.id)
+    if status:
+        q = q.filter_by(status=status)
+    return {"items": [ap.view(r) for r in q.order_by(TrinetraApproval.created_at.desc()).limit(100)]}
+
+
+def _approval(db, w, approval_id):
+    from app.models.trinetra import TrinetraApproval
+
+    row = db.execute(
+        _select(TrinetraApproval).filter_by(id=approval_id, workspace_id=w.id).with_for_update()
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "Approval not found.")
+    return row
+
+
+@router.post(P + "/approvals/{approval_id}/approve", response_model=CaseOut)
+def approve_closure(
+    workspace_id: uuid.UUID,
+    approval_id: uuid.UUID,
+    body: ApprovalDecisionIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    from datetime import datetime, timezone
+
+    w = workspace(db, context, workspace_id)
+    approval = _approval(db, w, approval_id)
+    ap.check_can_decide(db, w, approval, context.user_id)
+    case, p = locked_case(db, w, approval.credit_id)
+    if case.revision != approval.case_revision:
+        ap.mark_stale(approval)
+        db.commit()
+        raise HTTPException(409, "The case changed after this approval was asked for, so it no longer applies. Ask again.")
+    s.decide(db, w, case, p, context.user_id, case.revision, approval.action,
+             f"Approved by the {approval.approver_role.lower()}: {body.reason}", [], 0, None, approval=approval)
+    approval.status, approval.decided_by = "APPROVED", context.user_id
+    approval.decided_reason, approval.decided_at = body.reason, datetime.now(timezone.utc)
+    announce_review(db, w, case)
+    db.commit()
+    return s.view(db, w, case)
+
+
+@router.post(P + "/approvals/{approval_id}/reject")
+def reject_closure(
+    workspace_id: uuid.UUID,
+    approval_id: uuid.UUID,
+    body: ApprovalDecisionIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    from datetime import datetime, timezone
+
+    w = workspace(db, context, workspace_id)
+    approval = _approval(db, w, approval_id)
+    ap.check_can_decide(db, w, approval, context.user_id)
+    approval.status, approval.decided_by = "REJECTED", context.user_id
+    approval.decided_reason, approval.decided_at = body.reason, datetime.now(timezone.utc)
+    db.commit()
+    return ap.view(approval)
+
+
+@router.get(P + "/outcomes")
+def closure_ledger(
+    workspace_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    """The closure ledger by month: TDS now visible in your statement. Never cash recovered."""
+    from sqlalchemy import func as f
+
+    from app.models.trinetra import TrinetraOutcome
+    from app.services.trinetra import outcomes
+
+    w = workspace(db, context, workspace_id)
+    month = f.date_trunc("month", TrinetraOutcome.confirmed_at)
+    rows = (
+        db.query(month, f.sum(TrinetraOutcome.amount_micros), f.count(TrinetraOutcome.id))
+        .filter(TrinetraOutcome.workspace_id == w.id, TrinetraOutcome.was_gap.is_(True))
+        .group_by(month).order_by(month.desc()).limit(36).all()
+    )
+    return {"months": [{"month": m.date().isoformat()[:7], "amount_micros": str(int(total)), "cases": int(n)} for m, total, n in rows],
+            **{k: (str(v) if k.endswith("_micros") else v) for k, v in outcomes.ledger(db, w).items()}}
+
+
 @router.post(P + "/official-statements")
 def unsupported_statement(
     workspace_id: uuid.UUID,
@@ -894,19 +1153,33 @@ def decision(
         raise HTTPException(404, "Case not found.")
     p = s.profile(db, w, r.profile_id)
     db.refresh(r)
-    s.decide(
-        db,
-        w,
-        r,
-        p,
-        context.user_id,
-        body.revision,
-        body.action,
-        body.reason,
-        body.allocations,
-        body.review_minutes,
-        {"snapshot_id": body.snapshot_id, "line_id": body.line_id, "note": body.note},
-    )
+    try:
+        s.decide(
+            db,
+            w,
+            r,
+            p,
+            context.user_id,
+            body.revision,
+            body.action,
+            body.reason,
+            body.allocations,
+            body.review_minutes,
+            {"snapshot_id": body.snapshot_id, "line_id": body.line_id, "note": body.note},
+        )
+    except ap.ApprovalNeeded as needed:
+        # Enterprise: this closure needs a second person's approval. It is recorded, and nothing is closed yet.
+        asked = ap.request(db, w, r, context.user_id, body.action, body.reason, needed.policy)
+        db.commit()
+        return JSONResponse(
+            status_code=202,
+            content={
+                "approval_required": True,
+                "approval": ap.view(asked),
+                "message": f"This closure needs the approval of an organization {asked.approver_role.lower()} other than you. "
+                "The request is recorded; nothing is closed until it is approved.",
+            },
+        )
     announce_review(db, w, r)
     db.commit()
     return s.view(db, w, r)

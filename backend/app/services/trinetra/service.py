@@ -23,9 +23,10 @@ from app.models.trinetra import (
     TrinetraDecision as Decision,
     TrinetraOrgKey as OrgKey,
     TrinetraPairing as Pairing,
+    TrinetraOutcome as Outcome,
 )
 from app.services.trinetra import domain as d
-from app.services.trinetra import versions
+from app.services.trinetra import approvals, versions
 
 
 def evidence_ids(review):
@@ -359,6 +360,13 @@ def allocations(db, p, year):
         .all()
     )
     return [d.Allocation(**a) for dec in decisions for a in dec.allocations]
+
+
+def carry(db, row):
+    """The case's current allocations, to be written onto a new revision that is not an allocation decision (an inquiry sent,
+    a reply received): only the current decision's allocations count, so they must be carried forward."""
+    p = db.get(Profile, row.profile_id)
+    return [asdict(a) for a in allocations(db, p, row.year) if a.credit == str(row.id)]
 
 
 def decision_sources(db, row, p):
@@ -774,6 +782,7 @@ def decide(
     requested,
     review_minutes=0,
     extra=None,
+    approval=None,
 ):
     # Closing out, withdrawing and annotating never wait for a changed invoice to be reconfirmed.
     if action not in ("WITHDRAWN", "UNRESOLVED", "ANNOTATE") and (
@@ -785,6 +794,10 @@ def decide(
         )
     if revision != row.revision:
         raise HTTPException(409, "This case changed. Reload before deciding.")
+    if approval is None and action in approvals.CLOSING:
+        policy = approvals.required(db, workspace, row, action)
+        if policy is not None:
+            raise approvals.ApprovalNeeded(policy)       # Enterprise: a second person approves this closure
     snapshot = current(db, p, row.year)
     existing = allocations(db, p, row.year)
     retained = [a for a in existing if a.credit != str(row.id)]
@@ -883,6 +896,8 @@ def decide(
                     409,
                     "Enterprise accountant review requires a different reviewer from the allocator and most recent decision author.",
                 )
+    if action == "CA_REVIEWED":
+        record_outcome(db, workspace, row, p, user_id, snapshot, result)
     row.revision += 1
     if action not in ("REJECT_MATCH", "ANNOTATE"):      # these keep the case where it is
         row.state = "OPEN" if action in ("ALLOCATE", "REOPEN") else action
@@ -898,6 +913,30 @@ def decide(
             allocations=chosen,
             review_minutes=review_minutes,
             evidence_work_item_ids=decision_sources(db, row, p),
+        )
+    )
+    db.flush()
+
+
+def record_outcome(db, workspace, row, p, user_id, snapshot, result):
+    """The closure ledger: one row each time a closure is confirmed, deduplicated by (case, the snapshot that confirmed it), so
+    monthly and yearly figures add up without counting anything twice and survive later imports. Only a case that HAD a gap in
+    an earlier import counts as "now visible in your statement"; it is never cash recovered."""
+    if snapshot is None:
+        return None
+    if db.query(Outcome.id).filter_by(credit_id=row.id, snapshot_id=snapshot.id).first():
+        return None
+    before = ((snapshot.comparison or {}).get("cases") or {}).get(str(row.id))
+    db.add(
+        Outcome(
+            organization_id=workspace.organization_id,
+            workspace_id=workspace.id,
+            credit_id=row.id,
+            snapshot_id=snapshot.id,
+            year=row.year,
+            amount_micros=int(result["posted_micros"]),
+            was_gap=bool(before and int(before.get("gap_micros") or 0) > 0),
+            confirmed_by=user_id,
         )
     )
     db.flush()

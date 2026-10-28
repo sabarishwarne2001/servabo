@@ -82,4 +82,74 @@ def measure(db, workspace, items, credits, snapshots):
         "confirmed_cases": count,
         "review_minutes": int(minutes),
         "note": NOTE,
+        **ledger(db, workspace),
+        **cycle(db, workspace),
+    }
+
+
+LEDGER_NOTE = (
+    "TDS now visible in your statement: the tax of cases that had a gap in an earlier import and that an accountant has "
+    "since confirmed as posted. It is evidence that a credit appears in your statement. It is NOT cash recovered, a refund "
+    "or money saved."
+)
+CYCLE_NOTE = (
+    "Measured from the case history: the days from a case being opened to its being closed. The recorded review minutes "
+    "above are what reviewers typed in, a different thing."
+)
+
+
+def ledger(db, workspace):
+    """The cumulative closure ledger for this workspace (rows persist across imports; deduplicated by case and snapshot)."""
+    from datetime import datetime, timezone
+
+    from app.models.trinetra import TrinetraOutcome
+
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    year_start = month_start.replace(month=1)
+    O = TrinetraOutcome
+    month, year, total, count = (
+        db.query(
+            func.coalesce(func.sum(O.amount_micros).filter(O.confirmed_at >= month_start), 0),
+            func.coalesce(func.sum(O.amount_micros).filter(O.confirmed_at >= year_start), 0),
+            func.coalesce(func.sum(O.amount_micros), 0),
+            func.count(O.id),
+        )
+        .filter(O.workspace_id == workspace.id, O.was_gap.is_(True))
+        .one()
+    )
+    return {
+        "now_visible_this_month_micros": int(month or 0),
+        "now_visible_this_year_micros": int(year or 0),
+        "now_visible_total_micros": int(total or 0),
+        "now_visible_cases": int(count or 0),
+        "ledger_note": LEDGER_NOTE,
+    }
+
+
+def cycle(db, workspace):
+    """Days from a case being opened to its being closed, from the history (median and mean)."""
+    from statistics import mean, median
+
+    from app.models.trinetra import TrinetraCredit
+
+    closing = ("CA_REVIEWED", "EXPLAINED", "WITHDRAWN", "UNRESOLVED")
+    rows = (
+        db.query(
+            TrinetraCredit.id,
+            func.min(TrinetraDecision.created_at),
+            func.max(TrinetraDecision.created_at).filter(TrinetraDecision.action.in_(closing)),
+        )
+        .join(TrinetraDecision, TrinetraDecision.credit_id == TrinetraCredit.id)
+        .filter(TrinetraCredit.workspace_id == workspace.id, TrinetraCredit.state.in_(closing))
+        .group_by(TrinetraCredit.id)
+        .limit(5001)
+        .all()
+    )
+    spans = [max(0.0, (closed - opened).total_seconds() / 86400) for _, opened, closed in rows if opened and closed]
+    return {
+        "measured_cycle_cases": len(spans),
+        "measured_cycle_days_median": round(median(spans), 1) if spans else None,
+        "measured_cycle_days_mean": round(mean(spans), 1) if spans else None,
+        "cycle_note": CYCLE_NOTE,
     }

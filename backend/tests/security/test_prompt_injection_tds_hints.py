@@ -69,4 +69,9 @@ def test_trinetra_rows_are_written_only_by_a_person_through_its_api() -> None:
         if "preview" in path or "official-statements" in path:
             continue  # a dry run, and the route that refuses every upload
         signature = block.split("):", 1)[0]
-        assert "Depends(Write)" in signature, f"a TRINETRA write route without a person: {path}"
+        # A workspace write needs a workspace admin; an organization-level write (Final 2T, the closure
+        # policy) needs the organization's owner or admin. Either way a named person, never a job.
+        person = "Depends(Write)" in signature or (
+            "organizations/{organization_id}" in path
+            and "RequireOrgRole([OrganizationRole.OWNER, OrganizationRole.ADMIN])" in signature)
+        assert person, f"a TRINETRA write route without a person: {path}"

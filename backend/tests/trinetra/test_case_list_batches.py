@@ -46,3 +46,24 @@ def test_the_number_of_queries_does_not_grow_with_the_page(client, tenant, world
     assert n_small == 1 and n_large == 41
     assert large <= small + 2, f"{small} queries for 1 case, {large} for 41: the list is not batched"
     assert large <= 40, f"{large} queries for 41 cases"
+
+
+def test_the_summary_query_count_is_the_same_for_one_case_and_for_a_hundred(client, tenant, world, db_session):
+    url, body, _ = setup_case(client, tenant, world)
+    profile = db_session.get(TrinetraProfile, uuid.UUID(body["profile_id"]))
+
+    def count():
+        db_session.refresh(tenant.workspace)      # a commit expires it; reloading it is not a per-case query
+        n = []
+        connection = db_session.connection()
+        listener = lambda *a: n.append(1)  # noqa: E731
+        event.listen(connection, "before_cursor_execute", listener)
+        try:
+            service.summary(db_session, tenant.workspace)
+        finally:
+            event.remove(connection, "before_cursor_execute", listener)
+        return len(n)
+
+    one = count()
+    add_cases(db_session, tenant, profile, 99, "SUMQ")
+    assert count() == one

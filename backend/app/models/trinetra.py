@@ -356,3 +356,115 @@ class TrinetraPairing(Scoped, Base):
         CheckConstraint("positive_line >= 0 AND negative_line >= 0 AND positive_line <> negative_line", name="ck_trinetra_pairing_lines"),
         Index("uq_trinetra_pairing_negative", "statement_id", "negative_line", unique=True, postgresql_where=text("active")),
     )
+
+
+class TrinetraInquiry(Scoped, Base):
+    """A customer inquiry about a case (Final 2T, Phase 6): drafted, approved by a person, SENT by a person who pressed Send,
+    to the customer's confirmed contact, with a secure document-request link. Never automatic. The recipient's address is not
+    stored here (it is read from the confirmed Helm contact at send time); only a masked form is kept."""
+
+    __tablename__ = "trinetra_inquiries"
+    credit_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    document_kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    subject: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="DRAFT")
+    recipient_label: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    recipient_masked: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    approved_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sent_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    delivery_state: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    delivery_detail: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    request_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    reply_work_item_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    replied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    __table_args__ = (
+        *scope_constraints("trinetra_inquiries"),
+        ForeignKeyConstraint(
+            ["credit_id", "workspace_id"],
+            ["trinetra_credits.id", "trinetra_credits.workspace_id"],
+            ondelete="CASCADE",
+        ),
+        CheckConstraint("status IN ('DRAFT','APPROVED','SENT','FAILED','REPLIED','WITHDRAWN')", name="ck_trinetra_inquiry_status"),
+        CheckConstraint("document_kind IN ('CERTIFICATE','DEDUCTOR_ADVICE','CORRECTION_RESPONSE')", name="ck_trinetra_inquiry_kind"),
+        Index("ix_trinetra_inquiries_month", "organization_id", "sent_at"),
+    )
+
+
+class TrinetraPolicy(Base):
+    """An Enterprise organization's approval chain for closing cases (Final 2T, Phase 6): closing a case worth at least the
+    threshold, in one of the listed ways, needs the approval of the named role, by a different person."""
+
+    __tablename__ = "trinetra_policies"
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True
+    )
+    threshold_micros: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    actions: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    approver_role: Mapped[str] = mapped_column(String(10), nullable=False)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    __table_args__ = (
+        CheckConstraint("threshold_micros >= 0", name="ck_trinetra_policy_threshold"),
+        CheckConstraint("approver_role IN ('ADMIN','OWNER')", name="ck_trinetra_policy_role"),
+    )
+
+
+class TrinetraApproval(Scoped, Base):
+    """A closure waiting for (or decided by) the approval a policy asks for. Valid only for the revision it was asked on."""
+
+    __tablename__ = "trinetra_approvals"
+    credit_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    action: Mapped[str] = mapped_column(String(20), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    amount_micros: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    case_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    approver_role: Mapped[str] = mapped_column(String(10), nullable=False)
+    requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    status: Mapped[str] = mapped_column(String(10), nullable=False, default="PENDING")
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    decided_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    __table_args__ = (
+        *scope_constraints("trinetra_approvals"),
+        ForeignKeyConstraint(
+            ["credit_id", "workspace_id"],
+            ["trinetra_credits.id", "trinetra_credits.workspace_id"],
+            ondelete="CASCADE",
+        ),
+        CheckConstraint("status IN ('PENDING','APPROVED','REJECTED','STALE')", name="ck_trinetra_approval_status"),
+        CheckConstraint("action IN ('CA_REVIEWED','EXPLAINED','UNRESOLVED')", name="ck_trinetra_approval_action"),
+        Index("uq_trinetra_approval_pending", "credit_id", unique=True, postgresql_where=text("status = 'PENDING'")),
+    )
+
+
+class TrinetraOutcome(Scoped, Base):
+    """The closure ledger (Final 2T, Phase 6): one row each time a closure is confirmed, deduplicated by (case, the snapshot
+    that confirmed it), so monthly and yearly figures add up without counting anything twice and survive later imports.
+    "TDS now visible in your statement" is NEVER cash recovered."""
+
+    __tablename__ = "trinetra_outcomes"
+    credit_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    snapshot_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    amount_micros: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    #: The case had a gap in an earlier import: only these count as "now visible" (a first-import posting never had a gap).
+    was_gap: Mapped[bool] = mapped_column(nullable=False, default=False)
+    confirmed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    confirmed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    __table_args__ = (
+        *scope_constraints("trinetra_outcomes"),
+        ForeignKeyConstraint(
+            ["credit_id", "workspace_id"],
+            ["trinetra_credits.id", "trinetra_credits.workspace_id"],
+            ondelete="CASCADE",
+        ),
+        UniqueConstraint("credit_id", "snapshot_id", name="uq_trinetra_outcome"),
+        CheckConstraint("amount_micros >= 0", name="ck_trinetra_outcome_amount"),
+        Index("ix_trinetra_outcomes_confirmed", "organization_id", "confirmed_at"),
+    )
