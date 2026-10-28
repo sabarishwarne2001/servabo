@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.core import encryption
 from app.models.organization import Organization
+from app.models.workspace import Workspace
 from app.models.work_item import WorkItem
 from app.models.document_role import DocumentRole
 from app.models.trinetra import (
@@ -19,6 +20,7 @@ from app.models.trinetra import (
     TrinetraStatement as Statement,
     TrinetraCredit as CreditRow,
     TrinetraDecision as Decision,
+    TrinetraOrgKey as OrgKey,
 )
 from app.services.trinetra import domain as d
 from app.services.trinetra import versions
@@ -135,14 +137,59 @@ def profile(db, workspace, id):
     return row
 
 
+def org_salt(db, organization_id) -> str:
+    """The organization's random PAN-fingerprint salt, created on first use (call under `lock_capacity`)."""
+    row = db.get(OrgKey, organization_id)
+    if row is None:
+        row = OrgKey(
+            organization_id=organization_id,
+            salt_ciphertext=encryption.encrypt_secret(secrets.token_hex(32)),
+        )
+        db.add(row)
+        db.flush()
+    return encryption.decrypt_secret(row.salt_ciphertext)
+
+
+def org_fingerprint(salt: str, pan: str) -> str:
+    return hmac.new(salt.encode(), b"trinetra-org-pan:" + pan.encode("ascii"), hashlib.sha256).hexdigest()
+
+
 def create_profile(db, workspace, name, pan):
     lock_capacity(db, workspace)
     identity(pan, "PAN", "validation-only")
-    for old in db.query(Profile).filter_by(workspace_id=workspace.id).all():
-        if hmac.compare_digest(encryption.decrypt_secret(old.pan_ciphertext), pan):
-            return old
-    salt = secrets.token_hex(32)
-    key = identity(pan, "PAN", salt)
+    salt = org_salt(db, workspace.organization_id)
+    fingerprint = org_fingerprint(salt, pan)
+    # A profile made before the organization fingerprint existed: fill it in now (under the organization lock).
+    for legacy in db.query(Profile).filter_by(
+        organization_id=workspace.organization_id, org_pan_fingerprint=None
+    ):
+        key = org_fingerprint(salt, encryption.decrypt_secret(legacy.pan_ciphertext))
+        if not db.query(Profile.id).filter_by(
+            organization_id=workspace.organization_id, org_pan_fingerprint=key
+        ).first():
+            legacy.org_pan_fingerprint = key
+    db.flush()
+    held = (
+        db.query(Profile)
+        .filter_by(organization_id=workspace.organization_id, org_pan_fingerprint=fingerprint)
+        .first()
+    )
+    if held is not None:
+        if held.workspace_id == workspace.id:
+            return held
+        where = db.get(Workspace, held.workspace_id)
+        raise HTTPException(
+            409,
+            {
+                "code": "TRINETRA_ENTITY_HAS_PROFILE",
+                "message": "This legal entity already has a TRINETRA profile in the workspace "
+                f"\"{where.workspace_name if where else 'another workspace'}\". An organization keeps one profile "
+                "per legal entity, so the same tax credit is never counted twice. Use that workspace, or ask an "
+                "administrator to remove its profile first.",
+            },
+        )
+    salt_profile = secrets.token_hex(32)
+    key = identity(pan, "PAN", salt_profile)
     if db.query(Profile).filter_by(
         organization_id=workspace.organization_id
     ).count() >= capacity(db, workspace, "profiles"):
@@ -153,10 +200,11 @@ def create_profile(db, workspace, name, pan):
         organization_id=workspace.organization_id,
         workspace_id=workspace.id,
         name=name,
-        identity_salt_ciphertext=encryption.encrypt_secret(salt),
+        identity_salt_ciphertext=encryption.encrypt_secret(salt_profile),
         pan_ciphertext=encryption.encrypt_secret(pan),
         pan_fingerprint=key,
         pan_masked="******" + pan[-4:],
+        org_pan_fingerprint=fingerprint,
     )
     db.add(row)
     db.flush()

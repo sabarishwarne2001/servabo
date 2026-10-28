@@ -502,6 +502,7 @@ REGISTRY: dict[str, TableRule] = {
 # TRINETRA is evidence content, not a statutory ledger. No GST retention exemption is inferred.
 REGISTRY.update({
     "trinetra_profiles": _config(export="trinetra_profiles", note="Encrypted PAN; ciphertext excluded from export."),
+    "trinetra_org_keys": _secret("The organization's random salt for its one-profile-per-entity fingerprint."),
     "trinetra_statements": _r(Kind.CONTENT, Erasure.DELETE, Sweep.DELETE, OrgPurge.DELETE,
         export="trinetra_statements", links=(col("source_work_item_id"), json_array("evidence_work_item_ids"))),
     "trinetra_credits": _r(Kind.CONTENT, Erasure.DELETE, Sweep.DELETE, OrgPurge.DELETE,

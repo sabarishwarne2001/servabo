@@ -75,6 +75,33 @@ class TrinetraProfile(Scoped, Base):
     identity_salt_ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
     pan_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     pan_masked: Mapped[str] = mapped_column(String(10), nullable=False)
+    #: Final 2T (Phase 1.4): the PAN keyed with the ORGANIZATION's salt, so one legal entity has one profile per
+    #: organization without ever decrypting another workspace's PAN. NULL only for a profile made before it existed
+    #: (filled in when the organization next creates a profile).
+    org_pan_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    __table_args__ = (
+        *scope_constraints("trinetra_profiles"),
+        Index(
+            "uq_trinetra_org_pan",
+            "organization_id",
+            "org_pan_fingerprint",
+            unique=True,
+            postgresql_where=text("org_pan_fingerprint IS NOT NULL"),
+        ),
+    )
+
+
+class TrinetraOrgKey(Base):
+    """One random, encrypted salt per organization: the key of `org_pan_fingerprint` (never derived from a JWT secret)."""
+
+    __tablename__ = "trinetra_org_keys"
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True
+    )
+    salt_ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class TrinetraStatement(Scoped, Base):
