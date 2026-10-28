@@ -6,11 +6,9 @@ the ranked list after it is for after the first paying customers._
 Billing is Dodo Payments (it was Stripe once; where an old note says Stripe, it means Dodo). Build cost is in focused engineering days for one person who
 knows the code: an estimate, not a promise. Running cost is what the idea adds to the monthly bill (`docs/hardening/COSTS.md` has the baseline).
 
-**TRINETRA update (2026-10-26):** the current request adds a gated business-TDS
-review workflow, without changing the separate Final 2A pricing plan. Its implemented
-surfaces, test evidence and remaining official-format, adviser, pilot and product
-acceptance work are tracked in [trinetra/DELIVERY.md](trinetra/DELIVERY.md) and
-[trinetra/LAUNCH-GATES.md](trinetra/LAUNCH-GATES.md). It is not approved for live tax processing.
+**TRINETRA update (2026-10-28):** Final session 2T finished TRINETRA for Business and Enterprise (see
+[trinetra/PRODUCT.md](trinetra/PRODUCT.md) and [trinetra/COMPLETION.md](trinetra/COMPLETION.md)); it ships in pilot mode, and its
+official statement readers stay unverified until Final session 2B. Its next steps are in the section "TRINETRA, next" below.
 
 ## 1. What happened to the first list
 
@@ -51,8 +49,7 @@ workflows, resizable sidebars, the new logo, and a sweep of every organization c
 ### 2.0 Recoveries, next kinds (N-191 built the first five)
 
 Built: GST credit waiting, duplicates, prices above the order, supplier statement differences, payment deadlines. Next, in
-the order the pilots' numbers suggest: TRINETRA's "TDS not yet in the statement" (Final session 2T adds it through one
-adapter), then quantity differences against the goods receipt, then an assignee's email when an issue is given to them.
+the order the pilots' numbers suggest: TRINETRA's "TDS not yet in the statement" (**built** in Final session 2T, as the kind `TDS credit`), then quantity differences against the goods receipt, then an assignee's email when an issue is given to them.
 About a day each. No running cost.
 
 
@@ -145,3 +142,22 @@ customer can be singled out, the owner's legal review). **Run:** a small nightly
 **Recommendation (2026-10-22, after launch):** do **2.3 first** (about a day, only the catalogue and two Dodo products, and it answers the objection Indian buyers raise most), then
 **2.1** (the only item that sells to many organizations through one relationship). Keep **2.2** until customers ask for it, because it is the biggest dependency on someone else's
 platform, and leave 2.4 to 2.7 until usage tells you which of them hurts.
+
+## TRINETRA, next (Final session 2T; none started)
+
+Ordered by what a pilot customer is most likely to ask for. Each is about one to three days for one person who knows the code; no running
+cost unless said.
+
+1. **Real statements first (Final 2B, the owner's own files):** if a reader differs, fix it before anything else here.
+2. **A page in Platform admin for pilot enrolment** (today: `scripts/trinetra_pilot.py` or the API). Half a day.
+3. **Link a file-sourced statement to a document in Documents** (a file-sourced snapshot has none; N-203), and a remove route for a
+   wrongly imported snapshot. One day.
+4. **A second TAN directory source: a customer's TAN read from the advice they upload**, suggested, never automatic. Two days.
+5. **A Tally voucher read** (an accounting export instead of the expected-TDS template). Two to three days; needs a real export.
+6. **A reply parser for the customer's answer** that suggests which evidence kind it is (still attached by a person). One day; one
+   small model call per reply, metered.
+7. **Quarter-wise views** (Q1 to Q4 of the tax year) in the cockpit and the dossier. One day.
+8. **Compare the new statement with the previous one inside the database** instead of in memory, if a customer's import approaches
+   the 5 s budget (`PERFORMANCE.md`). One day.
+
+Never on this list: filing, portal access, rate or section advice, TCS and payroll TDS (a separate product with different rules).

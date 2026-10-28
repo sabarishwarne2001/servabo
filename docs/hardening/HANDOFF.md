@@ -757,6 +757,19 @@ again (step 8). Buy one seat of Starter in rupees with your own UPI or card, the
 - Merge the last pull request; deploy (RUNBOOK §9.3); sign up as a new customer yourself and go
   through the first-run checklist end to end.
 
+**Step 13 — Open TRINETRA (TDS credit) to customers (Final session 2T; after step 12 and Final session 2B).**
+TRINETRA ships in **pilot** mode: customers on Business and Enterprise see the examples and the line "in a pilot, not enrolled yet"
+until you enrol them, and the website says "rolling out". Do this in order: (a) Final session 2B has read **your own** Form 26AS, Form
+168 and AIS files and marked each row of `docs/trinetra/COMPLETION.md` "Verified in 2B" or "Differs"; (b) **your chartered accountant**
+reads `servabo.app/trinetra`, the in-app TDS credit pages and `docs/trinetra/USER-GUIDE.md` for about an hour and tells you what to
+reword (a session makes the change); (c) enrol your first customer on the server, from the backend folder:
+`python scripts/trinetra_pilot.py enrol --organization <their slug> --reason "First pilot customer"`; (d) when you are ready for every
+Business and Enterprise organization, set `TRINETRA_MODE=on` in `.env.production`, restart, run `python scripts/preflight.py` (it must
+say the mode is on and name any reader still unverified), set `PUBLIC_TRINETRA_STATUS=available` in the website's build settings and
+rebuild it. *Done when:* a test Business organization that you did not enrol opens the TDS credit page and sees its own screens
+(not the pilot line), `preflight.py` is READY, and `/trinetra` says "included". To go back: `TRINETRA_MODE=pilot`, restart.
+See `docs/trinetra/LAUNCH-GATES.md` (N-210).
+
 **Later, whenever it applies**
 - **After any encryption-key rotation** (`EMAIL_ENCRYPTION_KEYS`): run the re-encryption sweep and
   its `--verify` (RUNBOOK) before removing the old key; F-370 made it cover every secret.
@@ -1169,3 +1182,50 @@ person's re-plan waits for a running plan). What remains needs the real world, w
 - **The deletion warnings in a real inbox** (Gmail and Outlook).
 - **The logo in real inboxes** (N-199): seen in a browser rendering only, including a darkened card without the
   stylesheet (as Gmail's phone apps show dark mode), where the light logo's own white panel keeps it readable.
+
+## Final session 2T → Final session 2B (2026-10-28)
+
+Final session 2T (`docs/sessions/FINAL-2T-TRINETRA.md`, PR
+[sabarishwarne2001/servabo#44](https://github.com/sabarishwarne2001/servabo/pull/44)) finished TRINETRA, the TDS-credit check, for
+Business and Enterprise, in code and tests. Findings F-641 to F-651 and decisions N-201 to N-210 are in FINDINGS.md and
+NEEDS-OWNER.md; every requirement of your brief, with its final status, is `docs/trinetra/COMPLETION.md`; the product is
+`docs/trinetra/PRODUCT.md` and the person's guide is `docs/trinetra/USER-GUIDE.md`. Migrations `tr2t1` to `tr2t10` (one head,
+`tr2t10_recoveries_tds_kind`). **Everything was proven against synthetic data and stand-ins. Nothing of it has met a real statement.**
+
+### 1. What Final session 2B must try for real (FINAL-2-LIVE.md, Phase 18)
+
+| Feature | Settings | Turn it on locally | What proved it here | A real success looks like |
+| --- | --- | --- | --- | --- |
+| **The AIS CSV reader** | none | Statements → import your own AIS TDS/TCS CSV | `test_statement_files.py` on a synthetic file of the same shape | A preview whose row count, total and masked TANs agree with the portal's AIS page; any column question answered in the mapping preview |
+| **The Form 26AS and Form 168 text readers (unverified)** | none | Statements → import your own text download | Synthetic fixtures written from secondary descriptions (the official TRACES and e-filing hosts could not be reached) | The same agreement; then `verified_on` is set in `readers.py` and the "(unverified)" label goes. A refusal on a genuine file is a finding: say what differs |
+| **Zoho Books read** | the existing Zoho connection | Suggestions → "Read Zoho Books" | A mocked Zoho (`test_zoho_tds.py`) | The suggestions match what Zoho shows; nothing is written to Zoho |
+| **An inquiry in a real inbox** | the mail settings; a confirmed contact in Helm | A case → Ask the customer for the document → approve → Send | Mail-catcher tests (`test_resolution.py`), spec 143 | The email arrives only after Send, accuses no one, and its link opens the upload page; a reply attaches to that case only |
+| **A real case end to end** | `TRINETRA_MODE=pilot`, your organization enrolled | `python scripts/trinetra_pilot.py enrol …` | Specs 136 and 141 to 144 on invented data | Your accountant agrees with every figure; a missing line shows as a "possible gap", never as a refund |
+| **Notices and the Monday line** | none | Run `trinetra.sweep` after 09:00 on a Monday in your zone | `test_notices.py` | One in-app notice per case revision, one email line, nothing twice |
+
+### 2. Commands
+
+| Command | What it is for | Throwaway organization only? |
+| --- | --- | --- |
+| `python scripts/trinetra_pilot.py list \| enrol --organization SLUG --reason TEXT \| withdraw …` | Enrol an organization in the pilot (audited) | No |
+| `python scripts/preflight.py` | Shows the mode, how many are enrolled and which readers are unverified | No |
+| `python scripts/e2e_stand_in.py run-job --job trinetra.sweep` | Run the hourly sweep now (the 30-day notice, the Monday line) | **Yes**: it emails the owners and admins of every organization with something to say |
+
+### 3. What was not reached
+
+1. **Real statements** (the readers), **Zoho**, **a real inbox**: Final session 2B.
+2. **The accountant's read** of the wording: the owner's step 13(b).
+3. **Possible follow-ups, none started** (`docs/PRODUCT-NEXT.md`, "TRINETRA, next"): a page in Platform admin for enrolment, a document link
+   or a remove route for a file-sourced statement (N-203), TAN suggestions from the customer's advice, a Tally voucher read, quarter-wise
+   views.
+
+### 4. What is unverified, in plain words
+
+- **All three official statement readers**: written from secondary descriptions; they refuse what they do not recognise rather than
+  guess, and the screens label them unverified, but no real file has been read.
+- **Zoho Books and real inboxes** as above.
+- **The wording** has not been read by a tax professional; every figure is labelled an investigation item, never a refund or a claim.
+- **The performance figures** are from this build machine (2.6 s for 5,000 cases, 4.0 s to import 5,000 rows); a real customer's data may be
+  slower.
+- **A known limit:** one pre-existing test (`test_error_tracking_live`) fails only when run in the same process directly after
+  `tests/infra/test_error_tracking.py`, with or without these changes; it passes alone.

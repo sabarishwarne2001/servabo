@@ -21,18 +21,36 @@ restriction, not a statement that invoice date legally determines withholding.
 No statutory rate, taxable basis, automatic section translation, payroll, TCS or
 claim eligibility is computed. No absent row is called evasion.
 
+## Statement readers: what each was written from (Final session 2T, accessed 2026-10-28)
+
+**The official TRACES and e-filing hosts could not be reached from the build environment** this time (outside the session's
+allowed network; the three pages above were reachable on 25 October only). So no official reader was written from, or checked
+against, an official document or a real file. Each one is registered in `app/services/trinetra/readers.py` as **official and
+unverified** (`verified_on` empty) and the screens label it "(unverified)".
+
+| Reader | Written from | Status |
+|---|---|---|
+| `form26as-text-v1` (Form 26AS text download, FY/AY) | Secondary sources found by web search on 2026-10-28: a KDK Software support article on importing the Form 26AS text download, taxheal.com's text-to-Excel guide, tdsman.com's 2014 conversion guide. Checked only against **synthetic** fixtures of the same shape (`backend/tests/fixtures/trinetra/form26as_sample.txt`). | Unverified. Final 2B compares it with the owner's own download. |
+| `form168-text-v1` (Form 168 text download, Tax Year) | The same sources, plus the assumption that Form 168's text follows Form 26AS's layout. The reader refuses any difference rather than guess. | Unverified. Same. |
+| `ais-csv-v1` (AIS TDS/TCS information CSV) | Only the on-screen field names (information code, description, value, source), confirmed by web search; the AIS user guide and FAQ on incometax.gov.in could not be reached. Columns are found by **heading** and confirmed by the person in a mapping preview, so a different heading is a question, not a guess. TDS rows only (TCS rows are left out and counted). | Unverified. Same. |
+| `servabo-template-v1` | Servabo's own template; not an official format. | Not official; no verification needed. |
+| `human-transcription-v1` | Rows typed by a person from a statement they hold. | Not official. |
+
+What the readers do not do: read PDF (TRACES password-protects it; the text and CSV downloads carry the same data), convert an old
+section into a Section 393 table item or the reverse (each row keeps the label the file printed), mix a financial year with a tax
+year (the file's own label is shown back and must match the year the person chose), or compute any rate, base or eligibility.
+
 ## Formats and remaining validation
 
-`human-transcription-v1` records an authorized person's review of a canonical
-uploaded document. It is not a Form 26AS parser or a statement that Servabo fetched
-records from government. Official CSV/XLSX/TXT/PDF layouts remain unsupported:
-representative, legally usable historical/current exports have not been supplied.
-A download-help page alone cannot validate their structure. All evidence intake
-uses the existing Documents service; ambiguous official files are explicitly refused.
+`human-transcription-v1` and the Servabo template record an authorized person's review of a statement they hold; they are not a Form
+26AS parser or a statement that Servabo fetched anything from government. The official readers above are unverified:
+representative, legally usable historical and current exports have not been supplied, and a download-help page alone cannot validate
+their structure. All evidence intake uses the existing Documents service or the file limits (5 MB, 5,000 rows); an ambiguous or
+unrecognised file is refused in words.
 
-Before live release, obtain authorized representative exports for each claimed
-layout/year, add provenance-backed parser fixtures, and obtain tax-adviser approval
-of event dates, labels, synthetic examples and outcome wording. `TRINETRA_LIVE_ENABLED`
-remains false until those gates and the authorized pilot are completed.
-Never collect portal passwords, defeat CAPTCHA, scrape authenticated portals,
-invent a government API, file returns or recommend which credit to claim.
+Before live release for any customer, Final session 2B reads the owner's own Form 26AS / Form 168 text and AIS CSV on the owner's PC
+(never in the repository or in a chat), records "Verified in 2B" or "Differs" for each COMPLETION row, and the owner's chartered
+accountant approves event dates, labels, the examples and the wording of every financial conclusion. `TRINETRA_MODE` stays
+`pilot` (enrolled organizations only) until then and the website says "rolling out".
+Never collect portal passwords, defeat CAPTCHA, scrape authenticated portals, invent a government API, file returns or recommend
+which credit to claim.

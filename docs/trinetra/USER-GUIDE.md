@@ -228,4 +228,5 @@ sweep.
 ## For the person running Servabo
 
 Mode, enrolment, plan figures, the unverified readers and the official sources are in `docs/trinetra/LAUNCH-GATES.md`,
-`docs/trinetra/LEGAL-SOURCES.md` and the owner's launch checklist in `docs/trinetra/DELIVERY.md`.
+`docs/trinetra/LEGAL-SOURCES.md`; the owner's launch checklist (step 13) is in `docs/hardening/HANDOFF.md`, and the exact commands
+(`python scripts/trinetra_pilot.py enrol …`, `preflight.py`) are in `docs/RUNBOOK.md`, "TRINETRA deployment supplement".

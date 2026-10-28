@@ -1,92 +1,86 @@
 # TRINETRA: credit assurance
 
-TRINETRA compares evidence about business TDS receivables. It does not calculate a
-legal entitlement, recommend a rate, file a return, move money or promise recovery.
-Live processing defaults off. Read [LAUNCH-GATES.md](LAUNCH-GATES.md) before a pilot.
+TRINETRA compares evidence about business TDS receivables: **did the tax a customer withheld reach the business's tax statement?**
+It does not calculate a legal entitlement, recommend a rate or a section, file a return, move money or promise recovery. It is
+on **Business and Enterprise**, and ships in **pilot** mode: an organization is live only after a platform administrator enrolls
+it. Read [LAUNCH-GATES.md](LAUNCH-GATES.md) before opening it to anyone. The person-facing guide is [USER-GUIDE.md](USER-GUIDE.md).
+
+_Finished in Final session 2T (2026-10-28). The official statement readers are written but unverified until Final session 2B reads
+a real file; everything else here is tested on synthetic data._
 
 ## Reviewer workflow
 
-1. Open TRINETRA in an authorized workspace. The initial view is a transient,
-   read-only synthetic example; it creates no customer documents or tax records.
-2. With live access enabled and a current Business/Enterprise entitlement, a
-   workspace administrator creates a legal-entity profile. PAN is encrypted and
-   displayed masked. Do not enter tax-portal credentials.
-3. Upload evidence through Documents, using its existing validation, quotas,
-   extraction, review and retention controls. Select an INR invoice whose seller
-   matches the profile. Confirm the explicitly supported withholding expectation
-   and give a reason. A bank shortfall alone is insufficient.
-4. Transcribe a legally obtained statement into the reviewed rows form, check the
-   source entity and April–March period, preview the scope, then import. This is
-   **human transcription**, not a verified Form 26AS parser. Unverified official
-   file layouts are refused. References are preserved; TAN is keyed, not displayed.
-5. Inspect suggestions and source links. Allocate exact amounts to one or more
-   postings with a reason. Several invoices can share a posting, but its total
-   cannot be used twice. Suggestions never count as posted credit.
-6. Record disputed, explained, withdrawn or accountant-reviewed outcomes. Assign
-   the case to yourself, record priority, follow-up date and root cause, and attach
-   advice/accounting/certificate/correction documents from the same workspace.
-7. A later snapshot supersedes the selected view. Historical snapshots and review
-   decisions remain. New evidence requires new allocations; old ones do not carry
-   forward automatically. A changed invoice requires reconfirmation, which clears
-   current allocations and records a revision. A changed statement is unavailable
-   until a fresh transcription is confirmed.
-8. Prepare a plain-text inquiry draft, or export CSV, XLSX and an HTML evidence
-   dossier. Nothing sends an inquiry automatically. Use the existing document's
-   discussion and secure-request workflow for collaboration.
-9. Open **Compare source documents** for side-by-side canonical sources and review
-   controls. Search or page through source documents when attaching evidence. Attach
-   advice and accounting records separately, then explicitly confirm withholding for
-   the receivable projection. Helm shows that amount separately and holds gross cash
-   reminders. Changed evidence requires review; confirmation never marks an invoice paid.
+1. **See the examples.** Every plan can open TRINETRA to a transient, read-only synthetic example (nine scenarios, labelled). It
+   creates no records. A Starter organization is told that live TDS credit comes with Business and Enterprise; a Business or
+   Enterprise organization that is not yet enrolled is told it is in a pilot.
+2. **Set up the legal entity.** A workspace administrator creates a profile: name and PAN (encrypted, shown masked). One legal entity has
+   one profile per organization, even across workspaces (a clear message names the workspace that already holds it).
+3. **Say where the customer's withholding comes from.** Three ways, none automatic: a figure printed on an invoice (a suggestion
+   a person accepts), the *expected-TDS template* (for businesses whose books are in Tally: an accountant fills in invoice
+   reference, customer TAN and amount), or a read-only look at Zoho Books. A person accepts each suggestion with a reason; if the
+   seller's name on the invoice is spelled differently from the profile, the person must say they checked. A customer's TAN is
+   mapped to the customer once, in the *deductor directory*, by a person. A bank shortfall alone never creates an expectation.
+4. **Bring in the tax statement.** The Servabo template (CSV or Excel, typed from a statement the business holds), an AIS CSV (the
+   person confirms which column means what), or the text download of Form 26AS or Form 168 (unverified readers until 2B). Every file
+   is previewed first: rows read, total, the file's own tax-year label, checks against the file's own totals, each TAN masked. Nothing
+   is saved until the person confirms the entity, year and amounts. PDF is not read. An unrecognised or ambiguous file is refused
+   in words, naming the row or heading and never the content.
+5. **Review each case.** Allocate exact amounts from statement rows to the case with a reason (several invoices may share a row;
+   a row can't be used twice). Pair a reversal with the row it reverses. Record that the case is explained, disputed, withdrawn,
+   reviewed by the accountant, or **closed without resolution**. Annotate or reject a suggested match. The drawer shows *why* each
+   match was made: which keys agreed, which reader, which rule version.
+6. **Ask the customer for the document.** Prepare a draft, edit it, approve it, and press **Send**. It goes only to a contact a
+   person confirmed in Helm, once per case per week unless the person gives a reason, within the plan's monthly allowance. A reply
+   attaches to the case as evidence and changes nothing else.
+7. **Close with a second person (Enterprise).** An organization policy (amount, kinds of closure, approver role) makes a closure wait
+   for a different person in that role. An approval is tied to the case revision it was asked for and goes stale if the case moves.
+8. **Later statements.** A newer statement supersedes the active one; history and earlier decisions stay. New evidence needs new
+   allocations. A changed invoice needs reconfirmation; a *touch* (a rename) is not a change, a replaced file is.
+9. **Export.** CSV, XLSX and an HTML evidence dossier, with masked identifiers, snapshots, rule versions, history and a disclaimer.
 
 ## Meaning of the figures
 
 | Figure | Meaning |
 | --- | --- |
 | Supported expected withholding | Current reviewed expectations, excluding withdrawn cases. Not a tax asset. |
-| Allocated uploaded postings | Reviewed allocations in the current, unchanged uploaded statement. Not independently verified government data. |
-| Possible credit gap | Positive expected-minus-allocated amount where current statement evidence exists, excluding explained/withdrawn cases. Unknowns are excluded, not zero-filled. |
-| Unresolved cases | Cases without a fully allocated posting or an explicit explained/withdrawn outcome. |
-| Deductor advice / accounting record | Separate amounts explicitly attached by a reviewer; neither becomes a posted statement amount. |
-| Bank receipt | Canonical Helm matched receipt, available only under the viewer's Helm/book/workspace permissions. It never creates a TDS expectation. |
-| Confirmed later gap closure | Current CA-reviewed closure against the immediately preceding import, with the same invoice version/expectation, capped by the increase in that deductor's uploaded postings. Not cumulative recovery. |
-| Recorded review minutes | Optional whole minutes entered on each decision, summed as effort. Not measured time saved. |
+| Allocated uploaded postings | Reviewed allocations in the current, unchanged statement. Not independently verified government data. |
+| Possible credit gap | Expected minus allocated where current statement evidence exists, excluding explained, withdrawn and closed cases. Unknowns are excluded, not zero-filled. An **investigation item**, never a refund or an asset. |
+| Unresolved cases | Cases without a fully allocated posting or an explicit closed outcome. |
+| Deductor advice / accounting record | Separate amounts a reviewer attached; neither becomes a posted statement amount. |
+| Bank receipt | The matched Helm receipt, under the viewer's own Helm permissions. Never creates an expectation. |
+| TDS now visible in your statement | The closure ledger: one row per case and confirming statement, written when a case that was a gap is later confirmed against a statement that shows the tax. **Evidence the credit appears. Never cash, never a refund, never added to GST or cash figures.** |
+| Recorded review minutes | Whole minutes a person entered on a decision, summed as effort. Not measured time saved. |
 
-Totals can cover several periods. The case filter narrows the queue; headline
-figures retain the workspace scope. The import timestamp is an **evidence as-of**
-timestamp, not a government filing timestamp. Case age is days since creation;
-it does not assert a statutory deadline. Reviewer-time savings, tax refunds and
-cash recovery are not measured or claimed.
+Totals can cover several tax years. The import timestamp is an **evidence as-of** date, not a filing date. Case age is days since
+creation; no statutory deadline is asserted. "Due" in a notice means the case has been open for 30 days (a Servabo setting, not a legal date).
 
-## Synthetic walkthrough
+## Where it shows up (as with GST Credit and Helm)
 
-The nine arithmetic scenarios use FY 2025–26 / AY 2026–27 and a 31 March 2026
-statement timestamp: exact posted ₹2,000; partial posting ₹1,500 against ₹3,000;
-disputed ₹1,800; no uploaded posting ₹2,400; a later ₹1,200 posting; suspected
-deductor mismatch ₹900; ₹4,000 allocated from a shared ₹6,000 quarterly posting;
-an unsupported source with an unknown gap; and a credit note requiring review.
-The partial-remittance case shows ₹50,000 bank cash separately from withholding.
-Sample case ages are measured at that fixed statement date, with matching creation
-dates; they do not keep aging against the real calendar.
-No section, tax rate or taxable basis is asserted. The examples still require
-tax-adviser review before being described as law-reviewed.
+Getting started (a step for workspace administrators), global search (by customer and invoice, never by PAN or TAN), notification
+preferences ("TDS credit", on by default for owners and admins), the Monday line, the value receipt ("found" and "now visible", never
+added), rule triggers and recipes (Business: *a gap is found*, *evidence went stale*, *a case closed*; the actions notify, assign, tag
+or post to chat, **never send an inquiry**), Recoveries (kind *TDS credit*, outside every "found money" total), Helm (confirmed
+withholding shown beside the commercial balance; gross reminders held), and for Enterprise the public events and read API, the
+warehouse dataset, and the organization view per legal entity (each entity counted once).
 
 ## Permissions and packaging
 
-Viewers read; workspace administrators write and export. API keys can read only
-the scoped organization summary with `trinetra:read` and the Enterprise capability.
-Free/Starter (the `developer` plan, N-187) get synthetic examples only. Business caps are 2 profiles, 12
-retained snapshots and 500 retained cases per organization. Enterprise defaults
-are 10/60/5,000. Published subscription versions supply the limits, with finite
-platform ceilings. No prices, provider products or billing intervals change.
-The proposed 50 outbound inquiries/month is not charged or consumed: outbound
-TRINETRA sending is disabled. Canonical document processing still consumes its
-existing document/OCR/storage allowances.
+| | Viewer / member | Workspace admin | Organization owner / admin |
+|---|---|---|---|
+| Read cases, statements, evidence | yes | yes | yes |
+| Write (profiles, expectations, imports, decisions, inquiries) | no | yes | yes (if also a workspace admin) |
+| Closure policy (Enterprise) | no | no | yes |
+| Approve a closure (Enterprise) | no | no | the named role, never the requester |
+| Pilot enrolment | no | no | no (platform administrator only) |
 
-## Boundaries still requiring work
+Starter (the `developer` plan, N-187) and trial organizations: synthetic examples only. **Business:** 2 profiles, 12 snapshots, 500
+open cases, 50 inquiries a month. **Enterprise:** 10 profiles, 60 snapshots, 5,000 open cases, every Business feature plus the
+organization view, approval chains, the closure ledger across workspaces, the read API and webhooks, the warehouse dataset.
+Capacities count working figures (superseded snapshots and closed cases are kept, within a retention ceiling, but do not use up the
+plan). No price, provider product or billing interval changed: `capability.trinetra` is bundled, not sold.
 
-See [LAUNCH-GATES.md](LAUNCH-GATES.md). Official formats, TCS, automatic ERP
-expectation derivation, signed/advance workflows and externally validated outcomes
-remain gated. The present
-surface is a gated reviewed-evidence workflow, not completion of all original
-production acceptance criteria.
+## What it will not do
+
+No tax-portal login, scraping or CAPTCHA bypass; no filing; no autonomous sending; no advice on rates, sections or which credit to
+claim; no TCS; no payroll TDS (Form 16); no statements from PDF; no promise of a refund or a guaranteed credit. A chartered accountant
+decides what a business may claim. Product decisions made along the way are N-190 to N-209 in `docs/hardening/NEEDS-OWNER.md`.

@@ -36,7 +36,7 @@ Plain language, no prior DevOps knowledge assumed._
 
 ## 2. The sessions, in order
 
-| | **Final session 1** (done) | **2A: upgrade** (next) | **2T: TRINETRA** | **2B: live** |
+| | **Final session 1** (done) | **2A: upgrade** (done) | **2T: TRINETRA** (done, 2026-10-28) | **2B: live** (next) |
 | --- | --- | --- | --- | --- |
 | **What** | Study the whole project, bring it up to date, build the money features (email-in, zip upload, GST digest, Zoho/Tally, Sentry, `preflight.py`, …) | Prices for India in rupees; the custom-domain fix; safety jobs that cannot stop silently; a prompt-injection map and tests; Final 1's leftovers; an accuracy report and a pilot playbook; assess Evidence-to-Resolution and build a thin version only if it passes the test; **rewrite the live prompt to match reality** | **TRINETRA finished for Business and Enterprise:** every line of its original brief, every integration other features have, the review's gaps fixed; statement readers instead of typing; sending inquiries; approval chains; a switch for one pilot customer, then for everyone | Test **everything for real** on your PC: real AI and OCR, your real invoices (with the accuracy report), real GST files, **TRINETRA with your own Form 26AS / AIS**, Dodo test payments in rupees and dollars, real emails, Slack, Zoho Books, Tally, Sentry, a production rehearsal |
 | **Where** | Claude Code on the web | Claude Code **on the web** | Claude Code **on the web** | Claude Code **in VS Code on your PC** |
@@ -45,7 +45,7 @@ Plain language, no prior DevOps knowledge assumed._
 | **Prompt** | [`FINAL-1-UPGRADE.md`](sessions/FINAL-1-UPGRADE.md) | [`FINAL-2-UPGRADE.md`](sessions/FINAL-2-UPGRADE.md) | [`FINAL-2T-TRINETRA.md`](sessions/FINAL-2T-TRINETRA.md) | [`FINAL-2-LIVE.md`](sessions/FINAL-2-LIVE.md) (2A and 2T rewrite it before you run it) |
 | **Cost** | Zero | Zero | Zero | Zero (free plans; Dodo **Test Mode**, no real money) |
 
-**Run them in this order:** 2A, then 2T, then 2B. 2B tests what 2A and 2T change, and both update 2B's prompt and the
+**Run them in this order:** 2A, then 2T, then 2B (2A and 2T are done; 2B is next, after their pull requests are merged). 2B tests what 2A and 2T change, and both update 2B's prompt and the
 preparation list below.
 Wherever older documents say "Final session 2", they mean 2B, the live session.
 
@@ -117,6 +117,13 @@ Wherever older documents say "Final session 2", they mean 2B, the live session.
    - `docs/product/PILOT-PLAYBOOK.md`: how to run your first paid pilot.
 
    Then re-read §4 below: 2A may have added something to prepare.
+
+**Final session 2T finished (2026-10-28).** TRINETRA now works like Helm and GST Credit on Business and Enterprise, in code and tests:
+statement files (the Servabo template, an AIS CSV, Form 26AS and Form 168 text downloads), suggestions from invoices, an
+expected-TDS template and Zoho Books, credit notes and reversals, inquiries a person sends, Enterprise approvals, and the places
+it shows up (Getting started, search, notices, the value receipt, rules, Recoveries, Helm, an organization view). It ships in
+**pilot** mode. **Not proven:** the three official statement readers have never read a real file (the official hosts could not
+be reached), the Zoho read and a real inbox. `docs/trinetra/COMPLETION.md` has every line of your brief with its final status.
 
 ## 3b. How to run Final session 2T (TRINETRA)
 

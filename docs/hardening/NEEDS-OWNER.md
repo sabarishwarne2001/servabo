@@ -2781,3 +2781,14 @@ Rules (Business and up) can be triggered by a gap found, evidence going stale an
 the invoice and post to chat, **never send an inquiry, an email or a webhook**. Enterprise webhooks (`gap_found`, `closed`, with
 `reviewed`) and the read-only cases API carry ids, states and amounts only. In Recoveries, a TDS gap is its own kind whose figure is
 a possible gap kept out of every "found money" total and every digest line; verifying it records no recovered outcome.
+
+## N-210 — How TRINETRA is opened to customers (DECIDED (Final 2T); your launch step)
+
+Three things move together when you open TRINETRA, and each has one setting. (1) **The mode**: `TRINETRA_MODE` is `pilot` as shipped (only
+organizations you enrol are live; enrol with `python scripts/trinetra_pilot.py enrol --organization <slug> --reason "..."`), and `on`
+opens it to every Business and Enterprise organization. (2) **The website**: it says "rolling out" for TRINETRA everywhere (the page, the
+home card, the pricing line) until you build it with `PUBLIC_TRINETRA_STATUS=available`; then it says "included". (3) **The order**:
+Final session 2B reads your own statements; your chartered accountant reads `/trinetra` and the in-app wording for about an hour;
+then you set the mode to `on`, restart, run `scripts/preflight.py` (it must say the mode is on) and rebuild the website. The checklist
+step is HANDOFF "Owner launch checklist", step 13. You never need to touch code to do any of this, and none of it changes a price.
+Decided without you because it is reversible: set `TRINETRA_MODE=pilot` again and the app returns to enrolled organizations only.
