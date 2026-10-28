@@ -2,7 +2,37 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-27 (Final session 2A finished; next: Final session 2T)_
+_Last updated: 2026-10-28 (Final session 2T started)_
+
+## Current phase — Final session 2T (TRINETRA finished for Business and Enterprise) (2026-10-28)
+Branch `claude/new-session-9f51dc` (the session's assigned branch; CLAUDE.md says `hardening/<topic>`, the brief says "use the assigned branch"),
+based on `main` at `2041ef6` (PR #43 merged). Founder authority delegated (N-190): decisions are logged as `DECIDED (Final 2T)` from **N-200**,
+findings from **F-641**, browser specs from **141**. Prompt: `docs/sessions/FINAL-2T-TRINETRA.md`. **If cut off, type `continue`: carry on from
+the first unticked box. Never restart a ticked phase.** The completion matrix is `docs/trinetra/COMPLETION.md`.
+Local stack: Postgres 16 with pgvector 0.6.0 (the Ubuntu package; building 0.8 from a GitHub checkout was refused by the sandbox's
+safety classifier) on :5433 (e2e) and :5434 (backend tests), Redis, backend venv Python 3.12 (`backend/.venv`).
+
+- [ ] 0. Start-up: docs and code read; stack; this checklist; draft PR
+- [ ] 1. Phase 0: `docs/trinetra/COMPLETION.md` (every brief sentence and every "like every other feature" row)
+- [ ] 2. Phase 1 (P0), each test-first: 2.1 Helm hold (net cash due, Guard block, release list); 2.2 evidence fingerprint instead of `updated_at`;
+  2.3 seller check (PAN normalized, from GSTIN, name-only needs confirmation, 422 not 500); 2.4 one PAN, one profile per organization;
+  2.5 case list in batches (query-count test); 2.6 who sees the write forms; 2.7 one data-lifecycle rule
+- [ ] 3. Phase 2 (P0): three modes (off, pilot, on; ships "pilot") and one helper `live_for(org)`; platform enrolment; plans and capacities
+  (active snapshots, open cases, inquiry allowance); `preflight.py`
+- [ ] 4. Phase 3: Servabo template (CSV/XLSX) and the readers for Form 26AS / Form 168 text and the AIS CSV; reader registry; limits
+- [ ] 5. Phase 4: printed hints to suggestions; expectations template; Zoho customer-payment TDS; deductor directory
+- [ ] 6. Phase 5: credit notes; reversals; advances; sourced taxable basis; split remittances; new statuses; reject and annotate
+- [ ] 7. Phase 6: authorized inquiries (secure link, allowance, reply); approval chains (Enterprise); closure ledger; measured time
+- [ ] 8. Phase 7: Getting started; search; notifications + `trinetra.recompute` doing real work; digest; value receipt and monthly; automation
+  triggers; webhooks and API; warehouse dataset; organization view; Recoveries; Helm ledger; egress and legal holds
+- [ ] 9. Phase 8: the screens (selector, filters, KPIs by confidence, waterfall, tutorial, import, inquiry, approvals, held reminders, states),
+  USER-GUIDE, browser specs by role and plan
+- [ ] 10. Phase 9: performance budgets, hostile files, isolation sweeps, prompt injection, privacy (TAN scrubber), threat model
+- [ ] 11. Phase 10: docs/trinetra/*, campaign records, website, owner launch checklist, FINAL-2-LIVE.md, FINAL-SESSIONS.md
+- [ ] 12. Finish line: backend, frontend, website and browser suites; `campaign_slices.py --check all`; one Alembic head, up/down/up populated;
+  PR ready; CI green
+
+- **Next action:** step 0, then Phase 0 (COMPLETION.md). Next free numbers: **N-200**, **F-641**, browser spec **141**.
 
 ## Current phase — Final session 2A (FINAL-2-UPGRADE) (2026-10-26)
 Branch `claude/new-session-gbo9ee` (the session's assigned branch; CLAUDE.md says `hardening/<topic>`, the brief says "use the session's
