@@ -3920,3 +3920,13 @@ up per case; 2.6 s at 5,000 cases, with the same figures as before. **Proof:** `
 first at 28 s against a 5 s budget), `tests/trinetra/test_case_list_batches.py` (the batched list equals the one-case path).
 Also found by the isolation sweep: a case's inquiries for an unknown case answered an empty list; it now answers 404 like every
 other case route (`tests/trinetra/test_isolation_sweep.py`).
+
+## F-651 — A viewer was offered the statement import form (P2)
+
+**Found:** writing browser spec 142 (by role). The Statements tab showed the whole import form to a viewer; the server refused every
+save (403), so the screen offered what it would not allow (F-649 had covered the other forms but not this tab). **Fix:** the tab now
+tells a viewer that only a workspace administrator imports a statement. **Proof:** spec 142 ("a viewer reads the cases … but is offered no
+way to write", with the server asked too). Not proven by a failing run first: the spec was written after the fix in the same step.
+Also found by the browser specs: the organization view's totals were a scrollable region with nothing the keyboard could reach (axe,
+`scrollable-region-focusable`); it is now focusable (spec 144, light and dark). And the isolation sweep: an unknown case's inquiries
+answered an empty 200 instead of 404 (F-650's commit).
