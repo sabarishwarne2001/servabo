@@ -607,22 +607,26 @@ def reconfirm(db, workspace, row, p, user_id, revision, amount, reason, seller_n
     db.flush()
 
 
-def summary(db, workspace):
-    rows = (
-        db.query(CreditRow)
-        .filter_by(workspace_id=workspace.id)
-        .order_by(CreditRow.created_at, CreditRow.id)
-        .limit(5001)
-        .all()
-    )
-    if len(rows) > 5000:
-        raise HTTPException(
-            409,
-            "Workspace exceeds the supported report size; archive evidence under the retention policy.",
+def views(db, workspace, rows):
+    """The case views for these rows, read in batches (profiles, statements, documents, decisions): the number of
+    queries does not grow with the number of cases. Returns (items, active snapshots by (profile, year))."""
+    profile_ids = {r.profile_id for r in rows}
+    profiles = {
+        p.id: p
+        for p in db.query(Profile).filter(
+            Profile.workspace_id == workspace.id, Profile.id.in_(profile_ids)
         )
-    profiles = {p.id: p for p in db.query(Profile).filter_by(workspace_id=workspace.id)}
-    snapshots = list(
-        db.query(Statement).filter_by(workspace_id=workspace.id, active=True)
+    }
+    snapshots = (
+        list(
+            db.query(Statement).filter(
+                Statement.workspace_id == workspace.id,
+                Statement.active.is_(True),
+                Statement.profile_id.in_(profile_ids),
+            )
+        )
+        if profile_ids
+        else []
     )
     ids = {row.work_item_id for row in rows} | {
         snap.source_work_item_id for snap in snapshots
@@ -653,8 +657,13 @@ def summary(db, workspace):
             (Decision.credit_id == CreditRow.id)
             & (Decision.revision == CreditRow.revision),
         )
-        .filter(CreditRow.workspace_id == workspace.id)
+        .filter(
+            CreditRow.workspace_id == workspace.id,
+            CreditRow.profile_id.in_(profile_ids),
+        )
         .all()
+        if profile_ids
+        else []
     )
     by_group = {}
     for decision, profile_id, year in latest:
@@ -673,10 +682,26 @@ def summary(db, workspace):
                 postings(snapshot, workspace, p),
                 by_group.get(key, []),
             )
-    items = [
+    return [
         view(db, workspace, r, bundles[(r.profile_id, r.year)], facts, roles)
         for r in rows
-    ]
+    ], active
+
+
+def summary(db, workspace):
+    rows = (
+        db.query(CreditRow)
+        .filter_by(workspace_id=workspace.id)
+        .order_by(CreditRow.created_at, CreditRow.id)
+        .limit(5001)
+        .all()
+    )
+    if len(rows) > 5000:
+        raise HTTPException(
+            409,
+            "Workspace exceeds the supported report size; archive evidence under the retention policy.",
+        )
+    items, active = views(db, workspace, rows)
     from app.services.trinetra.outcomes import measure
 
     return dict(

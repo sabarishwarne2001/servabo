@@ -425,15 +425,8 @@ def credits(
     if year:
         q = q.filter_by(year=year)
     response.headers["Cache-Control"] = "no-store"
-    return {
-        "total": q.count(),
-        "items": [
-            s.view(db, w, r)
-            for r in q.order_by(Credit.created_at, Credit.id)
-            .offset(offset)
-            .limit(limit)
-        ],
-    }
+    page = q.order_by(Credit.created_at, Credit.id).offset(offset).limit(limit).all()
+    return {"total": q.count(), "items": s.views(db, w, page)[0]}
 
 
 @router.post(P + "/credits/{credit_id}/decisions", response_model=CaseOut)
