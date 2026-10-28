@@ -112,7 +112,7 @@ test.describe("TRINETRA working screens", () => {
     await suggestion.getByRole("button", { name: "Accept as a case" }).click();
     await suggestion.getByLabel(/Why you accept this/).fill("Checked the customer's advice against the invoice.");
     await suggestion.getByRole("button", { name: "Accept", exact: true }).click();
-    await expect(suggestion).toContainText("Accepted");
+    await expect(page.getByTestId("trinetra-suggestion")).toHaveCount(0);   // an accepted suggestion leaves the to-confirm list
     await page.goto(customer.ws("trinetra"));
     await expect(page.getByRole("button", { name: /TRW-2/ })).toBeVisible();
   });
