@@ -233,6 +233,35 @@ class OrganizationSummaryOut(BaseModel):
     is_sample: bool
 
 
+class OrganizationCaseOut(Wire):
+    """One case as the Enterprise read API shows it: ids, states and amounts as decimal strings. Never a PAN, a TAN or a hash."""
+
+    id: str
+    workspace_id: str
+    profile_id: str | None
+    reference: str
+    customer: str
+    year: int
+    revision: int
+    review_state: str
+    status: str
+    expected_micros: Micros | None
+    posted_micros: Micros
+    gap_micros: Micros | None
+    currency: str = "INR"
+    source_current: bool
+    age_days: int
+    as_of: str | None
+    created_at: str
+
+
+class OrganizationCasesOut(BaseModel):
+    total: int
+    items: list[OrganizationCaseOut]
+    scope: str
+    is_sample: bool
+
+
 class SuggestionsOut(BaseModel):
     total: int
     items: list[dict]

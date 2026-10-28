@@ -240,6 +240,44 @@ def _gst(db: Session, workspaces: list[Workspace], page, today: date) -> list[di
     ) if f]
 
 
+def _tds(db: Session, organization_id: uuid.UUID, workspaces: list[Workspace], page, start: datetime, end: datetime) -> list[dict[str, Any]]:
+    """TRINETRA (Final 2T, Phase 7.5): two lines, each its own, never added to each other, to cash or to a GST figure, and neither
+    ever the headline (`headline` and `first_money` skip every `tds_` key):
+
+      tds_not_in_statement   the tax customers withheld that is not yet in the imported statement, as of now. A possible gap in a
+                             tax statement to check; honesty "potential". Never money found.
+      tds_now_visible        the tax of cases that had a gap in an earlier import and that an accountant has since confirmed as
+                             posted, confirmed in the period (the closure ledger). Evidence that a credit appears; NOT cash.
+
+    Nothing unless TRINETRA is live for the organization (mode and plan), the same `live_for` as every other gate."""
+    from app.models.trinetra import TrinetraOutcome
+    from app.services.trinetra import mode, notices, service
+
+    if not mode.live_for(db, organization_id):
+        return []
+    gap = cases = lead_gap = 0
+    lead: Optional[uuid.UUID] = None
+    for workspace in workspaces:
+        found, n = notices.gap_of(service.summary(db, workspace)["items"])
+        gap += found
+        cases += n
+        if found > lead_gap:
+            lead_gap, lead = found, workspace.id
+    ids = [w.id for w in workspaces]
+    visible, closed = db.execute(
+        select(func.coalesce(func.sum(TrinetraOutcome.amount_micros), 0), func.count())
+        .where(TrinetraOutcome.workspace_id.in_(ids), TrinetraOutcome.was_gap.is_(True),
+               TrinetraOutcome.confirmed_at >= start, TrinetraOutcome.confirmed_at < end)).one()
+    return [f for f in (
+        _finding("tds_not_in_statement", f"TDS not yet in your statement, across {_plural(cases, 'invoice')}",
+                 source=page(lead, "trinetra"), count=cases, amount_micros=gap, currency="INR", honesty=helm_v.HONESTY_POTENTIAL),
+        _finding("tds_now_visible", f"TDS now visible in your statement, confirmed by your accountant ({_plural(int(closed), 'invoice')}; "
+                                    "evidence, not cash)",
+                 source=page(None, "trinetra"), count=int(closed), amount_micros=int(visible), currency="INR",
+                 honesty=helm_v.HONESTY_CONFIRMED),
+    ) if f]
+
+
 def _time_machine(db: Session, organization_id: uuid.UUID, start: datetime, end: datetime,
                   path: str) -> list[dict[str, Any]]:
     """The latest finished replay of the organization's own documents in the period. One finding per honesty class
@@ -431,7 +469,7 @@ def _phrase(finding: dict[str, Any]) -> str:
 
 def headline(period: str, work: dict[str, int], found: list[dict[str, Any]], *, previous: bool = False) -> Optional[str]:
     """One sentence from the work counts and the first finding that is confirmed or has no honesty class."""
-    lead = next((f for f in found if f["honesty"] in (None, helm_v.HONESTY_CONFIRMED)), None)
+    lead = next((f for f in found if f["honesty"] in (None, helm_v.HONESTY_CONFIRMED) and not f["key"].startswith("tds_")), None)
     opening = "In your trial" if period == TRIAL else ("Last month" if previous else "This month")
     docs = work["documents"]
     if docs and lead:
@@ -520,6 +558,7 @@ def receipt(db: Session, organization_id: uuid.UUID, period: str, *, now: Option
         has = lambda key: capability_gate.has_capability(db, organization_id=organization_id, capability_key=key)  # noqa: E731
         found += _gst(db, workspaces, page, as_of.astimezone(zone).date())
         found += _time_machine(db, organization_id, start, end, time_machine_path)
+        found += _tds(db, organization_id, workspaces, page, start, end)
         radar = has(entitlements.ANOMALY_RADAR_CAPABILITY)
         if radar:
             found += _duplicates(db, ids, start, end, page)

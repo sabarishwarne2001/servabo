@@ -44,6 +44,7 @@ from app.services.trinetra.schemas import (
     RunStatusOut,
     OrganizationAccessOut,
     OrganizationSummaryOut,
+    OrganizationCasesOut,
 )
 
 
@@ -1584,6 +1585,71 @@ def organization_access(
             capability_key="capability.trinetra_all_workspaces",
         ),
     }
+
+
+@router.get(
+    "/organizations/{organization_id}/trinetra/cases",
+    response_model=OrganizationCasesOut,
+)
+def organization_cases(
+    organization_id: uuid.UUID,
+    offset: int = Query(0, ge=0, le=10000),
+    limit: int = Query(50, ge=1, le=100),
+    workspace_id: uuid.UUID | None = Query(None),
+    year: int | None = Query(None, ge=2000, le=2100),
+    db: Session = Depends(get_db),
+    context: OrganizationContext = Depends(
+        RequireOrgRole([OrganizationRole.OWNER, OrganizationRole.ADMIN, OrganizationRole.BILLING])
+    ),
+):
+    """Enterprise, read-only (`trinetra:read`): the cases of every workspace the caller may read, oldest first. Ids, states and
+    amounts as decimal strings (millionths of a rupee); never a PAN, a TAN or a document."""
+    from app.services.helm.gate import readable_workspaces
+    from app.workers.tenant_gate import inactive_reason, unpaid_reason
+
+    capability_gate.require_capability(
+        db, context=context, capability_key="capability.trinetra_all_workspaces", operation="trinetra.org.cases"
+    )
+    require_source_validation(db, organization_id)
+    if inactive_reason(db, organization_id=organization_id) or unpaid_reason(db, organization_id=organization_id):
+        raise HTTPException(402, "An active organization subscription is required.")
+    allowed = set(readable_workspaces(db, organization_id=organization_id, user_id=context.user_id, role=context.role))
+    if workspace_id is not None:
+        allowed &= {workspace_id}
+    workspaces = {
+        w.id: w
+        for w in db.query(Workspace).filter(
+            Workspace.organization_id == organization_id, Workspace.id.in_(allowed), Workspace.is_sample.is_(False)
+        )
+    } if allowed else {}
+    if not workspaces:
+        return {"total": 0, "items": [], "scope": ORG_CASES_SCOPE, "is_sample": False}
+    q = db.query(Credit).filter(Credit.organization_id == organization_id, Credit.workspace_id.in_(list(workspaces)))
+    q = q.filter_by(year=year) if year else s.working_set(q)
+    page = q.order_by(Credit.created_at, Credit.id).offset(offset).limit(limit).all()
+    by_workspace: dict = {}
+    for row in page:
+        by_workspace.setdefault(row.workspace_id, []).append(row)
+    views = {}
+    for wid, rows in by_workspace.items():
+        for item in s.views(db, workspaces[wid], rows)[0]:
+            views[item["id"]] = item
+    items = []
+    for row in page:
+        v = views[str(row.id)]
+        items.append(
+            {
+                "id": v["id"], "workspace_id": str(row.workspace_id), "profile_id": v["profile_id"],
+                "reference": v["reference"], "customer": v["counterparty"], "year": v["year"], "revision": v["revision"],
+                "review_state": v["review_state"], "status": v["status"], "expected_micros": v["expected_micros"],
+                "posted_micros": v["posted_micros"], "gap_micros": v["gap_micros"], "source_current": v["source_current"],
+                "age_days": v["age_days"], "as_of": v["as_of"], "created_at": v["created_at"],
+            }
+        )
+    return {"total": q.count(), "items": items, "scope": ORG_CASES_SCOPE, "is_sample": False}
+
+
+ORG_CASES_SCOPE = "Only workspaces readable by the caller. Amounts are decimal strings of millionths of a rupee; a gap is an item to check, never money."
 
 
 @router.get(

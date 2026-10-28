@@ -141,6 +141,17 @@ SESSION_J_TRIGGER_EVENT_TYPES: Final[tuple[str, ...]] = (
 )
 TRIGGER_NATIVE_EVENT_TYPES = TRIGGER_NATIVE_EVENT_TYPES + SESSION_J_TRIGGER_EVENT_TYPES
 
+#: Final session 2T (Phase 7.6): TRINETRA's case events as automation triggers. `tr2t9_case_events` rebuilds
+#: ck_outbox_events_visibility_vocabulary to admit them. Emitters: `app/services/trinetra/events.py` (a gap found and a stale
+#: confirmation, once per case revision, from the recompute job; a closure, from the decision). A rule on them may notify, assign,
+#: tag and chat; it can never send an inquiry. Their public counterparts are `trinetra.case.gap_found` and `.closed`.
+TRINETRA_TRIGGER_EVENT_TYPES: Final[tuple[str, ...]] = (
+    "trigger.trinetra.case.gap_found",
+    "trigger.trinetra.case.evidence_stale",
+    "trigger.trinetra.case.closed",
+)
+TRIGGER_NATIVE_EVENT_TYPES = TRIGGER_NATIVE_EVENT_TYPES + TRINETRA_TRIGGER_EVENT_TYPES
+
 #: Internal events that existed before ARCH-37 and that rules may listen to.
 #: `automation_rule_triggers` accepts exactly these plus the `trigger.` names.
 LEGACY_RULE_EVENT_TYPES: Final[tuple[str, ...]] = (

@@ -1,7 +1,10 @@
 """TRINETRA woven into the rest of Servabo (Final 2T, Phase 7): Getting started, search, notifications, the digest, the value receipt,
 automation, the public API, the warehouse, the organization view, Recoveries, Helm and the Enterprise controls."""
 
+import uuid
 from datetime import datetime, timezone
+
+from app.core.config import settings
 
 import pytest
 
@@ -103,3 +106,83 @@ def test_a_person_with_no_grant_on_the_workspace_and_another_organizations_membe
     assert _search(client, tenant, "TR-GRANT", who="contributor")["tds_cases"] == []
     r = client.get(f"/api/v1/organizations/{tenant.organization.id}/search", params={"q": "TR-GRANT"}, headers=tenant.other_org_member.headers)
     assert r.status_code in (403, 404) and "TR-GRANT" not in r.text
+
+
+# --- 5. The value receipt and the monthly summary ----------------------------------------------------------------------------
+
+from tests.trinetra.test_money_model import allocate, decide, get, statement  # noqa: E402
+
+
+def _receipt(db, tenant, period="month"):
+    from app.services import value_receipt
+
+    value_receipt.forget(tenant.organization.id)
+    return value_receipt.receipt(db, tenant.organization.id, period)
+
+
+def test_the_receipt_shows_tds_not_yet_in_the_statement_as_its_own_line_that_never_leads_or_adds(client, tenant, world, db_session):
+    url, body, case = setup_case(client, tenant, world)
+    assert [f for f in _receipt(db_session, tenant)["found"] if f["key"].startswith("tds_")] == []        # no statement, no figure
+    statement(client, tenant, url, body, ["MUMB54321K,10.00,x0,194C,15-Jun-2025,F,FY 2025-26 / AY 2026-27"])
+    receipt = _receipt(db_session, tenant)
+    [gap] = [f for f in receipt["found"] if f["key"] == "tds_not_in_statement"]
+    assert gap["amount_micros"] == 2_000_000_000 and gap["currency"] == "INR" and gap["count"] == 1
+    assert "TDS not yet in your statement" in gap["label"] and gap["source"].endswith("/trinetra")
+    assert gap["honesty"] == "potential"                         # a possible gap in a tax statement: never confirmed, never money
+    assert "TDS" not in (receipt["headline"] or "")             # it never leads the sentence about what Servabo found
+    assert not any(f["key"] not in ("tds_not_in_statement",) and f["amount_micros"] == gap["amount_micros"] and f["key"].startswith("gst")
+                   for f in receipt["found"])                    # and is never folded into a GST or cash line
+
+
+def test_tds_now_visible_comes_from_the_closure_ledger_and_is_labelled_as_not_cash(client, tenant, world, db_session):
+    url, body, case = setup_case(client, tenant, world)
+    statement(client, tenant, url, body, ["MUMB54321K,10.00,x0,194C,15-Jun-2025,F,FY 2025-26 / AY 2026-27"])
+    second = statement(client, tenant, url, body, ["ABCD12345E,2000.00,y0,194C,15-Jun-2025,F,FY 2025-26 / AY 2026-27"])
+    done = decide(client, tenant, url, get(client, tenant, url, case), "ALLOCATE", allocations=[allocate(second, 0, "2000")])
+    decide(client, tenant, url, done.json(), "CA_REVIEWED", reason="Accountant confirmed it in the new statement.")
+    receipt = _receipt(db_session, tenant)
+    [visible] = [f for f in receipt["found"] if f["key"] == "tds_now_visible"]
+    assert visible["amount_micros"] == 2_000_000_000 and "not cash" in visible["label"].lower() and visible["honesty"] == "confirmed"
+    assert [f for f in receipt["found"] if f["key"] == "tds_not_in_statement"] == []      # nothing is left unposted
+    assert "TDS" not in (receipt["headline"] or "")
+    from app.services import getting_started
+
+    assert getting_started.first_money(db_session, tenant.organization.id) is None        # TDS is never "first money found"
+
+
+def test_the_receipt_has_no_tds_line_when_trinetra_is_not_live_for_the_organization(client, tenant, world, db_session, monkeypatch):
+    url, body, case = setup_case(client, tenant, world)
+    statement(client, tenant, url, body, ["MUMB54321K,10.00,x0,194C,15-Jun-2025,F,FY 2025-26 / AY 2026-27"])
+    monkeypatch.setattr(settings, "TRINETRA_LIVE_ENABLED", None)
+    monkeypatch.setattr(settings, "TRINETRA_MODE", "off")
+    assert [f for f in _receipt(db_session, tenant)["found"] if f["key"].startswith("tds_")] == []
+
+
+# --- 7. The public API (Enterprise) -----------------------------------------------------------------------------------------
+
+
+def test_enterprise_keys_read_cases_and_nothing_else_with_amounts_as_strings_and_no_tax_identifier(client, tenant, world, db_session):
+    from tests.security.test_non_human_principals_default_deny import _key
+    from tests.trinetra.test_money_model import statement
+
+    url, body, case = setup_case(client, tenant, world, reference="TR-API-1")
+    statement(client, tenant, url, body, ["MUMB54321K,10.00,x0,194C,15-Jun-2025,F,FY 2025-26 / AY 2026-27"])
+    path = f"/api/v1/organizations/{tenant.organization.id}/trinetra/cases"
+    assert client.get(path, headers=tenant.owner.headers).status_code == 402                 # Business: an Enterprise capability
+    headers = _key(db_session, tenant, ["trinetra:read"])
+    result = client.get(path, headers=headers)
+    assert result.status_code == 200, result.text
+    data = result.json()
+    assert data["total"] == 1 and data["is_sample"] is False
+    [item] = data["items"]
+    assert item["id"] == case["id"] and item["workspace_id"] == str(tenant.workspace.id) and item["reference"] == "TR-API-1"
+    assert item["review_state"] == "OPEN" and item["status"] == "POSSIBLE_MISSING_POSTING" and item["revision"] == case["revision"]
+    assert item["expected_micros"] == "2000000000" and item["posted_micros"] == "0" and item["gap_micros"] == "2000000000"
+    assert item["currency"] == "INR"
+    assert "ABCDE1234F" not in result.text and "ABCD12345E" not in result.text and "deductor_key" not in result.text
+    assert client.get(path, params={"limit": 1, "offset": 1}, headers=headers).json()["items"] == []
+    assert client.get(path, params={"workspace_id": str(uuid.uuid4())}, headers=headers).json()["total"] == 0
+    # A key reads; it never writes, never reads another route, and a person's viewer role does not reach it.
+    assert client.post(path, headers=headers, json={}).status_code in (403, 405)
+    assert client.get(world[0] + "/credits", headers=headers).status_code == 403
+    assert client.get(path, headers=tenant.viewer.headers).status_code == 403

@@ -76,6 +76,7 @@ ExportDataset = Literal[
     "AUTOMATION_RUNS",
     "GST_MATCHES",
     "HELM_LEDGER",
+    "TRINETRA_CASES",
 ]
 ScheduleCadence = Literal["DAILY", "WEEKLY", "MONTHLY"]
 SyncTrigger = Literal["SCHEDULED", "MANUAL"]

@@ -47,6 +47,10 @@ MANUAL = "trigger.manual"
 HELM_BREACHED = "trigger.helm.mandate_breached"
 HELM_APPROVAL = "trigger.helm.approval_needed"
 RECEIVED_BY_LINK = "trigger.document.received_by_link"
+#: Final session 2T (Phase 7.6): TDS credit. Written by `app/services/trinetra/events.py` through `emit_once` below.
+TRINETRA_GAP_FOUND = "trigger.trinetra.case.gap_found"
+TRINETRA_EVIDENCE_STALE = "trigger.trinetra.case.evidence_stale"
+TRINETRA_CLOSED = "trigger.trinetra.case.closed"
 
 WEEKDAYS = ("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY")
 

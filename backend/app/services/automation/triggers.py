@@ -42,6 +42,7 @@ from app.core.entitlements import (
     GST_CREDIT_ADDON,
     GST_CREDIT_CAPABILITY,
     HELM_CAPABILITY,
+    TRINETRA_CAPABILITY,
     TRUTHMESH_CAPABILITY,
     CASE_INTELLIGENCE_CAPABILITY,
     RECONCILIATION_CAPABILITY,
@@ -639,6 +640,9 @@ TRIGGERS: Final[tuple[TriggerSpec, ...]] = (
 HELM_ALLOWED_ACTIONS: Final[tuple[str, ...]] = (
     "notify.role", "email.send", "chat.post", "webhook.send", "review.assign", "review.escalate", "document.tag",
 )
+#: TRINETRA may tell people and open a review; it never sends an inquiry, an email or a webhook (Final 2T, N-209): a message
+#: to a customer is only ever sent by a person who pressed Send.
+TRINETRA_ALLOWED_ACTIONS: Final[tuple[str, ...]] = ("notify.role", "chat.post", "review.assign", "document.tag")
 OPTIONS_WEEKDAY: Final[tuple[tuple[str, str], ...]] = (
     ("MONDAY", "Monday"), ("TUESDAY", "Tuesday"), ("WEDNESDAY", "Wednesday"), ("THURSDAY", "Thursday"),
     ("FRIDAY", "Friday"), ("SATURDAY", "Saturday"), ("SUNDAY", "Sunday"),
@@ -881,6 +885,65 @@ SESSION_J_TRIGGERS: Final[tuple[TriggerSpec, ...]] = (
             TriggerField("run_date", "Planned for", "date", "2026-10-30"),
         ),
         capability=HELM_CAPABILITY, has_document=False, allowed_actions=HELM_ALLOWED_ACTIONS,
+    ),
+    TriggerSpec(
+        key="trinetra.case.gap_found", label="TDS credit gap found", category="TDS credit",
+        summary="A customer's TDS is not (fully) in your tax statement.",
+        description=(
+            "After a statement import or a change in the evidence, a case's tax is not fully in the imported statement: a "
+            "possible missing posting, an amount mismatch or a suggestion nobody has confirmed. Fires once per case and "
+            "revision. The document is the invoice. A gap is an item to check, never money. Automations on TDS credit can "
+            "tell people, assign a reviewer, tag the invoice and post to chat; they never send an inquiry to a customer."
+        ),
+        event_types=("trigger.trinetra.case.gap_found",),
+        fields=(
+            TriggerField("reference", "Invoice reference", "string", "INV-2231"),
+            TriggerField("customer", "Customer", "string", "Acme Retail Ltd"),
+            TriggerField("amount", "Gap", "money", "50000.00", source_key="amount_micros", unit="micros", currency_key="currency"),
+            TriggerField("status", "Status", "string", "POSSIBLE_MISSING_POSTING"),
+            TriggerField("year", "Tax year", "number", "2025"),
+            TriggerField("days_open", "Days open", "number", "12"),
+        ),
+        capability=TRINETRA_CAPABILITY, runs_during_review=True, allowed_actions=TRINETRA_ALLOWED_ACTIONS,
+    ),
+    TriggerSpec(
+        key="trinetra.case.evidence_stale", label="TDS confirmation lost its evidence", category="TDS credit",
+        summary="The evidence behind a confirmed withholding changed.",
+        description=(
+            "The invoice or a piece of evidence a TDS case was confirmed on really changed, so the confirmation no longer "
+            "counts until it is confirmed again. Fires once per case and revision. The document is the invoice. Automations "
+            "on TDS credit can tell people, assign a reviewer, tag the invoice and post to chat; they never send an inquiry."
+        ),
+        event_types=("trigger.trinetra.case.evidence_stale",),
+        fields=(
+            TriggerField("reference", "Invoice reference", "string", "INV-2231"),
+            TriggerField("customer", "Customer", "string", "Acme Retail Ltd"),
+            TriggerField("amount", "Withheld amount", "money", "50000.00", source_key="amount_micros", unit="micros",
+                         currency_key="currency"),
+            TriggerField("year", "Tax year", "number", "2025"),
+            TriggerField("days_open", "Days open", "number", "12"),
+        ),
+        capability=TRINETRA_CAPABILITY, runs_during_review=True, allowed_actions=TRINETRA_ALLOWED_ACTIONS,
+    ),
+    TriggerSpec(
+        key="trinetra.case.closed", label="TDS case closed", category="TDS credit",
+        summary="A TDS case was closed by a person.",
+        description=(
+            "A person closed a TDS case: confirmed by the accountant, explained, withdrawn or left unresolved. Fires once per "
+            "case and revision. The document is the invoice. Automations on TDS credit can tell people, assign a reviewer, tag "
+            "the invoice and post to chat; they never send an inquiry."
+        ),
+        event_types=("trigger.trinetra.case.closed",),
+        fields=(
+            TriggerField("reference", "Invoice reference", "string", "INV-2231"),
+            TriggerField("customer", "Customer", "string", "Acme Retail Ltd"),
+            TriggerField("amount", "Withheld amount", "money", "50000.00", source_key="amount_micros", unit="micros",
+                         currency_key="currency"),
+            TriggerField("state", "How it was closed", "string", "CA_REVIEWED"),
+            TriggerField("year", "Tax year", "number", "2025"),
+            TriggerField("days_open", "Days open", "number", "12"),
+        ),
+        capability=TRINETRA_CAPABILITY, runs_during_review=True, allowed_actions=TRINETRA_ALLOWED_ACTIONS,
     ),
     TriggerSpec(
         key="document.received_by_link", label="Document received through a request link", category="Cases",

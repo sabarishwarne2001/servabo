@@ -86,6 +86,7 @@ EXPORT_DATASET_VALUES: tuple[str, ...] = (
     "AUTOMATION_RUNS",
     "GST_MATCHES",
     "HELM_LEDGER",
+    "TRINETRA_CASES",
 )
 
 SCHEDULE_CADENCE_VALUES: tuple[str, ...] = ("DAILY", "WEEKLY", "MONTHLY")

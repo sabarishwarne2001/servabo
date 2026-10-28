@@ -102,3 +102,26 @@ The `trinetra:read` scope grants only the authorized organization summary; it do
 not grant case documents, decisions or exports. Migration `tr1a1_credit_assurance`
 adds the database event vocabulary; its downgrade removes these subscriptions
 and deliveries. See [TRINETRA architecture](../trinetra/ARCHITECTURE.md).
+
+## `trinetra.case.gap_found` and `trinetra.case.closed`
+
+Final session 2T. The same conditions as `trinetra.case.reviewed` (Enterprise `capability.trinetra_all_workspaces`, TRINETRA live
+for the organization, an endpoint explicitly subscribed, no sample evidence). Each is sent once per case and revision.
+
+* `gap_found`: after a statement import or a change in the evidence, the case's tax is not fully in the imported statement
+  (`status` says how: `POSSIBLE_MISSING_POSTING`, `AMOUNT_MISMATCH`, `SUGGESTED`, `AMBIGUOUS`, `DUPLICATE_SUSPECTED`,
+  `TAN_MISMATCH_SUSPECTED`). It is an item to check, never money, and not a statement that anyone failed to file or deposit.
+* `closed`: a person closed the case (`state` is `CA_REVIEWED`, `EXPLAINED`, `WITHDRAWN` or `UNRESOLVED`).
+
+| Field | Meaning |
+| --- | --- |
+| `workspace_id`, `case_id` | Opaque identifiers of the workspace and the case. |
+| `revision`, `year` | The case revision the event is about, and its tax year (the year in which the tax year starts). |
+| `state` | Review state: `OPEN`, `DISPUTED`, `EXPLAINED`, `WITHDRAWN`, `CA_REVIEWED` or `UNRESOLVED`. |
+| `status` | The comparison status at that moment (see above). |
+| `amount_micros`, `currency` | `gap_found`: the gap the statement does not show; `closed`: the withheld amount the case concerned. Integer millionths of a rupee, `INR`. Never added to cash. |
+
+No PAN, TAN, invoice reference or customer name is included; read the case through the API (`trinetra:read`) for those you may see.
+Migration `tr2t9_case_events` widens the three database CHECKs that pin the vocabulary; its downgrade removes the new names from
+subscriptions, deliveries and the outbox. Code: `backend/app/services/trinetra/events.py`; tests
+`backend/tests/trinetra/test_case_events.py`.

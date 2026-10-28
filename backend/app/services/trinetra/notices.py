@@ -118,10 +118,32 @@ def _tell(db: Session, organization_id: uuid.UUID, *, title: str, message: str) 
 
 
 def announce(db: Session, workspace: Workspace, items: list[dict]) -> dict[str, int]:
-    """Say what is new about these cases, once. Never raises into the job that calls it. Returns {kind: how many cases}."""
+    """Say what is new about these cases, once: to the owners (in the app) and to anyone who listens (rules and webhooks). Never
+    raises into the job that calls it. Returns {kind: how many cases} for the notices."""
     told: dict[str, int] = {}
     if workspace.is_sample or not mode.live_for(db, workspace.organization_id):
         return told
+    told = _notify(db, workspace, items)
+    try:
+        with db.begin_nested():
+            from app.services.trinetra import events as case_events
+
+            amounts: dict[str, int] = {}
+
+            def expected_of(item: dict) -> Optional[int]:
+                if item["id"] not in amounts:
+                    row = db.get(TrinetraCredit, uuid.UUID(item["id"]))
+                    amounts[item["id"]] = row.expected_micros if row else None
+                return amounts[item["id"]]
+
+            case_events.detected(db, workspace, items, GAP_STATUSES, _evidence_lost, OPEN_STATES, expected_of)
+    except Exception:  # noqa: BLE001 - an announcement must never fail the job that found the change
+        logger.warning("trinetra.announce_failed", exc_info=True)
+    return told
+
+
+def _notify(db: Session, workspace: Workspace, items: list[dict]) -> dict[str, int]:
+    told: dict[str, int] = {}
     try:
         with db.begin_nested():
             fresh = [e for e in events(items) if claim(db, workspace.organization_id, e["kind"], f"{e['case_id']}:{e['revision']}")]
@@ -141,7 +163,6 @@ def announce(db: Session, workspace: Workspace, items: list[dict]) -> dict[str, 
             else:
                 for e in fresh:
                     _tell(db, workspace.organization_id, title=_TITLES[e["kind"]], message=_sentence(e, money(amounts.get(e["case_id"]))))
-            _announce_elsewhere(db, workspace, fresh, amounts)
     except Exception:  # noqa: BLE001 - a notice must never fail the job that found the change
         logger.warning("trinetra.notice_failed", exc_info=True)
         return {}
@@ -149,11 +170,6 @@ def announce(db: Session, workspace: Workspace, items: list[dict]) -> dict[str, 
 
 
 _PHRASE = {KIND_STALE: "with changed evidence", KIND_MISSING: "with a possible missing posting", KIND_DUE: "past their due date"}
-
-
-def _announce_elsewhere(db: Session, workspace: Workspace, fresh: list[dict], amounts: dict) -> None:
-    """Hook for the automation triggers and webhooks of the same moments (added with Phase 7.6 and 7.7)."""
-    return None
 
 
 # ------------------------------------------------------------------------------------------------ the sweep and the Monday line
@@ -190,17 +206,27 @@ def figures(db: Session, organization_id: uuid.UUID) -> dict[str, Any]:
         for item in result["items"]:
             if item["review_state"] not in OPEN_STATES:
                 continue
-            if item["status"] in GAP_STATUSES and (item["gap_micros"] or 0) > 0:
-                total["gap_micros"] += item["gap_micros"]
-                total["gap_cases"] += 1
             if _evidence_lost(item):
                 total["stale"] += 1
             if item["status"] == "POSSIBLE_MISSING_POSTING":
                 total["missing"] += 1
             if item["status"] not in RESOLVED_STATUSES and item["age_days"] > DUE_AFTER_DAYS:
                 total["due"] += 1
+        gap, cases = gap_of(result["items"])
+        total["gap_micros"] += gap
+        total["gap_cases"] += cases
         total["now_visible_micros"] += outcomes.ledger(db, workspace)["now_visible_this_month_micros"]
     return total
+
+
+def gap_of(items: Iterable[dict]) -> tuple[int, int]:
+    """(rupees in micros, cases) of TDS not yet in the statement among these case views: open cases with a known, positive gap."""
+    micros = cases = 0
+    for item in items:
+        if item["review_state"] in OPEN_STATES and item["status"] in GAP_STATUSES and (item["gap_micros"] or 0) > 0:
+            micros += item["gap_micros"]
+            cases += 1
+    return micros, cases
 
 
 def digest_body(db: Session, organization_id: uuid.UUID) -> Optional[dict[str, Any]]:

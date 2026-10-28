@@ -101,7 +101,8 @@ def first_money(db: Session, organization_id: uuid.UUID) -> Optional[dict[str, A
         except Exception:  # noqa: BLE001 - a receipt that cannot be built must never break the checklist
             continue
         lead = next(
-            (f for f in receipt.get("found", []) if f.get("honesty") in (None, helm_v.HONESTY_CONFIRMED) and f.get("amount_micros")),
+            (f for f in receipt.get("found", []) if f.get("honesty") in (None, helm_v.HONESTY_CONFIRMED) and f.get("amount_micros")
+                 and not str(f.get("key", "")).startswith("tds_")),   # a TDS line is never "money found"
             None,
         )
         if lead:
