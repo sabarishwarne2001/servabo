@@ -17,24 +17,24 @@ from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
+from app.core.config import settings as deployment_settings
 from app.models.trinetra import TrinetraPilot
 
 OFF, PILOT, ON = "off", "pilot", "on"
 CAPABILITY = "capability.trinetra"
 
 
-def mode_of(config) -> str:
+def mode_of(settings) -> str:
     """The mode a settings object carries: the old boolean alias wins when it is set."""
-    alias = config.TRINETRA_LIVE_ENABLED
+    alias = settings.TRINETRA_LIVE_ENABLED
     if alias is not None:
         return ON if alias else OFF
-    return config.TRINETRA_MODE
+    return settings.TRINETRA_MODE
 
 
 def deployment_mode() -> str:
     """This deployment's mode."""
-    return mode_of(settings)
+    return mode_of(deployment_settings)
 
 
 @dataclass(frozen=True)

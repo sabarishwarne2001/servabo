@@ -506,6 +506,7 @@ REGISTRY: dict[str, TableRule] = {
 # dossier before erasure. No GST retention exemption is inferred for TRINETRA.
 REGISTRY.update({
     "trinetra_profiles": _config(export="trinetra_profiles", note="Encrypted PAN; ciphertext excluded from export."),
+    "trinetra_pilot": _config(note="Which organizations the operator enrolled in the TRINETRA pilot, and why (platform setting)."),
     "trinetra_org_keys": _secret("The organization's random salt for its one-profile-per-entity fingerprint."),
     "trinetra_statements": _r(Kind.CONTENT, Erasure.DELETE, Sweep.DELETE, OrgPurge.DELETE,
         note="Working paper (N-200): erased with the statement document it was read from.",
