@@ -8113,6 +8113,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/trinetra/pilot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pilot */
+        get: operations["pilot_api_v1_admin_trinetra_pilot_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/trinetra/pilot/{organization_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Enrol */
+        put: operations["enrol_api_v1_admin_trinetra_pilot__organization_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/trinetra/pilot/{organization_id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Withdraw */
+        post: operations["withdraw_api_v1_admin_trinetra_pilot__organization_id__withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/jobs/summary": {
         parameters: {
             query?: never;
@@ -10731,6 +10782,519 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/trinetra/statement-template.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Statement Template
+         * @description The Servabo template: your own transcription of a statement, never an official format.
+         */
+        get: operations["statement_template_api_v1_workspaces__workspace_id__trinetra_statement_template__format__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/statement-files/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Statement File
+         * @description What the file would import: the reader, the tax-year label as the file states it, the mapping of each column, every
+         *     check against the file's own totals, and the rows. Nothing is saved.
+         */
+        post: operations["preview_statement_file_api_v1_workspaces__workspace_id__trinetra_statement_files_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/statement-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Statement File
+         * @description Import the previewed file: the same confirm and import path as typed rows, to the same immutable snapshots.
+         */
+        post: operations["import_statement_file_api_v1_workspaces__workspace_id__trinetra_statement_files_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suggestions */
+        get: operations["suggestions_api_v1_workspaces__workspace_id__trinetra_suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/suggestions/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Scan Suggestions
+         * @description Look for invoices that print a TDS amount and suggest an expectation for each. Nothing is confirmed.
+         */
+        post: operations["scan_suggestions_api_v1_workspaces__workspace_id__trinetra_suggestions_scan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/suggestion-template.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suggestion Template */
+        get: operations["suggestion_template_api_v1_workspaces__workspace_id__trinetra_suggestion_template__format__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/suggestions/template/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Suggestion Template */
+        post: operations["preview_suggestion_template_api_v1_workspaces__workspace_id__trinetra_suggestions_template_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/suggestions/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Suggestion Template
+         * @description Turn the matched rows into SUGGESTIONS. A person still accepts each one.
+         */
+        post: operations["import_suggestion_template_api_v1_workspaces__workspace_id__trinetra_suggestions_template_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/suggestions/zoho/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Scan Zoho Suggestions
+         * @description Read the TDS customers withheld from Zoho Books customer payments (read only) and suggest an expectation for each
+         *     invoice Servabo knows. Unverified until Final session 2B; a person accepts each suggestion.
+         */
+        post: operations["scan_zoho_suggestions_api_v1_workspaces__workspace_id__trinetra_suggestions_zoho_scan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/suggestions/{suggestion_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept Suggestion */
+        post: operations["accept_suggestion_api_v1_workspaces__workspace_id__trinetra_suggestions__suggestion_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/suggestions/{suggestion_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss Suggestion */
+        post: operations["dismiss_suggestion_api_v1_workspaces__workspace_id__trinetra_suggestions__suggestion_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/deductors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Deductors */
+        get: operations["deductors_api_v1_workspaces__workspace_id__trinetra_deductors_get"];
+        put?: never;
+        /** Map Deductor */
+        post: operations["map_deductor_api_v1_workspaces__workspace_id__trinetra_deductors_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/deductors/{deductor_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Deductor */
+        post: operations["confirm_deductor_api_v1_workspaces__workspace_id__trinetra_deductors__deductor_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/pairings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pair Reversal
+         * @description Pair a reversal (a negative statement row) with the row it reverses. Netting happens only through a pairing a person made.
+         */
+        post: operations["pair_reversal_api_v1_workspaces__workspace_id__trinetra_pairings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/pairings/{pairing_id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unpair Reversal */
+        post: operations["unpair_reversal_api_v1_workspaces__workspace_id__trinetra_pairings__pairing_id__withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/exceptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Statement Exceptions
+         * @description Reversals in the active statements that nobody has paired: exceptions, never netted on their own.
+         */
+        get: operations["statement_exceptions_api_v1_workspaces__workspace_id__trinetra_exceptions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/inquiries/allowance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inquiry Allowance */
+        get: operations["inquiry_allowance_api_v1_workspaces__workspace_id__trinetra_inquiries_allowance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/credits/{credit_id}/inquiries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Case Inquiries */
+        get: operations["case_inquiries_api_v1_workspaces__workspace_id__trinetra_credits__credit_id__inquiries_get"];
+        put?: never;
+        /** Draft Inquiry */
+        post: operations["draft_inquiry_api_v1_workspaces__workspace_id__trinetra_credits__credit_id__inquiries_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/inquiries/{inquiry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Edit Inquiry */
+        patch: operations["edit_inquiry_api_v1_workspaces__workspace_id__trinetra_inquiries__inquiry_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/inquiries/{inquiry_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Inquiry */
+        post: operations["approve_inquiry_api_v1_workspaces__workspace_id__trinetra_inquiries__inquiry_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/inquiries/{inquiry_id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Inquiry
+         * @description Press Send: a person, on an approved draft, to the confirmed contact. Never automatic.
+         */
+        post: operations["send_inquiry_api_v1_workspaces__workspace_id__trinetra_inquiries__inquiry_id__send_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/inquiries/{inquiry_id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Withdraw Inquiry */
+        post: operations["withdraw_inquiry_api_v1_workspaces__workspace_id__trinetra_inquiries__inquiry_id__withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Closure Policy */
+        get: operations["closure_policy_api_v1_workspaces__workspace_id__trinetra_policy_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organization_id}/trinetra/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Closure Policy
+         * @description Enterprise: which closures need a second person's approval, above what amount, by which role.
+         */
+        put: operations["set_closure_policy_api_v1_organizations__organization_id__trinetra_policy_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Approvals List */
+        get: operations["approvals_list_api_v1_workspaces__workspace_id__trinetra_approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/approvals/{approval_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Closure */
+        post: operations["approve_closure_api_v1_workspaces__workspace_id__trinetra_approvals__approval_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/approvals/{approval_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject Closure */
+        post: operations["reject_closure_api_v1_workspaces__workspace_id__trinetra_approvals__approval_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/trinetra/outcomes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Closure Ledger
+         * @description The closure ledger by month: TDS now visible in your statement. Never cash recovered.
+         */
+        get: operations["closure_ledger_api_v1_workspaces__workspace_id__trinetra_outcomes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/trinetra/official-statements": {
         parameters: {
             query?: never;
@@ -10928,6 +11492,27 @@ export interface paths {
         };
         /** Organization Access */
         get: operations["organization_access_api_v1_organizations__organization_id__trinetra_access_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organization_id}/trinetra/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Organization Cases
+         * @description Enterprise, read-only (`trinetra:read`): the cases of every workspace the caller may read, oldest first. Ids, states and
+         *     amounts as decimal strings (millionths of a rupee); never a PAN, a TAN or a document.
+         */
+        get: operations["organization_cases_api_v1_organizations__organization_id__trinetra_cases_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -11638,6 +12223,20 @@ export interface components {
             /** Enable Streaming */
             enable_streaming: boolean;
         };
+        /** AcceptIn */
+        AcceptIn: {
+            /** Source Confirmation */
+            source_confirmation: string;
+            /** Tan */
+            tan?: string | null;
+            /** Amount */
+            amount?: string | null;
+            /**
+             * Seller Name Confirmed
+             * @default false
+             */
+            seller_name_confirmed: boolean;
+        };
         /** AcceptVarianceRequest */
         AcceptVarianceRequest: {
             /**
@@ -11662,10 +12261,23 @@ export interface components {
         AccessOut: {
             /** Live Enabled */
             live_enabled: boolean;
+            /** Mode */
+            mode: string;
+            /** Enrolled */
+            enrolled: boolean;
+            /** Enrolled Since */
+            enrolled_since?: string | null;
             /** Entitled */
             entitled: boolean;
             /** Official Formats */
             official_formats: string[];
+            /**
+             * Statement Readers
+             * @default []
+             */
+            statement_readers: {
+                [key: string]: unknown;
+            }[];
             /** Transcription Format */
             transcription_format: string;
             /** Tcs Supported */
@@ -12281,6 +12893,11 @@ export interface components {
         ApprovalChainIn: {
             /** Tiers */
             tiers?: components["schemas"]["ChainTierIn"][];
+        };
+        /** ApprovalDecisionIn */
+        ApprovalDecisionIn: {
+            /** Reason */
+            reason: string;
         };
         /** ApproveOut */
         ApproveOut: {
@@ -13389,6 +14006,24 @@ export interface components {
             on: string;
         };
         /**
+         * BasisIn
+         * @description The amount the tax was computed on, ONLY when a document states it. Never computed by Servabo.
+         */
+        BasisIn: {
+            /** Amount */
+            amount: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "INVOICE" | "ACCOUNTING_RECORD" | "DEDUCTOR_ADVICE";
+            /**
+             * Evidence Work Item Id
+             * Format: uuid
+             */
+            evidence_work_item_id: string;
+        };
+        /**
          * BatchAnalytics
          * @description Confidence, schema health, lanes and throughput of one batch (see services/batches/service.py).
          */
@@ -13827,6 +14462,43 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_import_statement_file_api_v1_workspaces__workspace_id__trinetra_statement_files_post */
+        Body_import_statement_file_api_v1_workspaces__workspace_id__trinetra_statement_files_post: {
+            /** File */
+            file: string;
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /** Year */
+            year: number;
+            /** Pan */
+            pan: string;
+            /** Confirmed */
+            confirmed: boolean;
+            /** Expected Sha256 */
+            expected_sha256: string;
+            /** Reader */
+            reader?: string | null;
+            /** Mapping */
+            mapping?: string | null;
+        };
+        /** Body_import_suggestion_template_api_v1_workspaces__workspace_id__trinetra_suggestions_template_post */
+        Body_import_suggestion_template_api_v1_workspaces__workspace_id__trinetra_suggestions_template_post: {
+            /** File */
+            file: string;
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /**
+             * Skip Refused
+             * @default false
+             */
+            skip_refused: boolean;
+        };
         /** Body_login_api_v1_auth_login_post */
         Body_login_api_v1_auth_login_post: {
             /** Grant Type */
@@ -13850,6 +14522,34 @@ export interface components {
              * Format: password
              */
             client_secret?: string | null;
+        };
+        /** Body_preview_statement_file_api_v1_workspaces__workspace_id__trinetra_statement_files_preview_post */
+        Body_preview_statement_file_api_v1_workspaces__workspace_id__trinetra_statement_files_preview_post: {
+            /** File */
+            file: string;
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /** Year */
+            year: number;
+            /** Pan */
+            pan: string;
+            /** Reader */
+            reader?: string | null;
+            /** Mapping */
+            mapping?: string | null;
+        };
+        /** Body_preview_suggestion_template_api_v1_workspaces__workspace_id__trinetra_suggestions_template_preview_post */
+        Body_preview_suggestion_template_api_v1_workspaces__workspace_id__trinetra_suggestions_template_preview_post: {
+            /** File */
+            file: string;
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
         };
         /** Body_single_logout_api_v1_saml_slo_post */
         Body_single_logout_api_v1_saml_slo_post: {
@@ -14389,6 +15089,17 @@ export interface components {
             booked_micros: string | null;
             /** Advice Micros */
             advice_micros: string | null;
+            /** Adjusted Gross Micros */
+            adjusted_gross_micros?: string | null;
+            /**
+             * Credit Notes Micros
+             * @default 0
+             */
+            credit_notes_micros: string;
+            /** Basis Micros */
+            basis_micros?: string | null;
+            /** Basis Source */
+            basis_source?: string | null;
             /** Candidate Ids */
             candidate_ids: string[];
             /** Rule Version */
@@ -14399,6 +15110,10 @@ export interface components {
             work_item_id?: string | null;
             /** Statement Work Item Id */
             statement_work_item_id?: string | null;
+            /** Statement Reader */
+            statement_reader?: {
+                [key: string]: unknown;
+            } | null;
             /** Snapshot Id */
             snapshot_id?: string | null;
             /**
@@ -15522,6 +16237,12 @@ export interface components {
             amount: string;
             /** Source Confirmation */
             source_confirmation: string;
+            /**
+             * Seller Name Confirmed
+             * @default false
+             */
+            seller_name_confirmed: boolean;
+            triggering_event?: components["schemas"]["TriggeringEventIn"] | null;
         };
         /**
          * CustomDomainCreate
@@ -15822,6 +16543,27 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** DeductorConfirmIn */
+        DeductorConfirmIn: {
+            /** Counterparty */
+            counterparty: string;
+            /** Reason */
+            reason: string;
+        };
+        /** DeductorIn */
+        DeductorIn: {
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /** Tan */
+            tan: string;
+            /** Counterparty */
+            counterparty: string;
+            /** Reason */
+            reason: string;
+        };
         /** DeliveryOut */
         DeliveryOut: {
             /**
@@ -15895,6 +16637,17 @@ export interface components {
             booked_micros: string | null;
             /** Advice Micros */
             advice_micros: string | null;
+            /** Adjusted Gross Micros */
+            adjusted_gross_micros?: string | null;
+            /**
+             * Credit Notes Micros
+             * @default 0
+             */
+            credit_notes_micros: string;
+            /** Basis Micros */
+            basis_micros?: string | null;
+            /** Basis Source */
+            basis_source?: string | null;
             /** Candidate Ids */
             candidate_ids: string[];
             /** Rule Version */
@@ -15905,6 +16658,10 @@ export interface components {
             work_item_id?: string | null;
             /** Statement Work Item Id */
             statement_work_item_id?: string | null;
+            /** Statement Reader */
+            statement_reader?: {
+                [key: string]: unknown;
+            } | null;
             /** Snapshot Id */
             snapshot_id?: string | null;
             /**
@@ -16189,6 +16946,11 @@ export interface components {
             decided_by_user_id?: string | null;
             /** Note */
             note?: string | null;
+        };
+        /** DismissIn */
+        DismissIn: {
+            /** Reason */
+            reason: string;
         };
         /** DismissRequest */
         DismissRequest: {
@@ -17237,6 +17999,41 @@ export interface components {
             models: components["schemas"]["ModelRow"][];
         };
         /**
+         * EntitySummaryOut
+         * @description One legal entity across the readable workspaces: counted once. Its name, never its PAN.
+         */
+        EntitySummaryOut: {
+            /** Entity Id */
+            entity_id: string;
+            /** Name */
+            name: string;
+            /** Workspace Ids */
+            workspace_ids: string[];
+            /** Total */
+            total: number;
+            /** Unresolved */
+            unresolved: number;
+            /** Expected Micros */
+            expected_micros: string;
+            /** Posted Micros */
+            posted_micros: string;
+            /** Gap Micros */
+            gap_micros: string;
+        };
+        /** EntityTotalsOut */
+        EntityTotalsOut: {
+            /** Total */
+            total: number;
+            /** Unresolved */
+            unresolved: number;
+            /** Expected Micros */
+            expected_micros: string;
+            /** Posted Micros */
+            posted_micros: string;
+            /** Gap Micros */
+            gap_micros: string;
+        };
+        /**
          * EphemeralSessionResponse
          * @description A minted session URL.
          *
@@ -17403,7 +18200,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "DEDUCTOR_ADVICE" | "ACCOUNTING_RECORD" | "CERTIFICATE" | "CORRECTION_RESPONSE";
+            kind: "DEDUCTOR_ADVICE" | "ACCOUNTING_RECORD" | "CERTIFICATE" | "CORRECTION_RESPONSE" | "CREDIT_NOTE" | "TRIGGERING_EVENT";
             /** Amount */
             amount?: string | null;
         };
@@ -17452,7 +18249,7 @@ export interface components {
              * Dataset
              * @enum {string}
              */
-            dataset: "USAGE_ROLLUPS" | "DOCUMENT_METADATA" | "ASSISTANT_TURNS" | "AUTOMATION_RUNS" | "GST_MATCHES" | "HELM_LEDGER";
+            dataset: "USAGE_ROLLUPS" | "DOCUMENT_METADATA" | "ASSISTANT_TURNS" | "AUTOMATION_RUNS" | "GST_MATCHES" | "HELM_LEDGER" | "TRINETRA_CASES";
             /** Version */
             version: number;
             /** Description */
@@ -17470,7 +18267,7 @@ export interface components {
              */
             destination_id: string;
             /** Datasets */
-            datasets: ("USAGE_ROLLUPS" | "DOCUMENT_METADATA" | "ASSISTANT_TURNS" | "AUTOMATION_RUNS" | "GST_MATCHES" | "HELM_LEDGER")[];
+            datasets: ("USAGE_ROLLUPS" | "DOCUMENT_METADATA" | "ASSISTANT_TURNS" | "AUTOMATION_RUNS" | "GST_MATCHES" | "HELM_LEDGER" | "TRINETRA_CASES")[];
             /**
              * Cadence
              * @enum {string}
@@ -17571,7 +18368,7 @@ export interface components {
         /** ExportScheduleUpdate */
         ExportScheduleUpdate: {
             /** Datasets */
-            datasets?: ("USAGE_ROLLUPS" | "DOCUMENT_METADATA" | "ASSISTANT_TURNS" | "AUTOMATION_RUNS" | "GST_MATCHES" | "HELM_LEDGER")[] | null;
+            datasets?: ("USAGE_ROLLUPS" | "DOCUMENT_METADATA" | "ASSISTANT_TURNS" | "AUTOMATION_RUNS" | "GST_MATCHES" | "HELM_LEDGER" | "TRINETRA_CASES")[] | null;
             /** Cadence */
             cadence?: ("DAILY" | "WEEKLY" | "MONTHLY") | null;
             /** Hour Utc */
@@ -17827,6 +18624,62 @@ export interface components {
             baseline_rate?: number | null;
             /** Memory Rate */
             memory_rate?: number | null;
+        };
+        /**
+         * FilePreviewOut
+         * @description What a statement file would import, for the reviewer to confirm before anything is saved.
+         */
+        FilePreviewOut: {
+            /** Reader */
+            reader: string;
+            /** Reader Label */
+            reader_label: string;
+            /** Official */
+            official: boolean;
+            /** Verified */
+            verified: boolean;
+            /** Parser Version */
+            parser_version: string;
+            /** Sha256 */
+            sha256: string;
+            /** Tax Year Label */
+            tax_year_label?: string | null;
+            /** Tax Year Kind */
+            tax_year_kind?: string | null;
+            /** Year */
+            year: number;
+            /** Year Matches */
+            year_matches: boolean;
+            /** File Pan Matches */
+            file_pan_matches?: boolean | null;
+            /** Rows */
+            rows: number;
+            /** Total Micros */
+            total_micros: string;
+            /** Deductors */
+            deductors: {
+                [key: string]: unknown;
+            }[];
+            /** Mapping */
+            mapping: {
+                [key: string]: unknown;
+            }[];
+            /** Columns */
+            columns?: {
+                [key: string]: unknown;
+            } | null;
+            /** Checks */
+            checks: {
+                [key: string]: unknown;
+            }[];
+            /** Ignored */
+            ignored: string[];
+            /** Sample */
+            sample: {
+                [key: string]: unknown;
+            }[];
+            /** Notice */
+            notice: string;
         };
         /** FittedCurvePoint */
         FittedCurvePoint: {
@@ -18167,6 +19020,31 @@ export interface components {
             confirmed: boolean;
             /** Rows */
             rows: components["schemas"]["LineIn"][];
+        };
+        /** InquiryEditIn */
+        InquiryEditIn: {
+            /** Subject */
+            subject?: string | null;
+            /** Body */
+            body?: string | null;
+        };
+        /** InquiryIn */
+        InquiryIn: {
+            /**
+             * Document Kind
+             * @default CERTIFICATE
+             * @enum {string}
+             */
+            document_kind: "CERTIFICATE" | "DEDUCTOR_ADVICE" | "CORRECTION_RESPONSE";
+            /** Subject */
+            subject?: string | null;
+            /** Body */
+            body?: string | null;
+        };
+        /** InquirySendIn */
+        InquirySendIn: {
+            /** Override Reason */
+            override_reason?: string | null;
         };
         /** InstallationCreate */
         InstallationCreate: {
@@ -19004,7 +19882,7 @@ export interface components {
              */
             destination_id: string;
             /** Datasets */
-            datasets: ("USAGE_ROLLUPS" | "DOCUMENT_METADATA" | "ASSISTANT_TURNS" | "AUTOMATION_RUNS" | "GST_MATCHES" | "HELM_LEDGER")[];
+            datasets: ("USAGE_ROLLUPS" | "DOCUMENT_METADATA" | "ASSISTANT_TURNS" | "AUTOMATION_RUNS" | "GST_MATCHES" | "HELM_LEDGER" | "TRINETRA_CASES")[];
             /**
              * Lookback Days
              * @default 1
@@ -19867,7 +20745,7 @@ export interface components {
              * Category
              * @enum {string}
              */
-            category: "security" | "billing" | "usage" | "workflow" | "monthly_summary" | "gst_credit" | "helm" | "helm_briefing";
+            category: "security" | "billing" | "usage" | "workflow" | "monthly_summary" | "gst_credit" | "tds_credit" | "helm" | "helm_briefing";
             /** Email */
             email: boolean;
         };
@@ -20332,6 +21210,10 @@ export interface components {
         OrganizationAccessOut: {
             /** Live Enabled */
             live_enabled: boolean;
+            /** Mode */
+            mode: string;
+            /** Enrolled */
+            enrolled: boolean;
             /** Entitled */
             entitled: boolean;
         };
@@ -20355,6 +21237,60 @@ export interface components {
              * @description Defaults to now. Rev-share counts sealed periods at or after this moment only: a partner does not earn on a tenant's history.
              */
             effective_from?: string | null;
+        };
+        /**
+         * OrganizationCaseOut
+         * @description One case as the Enterprise read API shows it: ids, states and amounts as decimal strings. Never a PAN, a TAN or a hash.
+         */
+        OrganizationCaseOut: {
+            /** Id */
+            id: string;
+            /** Workspace Id */
+            workspace_id: string;
+            /** Profile Id */
+            profile_id: string | null;
+            /** Reference */
+            reference: string;
+            /** Customer */
+            customer: string;
+            /** Year */
+            year: number;
+            /** Revision */
+            revision: number;
+            /** Review State */
+            review_state: string;
+            /** Status */
+            status: string;
+            /** Expected Micros */
+            expected_micros: string | null;
+            /** Posted Micros */
+            posted_micros: string;
+            /** Gap Micros */
+            gap_micros: string | null;
+            /**
+             * Currency
+             * @default INR
+             */
+            currency: string;
+            /** Source Current */
+            source_current: boolean;
+            /** Age Days */
+            age_days: number;
+            /** As Of */
+            as_of: string | null;
+            /** Created At */
+            created_at: string;
+        };
+        /** OrganizationCasesOut */
+        OrganizationCasesOut: {
+            /** Total */
+            total: number;
+            /** Items */
+            items: components["schemas"]["OrganizationCaseOut"][];
+            /** Scope */
+            scope: string;
+            /** Is Sample */
+            is_sample: boolean;
         };
         /**
          * OrganizationCreate
@@ -20849,6 +21785,9 @@ export interface components {
         OrganizationSummaryOut: {
             /** Workspaces */
             workspaces: components["schemas"]["WorkspaceSummaryOut"][];
+            /** Entities */
+            entities?: components["schemas"]["EntitySummaryOut"][];
+            totals?: components["schemas"]["EntityTotalsOut"] | null;
             /** Scope */
             scope: string;
             /** Is Sample */
@@ -20934,6 +21873,45 @@ export interface components {
              * @default No measured outcomes for synthetic examples.
              */
             note: string;
+            /**
+             * Now Visible This Month Micros
+             * @default 0
+             */
+            now_visible_this_month_micros: string;
+            /**
+             * Now Visible This Year Micros
+             * @default 0
+             */
+            now_visible_this_year_micros: string;
+            /**
+             * Now Visible Total Micros
+             * @default 0
+             */
+            now_visible_total_micros: string;
+            /**
+             * Now Visible Cases
+             * @default 0
+             */
+            now_visible_cases: number;
+            /**
+             * Ledger Note
+             * @default
+             */
+            ledger_note: string;
+            /**
+             * Measured Cycle Cases
+             * @default 0
+             */
+            measured_cycle_cases: number;
+            /** Measured Cycle Days Median */
+            measured_cycle_days_median?: number | null;
+            /** Measured Cycle Days Mean */
+            measured_cycle_days_mean?: number | null;
+            /**
+             * Cycle Note
+             * @default
+             */
+            cycle_note: string;
         };
         /**
          * OwnershipTransferInitiateRequest
@@ -21291,6 +22269,25 @@ export interface components {
             paid_on: string;
             /** Reference */
             reference?: string | null;
+        };
+        /** PairIn */
+        PairIn: {
+            /**
+             * Snapshot Id
+             * Format: uuid
+             */
+            snapshot_id: string;
+            /** Positive Line */
+            positive_line: number;
+            /** Negative Line */
+            negative_line: number;
+            /** Reason */
+            reason: string;
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
         };
         /** PairRow */
         PairRow: {
@@ -21929,6 +22926,18 @@ export interface components {
              *     }
              */
             payments: components["schemas"]["PaymentFiguresResponse"];
+        };
+        /** PolicyIn */
+        PolicyIn: {
+            /** Threshold */
+            threshold: string;
+            /** Actions */
+            actions: ("CA_REVIEWED" | "EXPLAINED" | "UNRESOLVED")[];
+            /**
+             * Approver Role
+             * @enum {string}
+             */
+            approver_role: "ADMIN" | "OWNER";
         };
         /** PortalSessionRequest */
         PortalSessionRequest: {
@@ -23364,6 +24373,11 @@ export interface components {
              */
             reset_seconds: number;
         };
+        /** ReasonIn */
+        ReasonIn: {
+            /** Reason */
+            reason: string;
+        };
         /** RebuildOut */
         RebuildOut: {
             /**
@@ -23392,6 +24406,11 @@ export interface components {
         };
         /** ReconfirmIn */
         ReconfirmIn: {
+            /**
+             * Seller Name Confirmed
+             * @default false
+             */
+            seller_name_confirmed: boolean;
             /** Revision */
             revision: number;
             /** Amount */
@@ -23463,7 +24482,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "GST_CREDIT" | "DUPLICATE" | "OVERCHARGE" | "STATEMENT_DIFFERENCE" | "PAYMENT_DEADLINE";
+            kind: "GST_CREDIT" | "DUPLICATE" | "OVERCHARGE" | "STATEMENT_DIFFERENCE" | "PAYMENT_DEADLINE" | "TDS_CREDIT";
             /** Kind Label */
             kind_label: string;
             /**
@@ -24416,6 +25435,12 @@ export interface components {
              * @default false
              */
             confirm_receivable: boolean;
+            basis?: components["schemas"]["BasisIn"] | null;
+            /**
+             * Clear Basis
+             * @default false
+             */
+            clear_basis: boolean;
         };
         /**
          * ReviewItemResponse
@@ -24944,6 +25969,14 @@ export interface components {
             /** Degraded */
             degraded: boolean;
         };
+        /** ScanIn */
+        ScanIn: {
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+        };
         /** SearchHitOut */
         SearchHitOut: {
             /** Kind */
@@ -24991,6 +26024,11 @@ export interface components {
              * @default []
              */
             gst_invoices: components["schemas"]["SearchHitOut"][];
+            /**
+             * Tds Cases
+             * @default []
+             */
+            tds_cases: components["schemas"]["SearchHitOut"][];
             /**
              * Rules
              * @default []
@@ -25779,6 +26817,15 @@ export interface components {
              * @default false
              */
             can_manage_seats: boolean;
+        };
+        /** SuggestionsOut */
+        SuggestionsOut: {
+            /** Total */
+            total: number;
+            /** Items */
+            items: {
+                [key: string]: unknown;
+            }[];
         };
         /** SummaryOut */
         SummaryOut: {
@@ -26779,10 +27826,28 @@ export interface components {
              */
             lapsed: boolean;
         };
+        /**
+         * TriggeringEventIn
+         * @description An advance or earlier event, placed in its own tax year by a person (never inferred).
+         */
+        TriggeringEventIn: {
+            /** Reason */
+            reason: string;
+            /**
+             * Evidence Work Item Id
+             * Format: uuid
+             */
+            evidence_work_item_id: string;
+        };
         /** TwoFactorPolicyUpdate */
         TwoFactorPolicyUpdate: {
             /** Required */
             required: boolean;
+        };
+        /** UnpairIn */
+        UnpairIn: {
+            /** Reason */
+            reason: string;
         };
         /** UploadSessionCompleteResponse */
         UploadSessionCompleteResponse: {
@@ -28125,6 +29190,16 @@ export interface components {
             /** Date Format */
             date_format?: string | null;
         };
+        /** ZohoScanIn */
+        ZohoScanIn: {
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /** Year */
+            year?: number | null;
+        };
         /** DecisionIn */
         app__api__v1__gst__DecisionIn: {
             /** Decision */
@@ -28174,7 +29249,7 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "ALLOCATE" | "DISPUTED" | "EXPLAINED" | "WITHDRAWN" | "CA_REVIEWED" | "REOPEN";
+            action: "ALLOCATE" | "DISPUTED" | "EXPLAINED" | "WITHDRAWN" | "CA_REVIEWED" | "REOPEN" | "UNRESOLVED" | "REJECT_MATCH" | "ANNOTATE";
             /** Reason */
             reason: string;
             /** Allocations */
@@ -28184,6 +29259,12 @@ export interface components {
              * @default 0
              */
             review_minutes: number;
+            /** Snapshot Id */
+            snapshot_id?: string | null;
+            /** Line Id */
+            line_id?: string | null;
+            /** Note */
+            note?: string | null;
         };
         /**
          * EmailEncryption
@@ -36624,7 +37705,7 @@ export interface operations {
         parameters: {
             query?: {
                 state?: ("FOUND" | "BEING_FIXED" | "VERIFIED" | "NOT_MONEY" | "CLOSED") | null;
-                kind?: ("GST_CREDIT" | "DUPLICATE" | "OVERCHARGE" | "STATEMENT_DIFFERENCE" | "PAYMENT_DEADLINE") | null;
+                kind?: ("GST_CREDIT" | "DUPLICATE" | "OVERCHARGE" | "STATEMENT_DIFFERENCE" | "PAYMENT_DEADLINE" | "TDS_CREDIT") | null;
             };
             header?: never;
             path: {
@@ -46550,6 +47631,102 @@ export interface operations {
             };
         };
     };
+    pilot_api_v1_admin_trinetra_pilot_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    enrol_api_v1_admin_trinetra_pilot__organization_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_api_v1_admin_trinetra_pilot__organization_id__withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     jobs_summary_api_v1_admin_jobs_summary_get: {
         parameters: {
             query?: never;
@@ -52388,6 +53565,1064 @@ export interface operations {
             };
         };
     };
+    statement_template_api_v1_workspaces__workspace_id__trinetra_statement_template__format__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                format: "csv" | "xlsx";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_statement_file_api_v1_workspaces__workspace_id__trinetra_statement_files_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_preview_statement_file_api_v1_workspaces__workspace_id__trinetra_statement_files_preview_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilePreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_statement_file_api_v1_workspaces__workspace_id__trinetra_statement_files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_statement_file_api_v1_workspaces__workspace_id__trinetra_statement_files_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggestions_api_v1_workspaces__workspace_id__trinetra_suggestions_get: {
+        parameters: {
+            query?: {
+                profile_id?: string | null;
+                year?: number | null;
+                status?: ("OPEN" | "ACCEPTED" | "DISMISSED") | null;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scan_suggestions_api_v1_workspaces__workspace_id__trinetra_suggestions_scan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScanIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggestion_template_api_v1_workspaces__workspace_id__trinetra_suggestion_template__format__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                format: "csv" | "xlsx";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_suggestion_template_api_v1_workspaces__workspace_id__trinetra_suggestions_template_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_preview_suggestion_template_api_v1_workspaces__workspace_id__trinetra_suggestions_template_preview_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_suggestion_template_api_v1_workspaces__workspace_id__trinetra_suggestions_template_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_suggestion_template_api_v1_workspaces__workspace_id__trinetra_suggestions_template_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scan_zoho_suggestions_api_v1_workspaces__workspace_id__trinetra_suggestions_zoho_scan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZohoScanIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_suggestion_api_v1_workspaces__workspace_id__trinetra_suggestions__suggestion_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                suggestion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_suggestion_api_v1_workspaces__workspace_id__trinetra_suggestions__suggestion_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                suggestion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DismissIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deductors_api_v1_workspaces__workspace_id__trinetra_deductors_get: {
+        parameters: {
+            query?: {
+                profile_id?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    map_deductor_api_v1_workspaces__workspace_id__trinetra_deductors_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeductorIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_deductor_api_v1_workspaces__workspace_id__trinetra_deductors__deductor_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                deductor_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeductorConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pair_reversal_api_v1_workspaces__workspace_id__trinetra_pairings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PairIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unpair_reversal_api_v1_workspaces__workspace_id__trinetra_pairings__pairing_id__withdraw_post: {
+        parameters: {
+            query: {
+                profile_id: string;
+            };
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                pairing_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnpairIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    statement_exceptions_api_v1_workspaces__workspace_id__trinetra_exceptions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    inquiry_allowance_api_v1_workspaces__workspace_id__trinetra_inquiries_allowance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    case_inquiries_api_v1_workspaces__workspace_id__trinetra_credits__credit_id__inquiries_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                credit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draft_inquiry_api_v1_workspaces__workspace_id__trinetra_credits__credit_id__inquiries_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                credit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InquiryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_inquiry_api_v1_workspaces__workspace_id__trinetra_inquiries__inquiry_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                inquiry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InquiryEditIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_inquiry_api_v1_workspaces__workspace_id__trinetra_inquiries__inquiry_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                inquiry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_inquiry_api_v1_workspaces__workspace_id__trinetra_inquiries__inquiry_id__send_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                inquiry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InquirySendIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_inquiry_api_v1_workspaces__workspace_id__trinetra_inquiries__inquiry_id__withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                inquiry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    closure_policy_api_v1_workspaces__workspace_id__trinetra_policy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_closure_policy_api_v1_organizations__organization_id__trinetra_policy_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Organization identifier */
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approvals_list_api_v1_workspaces__workspace_id__trinetra_approvals_get: {
+        parameters: {
+            query?: {
+                status?: ("PENDING" | "APPROVED" | "REJECTED" | "STALE") | null;
+            };
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_closure_api_v1_workspaces__workspace_id__trinetra_approvals__approval_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                approval_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_closure_api_v1_workspaces__workspace_id__trinetra_approvals__approval_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+                approval_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    closure_ledger_api_v1_workspaces__workspace_id__trinetra_outcomes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace identifier */
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     unsupported_statement_api_v1_workspaces__workspace_id__trinetra_official_statements_post: {
         parameters: {
             query?: never;
@@ -52818,6 +55053,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrganizationAccessOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    organization_cases_api_v1_organizations__organization_id__trinetra_cases_get: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+                workspace_id?: string | null;
+                year?: number | null;
+            };
+            header?: never;
+            path: {
+                /** @description Organization identifier */
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationCasesOut"];
                 };
             };
             /** @description Validation Error */

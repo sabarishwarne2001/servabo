@@ -396,7 +396,7 @@ def _read_statement(upload: UploadFile, reader: str | None, mapping: str | None)
         return detect.read(filename, data, reader=reader, mapping=chosen)
     except StatementRefused as exc:
         raise HTTPException(
-            422, {"code": exc.code, "message": exc.message, "row": exc.row}
+            422, {"code": exc.code, "message": exc.message, "row": exc.row, "columns": exc.columns}
         ) from exc
 
 
@@ -808,9 +808,16 @@ def statement_exceptions(
     for snap in snaps:
         for i in s.unpaired_reversals(snap, pairs.get(snap.id, [])):
             r = snap.rows[i]
+            # The rows this one could reverse: the same deductor's positive rows in the same statement (a person chooses).
+            candidates = [
+                {"line_id": str(j), "amount_micros": str(x["amount_micros"]), "reference": x.get("reference"), "on": x.get("on"),
+                 "section": x.get("section") or None}
+                for j, x in enumerate(snap.rows)
+                if j != i and x["deductor_key"] == r["deductor_key"] and x["amount_micros"] > 0
+            ][:20]
             items.append({"profile_id": str(snap.profile_id), "snapshot_id": str(snap.id), "line_id": str(i),
                           "year": snap.year, "section": r.get("section") or None, "on": r.get("on"),
-                          "amount_micros": str(r["amount_micros"]), "reference": r.get("reference")})
+                          "amount_micros": str(r["amount_micros"]), "reference": r.get("reference"), "candidates": candidates})
     return {"items": items[:500], "total": len(items),
             "note": "A reversal or correction stays an exception until a person pairs it with the row it reverses."}
 
@@ -1363,6 +1370,37 @@ def summary(
     return s.summary(db, w)
 
 
+def _explanations(w, p, row, value, snapshot, used, pairings):
+    """Field by field, why each candidate and each allocated statement row is (or is not) this case's match."""
+    if snapshot is None:
+        return []
+    credit = s.credit(row, w)
+    rows = {x.id: x for x in s.postings(snapshot, w, p, pairings.get(snapshot.id, ()))}
+    mine = {a.posting: a.amount for a in used if a.credit == str(row.id) and a.snapshot == str(snapshot.id)}
+    reader = s._reader_of(snapshot)
+    out = []
+    for line_id in [*mine, *[c for c in value["candidate_ids"] if c not in mine]]:
+        posting = rows.get(line_id)
+        if posting is None:
+            continue
+        free = posting.amount - sum(
+            a.amount for a in used if a.posting == line_id and a.snapshot == str(snapshot.id) and a.credit != str(row.id)
+        )
+        out.append(
+            {
+                "snapshot_id": str(snapshot.id),
+                "line_id": line_id,
+                "role": "allocated" if line_id in mine else "candidate",
+                "allocated_micros": str(mine[line_id]) if line_id in mine else None,
+                "reader": reader["label"] if reader else None,
+                "reader_verified": bool(reader and reader["verified"]),
+                "rule_version": d.VERSION,
+                "checks": d.explain(credit, posting, expected=value["expected_micros"], available=free),
+            }
+        )
+    return out
+
+
 @router.get(P + "/credits/{credit_id}", response_model=DetailOut)
 def detail(
     workspace_id: uuid.UUID,
@@ -1408,8 +1446,10 @@ def detail(
     withholding = reviewed_withholding(row, value)
     from app.services.trinetra.fields import printed
 
+    explanations = _explanations(w, p, row, value, snapshot, used, s.active_pairings(db, [snapshot.id] if snapshot else []))
     return {
         **value,
+        "match_explanations": explanations,
         "printed_evidence": printed(
             s.document(db, w, row.work_item_id).extracted_entities
         ),

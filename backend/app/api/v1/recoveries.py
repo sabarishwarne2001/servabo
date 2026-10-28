@@ -38,7 +38,7 @@ RequireViewer = RequireWorkspaceRole(WorkspaceRole.VIEWER)
 RequireContributor = RequireWorkspaceRole(WorkspaceRole.CONTRIBUTOR)
 
 StateName = Literal["FOUND", "BEING_FIXED", "VERIFIED", "NOT_MONEY", "CLOSED"]
-KindName = Literal["GST_CREDIT", "DUPLICATE", "OVERCHARGE", "STATEMENT_DIFFERENCE", "PAYMENT_DEADLINE"]
+KindName = Literal["GST_CREDIT", "DUPLICATE", "OVERCHARGE", "STATEMENT_DIFFERENCE", "PAYMENT_DEADLINE", "TDS_CREDIT"]
 
 
 class RecoveryNextAction(BaseModel):
@@ -178,6 +178,10 @@ def _next_actions(issue: RecoveryIssue) -> list[RecoveryNextAction]:
         out.append(RecoveryNextAction(key="helm_plan", label="Hold the payment in Helm (a person decides)", scope="helm", path="plan"))
     elif issue.kind == v.STATEMENT_DIFFERENCE:
         out.append(RecoveryNextAction(key="helm_plan", label="Review Helm's drafted email to the supplier", scope="helm", path="plan"))
+    elif issue.kind == v.TDS_CREDIT:
+        case_id = details.get("case_id")
+        out.append(RecoveryNextAction(key="trinetra", label="Review the case in TDS credit (a person decides)", scope="workspace",
+                                      path=f"trinetra?case={case_id}" if case_id else "trinetra"))
     elif issue.kind == v.PAYMENT_DEADLINE:
         out.append(RecoveryNextAction(key="helm_plan", label="Plan the payment in Helm (a person approves)", scope="helm", path="plan"))
     if document:

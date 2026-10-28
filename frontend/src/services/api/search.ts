@@ -3,7 +3,7 @@
  *
  * Documents (by file name or any extracted value, e.g. an invoice number),
  * entity records, cases, GST suppliers (GSTIN or name), invoices in the GST books
- * (by number) and automation rules (by name), from every workspace of the
+ * (by number), TDS credit cases (by invoice reference or customer name) and automation rules (by name), from every workspace of the
  * organization the caller may open - never another. A result the person's role or
  * the plan would lock is not returned. Each hit names its workspace so the
  * palette can open it there.
@@ -11,7 +11,14 @@
 import apiClient from "@/services/api/client";
 import { SEARCH_ENDPOINTS } from "@/services/api/endpoints";
 
-export type SearchHitKind = "DOCUMENT" | "ENTITY" | "CASE" | "GST_SUPPLIER" | "GST_INVOICE" | "RULE";
+export type SearchHitKind =
+  | "DOCUMENT"
+  | "ENTITY"
+  | "CASE"
+  | "GST_SUPPLIER"
+  | "GST_INVOICE"
+  | "TDS_CASE"
+  | "RULE";
 
 export interface SearchHit {
   kind: SearchHitKind;
@@ -21,7 +28,7 @@ export interface SearchHit {
   workspace_id: string;
   workspace_slug: string;
   workspace_name: string;
-  /** What to look the hit up by on its page: a GSTIN or an invoice number (GST hits); else null. */
+  /** What to look the hit up by on its page: a GSTIN or an invoice number (GST hits), an invoice reference (TDS credit); else null. */
   reference: string | null;
 }
 
@@ -33,6 +40,8 @@ export interface SearchResponse {
   cases: SearchHit[];
   suppliers: SearchHit[];
   gst_invoices: SearchHit[];
+  /** TDS credit cases by invoice reference or customer name (never PAN or TAN); empty where TRINETRA is not open. */
+  tds_cases?: SearchHit[];
   rules: SearchHit[];
 }
 

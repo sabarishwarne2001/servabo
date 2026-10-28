@@ -47,7 +47,7 @@ describe("searchHitPath", () => {
 
 describe("the sections and the order", () => {
   it("names every kind in plain words", () => {
-    expect(Object.values(HIT_SECTION)).toEqual(["Documents", "Entities", "Cases", "GST suppliers", "GST invoices", "Workflows"]);
+    expect(Object.values(HIT_SECTION)).toEqual(["Documents", "Entities", "Cases", "GST suppliers", "GST invoices", "TDS credit", "Workflows"]);
   });
 
   it("lists documents first and tolerates a response from an older server", () => {
@@ -64,5 +64,24 @@ describe("the sections and the order", () => {
     expect(allSearchHits(response).map((h) => h.kind)).toEqual(["DOCUMENT", "CASE", "GST_SUPPLIER", "RULE"]);
     const old = { query: "x", workspaces_searched: 1, documents: [hit("DOCUMENT")], entities: [], cases: [] } as unknown as SearchResponse;
     expect(allSearchHits(old)).toHaveLength(1);
+  });
+});
+
+describe("TDS credit cases", () => {
+  it("opens the case in its workspace's TRINETRA page and sorts after the GST invoices", () => {
+    const tds = hit("TDS_CASE", { id: "11111111-2222-3333-4444-555555555555", reference: "INV-1" });
+    expect(searchHitPath("acme", tds)).toBe("/acme/branch/trinetra?case=11111111-2222-3333-4444-555555555555");
+    const response = {
+      query: "x",
+      workspaces_searched: 1,
+      documents: [],
+      entities: [],
+      cases: [],
+      suppliers: [],
+      gst_invoices: [hit("GST_INVOICE")],
+      tds_cases: [tds],
+      rules: [hit("RULE")],
+    } satisfies SearchResponse;
+    expect(allSearchHits(response).map((h) => h.kind)).toEqual(["GST_INVOICE", "TDS_CASE", "RULE"]);
   });
 });

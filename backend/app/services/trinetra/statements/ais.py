@@ -88,9 +88,11 @@ def read(filename: str, data: bytes, *, mapping: Optional[dict[str, Optional[int
     if chosen["deducted"] is None:
         raise StatementRefused("Which column holds the tax amount could not be told" + (
             " (two columns could be it)" if any(ROLES["deducted"].search(h) for h in header) else "") +
-            ". Choose it in the mapping.", code="TRINETRA_AMBIGUOUS_COLUMNS")
+            ". Choose it in the mapping.", code="TRINETRA_AMBIGUOUS_COLUMNS",
+            columns={"proposed": proposed, "chosen": chosen, "columns": header})
     if chosen["tan"] is None and chosen["source"] is None:
-        raise StatementRefused("No column holds the deductor's TAN or name and TAN. Choose it in the mapping.", code="TRINETRA_AMBIGUOUS_COLUMNS")
+        raise StatementRefused("No column holds the deductor's TAN or name and TAN. Choose it in the mapping.",
+                               code="TRINETRA_AMBIGUOUS_COLUMNS", columns={"proposed": proposed, "chosen": chosen, "columns": header})
     claimed = [i for i in chosen.values() if i is not None]
     if len(claimed) != len(set(claimed)):
         raise StatementRefused("One column was chosen for two meanings. Choose each column once.", code="TRINETRA_BAD_MAPPING")

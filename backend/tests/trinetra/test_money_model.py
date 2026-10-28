@@ -293,3 +293,19 @@ def test_a_late_booking_and_a_verified_correction_have_their_own_statuses(client
     assert final.status_code == 200 and final.json()["status"] == "VERIFIED_CORRECTED"
     ca = decide(client, tenant, url, final.json(), "CA_REVIEWED", reason="Accountant reviewed the corrected posting.")
     assert ca.status_code == 200 and ca.json()["review_state"] == "CA_REVIEWED"
+
+
+def test_each_unpaired_reversal_lists_the_rows_it_could_reverse_so_a_person_can_choose(client, tenant, world, db_session):
+    url, body, case = setup_case(client, tenant, world)
+    statement(client, tenant, url, body, [
+        "ABCD12345E,2000.00,r0,194C,15-Jun-2025,F,FY 2025-26 / AY 2026-27",
+        "ABCD12345E,-500.00,r1,194C,20-Jun-2025,F,FY 2025-26 / AY 2026-27",
+        "MUMB54321K,900.00,r2,194C,21-Jun-2025,F,FY 2025-26 / AY 2026-27",
+        "MUMB54321K,-300.00,r3,194C,22-Jun-2025,F,FY 2025-26 / AY 2026-27"])
+    exceptions = client.get(url + "/exceptions", headers=tenant.viewer.headers).json()["items"]
+    by_line = {e["line_id"]: e for e in exceptions}
+    assert set(by_line) == {"1", "3"}
+    assert [c["line_id"] for c in by_line["1"]["candidates"]] == ["0"]              # same deductor only, never the other customer's row
+    assert [c["line_id"] for c in by_line["3"]["candidates"]] == ["2"]
+    first = by_line["1"]["candidates"][0]
+    assert first["amount_micros"] == "2000000000" and first["reference"] == "r0" and "deductor_key" not in str(first)

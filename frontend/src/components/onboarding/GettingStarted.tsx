@@ -24,6 +24,7 @@ import {
   helmPath,
   organizationBillingPath,
   organizationMembersPath,
+  trinetraPath,
   workItemsPath,
   workspaceSettingsPath,
 } from "@/routes/tenantPaths";
@@ -184,6 +185,12 @@ export const GettingStarted: React.FC<GettingStartedProps> = ({ workspaceId, org
         return (
           <Link to={gstPath(orgSlug, workspaceSlug)} className={linkClass}>
             Open GST Credit
+          </Link>
+        );
+      case "trinetra":
+        return (
+          <Link to={trinetraPath(orgSlug, workspaceSlug)} className={linkClass}>
+            Open TDS credit
           </Link>
         );
       case "helm":

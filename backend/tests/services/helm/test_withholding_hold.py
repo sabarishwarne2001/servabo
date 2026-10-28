@@ -90,3 +90,17 @@ def test_the_cockpit_lists_blocked_reminders_held_for_withholding_with_the_case_
     [held] = withholding_holds([blocked, other, paying])
     assert held["action_id"] == "a1" and held["case_id"] == CASE
     assert "TRINETRA" in held["release"] and "TDS" in held["reason"]
+
+
+def test_each_held_reminder_names_the_workspace_slug_so_the_cockpit_can_link_to_the_case():
+    from types import SimpleNamespace as NS
+    import uuid
+
+    from app.services.helm.service import withholding_holds
+
+    wid = uuid.uuid4()
+    _, found = _reminder(_receivable(4, withheld_micros=150_000 * M, withholding_case_id=CASE))
+    blocked = NS(id="a1", kind=v.ACTION_SEND_REMINDER, state=v.ACTION_BLOCKED, guard=found[0].result.as_json(), title="Remind",
+                 workspace_id=wid)
+    [held] = withholding_holds([blocked], {wid: "engineering"})
+    assert held["workspace_slug"] == "engineering" and held["case_id"] == CASE

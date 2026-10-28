@@ -135,6 +135,7 @@ class PrintedEvidenceOut(Wire):
 
 
 class DetailOut(CaseOut):
+    match_explanations: list[dict] = Field(default_factory=list)
     printed_evidence: PrintedEvidenceOut
     statement_lines: list[PostingOut]
     bank_evidence: list[BankOut]

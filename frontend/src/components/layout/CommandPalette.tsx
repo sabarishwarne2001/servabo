@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Briefcase,
+  Eye,
   CornerDownLeft,
   FileText,
   ListChecks,
@@ -59,6 +60,7 @@ const HIT_ICON: Record<SearchHit["kind"], LucideIcon> = {
   CASE: Briefcase,
   GST_SUPPLIER: Truck,
   GST_INVOICE: ReceiptIndianRupee,
+  TDS_CASE: Eye,
   RULE: ListChecks,
 };
 

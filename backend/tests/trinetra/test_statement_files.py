@@ -1,6 +1,7 @@
 """Statement files through the same preview, confirm and import path as typed rows (Final 2T, Phase 3; N-203)."""
 
 import hashlib
+import json
 from pathlib import Path
 
 from app.models.trinetra import TrinetraStatement
@@ -134,3 +135,29 @@ def test_a_row_whose_booking_status_is_not_final_cannot_be_allocated(client, ten
                 "allocations": [{"snapshot_id": imported.json()["id"], "line_id": "0", "amount": "2000"}]}
     r = client.post(url + f"/credits/{case['id']}/decisions", headers=tenant.owner.headers, json=decision)
     assert r.status_code == 422 and "booking status" in r.text and "'U'" in r.text
+
+
+def test_an_ambiguous_ais_file_is_refused_with_the_headings_so_the_reviewer_can_choose_the_columns(client, tenant, world):
+    """The mapping choice needs the column headings. The refusal carries them (and what Servabo proposed), never a row."""
+    url, body, _ = setup_case(client, tenant, world)
+    ambiguous = blob("ais_tds_sample.csv").replace(b"Tax Deducted", b"Tax Deducted at Source,TDS Amount").replace(b",F\n", b",F,0\n")
+    refused = client.post(url + "/statement-files/preview", headers=tenant.owner.headers,
+                          data={"profile_id": body["profile_id"], "year": "2025", "pan": "ABCDE1234F"},
+                          files={"file": ("ais.csv", ambiguous, "text/csv")})
+    assert refused.status_code == 422, refused.text
+    detail = refused.json()["detail"]
+    assert detail["code"] == "TRINETRA_AMBIGUOUS_COLUMNS" and "Choose" in detail["message"]
+    columns = detail["columns"]
+    assert "Tax Deducted at Source" in columns["columns"] and "TDS Amount" in columns["columns"]
+    assert columns["proposed"]["deducted"] is None and set(columns["proposed"]) >= {"tan", "deducted", "date"}
+    assert "ABCD12345E" not in refused.text                                # no row, no TAN
+    chosen = columns["columns"].index("TDS Amount")
+    source = columns["columns"].index("Information Source")          # "Tax Deducted at Source" also says "source": choose it too
+    ok = client.post(url + "/statement-files/preview", headers=tenant.owner.headers,
+                     data={"profile_id": body["profile_id"], "year": "2025", "pan": "ABCDE1234F",
+                           "mapping": json.dumps({"deducted": chosen, "source": source})},
+                     files={"file": ("ais.csv", ambiguous, "text/csv")})
+    # The chosen columns are taken: whatever the file's rows then say, it is no longer refused for ambiguity.
+    assert ok.status_code in (200, 422), ok.text
+    if ok.status_code == 422:
+        assert ok.json()["detail"]["code"] != "TRINETRA_AMBIGUOUS_COLUMNS", ok.text

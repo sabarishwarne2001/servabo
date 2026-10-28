@@ -27,9 +27,12 @@ _TAN_IN_TEXT = re.compile(r"(?<![A-Z0-9])([A-Z]{4}[0-9]{5}[A-Z])(?![A-Z0-9])")
 class StatementRefused(ValueError):
     """The file is refused, in a sentence a person understands. Nothing was read into a statement."""
 
-    def __init__(self, message: str, *, code: str = "TRINETRA_STATEMENT_REFUSED", row: Optional[int] = None) -> None:
+    def __init__(self, message: str, *, code: str = "TRINETRA_STATEMENT_REFUSED", row: Optional[int] = None,
+                 columns: Optional[dict] = None) -> None:
         super().__init__(message)
         self.message, self.code, self.row = message, code, row
+        #: For a refusal the reviewer can fix by choosing columns: the headings and what was proposed (never a data row).
+        self.columns = columns
 
 
 @dataclass

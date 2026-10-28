@@ -91,3 +91,18 @@ def test_nothing_is_swept_when_trinetra_is_not_live_for_the_organization(client,
     monkeypatch.setattr(settings, "TRINETRA_MODE", "off")
     service.sweep(db_session, tenant.workspace, heavy=True)
     assert issues(db_session, tenant) == []
+
+
+def test_the_recoveries_page_lists_the_issue_in_words_with_a_way_back_to_the_case(client, tenant, world, db_session):
+    url, body, case = setup_case(client, tenant, world, reference="TR-REC-9")
+    statement(client, tenant, url, body, [OTHER])
+    service.sweep(db_session, tenant.workspace, heavy=True)
+    db_session.commit()
+    listed = client.get(f"/api/v1/workspaces/{tenant.workspace.id}/recoveries", headers=tenant.owner.headers)
+    assert listed.status_code == 200, listed.text
+    [issue] = [i for i in listed.json()["items"] if i["kind"] == "TDS_CREDIT"]
+    assert issue["kind_label"] == "TDS not yet in your statement" and issue["exposure_micros"] is None
+    assert issue["details"]["gap_micros"] == 2_000_000_000
+    one = client.get(f"/api/v1/workspaces/{tenant.workspace.id}/recoveries/{issue['id']}", headers=tenant.owner.headers).json()
+    assert [a["path"] for a in one["next_actions"] if a["key"] == "trinetra"] == [f"trinetra?case={case['id']}"]
+    assert listed.json()["summary"]["found"] == []

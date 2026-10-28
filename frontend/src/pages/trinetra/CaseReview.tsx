@@ -1,10 +1,23 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, INPUT, SELECT } from "@/components/ui/primitives";
-import { decideCredit, getCreditDetail, getInquiryDraft } from "@/services/api/trinetra";
+import { decideCredit, getCreditDetail } from "@/services/api/trinetra";
 import { errorMessage } from "@/services/api/errors";
 import { rupees } from "./format";
+import InquiryPanel from "./InquiryPanel";
 import ReviewTools from "./ReviewTools";
+
+export const DECISIONS: readonly (readonly [string, string])[] = [
+  ["ALLOCATE", "Allocate a statement posting"],
+  ["DISPUTED", "Mark as disputed"],
+  ["EXPLAINED", "Close with an explanation"],
+  ["WITHDRAWN", "Withdraw the case"],
+  ["CA_REVIEWED", "Confirmed by the accountant"],
+  ["UNRESOLVED", "Leave unresolved"],
+  ["REJECT_MATCH", "This statement row is not the match"],
+  ["ANNOTATE", "Add a note to the case"],
+  ["REOPEN", "Reopen"],
+];
 
 export default function CaseReview({
   workspaceId,
@@ -20,21 +33,30 @@ export default function CaseReview({
   const [reason, setReason] = useState("");
   const [minutes, setMinutes] = useState("0");
   const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const [line, setLine] = useState("");
+  const [note, setNote] = useState("");
+  const [waiting, setWaiting] = useState<string | null>(null);
   const detail = useQuery({
     queryKey: ["trinetra", workspaceId, "case", creditId],
     queryFn: () => getCreditDetail(workspaceId, creditId),
   });
-  const draft = useMutation({ mutationFn: () => getInquiryDraft(workspaceId, creditId) });
   const save = useMutation({
     mutationFn: async () => {
       if (!detail.data) {
         throw new Error("Reload the case before reviewing it.");
       }
+      const chosen = detail.data.statement_lines.find((l) => l.id === line);
       return decideCredit(workspaceId, creditId, {
         revision: detail.data.revision,
         action,
         reason,
         review_minutes: Number(minutes),
+        ...(action === "REJECT_MATCH" || action === "ANNOTATE"
+          ? {
+              ...(chosen ? { snapshot_id: chosen.snapshot_id, line_id: chosen.id } : {}),
+              ...(action === "ANNOTATE" ? { note } : {}),
+            }
+          : {}),
         allocations:
           action === "ALLOCATE"
             ? detail.data.statement_lines
@@ -47,10 +69,18 @@ export default function CaseReview({
             : [],
       });
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      // Enterprise: a closure above the organization's threshold waits for a second person (HTTP 202; nothing is closed yet).
+      const asked = result as unknown as { approval_required?: boolean; message?: string };
+      setWaiting(
+        asked.approval_required
+          ? (asked.message ?? "This closure needs a second person's approval.")
+          : null,
+      );
       setReason("");
       setMinutes("0");
       setAmounts({});
+      setNote("");
       void cache.invalidateQueries({ queryKey: ["trinetra", workspaceId] });
     },
   });
@@ -104,13 +134,11 @@ export default function CaseReview({
                 value={action}
                 onChange={(e) => setAction(e.target.value)}
               >
-                {["ALLOCATE", "DISPUTED", "EXPLAINED", "WITHDRAWN", "CA_REVIEWED", "REOPEN"].map(
-                  (value) => (
-                    <option key={value} value={value}>
-                      {value.toLowerCase().replaceAll("_", " ")}
-                    </option>
-                  ),
-                )}
+                {DECISIONS.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </select>
             </label>
             {action === "ALLOCATE" && (
@@ -132,6 +160,38 @@ export default function CaseReview({
                   </label>
                 ))}
               </fieldset>
+            )}
+            {(action === "REJECT_MATCH" || action === "ANNOTATE") && (
+              <label className="block text-sm">
+                {action === "REJECT_MATCH"
+                  ? "The statement row that is not the match"
+                  : "The statement row this is about (optional)"}
+                <select
+                  className={`${SELECT} mt-1 w-full`}
+                  required={action === "REJECT_MATCH"}
+                  value={line}
+                  onChange={(e) => setLine(e.target.value)}
+                >
+                  <option value="">Choose a row</option>
+                  {detail.data?.statement_lines.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      Posting {Number(l.id) + 1} · {rupees(l.amount_micros)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {action === "ANNOTATE" && (
+              <label className="block text-sm">
+                The note
+                <textarea
+                  required
+                  maxLength={500}
+                  className={`${INPUT} mt-1`}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                />
+              </label>
             )}
             <label className="block text-sm">
               Reason and evidence
@@ -164,26 +224,15 @@ export default function CaseReview({
                 {errorMessage(save.error, "Review could not be recorded.")}
               </p>
             )}
-          </form>
-          <button
-            className={BUTTON_SECONDARY}
-            onClick={() => draft.mutate()}
-            disabled={draft.isPending}
-          >
-            Prepare inquiry draft
-          </button>
-          {draft.data && (
-            <div className="rounded border border-border p-3 text-sm">
-              <p className="font-medium">{draft.data.subject}</p>
-              <p className="mt-2 whitespace-pre-wrap">{draft.data.body}</p>
-              <p className="mt-3 text-xs text-muted-foreground">
-                Draft only. No message has been sent.
+            {waiting && (
+              <p role="status" className="text-sm" data-testid="trinetra-approval-requested">
+                {waiting}
               </p>
-            </div>
-          )}
-          {draft.isError && <p role="alert">The draft could not be prepared.</p>}
+            )}
+          </form>
         </>
       )}
+      <InquiryPanel workspaceId={workspaceId} creditId={creditId} canDecide={canDecide} />
     </div>
   );
 }

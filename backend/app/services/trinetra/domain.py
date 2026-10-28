@@ -169,6 +169,32 @@ def allocate(
     return [*allocations, Allocation(credit.id, posting.id, amount, posting.snapshot)]
 
 
+def explain(credit: Credit, posting: Posting, *, expected: int | None, available: int) -> list[dict]:
+    """Field by field, why a statement row is or is not this case's match. Values are as printed (a section is never converted);
+    `agrees` is True, False, or None when one side prints nothing (never called a difference). Identifiers are not shown."""
+    a, b = (credit.section or "").strip(), (posting.section or "").strip()
+    section_agrees = None if not (a and b) else _label(a) == _label(b)
+    year_agrees = credit.scope == posting.scope and not outside_year(credit, posting)
+    posted_year = tax_period(posting.on)[1] if posting.on else None
+    ref_a, ref_b = (credit.reference or "").strip(), (posting.reference or "").strip()
+    reference_agrees = None if not (ref_a and ref_b) else ref_a.casefold() == ref_b.casefold()
+    return [
+        dict(key="deductor", label="Deductor", case_value=None, statement_value=None,
+             agrees=bool(credit.deductor) and credit.deductor == posting.deductor,
+             note="The deductor's TAN, compared as a key (never shown in full)."),
+        dict(key="entity_and_year", label="Legal entity and tax year", case_value=str(credit.scope.year), statement_value=posted_year,
+             agrees=year_agrees, note="The same entity, and a transaction date inside the case's tax year. Years are never mixed."),
+        dict(key="section", label="Section or table item", case_value=a or None, statement_value=b or None, agrees=section_agrees,
+             note=("Not printed on one side, so it is neither a match nor a difference." if section_agrees is None
+                   else "As printed. Servabo never converts an old-Act section into a new-Act table item or back.")),
+        dict(key="amount", label="Amount (INR micros)", case_value=None if expected is None else str(expected),
+             statement_value=str(available), agrees=expected is not None and expected == available,
+             note="The supported expected amount against what is still free on the statement row."),
+        dict(key="reference", label="Reference", case_value=ref_a or None, statement_value=ref_b or None, agrees=reference_agrees,
+             note="Shown for the reviewer; a different reference never decides a match on its own."),
+    ]
+
+
 def reconcile(
     credit: Credit,
     postings: list[Posting],
