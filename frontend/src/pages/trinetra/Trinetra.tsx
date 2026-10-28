@@ -118,7 +118,7 @@ function Cockpit() {
       <div className="flex flex-wrap gap-3">
         {!sample && live && (profiles.data?.items.length ?? 0) > 0 && (
           <label className="text-sm">
-            Legal entity
+            Show one legal entity
             <select
               className={`${SELECT} ml-2`}
               value={entity}
