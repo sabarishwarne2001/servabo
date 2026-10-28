@@ -838,10 +838,12 @@ class InquirySendIn(Strict):
 
 
 def _inquiry(db, w, inquiry_id):
+    from sqlalchemy import select  # the plain name: the ARCH-05 lock check reads it
+
     from app.models.trinetra import TrinetraInquiry
 
     row = db.execute(
-        _select(TrinetraInquiry).filter_by(id=inquiry_id, workspace_id=w.id).with_for_update()
+        select(TrinetraInquiry).filter_by(id=inquiry_id, workspace_id=w.id).with_for_update()
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(404, "Inquiry not found.")
@@ -1003,10 +1005,12 @@ def approvals_list(
 
 
 def _approval(db, w, approval_id):
+    from sqlalchemy import select  # the plain name: the ARCH-05 lock check reads it
+
     from app.models.trinetra import TrinetraApproval
 
     row = db.execute(
-        _select(TrinetraApproval).filter_by(id=approval_id, workspace_id=w.id).with_for_update()
+        select(TrinetraApproval).filter_by(id=approval_id, workspace_id=w.id).with_for_update()
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(404, "Approval not found.")
