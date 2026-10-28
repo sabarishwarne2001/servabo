@@ -50,7 +50,8 @@ test.describe("TRINETRA working screens", () => {
     await expect(page.getByTestId("trinetra-import-done")).toBeVisible();
   });
 
-  test("an AIS file with two possible tax columns asks which one means what, and never shows a row it could not read", async ({ page }) => {
+  test("an AIS file with two possible tax columns asks which one means what, and never shows a row it could not read", async ({ page, problems }) => {
+    problems.allowHttp(/\/trinetra\/statement-files\/preview/, [422], "the ambiguous columns are refused, with the headings, until the person chooses");
     const form = await openStatements(page);
     const ais = fixture("ais_tds_sample.csv");
     const ambiguous = Buffer.from(
@@ -71,7 +72,8 @@ test.describe("TRINETRA working screens", () => {
     await expect(page.getByTestId("trinetra-import-notice")).toBeVisible();
   });
 
-  test("the official statement formats are offered as unverified, never as a trusted reader", async ({ page }) => {
+  test("the official statement formats are offered as unverified, never as a trusted reader", async ({ page, problems }) => {
+    problems.allowHttp(/\/trinetra\/statement-files\/preview/, [409, 422], "an unverified or unrecognised official file is refused in words");
     const form = await openStatements(page);
     const readers = await form.getByLabel("How to read it").locator("option").allTextContents();
     const official = readers.filter((label) => /26AS|168/.test(label));
@@ -109,7 +111,8 @@ test.describe("TRINETRA working screens", () => {
     await expect(page.getByRole("button", { name: /TRW-002/ })).toBeVisible();
   });
 
-  test("an inquiry is a draft a person approves and presses Send on; without a confirmed contact it goes nowhere", async ({ page }) => {
+  test("an inquiry is a draft a person approves and presses Send on; without a confirmed contact it goes nowhere", async ({ page, problems }) => {
+    problems.allowHttp(/\/trinetra\/inquiries\//, [409, 422], "approving needs a confirmed contact in Helm");
     await signInAs(page, customer.email);
     await page.goto(customer.ws("trinetra"));
     await page.getByRole("button", { name: /TRW-001/ }).click();
