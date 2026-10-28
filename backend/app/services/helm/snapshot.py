@@ -152,10 +152,26 @@ class Receivable:
     #: Days later than their own history says this customer will pay: a what-if's assumption
     #: (`what_if.apply`); always 0 in a snapshot read from the database, and not in the digest.
     expected_delay_days: int = 0
+    #: TRINETRA (Final 2T): tax the customer withheld that a person reviewed (micros), and the case that holds the review.
+    #: `amount_micros` stays the commercial balance; the cash still owed is `cash_due_micros`.
+    withheld_micros: int = 0
+    withholding_case_id: Optional[str] = None
+    #: "UNKNOWN_AMOUNT": a withholding was confirmed but its evidence is no longer current, so the amount is not known.
+    withholding_hold: Optional[str] = None
 
     @property
     def open(self) -> bool:
         return self.paid_on is None and self.amount_micros > 0
+
+    @property
+    def cash_due_micros(self) -> int:
+        """What is still owed in cash: the open balance less the withholding a person reviewed."""
+        return max(0, self.amount_micros - self.withheld_micros)
+
+    @property
+    def reminder_held(self) -> bool:
+        """Nothing may be chased in cash: the withheld tax is all that is left, or its amount is not known."""
+        return bool(self.withholding_case_id) and (self.withholding_hold is not None or self.cash_due_micros <= 0)
 
 
 @dataclass(frozen=True)
@@ -285,6 +301,9 @@ class Snapshot:
     def payable_for_work_item(self, work_item_id: str) -> Optional[Payable]:
         return next((p for p in self.payables if p.work_item_id == work_item_id), None)
 
+    def receivable(self, promise_id: str) -> Optional[Receivable]:
+        return next((r for r in self.receivables if r.promise_id == promise_id), None)
+
     def currencies(self) -> list[str]:
         found = {p.currency for p in self.payables if p.currency} | {r.currency for r in self.receivables
                                                                       if r.currency} | set(self.cash)
@@ -308,7 +327,8 @@ def digest_content(snapshot: Snapshot) -> dict[str, Any]:
         "book": snapshot.book_id, "as_of": snapshot.as_of, "horizon": snapshot.horizon_days,
         "run_days": list(snapshot.run_days), "coc": snapshot.cost_of_capital_bps,
         "payables": [payable(p) for p in snapshot.payables],
-        "receivables": [[r.promise_id, r.amount_micros, r.due_date, r.paid_on, r.counterparty_key]
+        "receivables": [[r.promise_id, r.amount_micros, r.due_date, r.paid_on, r.counterparty_key,
+                         r.withheld_micros, r.withholding_case_id, r.withholding_hold]
                         for r in snapshot.receivables],
         "notices": [[n.promise_id, n.due_date, n.status] for n in snapshot.notices],
         "compliance": [[c.promise_id, c.valid_until, c.status] for c in snapshot.compliance],
