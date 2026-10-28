@@ -24,6 +24,12 @@ from app.services.trinetra import domain as d
 from app.services.trinetra import versions
 
 
+#: Recorded in the case history when the seller was matched by name alone and a reviewer confirmed it.
+SELLER_NAME_NOTE = {
+    "NAME_ONLY": " Seller matched by name only (no PAN or valid GSTIN printed); confirmed by the reviewer."
+}
+
+
 def capacity(db, workspace, kind):
     """Pinned published plan, with a finite platform ceiling even for legacy tiers."""
     from app.services.quota_service import plan_limit
@@ -70,9 +76,13 @@ def invoice_version(db, workspace, item_id):
     return facts.invoice if facts else None
 
 
-def receivable(db, workspace, p, source_id):
-    """Use canonical document facts and Helm's identity rules, without changing its ledger."""
-    from app.services.helm import ledger_store, identity as ident
+def receivable(db, workspace, p, source_id, *, seller_name_confirmed=False):
+    """Use canonical document facts and Helm's identity rules, without changing its ledger.
+
+    Returns (source, fact, seller). `seller.outcome` is MATCH, or NAME_ONLY when a reviewer confirmed the seller by name
+    because the invoice prints no PAN and no valid GSTIN (the caller records that in the case history)."""
+    from app.services.helm import ledger_store
+    from app.services.trinetra import seller as sellers
 
     source = document(db, workspace, source_id)
     facts = ledger_store.document_facts(db, workspace, ids=[source_id])
@@ -88,19 +98,18 @@ def receivable(db, workspace, p, source_id):
             "Choose a classified INR invoice with a positive source amount. Reversals require accountant review.",
         )
     fact = facts[0]
-    pan = ident.first(fact.entities, ("vendor_pan", "seller_pan"))
-    if pan:
-        same = hmac.compare_digest(pan, encryption.decrypt_secret(p.pan_ciphertext))
-    else:
-        same = ident.we_are_seller(
-            fact.entities, ident.Identities.of([{"name": p.name}])
-        )
-    if not same:
+    verdict = sellers.check(fact.entities, encryption.decrypt_secret(p.pan_ciphertext), p.name)
+    if verdict.outcome == sellers.MISMATCH:
+        raise HTTPException(422, verdict.message())
+    if verdict.outcome == sellers.NAME_ONLY and not seller_name_confirmed:
         raise HTTPException(
             422,
-            "The invoice seller does not match the selected receiving entity. Correct and review its canonical identity first.",
+            {
+                "code": "TRINETRA_SELLER_NAME_ONLY",
+                "message": "The invoice prints no PAN and no valid GSTIN for the seller, so it can only be matched to this entity by name. Check the invoice and confirm the seller by name to continue.",
+            },
         )
-    return source, fact
+    return source, fact, verdict
 
 
 def invoice_period(fact, year):
@@ -514,10 +523,12 @@ def decide(
     db.flush()
 
 
-def reconfirm(db, workspace, row, p, user_id, revision, amount, reason):
+def reconfirm(db, workspace, row, p, user_id, revision, amount, reason, seller_name_confirmed=False):
     if revision != row.revision:
         raise HTTPException(409, "This case changed. Reload before confirming.")
-    source, fact = receivable(db, workspace, p, row.work_item_id)
+    source, fact, seller = receivable(
+        db, workspace, p, row.work_item_id, seller_name_confirmed=seller_name_confirmed
+    )
     invoice_period(fact, row.year)
     value = d.money(amount)
     if value <= 0 or value > fact.total_micros:
@@ -540,7 +551,8 @@ def reconfirm(db, workspace, row, p, user_id, revision, amount, reason):
             action="EXPECTATION_RECONFIRMED",
             evidence_work_item_ids=decision_sources(db, row, p),
             reason=f"Previous expected micros: {previous}. Reconfirmed micros: {value}. "
-            + reason,
+            + reason
+            + SELLER_NAME_NOTE.get(seller.outcome, ""),
             allocations=[],
         )
     )

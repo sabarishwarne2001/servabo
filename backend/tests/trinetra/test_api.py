@@ -4,7 +4,11 @@ import pytest
 from app.core.config import settings
 from app.models.trinetra import TrinetraDecision, TrinetraStatement
 from tests.security.plans import put_on_plan
-from tests.services.gst.helpers import book_invoice, SUPPLIER_A
+from tests.services.gst.helpers import book_invoice
+from app.services.gst import builder as gst_builder
+
+#: The seller's GSTIN carries the seller's PAN (characters 3 to 12), as a real one does.
+SUPPLIER_A = gst_builder.make_gstin("27", "ABCDE1234F")
 
 
 def really_change(db, item):

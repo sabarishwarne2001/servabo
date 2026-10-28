@@ -4,7 +4,7 @@ import uuid
 from datetime import date
 from typing import Literal, Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel, ConfigDict, Field, AfterValidator
+from pydantic import BaseModel, ConfigDict, Field, AfterValidator, BeforeValidator
 from sqlalchemy.orm import Session
 from app.api.deps import (
     RequireWorkspaceRole,
@@ -50,6 +50,16 @@ def _money(value: str) -> str:
 Money = Annotated[str, AfterValidator(_money)]
 
 
+def _pan(value):
+    """Upper case, no spaces or hyphens; anything else is left for the pattern to refuse (a 422)."""
+    from app.services.trinetra.seller import normalize_pan
+
+    return (normalize_pan(value) or value) if isinstance(value, str) else value
+
+
+Pan = Annotated[str, BeforeValidator(_pan), Field(pattern=r"^[A-Z]{5}[0-9]{4}[A-Z]$", max_length=10)]
+
+
 def no_cache(response: Response):
     response.headers["Cache-Control"] = "no-store"
 
@@ -66,7 +76,7 @@ class Strict(BaseModel):
 
 class ProfileIn(Strict):
     name: str = Field(min_length=1, max_length=120)
-    pan: str = Field(pattern=r"^[A-Z]{5}[0-9]{4}[A-Z]$")
+    pan: Pan
 
 
 class LineIn(Strict):
@@ -80,7 +90,7 @@ class ImportIn(Strict):
     source_work_item_id: uuid.UUID
     source_version: str | None = Field(default=None, max_length=60)
     year: int = Field(ge=2000, le=2100)
-    pan: str = Field(pattern=r"^[A-Z]{5}[0-9]{4}[A-Z]$")
+    pan: Pan
     confirmed: bool
     rows: list[LineIn] = Field(min_length=1, max_length=500)
 
@@ -94,6 +104,7 @@ class CreditIn(Strict):
     tan: str = Field(pattern=r"^[A-Z]{4}[0-9]{5}[A-Z]$")
     amount: Money
     source_confirmation: str = Field(min_length=10, max_length=1000)
+    seller_name_confirmed: bool = False
 
 
 class AllocationIn(Strict):
@@ -113,6 +124,7 @@ class DecisionIn(Strict):
 
 
 class ReconfirmIn(Strict):
+    seller_name_confirmed: bool = False
     revision: int = Field(ge=1)
     amount: Money
     reason: str = Field(min_length=10, max_length=1000)
@@ -331,7 +343,9 @@ def create_credit(
 ):
     w = workspace(db, context, workspace_id)
     p = s.profile(db, w, body.profile_id)
-    source, fact = s.receivable(db, w, p, body.work_item_id)
+    source, fact, seller = s.receivable(
+        db, w, p, body.work_item_id, seller_name_confirmed=body.seller_name_confirmed
+    )
     s.invoice_period(fact, body.year)
     s.lock_capacity(db, w)
     old = (
@@ -388,7 +402,7 @@ def create_credit(
             actor_id=context.user_id,
             revision=1,
             action="EXPECTATION_CONFIRMED",
-            reason=body.source_confirmation,
+            reason=body.source_confirmation + s.SELLER_NAME_NOTE.get(seller.outcome, ""),
             allocations=[],
         )
     )
@@ -472,7 +486,17 @@ def reconfirm(
 ):
     w = workspace(db, context, workspace_id)
     row, p = locked_case(db, w, credit_id)
-    s.reconfirm(db, w, row, p, context.user_id, body.revision, body.amount, body.reason)
+    s.reconfirm(
+        db,
+        w,
+        row,
+        p,
+        context.user_id,
+        body.revision,
+        body.amount,
+        body.reason,
+        body.seller_name_confirmed,
+    )
     announce_review(db, w, row)
     db.commit()
     return s.view(db, w, row)
