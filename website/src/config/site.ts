@@ -41,6 +41,15 @@ export const SITE = {
   merchantOfRecord: "Dodo Payments",
 } as const;
 
+/**
+ * TRINETRA's rollout (Final session 2T). The pages say "rolling out" until the owner's launch step is done (a chartered
+ * accountant has read this page and the in-app wording and the deployment's TRINETRA_MODE is "on"); then the build variable
+ * PUBLIC_TRINETRA_STATUS=available switches every mention to "included". One setting, no other copy to edit.
+ */
+export const TRINETRA = {
+  status: (env.PUBLIC_TRINETRA_STATUS ?? "").trim() === "available" ? ("available" as const) : ("rolling_out" as const),
+};
+
 export const APP = {
   signIn: `${SITE.appUrl}/login`,
   register: `${SITE.appUrl}/register`,
@@ -57,7 +66,7 @@ export const FOOTER = {
   product: [
     { href: "/helm", label: "Helm" },
     { href: "/gst-credit", label: "GST credit" },
-    { href: "/trinetra", label: "TRINETRA preview" },
+    { href: "/trinetra", label: "TRINETRA" },
     { href: "/product", label: "Product tour" },
     { href: "/pricing", label: "Pricing" },
     { href: "/security", label: "Security" },
@@ -85,7 +94,7 @@ export const FOOTER = {
 export const NAV = [
   { href: "/helm", label: "Helm" },
   { href: "/gst-credit", label: "GST credit" },
-    { href: "/trinetra", label: "TRINETRA preview" },
+    { href: "/trinetra", label: "TRINETRA" },
   { href: "/product", label: "Product" },
   { href: "/solutions/accounts-payable", label: "Solutions", match: "/solutions" },
   { href: "/pricing", label: "Pricing" },

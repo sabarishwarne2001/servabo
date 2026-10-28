@@ -5,6 +5,7 @@
  * this file has no words for, so a new plan can never reach the site unlabelled.
  */
 import data from "../data/pricing.json";
+import { TRINETRA } from "../config/site";
 
 export type Interval = "month" | "year";
 
@@ -63,7 +64,7 @@ export const ALLOWANCE_LABELS: Record<string, { label: string; unit: string }> =
 /** Features (capabilities and add-ons), as the job they do. */
 export const FEATURE_LABELS: Record<string, string> = {
   "capability.trinetra_all_workspaces": "TRINETRA across all your workspaces and legal entities",
-  "capability.trinetra": "TRINETRA: check that your customers' TDS reached your tax statement",
+  "capability.trinetra": `TRINETRA: check that your customers' TDS reached your tax statement${TRINETRA.status === "available" ? "" : " (rolling out)"}`,
   "capability.developer_api": "Developer API keys",
   "capability.outgoing_webhooks": "Outgoing webhooks",
   "capability.custom_branding": "Your logo, colours and name",
