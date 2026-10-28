@@ -1,23 +1,22 @@
-/** Synthetic end-to-end review. API: TRINETRA_LIVE_ENABLED=true; runner: E2E_TRINETRA_LIVE=1. */
+/** Synthetic end-to-end review. The organization is enrolled in the pilot by the platform operator, as a launch would do it (Final 2T);
+ *  the old TRINETRA_LIVE_ENABLED alias still opens it too. */
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect, settle } from "../support/fixtures";
 import { api } from "../support/api";
 import { newCustomer, signInAs, standIn, type Customer } from "../support/journey";
 import { buildPdf } from "../support/sample-docs";
+import { enrol } from "../support/trinetra";
 let customer: Customer;
 let invoiceId: string;
 let statementId: string;
 let adviceId: string;
 let accountingId: string;
 test.describe("TRINETRA reviewed evidence", () => {
-  test.skip(
-    process.env.E2E_TRINETRA_LIVE !== "1",
-    "Requires explicitly enabled synthetic test API; release default remains off.",
-  );
   test.setTimeout(240_000);
   test.beforeAll(async () => {
     customer = await newCustomer("trinetra", "Synthetic Trinetra Services Ltd");
     standIn("subscribe", customer.orgSlug, "--plan", "business", "--seats", "2");
+    await enrol(customer.orgId);
     const documents = [
       {
         name: "TRINETRA-INVOICE.pdf",

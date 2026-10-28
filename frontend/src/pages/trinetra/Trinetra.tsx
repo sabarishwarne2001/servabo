@@ -509,7 +509,17 @@ function Cockpit() {
           <TabPanel idBase="trinetra" id={tab} className="space-y-6">
             {tab === "cases" && cases}
             {tab === "statements" &&
-              (access.data ? <ImportStatement workspaceId={id} access={access.data} /> : null)}
+              (!canWrite ? (
+                <section className={`${SURFACE} p-5 text-sm`} aria-label="Import your tax statement">
+                  <p className="font-medium">Only a workspace administrator imports a statement.</p>
+                  <p className="mt-1 text-muted-foreground">
+                    You can read every case and the statement it was compared with. Ask a workspace
+                    administrator to import a new one.
+                  </p>
+                </section>
+              ) : access.data ? (
+                <ImportStatement workspaceId={id} access={access.data} />
+              ) : null)}
             {tab === "suggestions" && <Suggestions workspaceId={id} canDecide={canWrite} />}
             {tab === "exceptions" && <Exceptions workspaceId={id} canDecide={canWrite} />}
             {tab === "approvals" && (
