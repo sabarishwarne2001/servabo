@@ -7,7 +7,7 @@ from app.models.trinetra import TrinetraCredit
 from app.models.work_item import WorkItem
 from app.models.document_role import DocumentRole
 from app.services.trinetra.projection import reviewed_withholding
-from app.services.trinetra.service import invoice_version
+from app.services.trinetra import versions
 
 
 @dataclass(frozen=True)
@@ -18,26 +18,21 @@ class Withholding:
     reviewed_micros: int | None
 
 
-def _value(row, sources, roles) -> dict:
+def _value(row, facts) -> dict:
     """The case's evidence as of now (read-only; the same rules as the case view)."""
     evidence = [
         {
             **e,
             "current": bool(
-                (doc := sources.get(uuid.UUID(e["work_item_id"])))
-                and doc.workspace_id == row.workspace_id
-                and doc.updated_at.isoformat() == e["source_version"]
+                (doc := facts.get(uuid.UUID(e["work_item_id"])))
+                and doc.evidence == e["source_version"]
             ),
         }
         for e in (row.review or {}).get("evidence", [])
     ]
-    source = sources.get(row.work_item_id)
+    source = facts.get(row.work_item_id)
     value = {
-        "source_current": bool(
-            source
-            and invoice_version(source, roles.get(row.work_item_id))
-            == row.source_version
-        ),
+        "source_current": bool(source and source.invoice == row.source_version),
         "review": {"evidence": evidence},
     }
     for kind, key in (
@@ -75,18 +70,7 @@ def _reviewed_for(db, rows) -> dict:
         for e in (r.review or {}).get("evidence", [])
     )
     workspaces = {r.workspace_id for r in rows}
-    sources = {
-        x.id: x
-        for x in db.query(WorkItem).filter(
-            WorkItem.id.in_(ids), WorkItem.workspace_id.in_(workspaces)
-        )
-    }
-    roles = {
-        r.work_item_id: r
-        for r in db.query(DocumentRole).filter(
-            DocumentRole.work_item_id.in_(ids), DocumentRole.workspace_id.in_(workspaces)
-        )
-    }
+    facts = versions.load(db, workspaces, ids)
     grouped = {}
     for row in rows:
         grouped.setdefault(row.work_item_id, []).append(row)
@@ -95,7 +79,7 @@ def _reviewed_for(db, rows) -> dict:
         row = candidates[0]
         amount = None
         if len(candidates) == 1:
-            amount = reviewed_withholding(row, _value(row, sources, roles))
+            amount = reviewed_withholding(row, _value(row, facts))
         found[work_item_id] = (row, amount)
     return found
 

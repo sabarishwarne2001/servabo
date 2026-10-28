@@ -7,6 +7,13 @@ from tests.security.plans import put_on_plan
 from tests.services.gst.helpers import book_invoice, SUPPLIER_A
 
 
+def really_change(db, item):
+    """A real change to a document: its stored file is replaced. (Since Final 2T a touch of the row, such as a rename or
+    a bumped updated_at, is not a change; see tests/trinetra/test_versions.py.)"""
+    item.stored_filename = item.stored_filename + ".replaced"
+    db.commit()
+
+
 @pytest.fixture()
 def world(client, db_session, tenant, monkeypatch):
     put_on_plan(db_session, tenant.organization, "business")

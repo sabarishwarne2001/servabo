@@ -248,7 +248,7 @@ def import_statement(
     p = s.profile(db, w, body.profile_id)
     if (
         body.source_version is not None
-        and s.document(db, w, body.source_work_item_id).updated_at.isoformat()
+        and s.versions.one(db, w.id, s.document(db, w, body.source_work_item_id).id).statement
         != body.source_version
     ):
         raise HTTPException(
@@ -298,7 +298,7 @@ def preview_statement(
         "pan_masked": p.pan_masked,
         "period": d.tax_period(date(body.year, 4, 1))[1],
         "source_work_item_id": str(source.id),
-        "source_version": source.updated_at.isoformat(),
+        "source_version": s.versions.one(db, w.id, source.id).statement,
         "rows": len(body.rows),
         "total_micros": str(sum(d.money(r.amount) for r in body.rows)),
         "parser_version": "human-transcription-v1",
@@ -364,11 +364,6 @@ def create_credit(
         organization_id=w.organization_id
     ).count() >= s.capacity(db, w, "cases"):
         raise HTTPException(409, "Live case limit reached.")
-    role = (
-        db.query(s.DocumentRole)
-        .filter_by(work_item_id=source.id, workspace_id=w.id)
-        .one()
-    )
     r = Credit(
         organization_id=w.organization_id,
         workspace_id=w.id,
@@ -377,7 +372,7 @@ def create_credit(
         year=body.year,
         counterparty=body.counterparty,
         reference=body.reference,
-        source_version=s.invoice_version(source, role),
+        source_version=s.invoice_version(db, w, source.id),
         deductor_key=s.identity(
             body.tan, "TAN", s.encryption.decrypt_secret(p.identity_salt_ciphertext)
         ),
@@ -507,7 +502,7 @@ def update_review(
             {
                 "work_item_id": str(source.id),
                 "kind": item.kind,
-                "source_version": source.updated_at.isoformat(),
+                "source_version": s.versions.one(db, w.id, source.id).evidence,
                 "amount_micros": (
                     d.money(item.amount) if item.amount is not None else None
                 ),

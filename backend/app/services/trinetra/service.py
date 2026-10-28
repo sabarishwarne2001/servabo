@@ -8,7 +8,7 @@ import uuid
 import secrets
 from dataclasses import asdict
 from fastapi import HTTPException
-from sqlalchemy.orm import Session, load_only
+from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.core import encryption
 from app.models.organization import Organization
@@ -21,6 +21,7 @@ from app.models.trinetra import (
     TrinetraDecision as Decision,
 )
 from app.services.trinetra import domain as d
+from app.services.trinetra import versions
 
 
 def capacity(db, workspace, kind):
@@ -63,13 +64,10 @@ def document(db, workspace, id):
     return row
 
 
-def invoice_version(source, role):
-    """Canonical invoice changes include reclassification/currency corrections."""
-    parts = [
-        source.updated_at.isoformat(),
-        role.updated_at.isoformat() if role else None,
-    ]
-    return hashlib.sha256(json.dumps(parts).encode()).hexdigest()
+def invoice_version(db, workspace, item_id):
+    """The invoice's fingerprint now (what it is, not when its row was last touched); None when it is gone."""
+    facts = versions.one(db, workspace.id, item_id)
+    return facts.invoice if facts else None
 
 
 def receivable(db, workspace, p, source_id):
@@ -181,8 +179,8 @@ def current(db, p, year):
         .first()
     )
     if snapshot:
-        source = db.get(WorkItem, snapshot.source_work_item_id)
-        if source is None or source.updated_at.isoformat() != snapshot.source_version:
+        facts = versions.one(db, p.workspace_id, snapshot.source_work_item_id)
+        if facts is None or facts.statement != snapshot.source_version:
             return None
     return snapshot
 
@@ -232,7 +230,7 @@ def postings(snapshot, workspace, p):
     ]
 
 
-def view(db, workspace, row, bundle=None, sources=None, roles=None):
+def view(db, workspace, row, bundle=None, facts=None, roles=None):
     if bundle is None:
         p = db.get(Profile, row.profile_id)
         snapshot = current(db, p, row.year)
@@ -243,11 +241,14 @@ def view(db, workspace, row, bundle=None, sources=None, roles=None):
             allocations(db, p, row.year),
         )
     p, snapshot, posting_rows, allocated = bundle
-    source = (
-        sources.get(row.work_item_id)
-        if sources is not None
-        else db.get(WorkItem, row.work_item_id)
-    )
+    if facts is None:
+        facts = versions.load(
+            db,
+            workspace.id,
+            [row.work_item_id]
+            + [uuid.UUID(e["work_item_id"]) for e in (row.review or {}).get("evidence", [])],
+        )
+    source = facts.get(row.work_item_id)
     role = (
         roles.get(row.work_item_id)
         if roles is not None
@@ -255,27 +256,16 @@ def view(db, workspace, row, bundle=None, sources=None, roles=None):
         .filter_by(work_item_id=row.work_item_id, workspace_id=workspace.id)
         .first()
     )
-    source_current = (
-        source is not None and invoice_version(source, role) == row.source_version
-    )
+    source_current = source is not None and source.invoice == row.source_version
     expectation = credit(row, workspace)
     reviewed = dict(row.review or {})
     reviewed["evidence"] = []
     for item in (row.review or {}).get("evidence", []):
-        evidence = (
-            sources.get(uuid.UUID(item["work_item_id"]))
-            if sources is not None
-            else db.query(WorkItem)
-            .filter_by(id=uuid.UUID(item["work_item_id"]), workspace_id=workspace.id)
-            .first()
-        )
+        evidence = facts.get(uuid.UUID(item["work_item_id"]))
         reviewed["evidence"].append(
             {
                 **item,
-                "current": bool(
-                    evidence
-                    and evidence.updated_at.isoformat() == item["source_version"]
-                ),
+                "current": bool(evidence and evidence.evidence == item["source_version"]),
             }
         )
     from dataclasses import replace
@@ -361,7 +351,7 @@ def import_reviewed(db, workspace, p, source, year, rows, pan, confirmed):
         raise HTTPException(
             422, "Duplicate posting rows require distinct source-row references."
         )
-    source_version = source_document.updated_at.isoformat()
+    source_version = versions.one(db, workspace.id, source_document.id).statement
     fp = hashlib.sha256(
         json.dumps(
             [str(source), source_version, year, normalized], sort_keys=True
@@ -433,14 +423,8 @@ def decide(
     requested,
     review_minutes=0,
 ):
-    source = db.get(WorkItem, row.work_item_id)
-    role = (
-        db.query(DocumentRole)
-        .filter_by(work_item_id=row.work_item_id, workspace_id=workspace.id)
-        .first()
-    )
     if action != "WITHDRAWN" and (
-        source is None or invoice_version(source, role) != row.source_version
+        invoice_version(db, workspace, row.work_item_id) != row.source_version
     ):
         raise HTTPException(
             409,
@@ -543,12 +527,7 @@ def reconfirm(db, workspace, row, p, user_id, revision, amount, reason):
         )
     previous = row.expected_micros
     row.expected_micros = value
-    role = (
-        db.query(DocumentRole)
-        .filter_by(work_item_id=row.work_item_id, workspace_id=workspace.id)
-        .one()
-    )
-    row.source_version = invoice_version(source, role)
+    row.source_version = invoice_version(db, workspace, source.id)
     row.state = "OPEN"
     row.revision += 1
     db.add(
@@ -593,12 +572,7 @@ def summary(db, workspace):
         for row in rows
         for e in (row.review or {}).get("evidence", [])
     )
-    sources = {
-        x.id: x
-        for x in db.query(WorkItem)
-        .options(load_only(WorkItem.id, WorkItem.workspace_id, WorkItem.updated_at))
-        .filter(WorkItem.workspace_id == workspace.id, WorkItem.id.in_(ids))
-    }
+    facts = versions.load(db, workspace.id, ids)
     roles = {
         x.work_item_id: x
         for x in db.query(DocumentRole).filter(
@@ -609,9 +583,8 @@ def summary(db, workspace):
     active = {
         (snap.profile_id, snap.year): snap
         for snap in snapshots
-        if snap.source_work_item_id in sources
-        and sources[snap.source_work_item_id].updated_at.isoformat()
-        == snap.source_version
+        if snap.source_work_item_id in facts
+        and facts[snap.source_work_item_id].statement == snap.source_version
     }
     latest = (
         db.query(Decision, CreditRow.profile_id, CreditRow.year)
@@ -641,7 +614,7 @@ def summary(db, workspace):
                 by_group.get(key, []),
             )
     items = [
-        view(db, workspace, r, bundles[(r.profile_id, r.year)], sources, roles)
+        view(db, workspace, r, bundles[(r.profile_id, r.year)], facts, roles)
         for r in rows
     ]
     from app.services.trinetra.outcomes import measure

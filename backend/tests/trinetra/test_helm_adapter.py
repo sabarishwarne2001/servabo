@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 
-from tests.trinetra.test_api import world  # noqa: F401
+from tests.trinetra.test_api import world, really_change  # noqa: F401
 from tests.trinetra.test_workflows import setup_case
 from app.models.trinetra import TrinetraCredit
 from app.services.helm import hands
@@ -47,8 +47,7 @@ def test_confirmed_withholding_does_not_require_government_posting(
     assert detail["cash_projection"]["cash_received_micros"] is None
     assert detail["cash_projection"]["unexplained_micros"] is None
     # Freshness failure must not make a stale deduction look verified.
-    world[2].updated_at = datetime.now(timezone.utc) + timedelta(seconds=1)
-    db_session.commit()
+    really_change(db_session, world[2])
     detail = client.get(path, headers=tenant.owner.headers).json()
     assert detail["cash_projection"]["reviewed_withholding_micros"] is None
 
@@ -93,8 +92,7 @@ def test_helm_never_sends_gross_reminder_for_reviewed_withholding(
         )
     assert sent == []
     # A stale confirmation also requires review, rather than silently resuming gross chasing.
-    world[2].updated_at = datetime.now(timezone.utc) + timedelta(seconds=1)
-    db_session.commit()
+    really_change(db_session, world[2])
     with pytest.raises(hands.HandError, match="withholding"):
         hands.send_reminder(
             db_session, action=action, book=SimpleNamespace(kind="WORKSPACE")
@@ -160,8 +158,7 @@ def test_the_snapshot_learns_the_reviewed_withholding_even_when_trinetra_is_off(
     monkeypatch.setattr(settings, "TRINETRA_LIVE_ENABLED", False)
     assert withholding_for(db_session, tenant.organization.id, ids)[world[1].id].reviewed_micros == 2_000_000_000
     # Stale evidence keeps the hold but the amount becomes unknown (never "nothing withheld").
-    world[2].updated_at = datetime.now(timezone.utc) + timedelta(seconds=1)
-    db_session.commit()
+    really_change(db_session, world[2])
     stale = withholding_for(db_session, tenant.organization.id, ids)[world[1].id]
     assert stale.case_id == case["id"] and stale.reviewed_micros is None
     # Withdrawing releases it.
@@ -224,7 +221,6 @@ def test_the_snapshot_marks_the_receivable_and_a_stale_confirmation_holds_the_re
     [plain] = snapshot_store._with_withholding(db_session, book, [receivable(world[2])])
     assert plain.withholding_case_id is None and plain.withheld_micros == 0
     # Stale evidence: the amount is not known, so the reminder is held, not sent for the gross.
-    world[2].updated_at = datetime.now(timezone.utc) + timedelta(seconds=1)
-    db_session.commit()
+    really_change(db_session, world[2])
     [stale] = snapshot_store._with_withholding(db_session, book, [receivable(world[1])])
     assert stale.withholding_hold == "UNKNOWN_AMOUNT" and stale.reminder_held
