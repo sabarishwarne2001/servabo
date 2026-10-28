@@ -24,7 +24,7 @@ UI work owed to Phase 8 by Phase 1: a checkbox for `seller_name_confirmed` (crea
 - [x] 2. Phase 1 (P0), DONE (commits 1.1 to 1.7; 1.6 is not a defect, pinned by a test; 1.7 decided as N-200), each test-first: 2.1 Helm hold (net cash due, Guard block, release list); 2.2 evidence fingerprint instead of `updated_at`;
   2.3 seller check (PAN normalized, from GSTIN, name-only needs confirmation, 422 not 500); 2.4 one PAN, one profile per organization;
   2.5 case list in batches (query-count test); 2.6 who sees the write forms; 2.7 one data-lifecycle rule
-- [ ] 3. Phase 2 (P0): three modes (off, pilot, on; ships "pilot") and one helper `live_for(org)`; platform enrolment; plans and capacities
+- [x] 3. Phase 2 (P0), DONE (N-201 modes, N-202 capacities; the figures: Business 2 profiles, 12 active snapshots, 500 open cases, 50 inquiries a month; Enterprise 10, 60, 5000, 500): three modes (off, pilot, on; ships "pilot") and one helper `live_for(org)`; platform enrolment; plans and capacities
   (active snapshots, open cases, inquiry allowance); `preflight.py`
 - [ ] 4. Phase 3: Servabo template (CSV/XLSX) and the readers for Form 26AS / Form 168 text and the AIS CSV; reader registry; limits
 - [ ] 5. Phase 4: printed hints to suggestions; expectations template; Zoho customer-payment TDS; deductor directory
