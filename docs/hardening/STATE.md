@@ -2,7 +2,7 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-28 (Final session 2T started)_
+_Last updated: 2026-10-28 (Final session 2T finished; PR #44 ready; next: Final session 2B)_
 
 ## Current phase — Final session 2T (TRINETRA finished for Business and Enterprise) (2026-10-28)
 Branch `claude/new-session-9f51dc` (the session's assigned branch; CLAUDE.md says `hardening/<topic>`, the brief says "use the assigned branch"),
@@ -15,7 +15,7 @@ in `/dev/shm/pgdata2`), Redis, backend venv Python 3.12 in the session scratchpa
 `testenv.sh` in the scratchpad. After a container restart recreate the cluster (initdb, role `servabo`, database `servabo_test`).
 Decisions so far: **N-200** to **N-209** (written in NEEDS-OWNER.md). Findings reserved: F-641 Helm hold, F-642 touch means changed, F-643 seller
 check (a 500), F-644 capacities (Phase 2), F-645 one PAN two workspaces, F-646 no pilot mode (Phase 2), F-647 recompute does nothing
-(Phase 7), F-648 case list queries, F-649 write forms (not a defect). Next free after these: **N-210**, **F-650**.
+(Phase 7), F-648 case list queries, F-649 write forms (not a defect). Written since: F-650 (quadratic summary), F-651 (viewer saw the import form), N-210 (how TRINETRA is opened). Next free: **N-211**, **F-652**, browser spec **145**.
 UI work owed to Phase 8 by Phase 1: a checkbox for `seller_name_confirmed` (create and reconfirm), the cockpit's
 `withholding_holds` list on the Helm page, `cash_due_micros` / `reminder_held` in the ledger note.
 
@@ -32,14 +32,12 @@ UI work owed to Phase 8 by Phase 1: a checkbox for `seller_name_confirmed` (crea
 - [x] 7. Phase 6 DONE (authorized inquiries with a secure link and a monthly allowance, reply hook; Enterprise approval chains; closure ledger that never counts cash; measured cycle time; migration tr2t7): authorized inquiries (secure link, allowance, reply); approval chains (Enterprise); closure ledger; measured time
 - [x] 8. Phase 7 DONE in the backend (migrations tr2t8 to tr2t10; N-209; screens for it are in Phase 8): Getting started; search; notifications + `trinetra.recompute` doing real work; digest; value receipt and monthly; automation
   triggers; webhooks and API; warehouse dataset; organization view; Recoveries; Helm ledger; egress and legal holds
-- [ ] 9. Phase 8: the screens (selector, filters, KPIs by confidence, waterfall, tutorial, import, inquiry, approvals, held reminders, states),
-  USER-GUIDE, browser specs by role and plan
-- [ ] 10. Phase 9: performance budgets, hostile files, isolation sweeps, prompt injection, privacy (TAN scrubber), threat model
-- [ ] 11. Phase 10: docs/trinetra/*, campaign records, website, owner launch checklist, FINAL-2-LIVE.md, FINAL-SESSIONS.md
-- [ ] 12. Finish line: backend, frontend, website and browser suites; `campaign_slices.py --check all`; one Alembic head, up/down/up populated;
-  PR ready; CI green
+- [x] 9. Phase 8 DONE: the screens for every capability, USER-GUIDE, browser specs 141 to 144 by role (owner, workspace admin, viewer) and plan (Starter, Business, Enterprise), axe in light and dark, 390 px; spec 136 enrols its own organization. 141 to 144, 135 and 136 pass.
+- [x] 10. Phase 9 DONE: performance budgets (F-650), hostile-file corpus, isolation sweep over every route (`test_isolation_sweep.py`), prompt-injection entries, privacy journey, TAN scrubber pattern, threat model.
+- [x] 11. Phase 10 DONE: docs/trinetra/* final (COMPLETION has no row pending), HANDOFF (launch checklist step 13, "Final session 2T to Final session 2B"), CHANGELOG, RUNBOOK, PRODUCT-NEXT, NEEDS-OWNER N-210, FINDINGS, website ("Business and Enterprise", "rolling out" from `PUBLIC_TRINETRA_STATUS`), `scripts/trinetra_pilot.py`, FINAL-2-LIVE.md Phase 18, FINAL-SESSIONS.md.
+- [ ] 12. Finish line: frontend (typecheck, lint, check:self, 313 unit tests, build) and website checks pass; backend suites run locally: tests/trinetra, isolation, infra, scripts, security, core, models, performance, templates, operational (2,947 passed; the failures were the sandbox's blocked model download, a speed budget missed under load and passing alone, and the lock check fixed in this session); `campaign_slices.py --check all` exits 0; one Alembic head `tr2t10_recoveries_tds_kind`, populated down/up/up test passes; PR #44 marked ready. **Open: CI on the ready PR (the full backend shards and the full browser suite run there), then the owner merges.**
 
-- **Next action:** step 0, then Phase 0 (COMPLETION.md). Next free numbers: **N-200**, **F-641**, browser spec **141**.
+- **Next action:** Final session 2B (`docs/sessions/FINAL-2-LIVE.md`, Phase 18 is TRINETRA): read the owner's own Form 26AS / Form 168 text and AIS CSV on the owner's PC (never in the repository), prove the Zoho read and a real inbox, mark each COMPLETION row "Verified in 2B" or "Differs". Then the owner's launch checklist step 13 (the CA's read, then the mode "on"). Local notes: this sandbox has no paddle, so the browser specs that read documents ran with a worker started without the heavy-image import check (a scratchpad launcher); one pre-existing order-dependent failure: `test_error_tracking_live` fails when run directly after `tests/infra/test_error_tracking.py` in one process, with or without these changes.
 
 ## Current phase — Final session 2A (FINAL-2-UPGRADE) (2026-10-26)
 Branch `claude/new-session-gbo9ee` (the session's assigned branch; CLAUDE.md says `hardening/<topic>`, the brief says "use the session's
