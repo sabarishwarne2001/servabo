@@ -9,12 +9,19 @@ Branch `claude/new-session-9f51dc` (the session's assigned branch; CLAUDE.md say
 based on `main` at `2041ef6` (PR #43 merged). Founder authority delegated (N-190): decisions are logged as `DECIDED (Final 2T)` from **N-200**,
 findings from **F-641**, browser specs from **141**. Prompt: `docs/sessions/FINAL-2T-TRINETRA.md`. **If cut off, type `continue`: carry on from
 the first unticked box. Never restart a ticked phase.** The completion matrix is `docs/trinetra/COMPLETION.md`.
-Local stack: Postgres 16 with pgvector 0.6.0 (the Ubuntu package; building 0.8 from a GitHub checkout was refused by the sandbox's
-safety classifier) on :5433 (e2e) and :5434 (backend tests), Redis, backend venv Python 3.12 (`backend/.venv`).
+Local stack: Postgres 16.15 (Ubuntu) with pgvector 0.8.0 (the files from the `pixeltable-pgserver` wheel copied into the system
+extension folders after the owner allowed it; the Ubuntu 0.6.0 backed up in `/dev/shm/vector06-backup`) on :5434 (backend tests, cluster
+in `/dev/shm/pgdata2`), Redis, backend venv Python 3.12 in the session scratchpad (`backend/.venv` is not git-ignored). Env block:
+`testenv.sh` in the scratchpad. After a container restart recreate the cluster (initdb, role `servabo`, database `servabo_test`).
+Decisions so far: **N-200** (TRINETRA's data lifecycle). Findings reserved: F-641 Helm hold, F-642 touch means changed, F-643 seller
+check (a 500), F-644 capacities (Phase 2), F-645 one PAN two workspaces, F-646 no pilot mode (Phase 2), F-647 recompute does nothing
+(Phase 7), F-648 case list queries, F-649 write forms (not a defect). Next free after these: **N-201**, **F-650**.
+UI work owed to Phase 8 by Phase 1: a checkbox for `seller_name_confirmed` (create and reconfirm), the cockpit's
+`withholding_holds` list on the Helm page, `cash_due_micros` / `reminder_held` in the ledger note.
 
-- [ ] 0. Start-up: docs and code read; stack; this checklist; draft PR
-- [ ] 1. Phase 0: `docs/trinetra/COMPLETION.md` (every brief sentence and every "like every other feature" row)
-- [ ] 2. Phase 1 (P0), each test-first: 2.1 Helm hold (net cash due, Guard block, release list); 2.2 evidence fingerprint instead of `updated_at`;
+- [x] 0. Start-up: docs and code read; stack; this checklist; draft PR #44
+- [x] 1. Phase 0: `docs/trinetra/COMPLETION.md` (every brief sentence and every "like every other feature" row)
+- [x] 2. Phase 1 (P0), DONE (commits 1.1 to 1.7; 1.6 is not a defect, pinned by a test; 1.7 decided as N-200), each test-first: 2.1 Helm hold (net cash due, Guard block, release list); 2.2 evidence fingerprint instead of `updated_at`;
   2.3 seller check (PAN normalized, from GSTIN, name-only needs confirmation, 422 not 500); 2.4 one PAN, one profile per organization;
   2.5 case list in batches (query-count test); 2.6 who sees the write forms; 2.7 one data-lifecycle rule
 - [ ] 3. Phase 2 (P0): three modes (off, pilot, on; ships "pilot") and one helper `live_for(org)`; platform enrolment; plans and capacities

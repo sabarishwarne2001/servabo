@@ -2696,3 +2696,16 @@ Mail an organization sends under its own brand shows its own name, as before. **
 session 2B looks at it in Gmail, Outlook and Apple Mail, light and dark. Dark mode in the Gmail phone apps ignores the
 stylesheet that swaps the two pictures, so the light picture carries its own small white rounded panel: its dark lettering
 stays readable on a darkened card (checked in a browser with the card darkened and the stylesheet removed).
+
+## N-200 — TRINETRA's reviewed figures go with the documents they were built from (DECIDED (Final 2T); a lawyer should confirm)
+
+TRINETRA keeps a case (the invoice's expected TDS), the decisions a person made on it, and each statement you entered. **Decision: these
+are working papers, not your books of account, so they are erased with the documents they were built from** (the invoice, the advice, the
+statement file), and the compliance export hands you the whole dossier first. This is the opposite of GST (N-163), on purpose: the GST
+return rows are the statutory record itself, while TRINETRA only compares your accounting records (kept in Tally or Zoho) with the
+government's statement (kept at the tax portal). A legal hold on a document stops its purge, as for any document. The rule is written in
+`app/services/compliance/data_map.py` and tested in `tests/trinetra/test_lifecycle_rule.py`. Basis, read in practitioner copies and **not
+yet confirmed by your lawyer**: the duty to keep books of account (Income-tax Act 1961 Section 44AA with its rules; the Income-tax Act 2025
+equivalent) applies to the books and supporting vouchers, which stay where you keep them. If your lawyer says the reviewed outcomes must be
+kept for a fixed period, the change is one line in the data map (`Erasure.KEEP`); no code elsewhere depends on it.
+
