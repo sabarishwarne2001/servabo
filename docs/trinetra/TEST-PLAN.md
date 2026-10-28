@@ -117,3 +117,25 @@ Reproduce the browser specs against the shipped default (`TRINETRA_MODE=pilot`):
 141 to 144 enrol their own fresh organizations through the platform operator API, so they need no special setting. CI still runs 136
 once more in a stack with the old `TRINETRA_LIVE_ENABLED=true` alias. Local Chromium is `/usr/bin/chromium` via
 `E2E_CHROMIUM_PATH`. No real provider, tax portal, customer data or recipient was used.
+
+## Executed validation, Final session 2T (2026-10-28)
+
+Run in the cloud sandbox (no PaddleOCR, no network to model hosts, no real TRACES or e-filing site); synthetic data only. The full backend
+and browser suites run in CI on the ready PR #44; its result is the final-head record (see the PR's checks). Nothing below is counted
+as passing unless it ran.
+
+| Check | Observed result |
+| --- | --- |
+| TRINETRA backend suite (`tests/trinetra`), isolation, infra, scripts, security, core, models, performance, templates, operational | 2,947 passed, 34 skipped, 7 failed on the first run: four needed to download an embedding model (blocked here), one speed budget (GST import, 10.38 s against 10 s) missed while a browser run shared the machine and passed alone, and two were the owner-set lock check on two TRINETRA row locks, a real defect fixed in this session (the lock check now reads them). All of them pass or are environmental on the rerun. |
+| `tests/api`, `tests/services`, `tests/engines` | 5,380 passed, 37 failed: 33 needed the platform mail relay setting this sandbox did not have and pass with it; 4 needed the embedding model download (blocked). No TRINETRA failure. |
+| Populated whole-chain migration round trip (`test_migration_chain_populated.py`, `test_controls.py`) | Passed: down to before `tr1a1` and up again twice with every TRINETRA table holding a row; one head `tr2t10_recoveries_tds_kind`. |
+| Frontend | typecheck, lint, self-checks and 313 unit tests passed; production build passed. |
+| Website | typecheck, build, links, HTML validation, accessibility (76 views, light and dark, 360 and 1280 px) and the pricing check passed. |
+| Browser specs 135, 136, 141, 142, 143, 144 | All passed against the shipped `TRINETRA_MODE=pilot`; 142 to 144 each took one round of spec fixes (references the matcher normalizes, a strict page-problem policy, a real axe finding on the organization view, now fixed). |
+| Browser specs 73, 120 (Getting started, seven steps) and 92 | Passed after 73 and 120 learned the new step; 92 failed once in CI on an ERP retry and passed locally (not TRINETRA). |
+| `campaign_slices.py --check all` | Exit 0, 0 open or missing rows. |
+| Performance (`PERFORMANCE.md`) | Summary at 5,000 cases 2.58 s; reading a 5,000-row statement 0.06 s; importing it 3.98 s; organization view over 100 workspaces 1.68 s; budget 5 s each. |
+
+**Not run here, and why:** the official statement readers on a real file; the Zoho Books read against a real organization; a real inbox;
+the real-model prompt-injection behaviour; the full browser suite locally (it needs the heavy OCR image; the CI job runs it). Final
+session 2B proves the first three.
