@@ -19,8 +19,8 @@ test.describe("TRINETRA working screens", () => {
   test.beforeAll(async () => {
     customer = await liveCustomer("tr-work", "business");
     profileId = await createProfile(customer);
-    const invoice = await bookInvoice(customer, "TRW-001");
-    firstCase = (await createCase(customer, profileId, invoice, "TRW-001")).id;
+    const invoice = await bookInvoice(customer, "TRW-1");
+    firstCase = (await createCase(customer, profileId, invoice, "TRW-1")).id;
   });
 
   async function openStatements(page: import("@playwright/test").Page) {
@@ -81,26 +81,32 @@ test.describe("TRINETRA working screens", () => {
     for (const label of official) expect(label).toContain("(unverified)");
     await form.getByLabel(/The file \(CSV/).setInputFiles(fixture("form26as_sample.txt"));
     await form.getByRole("button", { name: "Preview what the file says" }).click();
+    // Whatever the reader makes of the file, the screen says it is unverified and nothing is saved without the person's confirmation.
     await expect(page.getByTestId("trinetra-import-error").or(page.getByTestId("trinetra-import-notice"))).toBeVisible();
-    await expect(page.getByRole("button", { name: "Import this statement" })).toHaveCount(0);
+    const notice = page.getByTestId("trinetra-import-notice");
+    if (await notice.count()) {
+      await expect(notice).toContainText("Unverified reader");
+      await expect(page.getByRole("button", { name: "Import this statement" })).toBeDisabled();
+    }
+    await expect(page.getByTestId("trinetra-import-preview").or(page.getByTestId("trinetra-import-error"))).not.toContainText(TAN);
   });
 
   test("a filled template becomes suggestions; nothing is a case until a person accepts it with a reason", async ({ page }) => {
-    const second = await bookInvoice(customer, "TRW-002");
+    const second = await bookInvoice(customer, "TRW-2");
     expect(second).toBeTruthy();
     await signInAs(page, customer.email);
     await page.goto(customer.ws("trinetra?tab=suggestions"));
     const sources = page.getByTestId("trinetra-sources");
     await sources.getByLabel("Legal entity").selectOption({ label: `${ENTITY} · ******234F` });
     await sources.getByText("Fill in an expected-TDS template").click();
-    const rows = ["Invoice reference,Customer TAN,Expected TDS (INR),Section text (optional)", `TRW-002,${TAN},2000,194C as my records print it`];
+    const rows = ["Invoice reference,Customer TAN,Expected TDS (INR),Section text (optional)", `TRW-2,${TAN},2000,194C as my records print it`];
     await sources.getByLabel("The filled template").setInputFiles({ name: "expected.csv", mimeType: "text/csv", buffer: Buffer.from(rows.join("\n") + "\n") });
     await sources.getByRole("button", { name: "Check each row against your invoices" }).click();
     const check = sources.getByRole("region", { name: "Template check" });
     await expect(check).toContainText("1 of 1 rows match exactly one invoice.");
     await check.getByRole("button", { name: "Add as suggestions" }).click();
     const suggestion = page.getByTestId("trinetra-suggestion").first();
-    await expect(suggestion).toContainText("TRW-002");
+    await expect(suggestion).toContainText("TRW-2");
     await expect(suggestion).toContainText("To confirm");
     // Accepting needs the reviewer's own reason.
     await suggestion.getByRole("button", { name: "Accept as a case" }).click();
@@ -108,14 +114,14 @@ test.describe("TRINETRA working screens", () => {
     await suggestion.getByRole("button", { name: "Accept", exact: true }).click();
     await expect(suggestion).toContainText("Accepted");
     await page.goto(customer.ws("trinetra"));
-    await expect(page.getByRole("button", { name: /TRW-002/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /TRW-2/ })).toBeVisible();
   });
 
   test("an inquiry is a draft a person approves and presses Send on; without a confirmed contact it goes nowhere", async ({ page, problems }) => {
     problems.allowHttp(/\/trinetra\/inquiries\//, [409, 422], "approving needs a confirmed contact in Helm");
     await signInAs(page, customer.email);
     await page.goto(customer.ws("trinetra"));
-    await page.getByRole("button", { name: /TRW-001/ }).click();
+    await page.getByRole("button", { name: /TRW-1/ }).click();
     const panel = page.getByTestId("trinetra-inquiries");
     await expect(panel).toContainText("A draft is only ever sent by a person pressing Send.");
     await expect(panel.getByTestId("trinetra-allowance")).toContainText("0 of");

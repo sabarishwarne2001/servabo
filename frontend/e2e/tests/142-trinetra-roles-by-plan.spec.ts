@@ -17,8 +17,8 @@ test.describe("TRINETRA roles and plans", () => {
   test.beforeAll(async () => {
     enterprise = await liveCustomer("tr-roles-e", "enterprise", { people: true });
     const profile = await createProfile(enterprise);
-    const invoice = await bookInvoice(enterprise, "TRR-001");
-    caseId = (await createCase(enterprise, profile, invoice, "TRR-001")).id;
+    const invoice = await bookInvoice(enterprise, "TRR-1");
+    caseId = (await createCase(enterprise, profile, invoice, "TRR-1")).id;
     business = await liveCustomer("tr-roles-b", "business");
     await createProfile(business);
   });
@@ -29,7 +29,7 @@ test.describe("TRINETRA roles and plans", () => {
     for (const name of ["Cases", "Statements", "Suggestions", "Reversals", "Approvals", "Closures"]) {
       await expect(page.getByRole("tab", { name })).toBeVisible();
     }
-    await expect(page.getByRole("button", { name: "Add reviewed evidence" })).toBeVisible();
+    await expect(page.getByText("Add reviewed evidence", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: /Synthetic Deductor Ltd/ }).click();
     const insight = page.getByRole("complementary", { name: "Case insight" });
     await expect(insight.getByRole("button", { name: "Record review", exact: true })).toBeVisible();
@@ -43,7 +43,7 @@ test.describe("TRINETRA roles and plans", () => {
   test("a workspace administrator who is not an organization admin writes evidence but cannot set the policy", async ({ page }) => {
     await signInAs(page, enterprise.admin!.email);
     await page.goto(enterprise.ws("trinetra"));
-    await expect(page.getByRole("button", { name: "Add reviewed evidence" })).toBeVisible();
+    await expect(page.getByText("Add reviewed evidence", { exact: true })).toBeVisible();
     await page.getByRole("tab", { name: "Approvals" }).click();
     await expect(page.getByText("Only an organization owner or admin changes the policy.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Save the policy" })).toHaveCount(0);
@@ -57,7 +57,7 @@ test.describe("TRINETRA roles and plans", () => {
     await signInAs(page, enterprise.viewer!.email);
     await page.goto(enterprise.ws("trinetra"));
     await expect(page.getByRole("button", { name: /Synthetic Deductor Ltd/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Add reviewed evidence" })).toHaveCount(0);
+    await expect(page.getByText("Add reviewed evidence", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Export CSV", exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: /Synthetic Deductor Ltd/ }).click();
     const insight = page.getByRole("complementary", { name: "Case insight" });
@@ -88,7 +88,7 @@ test.describe("TRINETRA roles and plans", () => {
     await page.goto(business.ws("trinetra"));
     await expect(page.getByRole("tab", { name: "Statements" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Approvals" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Add reviewed evidence" })).toBeVisible();
+    await expect(page.getByText("Add reviewed evidence", { exact: true })).toBeVisible();
     const chain = await api(business.session, "PUT", `/organizations/${business.orgId}/trinetra/policy`, {
       threshold: "1000", actions: ["CA_REVIEWED"], approver_role: "OWNER",
     });

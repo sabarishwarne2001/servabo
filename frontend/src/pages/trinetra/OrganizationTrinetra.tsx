@@ -146,6 +146,7 @@ export default function OrganizationTrinetra() {
             <section
               className={`${SURFACE} space-y-3 p-5`}
               aria-labelledby="org-totals"
+              tabIndex={0}
               data-testid="trinetra-org-totals"
             >
               <h2 id="org-totals" className="font-semibold">

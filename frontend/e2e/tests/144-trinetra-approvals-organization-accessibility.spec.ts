@@ -32,8 +32,8 @@ test.describe("TRINETRA Enterprise", () => {
   test.beforeAll(async () => {
     customer = await liveCustomer("tr-ent", "enterprise", { people: true });
     const profile = await createProfile(customer);
-    const invoice = await bookInvoice(customer, "TRE-001");
-    caseId = (await createCase(customer, profile, invoice, "TRE-001")).id;
+    const invoice = await bookInvoice(customer, "TRE-1");
+    caseId = (await createCase(customer, profile, invoice, "TRE-1")).id;
     const snapshot = await importStatement(
       customer, profile, templateFile([`${TAN},2000.00,row-1,194C,15-Jun-2025,F,FY 2025-26 / AY 2026-27`]),
     );
@@ -108,7 +108,7 @@ test.describe("TRINETRA Enterprise", () => {
         await expectNoSeriousViolations(page, `${name} ${scheme}`);
       }
       await page.getByRole("tab", { name: "Cases" }).click();
-      await page.getByRole("button", { name: /TRE-001/ }).click();
+      await page.getByRole("button", { name: /TRE-1/ }).click();
       await settle(page);
       await expectNoSeriousViolations(page, `case insight ${scheme}`);
       await page.goto(customer.org("trinetra"));
@@ -138,7 +138,7 @@ test.describe("TRINETRA Enterprise", () => {
       await expectNoSidewaysScroll(page, name);
     }
     await page.getByRole("tab", { name: "Cases" }).click();
-    await page.getByRole("button", { name: /TRE-001/ }).click();
+    await page.getByRole("button", { name: /TRE-1/ }).click();
     await settle(page);
     await expectNoSidewaysScroll(page, "case insight");
     await page.goto(customer.org("trinetra"));
