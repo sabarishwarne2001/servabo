@@ -57,6 +57,8 @@ DOWNLOAD_URL_TTL_SECONDS: int = 900
 GENERIC_SECTIONS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "trinetra_profiles": ("trinetra_profiles", "org", ("pan_ciphertext", "pan_fingerprint", "identity_salt_ciphertext", "org_pan_fingerprint")),
     "trinetra_statements": ("trinetra_statements", "org", ()),
+    "trinetra_suggestions": ("trinetra_suggestions", "org", ("deductor_key",)),
+    "trinetra_deductors": ("trinetra_deductors", "org", ("deductor_key",)),
     "trinetra_credits": ("trinetra_credits", "org", ("deductor_key",)),
     "trinetra_decisions": ("trinetra_decisions", "org", ()),
     "gst_returns": ("gst_returns", "org", ()),

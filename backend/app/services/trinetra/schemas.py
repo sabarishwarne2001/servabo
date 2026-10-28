@@ -218,3 +218,8 @@ class OrganizationSummaryOut(BaseModel):
     workspaces: list[WorkspaceSummaryOut]
     scope: str
     is_sample: bool
+
+
+class SuggestionsOut(BaseModel):
+    total: int
+    items: list[dict]

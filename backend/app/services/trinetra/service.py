@@ -27,6 +27,25 @@ from app.services.trinetra import domain as d
 from app.services.trinetra import versions
 
 
+def evidence_ids(review):
+    """The documents a case's evidence points at (a record read from an accounting system points at none)."""
+    return [uuid.UUID(e["work_item_id"]) for e in (review or {}).get("evidence", []) if e.get("work_item_id")]
+
+
+def evidence_current(item, facts):
+    """Is this piece of evidence what the reviewer saw? A document: its fingerprint is unchanged. A record read from an
+    accounting system is immutable once attached, so it stays current (its source_version is its own content hash)."""
+    if not item.get("work_item_id"):
+        return bool(item.get("source_version"))
+    doc = facts.get(uuid.UUID(item["work_item_id"]))
+    return bool(doc and doc.evidence == item["source_version"])
+
+
+#: Parts of a case's review record that a review update must carry over: where the expectation came from, its printed
+#: section, and the reviewer's rejections and annotations of statement matches (Phase 5).
+KEPT_REVIEW_KEYS = ("origin", "origin_evidence", "section_text", "rejected_candidates", "annotations", "basis", "triggering_event")
+
+
 #: Recorded in the case history when the seller was matched by name alone and a reviewer confirmed it.
 SELLER_NAME_NOTE = {
     "NAME_ONLY": " Seller matched by name only (no PAN or valid GSTIN printed); confirmed by the reviewer."
@@ -378,7 +397,7 @@ def view(db, workspace, row, bundle=None, facts=None, roles=None):
             db,
             workspace.id,
             [row.work_item_id]
-            + [uuid.UUID(e["work_item_id"]) for e in (row.review or {}).get("evidence", [])],
+            + evidence_ids(row.review),
         )
     source = facts.get(row.work_item_id)
     role = (
@@ -393,13 +412,7 @@ def view(db, workspace, row, bundle=None, facts=None, roles=None):
     reviewed = dict(row.review or {})
     reviewed["evidence"] = []
     for item in (row.review or {}).get("evidence", []):
-        evidence = facts.get(uuid.UUID(item["work_item_id"]))
-        reviewed["evidence"].append(
-            {
-                **item,
-                "current": bool(evidence and evidence.evidence == item["source_version"]),
-            }
-        )
+        reviewed["evidence"].append({**item, "current": evidence_current(item, facts)})
     from dataclasses import replace
 
     for kind, field in [
@@ -836,11 +849,8 @@ def views(db, workspace, rows):
     ids = {row.work_item_id for row in rows} | {
         snap.source_work_item_id for snap in snapshots if snap.source_work_item_id
     }
-    ids.update(
-        uuid.UUID(e["work_item_id"])
-        for row in rows
-        for e in (row.review or {}).get("evidence", [])
-    )
+    for row in rows:
+        ids.update(evidence_ids(row.review))
     facts = versions.load(db, workspace.id, ids)
     roles = {
         x.work_item_id: x
@@ -894,6 +904,109 @@ def views(db, workspace, rows):
         view(db, workspace, r, bundles[(r.profile_id, r.year)], facts, roles)
         for r in rows
     ], active
+
+
+def create_case(
+    db,
+    workspace,
+    p,
+    user_id,
+    *,
+    work_item_id,
+    year,
+    counterparty,
+    reference,
+    tan,
+    amount,
+    source_confirmation,
+    seller_name_confirmed=False,
+    origin="TYPED",
+    section_text=None,
+    evidence=None,
+    deductor_key=None,
+):
+    """Confirm one expected withholding on an invoice. Every way in (typed, an accepted suggestion) ends here, so every case
+    has the same checks: the invoice is a classified INR invoice of this entity, the period contains its date, the amount is
+    positive and within the gross, and the plan has room. `origin` records where the expectation came from; it is a person's
+    confirmation either way (`source_confirmation` is their reason)."""
+    source, fact, seller = receivable(
+        db, workspace, p, work_item_id, seller_name_confirmed=seller_name_confirmed
+    )
+    invoice_period(fact, year)
+    lock_capacity(db, workspace)
+    old = (
+        db.query(CreditRow)
+        .filter_by(profile_id=p.id, work_item_id=work_item_id, year=year)
+        .first()
+    )
+    deductor = deductor_key or identity(
+        tan, "TAN", encryption.decrypt_secret(p.identity_salt_ciphertext)
+    )
+    value = d.money(amount) if isinstance(amount, str) else int(amount)
+    if value <= 0 or value > fact.total_micros:
+        raise HTTPException(
+            422,
+            "Expected withholding must be positive and cannot exceed the sourced gross invoice.",
+        )
+    if old:
+        if (old.expected_micros, old.deductor_key, old.reference, old.counterparty) != (
+            value,
+            deductor,
+            reference,
+            counterparty,
+        ):
+            raise HTTPException(
+                409,
+                "This source already has an expectation; use the versioned reconfirmation workflow.",
+            )
+        return old
+    check_case_capacity(db, workspace)
+    review = {"origin": origin}
+    if section_text:
+        review["section_text"] = section_text[:100]
+    if evidence:
+        review["origin_evidence"] = evidence
+        if evidence.get("accounting_record") and evidence.get("withheld_micros"):
+            # A record read from the accounting system (Zoho Books): evidence of the booked withholding, not a document.
+            review["evidence"] = [
+                {
+                    "work_item_id": None,
+                    "kind": "ACCOUNTING_RECORD",
+                    "source": "ZOHO",
+                    "external_ref": ",".join(p_["id"] for p_ in (evidence.get("zoho") or {}).get("payments", []))[:200],
+                    "source_version": hashlib.sha256(json.dumps(evidence, sort_keys=True, default=str).encode()).hexdigest()[:48],
+                    "amount_micros": int(evidence["withheld_micros"]),
+                }
+            ]
+    r = CreditRow(
+        organization_id=workspace.organization_id,
+        workspace_id=workspace.id,
+        profile_id=p.id,
+        work_item_id=work_item_id,
+        year=year,
+        counterparty=counterparty,
+        reference=reference,
+        source_version=invoice_version(db, workspace, source.id),
+        deductor_key=deductor,
+        expected_micros=value,
+        review=review,
+    )
+    db.add(r)
+    db.flush()
+    db.add(
+        Decision(
+            organization_id=workspace.organization_id,
+            workspace_id=workspace.id,
+            credit_id=r.id,
+            actor_id=user_id,
+            revision=1,
+            action="EXPECTATION_CONFIRMED",
+            reason=source_confirmation + SELLER_NAME_NOTE.get(seller.outcome, ""),
+            allocations=[],
+        )
+    )
+    db.flush()
+    return r
 
 
 def summary(db, workspace):

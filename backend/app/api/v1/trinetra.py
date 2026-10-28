@@ -22,7 +22,7 @@ from app.models.trinetra import (
     TrinetraCredit as Credit,
     TrinetraDecision as Decision,
 )
-from app.services.trinetra import service as s, domain as d, mode, readers
+from app.services.trinetra import service as s, domain as d, mode, readers, suggestions as sg, directory as dr
 from app.services.trinetra.events import reviewed as announce_review
 from app.services.trinetra.schemas import (
     AccessOut,
@@ -36,6 +36,7 @@ from app.services.trinetra.schemas import (
     DraftOut,
     PreviewOut,
     FilePreviewOut,
+    SuggestionsOut,
     RunOut,
     RunStatusOut,
     OrganizationAccessOut,
@@ -482,6 +483,232 @@ def import_statement_file(
     }
 
 
+class ScanIn(Strict):
+    profile_id: uuid.UUID
+
+
+class AcceptIn(Strict):
+    source_confirmation: str = Field(min_length=10, max_length=1000)
+    tan: str | None = Field(default=None, pattern=r"^[A-Z]{4}[0-9]{5}[A-Z]$")
+    amount: Money | None = None
+    seller_name_confirmed: bool = False
+
+
+class DismissIn(Strict):
+    reason: str = Field(min_length=10, max_length=1000)
+
+
+class DeductorIn(Strict):
+    profile_id: uuid.UUID
+    tan: str = Field(pattern=r"^[A-Z]{4}[0-9]{5}[A-Z]$")
+    counterparty: str = Field(min_length=1, max_length=120)
+    reason: str = Field(min_length=10, max_length=1000)
+
+
+class DeductorConfirmIn(Strict):
+    counterparty: str = Field(min_length=1, max_length=120)
+    reason: str = Field(min_length=10, max_length=1000)
+
+
+@router.get(P + "/suggestions", response_model=SuggestionsOut)
+def suggestions(
+    workspace_id: uuid.UUID,
+    profile_id: uuid.UUID | None = None,
+    year: int | None = Query(None, ge=2000, le=2100),
+    status: Literal["OPEN", "ACCEPTED", "DISMISSED"] | None = None,
+    offset: int = Query(0, ge=0, le=10000),
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    w = workspace(db, context, workspace_id)
+    return sg.listing(db, w, profile_id=profile_id, year=year, status=status, limit=limit, offset=offset)
+
+
+@router.post(P + "/suggestions/scan")
+def scan_suggestions(
+    workspace_id: uuid.UUID,
+    body: ScanIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    """Look for invoices that print a TDS amount and suggest an expectation for each. Nothing is confirmed."""
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, body.profile_id)
+    counts = sg.scan_hints(db, w, p)
+    db.commit()
+    return counts
+
+
+@router.get(P + "/suggestion-template.{format}")
+def suggestion_template(
+    workspace_id: uuid.UUID,
+    format: Literal["csv", "xlsx"],
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    from app.services.trinetra.statements import expectations
+
+    workspace(db, context, workspace_id, live=False)
+    body = expectations.csv_bytes() if format == "csv" else expectations.xlsx_bytes()
+    media = "text/csv" if format == "csv" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return Response(
+        body, media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="servabo-expected-tds-template.{format}"'},
+    )
+
+
+def _template_lines(upload: UploadFile):
+    from app.services.trinetra.statements import expectations
+    from app.services.trinetra.statements.common import StatementRefused
+
+    filename, data = _statement_file(upload)
+    try:
+        return expectations.read(filename, data)
+    except StatementRefused as exc:
+        raise HTTPException(422, {"code": exc.code, "message": exc.message, "row": exc.row}) from exc
+
+
+@router.post(P + "/suggestions/template/preview")
+def preview_suggestion_template(
+    workspace_id: uuid.UUID,
+    file: UploadFile = File(...),
+    profile_id: uuid.UUID = Form(...),
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, profile_id)
+    results = sg.match_template(db, w, p, _template_lines(file))
+    shown = [{k: v for k, v in r.items() if not k.startswith("_")} for r in results]
+    return {"rows": len(shown), "ok": sum(r["status"] == "OK" for r in shown), "items": shown[:500]}
+
+
+@router.post(P + "/suggestions/template")
+def import_suggestion_template(
+    workspace_id: uuid.UUID,
+    file: UploadFile = File(...),
+    profile_id: uuid.UUID = Form(...),
+    skip_refused: bool = Form(default=False),
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    """Turn the matched rows into SUGGESTIONS. A person still accepts each one."""
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, profile_id)
+    lines = _template_lines(file)
+    results = sg.match_template(db, w, p, lines)
+    out = sg.import_template(db, w, p, lines, results, skip_refused=skip_refused)
+    db.commit()
+    return out
+
+
+class ZohoScanIn(Strict):
+    profile_id: uuid.UUID
+    year: int | None = Field(default=None, ge=2000, le=2100)
+
+
+@router.post(P + "/suggestions/zoho/scan")
+def scan_zoho_suggestions(
+    workspace_id: uuid.UUID,
+    body: ZohoScanIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    """Read the TDS customers withheld from Zoho Books customer payments (read only) and suggest an expectation for each
+    invoice Servabo knows. Unverified until Final session 2B; a person accepts each suggestion."""
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, body.profile_id)
+    counts = sg.scan_zoho(db, w, p, year=body.year)
+    db.commit()
+    return counts
+
+
+@router.post(P + "/suggestions/{suggestion_id}/accept", response_model=CaseOut)
+def accept_suggestion(
+    workspace_id: uuid.UUID,
+    suggestion_id: uuid.UUID,
+    body: AcceptIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    row = sg.locked(db, w, suggestion_id)
+    p = s.profile(db, w, row.profile_id)
+    case = sg.accept(
+        db, w, p, context.user_id, row, source_confirmation=body.source_confirmation, tan=body.tan, amount=body.amount,
+        seller_name_confirmed=body.seller_name_confirmed,
+    )
+    db.commit()
+    return s.view(db, w, case)
+
+
+@router.post(P + "/suggestions/{suggestion_id}/dismiss")
+def dismiss_suggestion(
+    workspace_id: uuid.UUID,
+    suggestion_id: uuid.UUID,
+    body: DismissIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    row = sg.dismiss(db, sg.locked(db, w, suggestion_id), context.user_id, body.reason)
+    db.commit()
+    return sg.view(row)
+
+
+@router.get(P + "/deductors")
+def deductors(
+    workspace_id: uuid.UUID,
+    profile_id: uuid.UUID | None = None,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    from app.models.trinetra import TrinetraDeductor
+
+    w = workspace(db, context, workspace_id)
+    q = db.query(TrinetraDeductor).filter_by(workspace_id=w.id)
+    if profile_id:
+        q = q.filter_by(profile_id=profile_id)
+    return {"items": [dr.view(r) for r in q.order_by(TrinetraDeductor.created_at).limit(500)]}
+
+
+@router.post(P + "/deductors")
+def map_deductor(
+    workspace_id: uuid.UUID,
+    body: DeductorIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, body.profile_id)
+    salt = s.encryption.decrypt_secret(p.identity_salt_ciphertext)
+    row = dr.confirm(db, w, p, context.user_id, s.identity(body.tan, "TAN", salt), "******" + body.tan[-4:],
+                     body.counterparty, body.reason)
+    db.commit()
+    return dr.view(row)
+
+
+@router.post(P + "/deductors/{deductor_id}/confirm")
+def confirm_deductor(
+    workspace_id: uuid.UUID,
+    deductor_id: uuid.UUID,
+    body: DeductorConfirmIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    from app.models.trinetra import TrinetraDeductor
+
+    w = workspace(db, context, workspace_id)
+    row = db.query(TrinetraDeductor).filter_by(id=deductor_id, workspace_id=w.id).first()
+    if row is None:
+        raise HTTPException(404, "Deductor not found.")
+    p = s.profile(db, w, row.profile_id)
+    row = dr.confirm(db, w, p, context.user_id, row.deductor_key, row.tan_masked, body.counterparty, body.reason)
+    db.commit()
+    return dr.view(row)
+
+
 @router.post(P + "/official-statements")
 def unsupported_statement(
     workspace_id: uuid.UUID,
@@ -507,65 +734,19 @@ def create_credit(
 ):
     w = workspace(db, context, workspace_id)
     p = s.profile(db, w, body.profile_id)
-    source, fact, seller = s.receivable(
-        db, w, p, body.work_item_id, seller_name_confirmed=body.seller_name_confirmed
-    )
-    s.invoice_period(fact, body.year)
-    s.lock_capacity(db, w)
-    old = (
-        db.query(Credit)
-        .filter_by(profile_id=p.id, work_item_id=body.work_item_id, year=body.year)
-        .first()
-    )
-    deductor = s.identity(
-        body.tan, "TAN", s.encryption.decrypt_secret(p.identity_salt_ciphertext)
-    )
-    amount = d.money(body.amount)
-    if amount <= 0 or amount > fact.total_micros:
-        raise HTTPException(
-            422,
-            "Expected withholding must be positive and cannot exceed the sourced gross invoice.",
-        )
-    if old:
-        if (old.expected_micros, old.deductor_key, old.reference, old.counterparty) != (
-            amount,
-            deductor,
-            body.reference,
-            body.counterparty,
-        ):
-            raise HTTPException(
-                409,
-                "This source already has an expectation; use the versioned reconfirmation workflow.",
-            )
-        return s.view(db, w, old)
-    s.check_case_capacity(db, w)
-    r = Credit(
-        organization_id=w.organization_id,
-        workspace_id=w.id,
-        profile_id=p.id,
+    r = s.create_case(
+        db,
+        w,
+        p,
+        context.user_id,
         work_item_id=body.work_item_id,
         year=body.year,
         counterparty=body.counterparty,
         reference=body.reference,
-        source_version=s.invoice_version(db, w, source.id),
-        deductor_key=s.identity(
-            body.tan, "TAN", s.encryption.decrypt_secret(p.identity_salt_ciphertext)
-        ),
-        expected_micros=d.money(body.amount),
-    )
-    db.add(r)
-    db.flush()
-    db.add(
-        Decision(
-            organization_id=w.organization_id,
-            workspace_id=w.id,
-            credit_id=r.id,
-            actor_id=context.user_id,
-            revision=1,
-            action="EXPECTATION_CONFIRMED",
-            reason=body.source_confirmation + s.SELLER_NAME_NOTE.get(seller.outcome, ""),
-            allocations=[],
-        )
+        tan=body.tan,
+        amount=body.amount,
+        source_confirmation=body.source_confirmation,
+        seller_name_confirmed=body.seller_name_confirmed,
     )
     db.commit()
     return s.view(db, w, r)
@@ -688,10 +869,13 @@ def update_review(
                 ),
             }
         )
+    # A record read from an accounting system (Zoho Books) is not a document the person attaches; it stays.
+    evidence = [e for e in (row.review or {}).get("evidence", []) if not e.get("work_item_id")] + evidence
     prior = [
         asdict(a) for a in s.allocations(db, p, row.year) if a.credit == str(row.id)
     ]
     row.review = {
+        **{k: v for k, v in (row.review or {}).items() if k in s.KEPT_REVIEW_KEYS},
         "owner_id": (
             str(context.user_id)
             if body.assign_to_me
@@ -704,7 +888,7 @@ def update_review(
         "withholding_confirmed": body.confirm_receivable,
         "invoice_version": row.source_version,
     }
-    row.evidence_work_item_ids = [e["work_item_id"] for e in evidence]
+    row.evidence_work_item_ids = [e["work_item_id"] for e in evidence if e["work_item_id"]]
     if body.confirm_receivable:
         from app.services.trinetra.projection import reviewed_withholding
 

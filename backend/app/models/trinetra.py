@@ -253,3 +253,76 @@ class TrinetraDecision(Scoped, Base):
         ),
         UniqueConstraint("credit_id", "revision", name="uq_trinetra_decision_revision"),
     )
+
+
+class TrinetraSuggestion(Scoped, Base):
+    """A SUGGESTED expectation (Final 2T, Phase 4): printed on an invoice, typed in the expectations template, or read from
+    Zoho Books. It becomes a case only when a person accepts it, with a reason. Never confirmed automatically."""
+
+    __tablename__ = "trinetra_suggestions"
+    profile_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    work_item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    source: Mapped[str] = mapped_column(String(20), nullable=False)
+    amount_micros: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    #: The deductor's TAN keyed with the profile's salt; NULL when the source does not carry one (the person supplies it).
+    deductor_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    tan_masked: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    section_text: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    counterparty: Mapped[str] = mapped_column(String(120), nullable=False)
+    reference: Mapped[str] = mapped_column(String(100), nullable=False)
+    #: The invoice's fingerprint when it was suggested; a changed invoice is suggested again, not silently accepted.
+    source_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    evidence: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="OPEN")
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    decided_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    credit_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    __table_args__ = (
+        *scope_constraints("trinetra_suggestions"),
+        ForeignKeyConstraint(
+            ["profile_id", "workspace_id"],
+            ["trinetra_profiles.id", "trinetra_profiles.workspace_id"],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["work_item_id", "workspace_id"],
+            ["work_items.id", "work_items.workspace_id"],
+            ondelete="CASCADE",
+        ),
+        UniqueConstraint("profile_id", "work_item_id", "year", "source", name="uq_trinetra_suggestion_source"),
+        CheckConstraint("source IN ('PRINTED_HINT','TEMPLATE','ZOHO')", name="ck_trinetra_suggestion_source"),
+        CheckConstraint("status IN ('OPEN','ACCEPTED','DISMISSED')", name="ck_trinetra_suggestion_status"),
+        CheckConstraint("amount_micros > 0 AND amount_micros <= 9000000000000000", name="ck_trinetra_suggestion_amount"),
+        CheckConstraint("year BETWEEN 2000 AND 2100", name="ck_trinetra_suggestion_year"),
+    )
+
+
+class TrinetraDeductor(Scoped, Base):
+    """The deductor directory (Final 2T, Phase 4): a customer's TAN mapped to the customer once, reviewed by a person, then
+    used for suggestions and display with the TAN masked. A TAN seen under two customers is FLAGGED for review and never merged."""
+
+    __tablename__ = "trinetra_deductors"
+    profile_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    deductor_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    tan_masked: Mapped[str] = mapped_column(String(10), nullable=False)
+    counterparty_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    counterparty_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="PROPOSED")
+    #: The other customer names this TAN was seen under (only while FLAGGED), for the reviewer to choose from.
+    seen_as: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    review_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    __table_args__ = (
+        *scope_constraints("trinetra_deductors"),
+        ForeignKeyConstraint(
+            ["profile_id", "workspace_id"],
+            ["trinetra_profiles.id", "trinetra_profiles.workspace_id"],
+            ondelete="CASCADE",
+        ),
+        UniqueConstraint("profile_id", "deductor_key", name="uq_trinetra_deductor"),
+        CheckConstraint("status IN ('PROPOSED','CONFIRMED','FLAGGED')", name="ck_trinetra_deductor_status"),
+    )

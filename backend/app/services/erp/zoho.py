@@ -50,7 +50,11 @@ STATE_TTL = timedelta(minutes=10)
 #: settings (accounts, taxes) and the organizations. Nothing that deletes.
 SCOPES = ("ZohoBooks.bills.CREATE", "ZohoBooks.bills.READ", "ZohoBooks.purchaseorders.CREATE", "ZohoBooks.purchaseorders.READ",
           "ZohoBooks.accountants.CREATE", "ZohoBooks.accountants.READ", "ZohoBooks.vendorpayments.CREATE",
-          "ZohoBooks.vendorpayments.READ", "ZohoBooks.contacts.READ", "ZohoBooks.settings.READ")
+          "ZohoBooks.vendorpayments.READ", "ZohoBooks.contacts.READ", "ZohoBooks.settings.READ",
+          # Final session 2T (Phase 4): TRINETRA reads the TDS a customer withheld from `customerpayments`, and the invoices they
+          # were applied to. Read only. A connection made before this release lacks them and is asked to reconnect.
+          "ZohoBooks.customerpayments.READ", "ZohoBooks.invoices.READ")
+PAYMENTS_SCOPE = "ZohoBooks.customerpayments.READ"
 RECONNECT_SENTENCE = "Zoho Books needs to be reconnected: Zoho no longer accepts the saved sign-in."
 
 
@@ -235,7 +239,70 @@ def connection_view(target: ErpTarget) -> dict[str, Any]:
     centre = DATA_CENTRES.get(z.get("data_centre") or "")
     return {"state": state, "data_centre": z.get("data_centre"), "data_centre_label": centre.label if centre else None,
             "organization_id": z.get("organization_id") if z.get("organization_chosen") else None,
-            "organization_name": z.get("organization_name"), "connected_by": z.get("connected_by")}
+            "organization_name": z.get("organization_name"), "connected_by": z.get("connected_by"),
+            "can_read_payments": PAYMENTS_SCOPE in (z.get("scopes") or [])}
+
+
+def customer_payments(db: Session, target: ErpTarget, *, date_start: str, date_end: str, limit: int = 200) -> list[dict[str, Any]]:
+    """The TDS customers withheld, from Zoho Books customer payments (read only), one record per payment and invoice:
+
+        {payment_id, date, customer, invoice_number, withheld_micros}
+
+    Zoho API v3 customer payments: the list answers with payment summaries, the payment itself with `tax_amount_withheld` and
+    `invoices[].tax_amount_withheld`. UNVERIFIED until Final session 2B runs against a real Zoho Books organization (the page could
+    not be opened from the build sandbox). Asks for at most `limit` payments, with the person's own sign-in."""
+    from decimal import Decimal, InvalidOperation
+
+    z = _settings_of(target)
+    if PAYMENTS_SCOPE not in (z.get("scopes") or []):
+        raise ZohoError("SCOPE", "Reconnect Zoho Books so Servabo can read your customer payments (read only).")
+    if not z.get("organization_chosen"):
+        raise ZohoError("NOT_CONNECTED", "Zoho Books is not connected to an organization yet.")
+    token = _access_token(db, target)
+    centre = data_centre(z.get("data_centre") or DEFAULT_DATA_CENTRE)
+    base = f"{_api(centre)}/books/v3/customerpayments"
+    organization = urlencode({"organization_id": z["organization_id"]})
+
+    def get(url: str) -> Any:
+        status, body = _get(target.organization_id, url, token)
+        if status in (401, 403):
+            mark_reconnect(db, target)
+            raise ZohoError("RECONNECT", RECONNECT_SENTENCE)
+        if status != 200 or not isinstance(body, dict):
+            raise ZohoError("UNREACHABLE", "Zoho could not list your customer payments. Try again in a moment.")
+        return body
+
+    def micros(value: Any) -> int:
+        try:
+            amount = Decimal(str(value or 0))
+        except InvalidOperation:
+            return 0
+        if amount <= 0 or amount.as_tuple().exponent < -2:
+            return 0
+        return int(amount * 1_000_000)
+
+    summaries: list[dict[str, Any]] = []
+    page = 1
+    while len(summaries) < limit:
+        body = get(f"{base}?{organization}&" + urlencode({"date_start": date_start, "date_end": date_end, "page": page,
+                                                          "per_page": min(200, limit)}))
+        summaries += [p for p in body.get("customerpayments") or [] if isinstance(p, dict) and p.get("payment_id")]
+        if not (body.get("page_context") or {}).get("has_more_page"):
+            break
+        page += 1
+    out: list[dict[str, Any]] = []
+    for summary in summaries[:limit]:
+        payment = get(f"{base}/{summary['payment_id']}?{organization}").get("payment") or {}
+        applied = [a for a in payment.get("invoices") or [] if isinstance(a, dict) and a.get("invoice_number")]
+        for application in applied:
+            withheld = micros(application.get("tax_amount_withheld"))
+            if not withheld and len(applied) == 1:
+                withheld = micros(payment.get("tax_amount_withheld"))     # the payment-level figure, for a single invoice only
+            if withheld:
+                out.append({"payment_id": str(summary["payment_id"]), "date": str(payment.get("date") or summary.get("date") or ""),
+                            "customer": str(payment.get("customer_name") or summary.get("customer_name") or "")[:120],
+                            "invoice_number": str(application["invoice_number"]), "withheld_micros": withheld})
+    return out
 
 
 def mark_reconnect(db: Session, target: ErpTarget) -> None:
@@ -297,7 +364,8 @@ def complete(db: Session, *, code: str, state: str, location: Optional[str] = No
         previous = _settings_of(target)
         service.set_credential(db, target=target, credential=credential, actor_user_id=user_id)
         target.config = config
-        _set_settings(target, data_centre=centre.key, needs_reconnect=False, disconnected=False, connected_by=str(user_id))
+        _set_settings(target, data_centre=centre.key, needs_reconnect=False, disconnected=False, connected_by=str(user_id),
+                      scopes=list(SCOPES))
         reconnected = bool(previous.get("organization_chosen"))
         if reconnected and target.status != v.TARGET_ACTIVE:
             target.status = v.TARGET_ACTIVE
@@ -305,7 +373,8 @@ def complete(db: Session, *, code: str, state: str, location: Optional[str] = No
     else:
         name = _free_name(db, workspace_id, "Zoho Books")
         config = _build_config(centre, {"zoho": {"organization_id": "pending", "data_centre": centre.key,
-                                                 "organization_chosen": False, "connected_by": str(user_id)}})
+                                                 "organization_chosen": False, "connected_by": str(user_id),
+                                                 "scopes": list(SCOPES)}})
         target = service.create_target(
             db, organization_id=organization_id, workspace_id=workspace_id, actor_user_id=user_id, name=name,
             format=v.FORMAT_JSON, transport=v.TRANSPORT_HTTP, preset=v.PRESET_ZOHO, ack_mode=v.ACK_SYNC,
@@ -402,6 +471,6 @@ def requeue_waiting(db: Session, target: ErpTarget, *, actor_user_id: uuid.UUID)
     return len(rows)
 
 
-__all__ = ["Completed", "DATA_CENTRES", "DEFAULT_DATA_CENTRE", "RECONNECT_SENTENCE", "SCOPES", "ZohoError", "check", "complete",
+__all__ = ["Completed", "DATA_CENTRES", "PAYMENTS_SCOPE", "customer_payments", "DEFAULT_DATA_CENTRE", "RECONNECT_SENTENCE", "SCOPES", "ZohoError", "check", "complete",
            "configured", "connection_view", "data_centre", "disconnect", "mark_reconnect", "organizations", "requeue_waiting",
            "start"]

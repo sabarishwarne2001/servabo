@@ -8,6 +8,7 @@ from app.models.work_item import WorkItem
 from app.models.document_role import DocumentRole
 from app.services.trinetra.projection import reviewed_withholding
 from app.services.trinetra import versions
+from app.services.trinetra.service import evidence_current, evidence_ids
 
 
 @dataclass(frozen=True)
@@ -21,13 +22,7 @@ class Withholding:
 def _value(row, facts) -> dict:
     """The case's evidence as of now (read-only; the same rules as the case view)."""
     evidence = [
-        {
-            **e,
-            "current": bool(
-                (doc := facts.get(uuid.UUID(e["work_item_id"])))
-                and doc.evidence == e["source_version"]
-            ),
-        }
+        {**e, "current": evidence_current(e, facts)}
         for e in (row.review or {}).get("evidence", [])
     ]
     source = facts.get(row.work_item_id)
@@ -64,11 +59,8 @@ def _confirmed(db, organization_id, work_item_ids, workspace_ids=None):
 
 def _reviewed_for(db, rows) -> dict:
     ids = {r.work_item_id for r in rows}
-    ids.update(
-        uuid.UUID(e["work_item_id"])
-        for r in rows
-        for e in (r.review or {}).get("evidence", [])
-    )
+    for r in rows:
+        ids.update(evidence_ids(r.review))
     workspaces = {r.workspace_id for r in rows}
     facts = versions.load(db, workspaces, ids)
     grouped = {}

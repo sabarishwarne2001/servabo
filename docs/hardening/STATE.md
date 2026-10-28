@@ -27,7 +27,7 @@ UI work owed to Phase 8 by Phase 1: a checkbox for `seller_name_confirmed` (crea
 - [x] 3. Phase 2 (P0), DONE (N-201 modes, N-202 capacities; the figures: Business 2 profiles, 12 active snapshots, 500 open cases, 50 inquiries a month; Enterprise 10, 60, 5000, 500): three modes (off, pilot, on; ships "pilot") and one helper `live_for(org)`; platform enrolment; plans and capacities
   (active snapshots, open cases, inquiry allowance); `preflight.py`
 - [x] 4. Phase 3 (backend DONE; screens in Phase 8; hostile-file corpus and speed budget in Phase 9; unverified readers wait for 2B; N-203): Servabo template (CSV/XLSX) and the readers for Form 26AS / Form 168 text and the AIS CSV; reader registry; limits
-- [ ] 5. Phase 4: printed hints to suggestions; expectations template; Zoho customer-payment TDS; deductor directory
+- [x] 5. Phase 4 DONE (printed hints, expectations template, deductor directory, Zoho customer payments; N-204; Zoho fields unverified until 2B): printed hints to suggestions; expectations template; Zoho customer-payment TDS; deductor directory
 - [ ] 6. Phase 5: credit notes; reversals; advances; sourced taxable basis; split remittances; new statuses; reject and annotate
 - [ ] 7. Phase 6: authorized inquiries (secure link, allowance, reply); approval chains (Enterprise); closure ledger; measured time
 - [ ] 8. Phase 7: Getting started; search; notifications + `trinetra.recompute` doing real work; digest; value receipt and monthly; automation
