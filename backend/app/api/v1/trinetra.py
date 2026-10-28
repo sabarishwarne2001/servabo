@@ -1,4 +1,4 @@
-"""TRINETRA workspace API. Official imports and live access remain release gated."""
+"""TRINETRA workspace API. Live access follows the deployment mode (off, pilot, on) through services/trinetra/mode.py."""
 
 import uuid
 from datetime import date
@@ -368,10 +368,7 @@ def create_credit(
                 "This source already has an expectation; use the versioned reconfirmation workflow.",
             )
         return s.view(db, w, old)
-    if db.query(Credit).filter_by(
-        organization_id=w.organization_id
-    ).count() >= s.capacity(db, w, "cases"):
-        raise HTTPException(409, "Live case limit reached.")
+    s.check_case_capacity(db, w)
     r = Credit(
         organization_id=w.organization_id,
         workspace_id=w.id,
@@ -417,7 +414,9 @@ def credits(
     w = workspace(db, context, workspace_id)
     q = db.query(Credit).filter_by(workspace_id=w.id)
     if year:
-        q = q.filter_by(year=year)
+        q = q.filter_by(year=year)  # an explicit year reaches closed history, outside the working set
+    else:
+        q = s.working_set(q)
     response.headers["Cache-Control"] = "no-store"
     page = q.order_by(Credit.created_at, Credit.id).offset(offset).limit(limit).all()
     return {"total": q.count(), "items": s.views(db, w, page)[0]}

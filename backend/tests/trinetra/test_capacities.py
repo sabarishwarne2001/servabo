@@ -117,7 +117,7 @@ def test_the_published_figures():
     spec.loader.exec_module(seed)
 
     def limits(tier):
-        return {e["limit_key"]: e["max_quantity"] for e in seed.PLACEHOLDER_TIERS[tier]["entries"] if e["limit_key"].startswith("limit.trinetra")}
+        return {e["limit_key"]: int(e["max_quantity"]) for e in seed.PLACEHOLDER_TIERS[tier]["entries"] if e["limit_key"].startswith("limit.trinetra")}
 
     business, enterprise = limits("business"), limits("enterprise")
     assert business["limit.trinetra_profiles"] == 2 and business["limit.trinetra_snapshots"] == 12

@@ -78,3 +78,7 @@ def test_evidence_stamps_and_the_downgrade_round_trip(client, tenant, world, db_
     db_session.expire_all()
     credit = db_session.query(TrinetraCredit).one()
     assert credit.review["evidence"] == kept["evidence"] and credit.review["invoice_version"] == credit.source_version
+
+
+def test_the_migrations_frozen_field_list_is_the_one_the_code_uses():
+    assert tuple(migration().FIELDS) == tuple(versions.FIELDS)

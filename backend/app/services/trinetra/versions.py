@@ -26,6 +26,7 @@ from app.models.document_role import DocumentRole
 from app.models.uploaded_file import UploadedFile
 from app.models.work_item import WorkItem
 from app.services.helm import identity as ident
+from app.services.trinetra import fields as printed_keys
 
 SCHEME = "v2"
 #: A legacy stamp that was already stale when the data was migrated: it never matches, so a person reconfirms.
@@ -35,9 +36,11 @@ STALE = "v2:stale-before-migration"
 #: printed TDS hints and the amounts and dates a reviewer compares).
 FIELDS: tuple[str, ...] = tuple(sorted({
     *ident.SELLER_NAME_KEYS, *ident.SELLER_TAX_KEYS, *ident.BUYER_NAME_KEYS, *ident.BUYER_TAX_KEYS,
-    "vendor_pan", "seller_pan", "buyer_pan", "deductor_tan", "tds_amount", "tds_section", "tds_rate",
+    "vendor_pan", "seller_pan", "buyer_pan", "tds_rate",
     "invoice_number", "invoice_date", "due_date", "total_amount", "subtotal", "tax_amount", "currency",
     "certificate_number", "challan_number", "amount", "date", "financial_year", "assessment_year", "tax_year",
+    # The printed TDS hints are named only in fields.py (invariant (f), tests/security/test_prompt_injection_tds_hints.py).
+    *printed_keys.AMOUNT_KEYS, *printed_keys.TAN_KEYS, *printed_keys.SECTION_KEYS,
 }))
 
 

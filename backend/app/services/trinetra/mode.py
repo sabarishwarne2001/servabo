@@ -24,12 +24,17 @@ OFF, PILOT, ON = "off", "pilot", "on"
 CAPABILITY = "capability.trinetra"
 
 
-def deployment_mode() -> str:
-    """The deployment's mode: the old boolean alias wins when it is set."""
-    alias = settings.TRINETRA_LIVE_ENABLED
+def mode_of(config) -> str:
+    """The mode a settings object carries: the old boolean alias wins when it is set."""
+    alias = config.TRINETRA_LIVE_ENABLED
     if alias is not None:
         return ON if alias else OFF
-    return settings.TRINETRA_MODE
+    return config.TRINETRA_MODE
+
+
+def deployment_mode() -> str:
+    """This deployment's mode."""
+    return mode_of(settings)
 
 
 @dataclass(frozen=True)

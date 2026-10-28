@@ -32,8 +32,22 @@ SELLER_NAME_NOTE = {
 }
 
 
+#: A superseded snapshot or a closed case is not working capacity, but it is kept (and counted) until the retention
+#: policy erases the documents it was built from. The ceiling is a multiple of the plan's working figure (N-202).
+RETENTION_MULTIPLIER = {"snapshots": 20, "cases": 40}
+#: The most cases one workspace's cockpit reads at once: open cases plus recently closed ones. Older closed cases stay
+#: in the database (and in the dossier, by year) but out of the working set, so a real year never hits a wall.
+WORKING_SET_LIMIT = 5000
+OPEN_STATES = ("OPEN", "DISPUTED")
+CLOSED_STATES = ("EXPLAINED", "WITHDRAWN", "CA_REVIEWED")
+#: A closed case this many tax years old (or older) leaves the working set.
+CLOSED_RETENTION_YEARS = 3
+
+
 def capacity(db, workspace, kind):
-    """Pinned published plan, with a finite platform ceiling even for legacy tiers."""
+    """The plan's WORKING capacity: profiles; ACTIVE snapshots (one per profile and tax year); OPEN cases.
+
+    Pinned published plan, with a finite platform ceiling even for legacy tiers."""
     from app.services.quota_service import plan_limit
 
     baseline, ceiling = {
@@ -47,6 +61,47 @@ def capacity(db, workspace, kind):
         limit_key="limit.trinetra_" + kind,
     )
     return min(value if value is not None else baseline, ceiling)
+
+
+def raise_hint(db, workspace) -> str:
+    """The plan that raises a limit, in words (a refusal names it)."""
+    from app.api.capability_gate import has_capability
+
+    if has_capability(
+        db,
+        organization_id=workspace.organization_id,
+        capability_key="capability.trinetra_all_workspaces",
+    ):
+        return "Ask Servabo to raise the limit for your Enterprise plan."
+    return "Enterprise raises it."
+
+
+def working_set(query, today=None):
+    """Narrow a CreditRow query to the working set: every open case, and closed cases of recent tax years."""
+    from datetime import date
+
+    cutoff = d.tax_period(today or date.today())[0] - CLOSED_RETENTION_YEARS
+    return query.filter(
+        CreditRow.state.in_(OPEN_STATES) | (CreditRow.year >= cutoff)
+    )
+
+
+def check_case_capacity(db, workspace):
+    """Admit one more OPEN case: under the plan's open-case figure, and under the retention ceiling for all cases."""
+    working = capacity(db, workspace, "cases")
+    base = db.query(CreditRow).filter_by(organization_id=workspace.organization_id)
+    if base.filter(CreditRow.state.in_(OPEN_STATES)).count() >= working:
+        raise HTTPException(
+            409,
+            f"Your plan allows {working} open TRINETRA cases. Close or withdraw finished cases to free room. "
+            + raise_hint(db, workspace),
+        )
+    if base.count() >= working * RETENTION_MULTIPLIER["cases"]:
+        raise HTTPException(
+            409,
+            "The retention ceiling for TRINETRA cases is reached. Closed cases age out with the documents they were "
+            "built from under your retention policy. " + raise_hint(db, workspace),
+        )
 
 
 def lock_capacity(db, workspace):
@@ -194,7 +249,8 @@ def create_profile(db, workspace, name, pan):
         organization_id=workspace.organization_id
     ).count() >= capacity(db, workspace, "profiles"):
         raise HTTPException(
-            409, "Legal-entity profile limit reached for this plan version."
+            409,
+            "Legal-entity profile limit reached for this plan version. " + raise_hint(db, workspace),
         )
     row = Profile(
         organization_id=workspace.organization_id,
@@ -421,13 +477,24 @@ def import_reviewed(db, workspace, p, source, year, rows, pan, confirmed):
     )
     if old:
         return old
-    if db.query(Statement).filter_by(
-        organization_id=workspace.organization_id
-    ).count() >= capacity(db, workspace, "snapshots"):
-        raise HTTPException(409, "Snapshot limit reached; contact your administrator.")
     previous = (
         db.query(Statement).filter_by(profile_id=p.id, year=year, active=True).first()
     )
+    snapshots = db.query(Statement).filter_by(organization_id=workspace.organization_id)
+    working = capacity(db, workspace, "snapshots")
+    # A new import supersedes the active snapshot of its profile and year: only a NEW profile-year adds an active one.
+    if previous is None and snapshots.filter_by(active=True).count() >= working:
+        raise HTTPException(
+            409,
+            f"Your plan allows {working} active statement snapshots (one for each legal entity and tax year). "
+            + raise_hint(db, workspace),
+        )
+    if snapshots.count() >= working * RETENTION_MULTIPLIER["snapshots"]:
+        raise HTTPException(
+            409,
+            "The retention ceiling for TRINETRA statement snapshots is reached. Superseded snapshots age out with "
+            "their documents under your retention policy. " + raise_hint(db, workspace),
+        )
     from app.services.trinetra.outcomes import baseline
 
     comparison = {}
@@ -690,13 +757,12 @@ def views(db, workspace, rows):
 
 def summary(db, workspace):
     rows = (
-        db.query(CreditRow)
-        .filter_by(workspace_id=workspace.id)
+        working_set(db.query(CreditRow).filter_by(workspace_id=workspace.id))
         .order_by(CreditRow.created_at, CreditRow.id)
-        .limit(5001)
+        .limit(WORKING_SET_LIMIT + 1)
         .all()
     )
-    if len(rows) > 5000:
+    if len(rows) > WORKING_SET_LIMIT:
         raise HTTPException(
             409,
             "Workspace exceeds the supported report size; archive evidence under the retention policy.",
