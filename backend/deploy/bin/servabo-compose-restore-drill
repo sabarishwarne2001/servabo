@@ -31,14 +31,18 @@ heartbeat() {
         "${HEARTBEAT_BASE}/${HEARTBEAT_UUID_COMPOSE_RESTORE_DRILL}$1" \
         || echo "HEARTBEAT_PING_FAILED: could not reach the monitor" >&2
 }
+REPORT="$(dirname "$0")/servabo-report-run"   # Final session 2A: runs reported to the app (never fails the drill)
 on_exit() {
     local status=$?
     if [[ -n "${SCRATCH}" ]]; then
         "${PGX[@]}" psql -U "${DB_USER}" -d postgres -qc "DROP DATABASE IF EXISTS \"${SCRATCH}\"" >/dev/null 2>&1 || true
     fi
     if (( status == 0 )); then heartbeat ""; else heartbeat "/fail"; fi
+    if (( status == 0 )); then "${REPORT}" restore-drill succeeded "the latest backup restored"
+    else "${REPORT}" restore-drill failed "exit ${status}; see compose_restore_drill.log"; fi
 }
 trap on_exit EXIT
+"${REPORT}" restore-drill started
 
 [[ -n "${KEY_FILE}" && -r "${KEY_FILE}" ]] || { echo "SERVABO_BACKUP_KEY_FILE must name a readable passphrase file" >&2; exit 64; }
 BACKUP="${1:-$({ ls -1 "${BACKUP_DIR}"/servabo-*.dump.enc 2>/dev/null || true; } | awk -F/ '{n=$NF; sub(/^[a-z]+-/, "", n); print n "\t" $0}' | sort -r | cut -f2- | head -1)}"

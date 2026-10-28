@@ -25,9 +25,13 @@ export const getOrganizationEntitlements = async (
 export const createAddonCheckoutSession = async (
   organizationId: string,
   addonKey: AddonKey,
+  // Final session 2A (N-187): which price to buy; the server uses the organization's default currency when omitted.
+  choice: { readonly currency?: "USD" | "INR"; readonly interval?: "month" | "year" } = {},
 ): Promise<EphemeralSessionResponse> => {
   const response = await apiClient.post<EphemeralSessionResponse>(
     ENTITLEMENT_ENDPOINTS.addonCheckout(organizationId, addonKey),
+    undefined,
+    { params: { ...(choice.currency ? { currency: choice.currency } : {}), ...(choice.interval ? { interval: choice.interval } : {}) } },
   );
   return response.data;
 };

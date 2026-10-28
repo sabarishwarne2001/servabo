@@ -40,8 +40,9 @@ interface RawPlan {
 
 /** What each plan is for, in one line. */
 export const PLAN_LABELS: Record<string, { name: string; for: string }> = {
-  free: { name: "Free trial", for: "Try Servabo on your own documents for a week. No card needed." },
-  developer: { name: "Developer", for: "For one team reading documents into its own tools, with the API and automations." },
+  free: { name: "Free trial", for: "Try Servabo on your own documents for two weeks, long enough for one monthly GSTR-2B. No card needed." },
+  // The key stays `developer`; customers see "Starter" (N-187).
+  developer: { name: "Starter", for: "For a small accounts team: invoices read for you, the Tally Prime file, automations and the API." },
   business: { name: "Business", for: "For finance and operations teams: matching, Helm, obligations and ERP posting." },
   enterprise: { name: "Enterprise", for: "For organizations that need single sign-on, approval chains and every control." },
 };
@@ -67,6 +68,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   "capability.outgoing_webhooks": "Outgoing webhooks",
   "capability.custom_branding": "Your logo, colours and name",
   "capability.automations": "Automations and marketplace workflows",
+  "capability.tally_file": "The Tally Prime import file",
   "addon.custom_domain": "Your own domain",
   "capability.reconciliation": "Three-way matching of invoices, POs and receipts",
   "capability.anomaly_radar": "Duplicate and anomaly radar",
@@ -96,13 +98,14 @@ export const FEATURE_LABELS: Record<string, string> = {
   "capability.helm_api": "Helm through the API and webhooks",
   "capability.gst_credit": "GST credit: purchase invoices matched with GSTR-2B",
   "capability.gst_credit_all_workspaces": "GST credit across every workspace",
+  "capability.recoveries": "Recoveries: money issues with an owner, closed only on evidence",
   "capability.priority_slo": "Priority 99.9% service objective",
 };
 
 interface RawAddon {
   key: string;
   name: string;
-  monthly_price: { currency: string; unit_amount: number };
+  prices: RawPrice[];
   per: string;
   included_in: string[];
   sold_on: string[];
@@ -113,7 +116,7 @@ export const ADDON_WORDS: Record<string, string> = {
   "addon.custom_domain": "Serve Servabo on your own hostname, with the certificate looked after for you.",
   "addon.warehouse_sync": "Scheduled exports of usage, documents and activity into Snowflake, BigQuery or S3.",
   "addon.gst_credit":
-    "The full GST Credit list on Developer: every supplier and invoice beside GSTR-2B, IMS recommendations, your decisions, the Excel export and supplier reminders.",
+    "The full GST Credit list on Starter: every supplier and invoice beside GSTR-2B, IMS recommendations, your decisions, the Excel export and supplier reminders.",
 };
 
 /** Order on plan cards and in the comparison table: the order the plans add them. */
@@ -139,13 +142,32 @@ for (const plan of raw.plans) {
   if (!plan.prices.some((p) => p.interval === "month")) fail(`plan "${plan.key}" has no monthly price`);
 }
 
+/**
+ * Final session 2A (N-187): every price in rupees (India, the default here) and in dollars, in minor units (paise or
+ * cents); null where the plan is not sold that way (Enterprise yearly is by agreement).
+ */
+export type Currency = "INR" | "USD";
+export const CURRENCIES: readonly Currency[] = ["INR", "USD"];
+export interface Amounts {
+  INR: number | null;
+  USD: number | null;
+}
+
+const amounts = (prices: RawPrice[], interval: Interval): Amounts => ({
+  INR: prices.find((p) => p.interval === interval && p.currency === "INR")?.unit_amount ?? null,
+  USD: prices.find((p) => p.interval === interval && p.currency === "USD")?.unit_amount ?? null,
+});
+
 export interface Plan {
   key: string;
   name: string;
   for: string;
   perSeat: boolean;
+  /** Dollar cents a month (0 for Free); kept for "is it paid" checks. Prices to show are `month` and `year`. */
   monthly: number;
   yearly: number | null;
+  month: Amounts;
+  year: Amounts;
   features: string[];
   allowances: RawAllowance[];
   helm: RawPlan["helm"];
@@ -164,6 +186,8 @@ export const PLANS: Plan[] = raw.plans
       perSeat: plan.per_seat,
       monthly: usd("month") ?? 0,
       yearly: usd("year"),
+      month: amounts(plan.prices, "month"),
+      year: amounts(plan.prices, "year"),
       features: FEATURE_ORDER.filter((f) => plan.features.includes(f)),
       allowances: plan.allowances,
       helm: plan.helm,
@@ -178,8 +202,10 @@ export interface Addon {
   key: string;
   name: string;
   words: string;
-  /** Cents a month, for the whole organization. */
-  monthly: number;
+  /** For the whole organization (N-187: rupees and dollars, monthly and yearly; none when it is only included). */
+  month: Amounts;
+  year: Amounts;
+  sold: boolean;
   includedIn: Plan[];
   soldOn: Plan[];
 }
@@ -191,7 +217,9 @@ export const ADDONS: Addon[] = raw.addons.map((a) => ({
   key: a.key,
   name: a.name,
   words: ADDON_WORDS[a.key]!,
-  monthly: a.monthly_price.unit_amount,
+  month: amounts(a.prices, "month"),
+  year: amounts(a.prices, "year"),
+  sold: a.prices.length > 0,
   includedIn: plansByKey(a.included_in),
   soldOn: plansByKey(a.sold_on),
 }));
@@ -216,6 +244,15 @@ export function lowestPlanWith(feature: string | null): Plan | null {
   if (feature === null) return null;
   if (!FEATURE_LABELS[feature]) fail(`feature "${feature}" has no label`);
   return PLANS.find((p) => p.features.includes(feature)) ?? fail(`no plan includes "${feature}"`);
+}
+
+/** "₹1,499" (Indian digit grouping: ₹1,49,990) or "$49". */
+export function money(minor: number, currency: Currency): string {
+  const whole = minor / 100;
+  if (currency === "INR") {
+    return `₹${whole.toLocaleString("en-IN", { maximumFractionDigits: whole % 1 === 0 ? 0 : 2 })}`;
+  }
+  return dollars(minor);
 }
 
 export function dollars(cents: number): string {

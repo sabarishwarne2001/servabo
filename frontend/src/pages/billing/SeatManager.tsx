@@ -4,7 +4,8 @@ import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Loader2, Minus, Plus, RefreshCw, Users } from "lucide-react";
 
-import { changeSeats, fetchSeatPriceBook, getSubscriptionState, syncSeats } from "@/services/api/billing";
+import { changeSeats, createPortalSession, fetchSeatPriceBook, getSubscriptionState, syncSeats } from "@/services/api/billing";
+import { ApiError } from "@/services/api/client";
 import { errorMessage } from "@/services/api/errors";
 import { billingKeys } from "@/services/api/queryKeys";
 import { formatMoneyMicros } from "@/utils/formatters";
@@ -232,10 +233,22 @@ export const SeatManager: React.FC<SeatManagerProps> = ({
               <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                 <p>
                   <strong className="font-medium text-foreground">
-                    {formatMoneyMicros(quote.data.unit_price_micros, quote.data.currency)} per seat per month
+                    {formatMoneyMicros(quote.data.unit_price_micros, quote.data.currency)}{" "}
+                    {quote.data.unit === "seat per year" ? "per seat per year" : "per seat per month"}
                   </strong>{" "}
                   for {adding} more {seatsWord(adding)}.
                 </p>
+                {quote.data.currency === "INR" && quote.data.unit !== "seat per year" &&
+                quote.data.unit_price_micros * desired * 1.18 > 15_000_000_000 ? (
+                  // Final session 2A (N-187 rule 8): above ₹15,000 a month with GST, the bank asks to approve the new
+                  // amount; said before the change, not discovered from a failed payment.
+                  <p className="text-amber-800 dark:text-amber-300" data-testid="seat-mandate-notice">
+                    Your new monthly total with GST is about{" "}
+                    {formatMoneyMicros(Math.round(quote.data.unit_price_micros * desired * 1.18), "INR")}. Indian banks ask you
+                    to approve automatic payments above ₹15,000, so your bank or UPI app may ask you to approve the new
+                    amount. If it does, nothing is charged until you do.
+                  </p>
+                ) : null}
                 <p>
                   {quote.data.proration_micros !== null
                     ? `Charged now for the rest of this period: ${formatMoneyMicros(quote.data.proration_micros, quote.data.currency)}.`
@@ -268,6 +281,21 @@ export const SeatManager: React.FC<SeatManagerProps> = ({
               {errorMessage(change.error, "The change didn't go through. Your seats are unchanged.")}
             </p>
           )}
+          {change.error instanceof ApiError && change.error.code === "MANDATE_APPROVAL_NEEDED" ? (
+            // N-187 rule 8: the approval step, with the place to do it, never a silent dunning email.
+            <button
+              type="button"
+              className="mt-2 text-xs font-semibold text-primary underline"
+              data-testid="approve-new-amount"
+              onClick={() => {
+                void createPortalSession(organizationId, { return_url: window.location.href }).then((session) =>
+                  window.location.assign(session.url),
+                );
+              }}
+            >
+              Approve the new amount
+            </button>
+          ) : null}
 
           <div className="mt-3 flex justify-end gap-2">
             <button

@@ -2,7 +2,73 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-26 (TRINETRA to Business and Enterprise: its own session 2T after 2A)_
+_Last updated: 2026-10-27 (Final session 2A finished; next: Final session 2T)_
+
+## Current phase — Final session 2A (FINAL-2-UPGRADE) (2026-10-26)
+Branch `claude/new-session-gbo9ee` (the session's assigned branch; CLAUDE.md says `hardening/<topic>`, the brief says "use the session's
+assigned branch"), based on `main` at `5600d9d` (PR #42 merged). Founder authority delegated: decisions `DECIDED (Final 2A)` from **N-191**,
+findings from **F-626**, browser specs from **137**. Prompt: `docs/sessions/FINAL-2-UPGRADE.md`. **If cut off, type `continue`: carry on from the
+first unticked box. Never restart a ticked phase.**
+Local stack this session: Postgres 16 with pgvector 0.8.7 from the `pgvector/pgvector:pg16` image (pulled through `mirror.gcr.io`; Docker Hub
+answered 429) on :5433 (e2e) and :5434 (backend tests), Redis, backend venv Python 3.12 and `npm ci`. The environment block is `testenv.sh` in
+the session scratchpad (outside the repo).
+
+- [x] 0. Start-up: docs and code read; stack; this checklist; draft PR #43; `main`'s latest CI (run #482 on `5600d9d`) green
+- [x] 0A. `docs/product/COMMERCIAL-READINESS.md`
+- [x] 0B. `docs/product/RESOLUTION-ASSESSMENT.md` and the build decision: N-191, build a thin "Recoveries" layer after the must-haves
+- [x] 1. Prices and packaging for India (N-187): catalogue per currency and interval, add-on prices, Dodo products, rupee checkout (currency,
+  country, tax id), the ₹15,000 mandate notice, 14-day trial, "Starter", custom domains to Business and Enterprise, the Tally file on Starter,
+  unit economics in every currency, the website, docs, tests. Findings F-626 to F-629; decisions N-192, N-193 (open: GSTIN on the
+  Dodo invoice). Browser regression of the billing, plan and ERP specs: 175 passed, 4 failed and fixed (F-629, N-187 expected values,
+  spec 137 isolation), re-run green. Unverified until 2B: Dodo's real rupee checkout, its exact refusal wording above the mandate.
+- [x] 2. Safety jobs that cannot stop silently: run reports, the stale watcher and alert, readiness `safety_jobs`, the health page, the
+  sweeps in the scheduler (or not, recorded), `servabo-install-host-jobs`, preflight, docs, tests. Sweeps stay on cron (N-194);
+  readiness adds `safety_jobs: degraded` only when degraded (a healthy answer stays `{"status": "ready"}`, F-042). Unverified until
+  2B: a real server's cron, and the stopped-cron email arriving the next day (checklist step 10).
+- [x] 3. Prompt injection: `docs/hardening/PROMPT-INJECTION.md`, registry-walking invariants (a) to (f), the red-team corpus, fixes test-first.
+  Six findings fixed test-first (F-631 to F-636): a learned address is never a recipient until confirmed (N-195, migration `s2a3`);
+  no automatic approval on a document that reads like instructions; Helm never takes a payment decision alone (N-196: the act cap
+  is gone for payments); every prompt fences document text; emails bound document values; a QR "number" that is a sentence is
+  not read. Open: N-197 (ERP auto-post of a case completed by an outside upload). Unverified until 2B: the real models on the corpus.
+- [x] 4. Leftovers: the GST speed test's timings, deletion warning emails, a zip in the upload tray, `k1a6`'s downgrade with rows, PR #39's
+  loose ends. GST matching 2.23 s / import 1.80 s, as Session H (no code change, budget unchanged); deletion warnings at once and 5 days
+  before (migration `s2a2`); the global tray takes a zip (spec 138); `k1a6` proven safe with rows (no change); spec 122 → 139.
+  CI on the PR was red after Phases 1-2 and is fixed in code: F-630 (ERP plan check before lookup), the safety-job webhook through the
+  egress gate, the data map, N-187 expected values, the website's fonts (Lighthouse 97 again). Spec 78 (Helm "already planning",
+  409) failed once on CI and passed twice locally: watched, not yet explained.
+- [x] 5. The proof kit: `scripts/accuracy_report.py`, `docs/product/PILOT-PLAYBOOK.md`. The report compares a truth sheet
+  (`scripts/accuracy_truth_template.csv`) with the extraction: field and document accuracy, the review catch rate, every miss,
+  no document values. Tested with an invented truth sheet; 2B runs it on the owner's invoices. Pilot price: N-198 (decided).
+- [x] 6. The Resolution layer: first declined by the cut line, then **built at the owner's request (2026-10-27)**: Recoveries
+  (N-191, docs/product/RECOVERIES.md). Five kinds, closure only on evidence, one outcome ledger with Helm's keys, Business and
+  Enterprise with a preview, the receipt / monthly / digest / Getting started lines, migration `s2a4_recoveries`, the hourly
+  `recoveries.sweep` job, 27 backend tests, 3 unit tests, browser spec 140 (Found to Verified on the sample company, axe light
+  and dark). Found by the walk and fixed test-first: an organization owner could not own an issue (derived admin).
+- [x] 7. Records and the docs customers see: PRODUCT-NEXT, COSTS, RUNBOOK, CONFIGURATION, the env templates, DODO.md and
+  DODO-LOCAL-TEST.md (journey I: the rupee journey, the mandate notice, the GSTIN), the website (rupees and dollars, the 14-day
+  trial, `/trinetra` per user), CHANGELOG, FINDINGS (F-626 to F-636), COVERAGE, NEEDS-OWNER (N-191 to N-198), FINAL-SESSIONS.
+- [x] 8. `docs/sessions/FINAL-2-LIVE.md` rewritten (2T adds TRINETRA's phase and removes the note); HANDOFF "Final session 2A →
+  Final session 2B". One small code change for it, test-first: the deletion-warning job honours `run-job --now` outside
+  production, so 2B sees the "last chance" email. Finish-line checks run here: frontend typecheck, lint, `check:self`,
+  `test:unit` (299) and build; the website's typecheck, build and checks; `campaign_slices.py --check all` 0; one Alembic head
+  `s2a3_counterparty_contact_source`, up, down three (to `tr1a2_review_outcomes`) and up on an empty database. The full backend
+  and browser suites: on the ready PR's CI (sabarishwarne2001/servabo#43).
+
+- **Next action: Final session 2T** (`docs/sessions/FINAL-2T-TRINETRA.md`, TRINETRA for Business and Enterprise), after PR #43
+  is merged with CI green. Then Final session 2B (`docs/sessions/FINAL-2-LIVE.md`) on the owner's PC. Next free numbers:
+  **N-200**, **F-641**, browser spec **141**.
+- **The owner's request of 2026-10-27, "finish everything in this session":** done. Recoveries (above); N-197 decided and built
+  (ERP auto-post waits for a person on a case an outside upload completed); N-198 decided (the pilot: one month on Business,
+  up to 3 seats, ₹9,999 plus GST, credited against the first year); the Gmail dark-mode logo (a white panel on the light
+  logo); F-637 (spec 78's flake explained and fixed: a person's re-plan waits for a running plan). CI on run 502 was red on
+  two things of this session's own making, both fixed and proven: the storage boundary rule (the logo file) and spec 115
+  (N-195 made the reminder wait for a confirmed contact). Run 505 found four more, all fixed: the isolation rule (Recoveries had no isolation test: `tests/engines/test_recoveries_live.py`), F-638 (two radar findings on one invoice crashed the sweep) the generated TENANCY-AND-PLANS.md (regenerated) and the capability's name in a plan refusal (it showed its key). A dnspython advisory published that day (CVE-2026-114605) was fixed by 2.9.0, a minor bump. Run 510 found F-639 (spec 75 read one document's indexing as the finished rebuild; the test now waits for every document). Run 511 found F-640: the hourly Recoveries sweep, one job over every workspace, held the worker's queue for minutes; it now queues one job per workspace. The leftovers the owner listed (deletion warnings, a zip in the
+  upload tray, the downgrade with rows, the GST speed test) were done in Phase 4. What only the real world can prove is
+  Final session 2B's (HANDOFF "Final session 2A → Final session 2B").
+- **Owner request during the finish (2026-10-27): the real logo in every email (N-199).** Built test-first: the logo
+  (mark and wordmark, light and dark) is a picture carried inside each email (`templates/emails/inline_images.py`).
+  Unverified until 2B: real inboxes.
+
 
 ## Current phase — the final sessions: 2A, then 2T (TRINETRA), then 2B (2026-10-26)
 Branch `hardening/trinetra-to-ga`, based on `main` at `2e0d61c` (PR #41 merged). Docs only: no code, no migration, one Alembic head
@@ -12,7 +78,7 @@ Branch `hardening/trinetra-to-ga`, based on `main` at `2e0d61c` (PR #41 merged).
 the revised session 2A"), and its original brief is only partly built (`docs/trinetra/ORIGINAL-BRIEF.md`, added here). The owner wants it on
 Business and Enterprise, working like every other feature, with nothing left behind. So finishing it is its own session, 2T, after 2A.
 
-- [ ] **Final session 2A** (cloud, Opus 5.5 High): `docs/sessions/FINAL-2-UPGRADE.md`: India prices, safety jobs, prompt injection, the proof
+- [x] **Final session 2A** (cloud, Opus 5.5 High; done 2026-10-27, PR #43): `docs/sessions/FINAL-2-UPGRADE.md`: India prices, safety jobs, prompt injection, the proof
   kit, the Resolution assessment, Final 1's and PR #39's leftovers, the live prompt rewritten. It touches TRINETRA only for its plan row and copy
   and the injection map.
 - [ ] **Final session 2T** (cloud, Opus 5.5 High): `docs/sessions/FINAL-2T-TRINETRA.md`: TRINETRA finished for Business and Enterprise, with

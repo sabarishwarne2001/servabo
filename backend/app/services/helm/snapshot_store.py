@@ -307,7 +307,10 @@ def take(db: Session, book: HelmBook, *, as_of: Optional[date] = None) -> snap.S
             v.MSME_MICRO, v.MSME_SMALL, v.MSME_MEDIUM), category=row.msme_category,
             confirmed=row.msme_source == v.MSME_SOURCE_PERSON, udyam_number=row.udyam_number)
         counterparties[row.key] = snap.Counterparty(key=row.key, name=row.display_name, role=row.role, msme=status,
-                                                    contact_email=row.contact_email, behaviour=row.behaviour or {})
+                                                    # N-195: Helm's hands email only an address a person confirmed.
+                                                    contact_email=(row.contact_email if row.contact_source
+                                                                   == v.CONTACT_SOURCE_PERSON else None),
+                                                    behaviour=row.behaviour or {})
 
     matched_po = set(db.execute(
         select(ProcurementCase.invoice_work_item_id).where(

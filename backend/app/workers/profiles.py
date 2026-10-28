@@ -165,6 +165,12 @@ LIGHT = WorkerProfile(
             "gst.notices",
             # Campaign session 4 (§C.4): alerts for the deployment's owner. Queries and SMTP only.
             "ops.alerts",
+            # Final session 2A (Phase 2): the host's safety jobs checked against their deadlines. Queries only.
+            "ops.safety_jobs",
+            # Final session 2A (Phase 4, N-164): deletion warnings. Queries and SMTP only.
+            "compliance.deletion_notices",
+            # Final session 2A (Phase 6, N-191): Recoveries re-read the engines' stored rows. Queries only.
+            "recoveries.sweep",
             # ARCH42-S1:entity-light-profile. Entity resolution: string
             # similarity, indexed lookups and EM arithmetic. Nothing under
             # app/services/entities/ imports a model, OCR or a PDF engine.

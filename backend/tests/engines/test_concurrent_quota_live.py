@@ -59,7 +59,7 @@ def test_eight_uploads_racing_for_the_last_document_one_wins(live_server: str, d
 
     put_on_plan(db_session, db_session.get(Organization, organization), "free")
     usage_service.record_usage(
-        db_session, organization_id=organization, event_type="document.upload", quantity=24, cost_micros=0,
+        db_session, organization_id=organization, event_type="document.upload", quantity=99, cost_micros=0,  # N-187: Free allows 100
         provider="internal",
     )
     db_session.commit()
@@ -82,7 +82,7 @@ def test_eight_uploads_racing_for_the_last_document_one_wins(live_server: str, d
             UsageEvent.organization_id == organization, UsageEvent.event_type == "document.upload"
         )
     ).scalar_one()
-    assert charged == 25
+    assert charged == 100
     created = db_session.execute(
         select(func.count()).select_from(WorkItem).where(WorkItem.workspace_id == tenant.foreign_workspace.id)
     ).scalar_one()

@@ -5,7 +5,7 @@ import SectionHead from "../components/SectionHead.astro";
 import PlanBadge from "../components/PlanBadge.astro";
 import ClosingCta from "../components/ClosingCta.astro";
 import { APP, SITE, absolute } from "../config/site";
-import { TRIAL_DAYS, addon, dollars, lowestPlanWith } from "../lib/pricing";
+import { TRIAL_DAYS, addon, money, lowestPlanWith } from "../lib/pricing";
 
 /** The one source of each rule: the section, and the official page that carries it. */
 const LAW = {
@@ -54,7 +54,7 @@ const faqs = [
   { q: "What is not verified?", a: "The file layout has been tested on invented files that follow the portal’s documented layout, not yet on a customer’s download. The 180-day figure depends on the payments Servabo knows about (Helm’s records and the bank statements you import). Interest is not calculated, and some financial years have special rules for the time limit in Section 16(4); the product says so where it matters." },
   { q: "What happens to the file and my invoices?", a: "They stay in your workspace, isolated from every other organization, like any document you upload. GSTR-2B is read by deterministic code, not by an AI model. A supplier reminder is only a draft until a person sends it, and the sample company never sends anything." },
   { q: "Will Servabo tell me when something needs attention?", a: "Yes, in the app and, on Mondays, in one email to owners, administrators and the billing role: only when there is something to report, never an empty summary. It says what is claimable now, which invoices are close to 180 days unpaid and which suppliers have not reported. A plan that shows only the headline figures gets one line about what the lists add. Switch it off in notification settings." },
-  { q: "What does it cost?", a: `Every plan can import a file and see the six figures; the sample company is there to look at during the ${TRIAL_DAYS}-day trial. The supplier list, invoice list, IMS actions, Excel export and reminders come with ${lowest?.name ?? "Business"} and up. On ${gstAddon.soldOn.map((p) => p.name).join(" or ")}, add GST Credit for ${dollars(gstAddon.monthly)} a month for the whole organization.` },
+  { q: "What does it cost?", a: `Every plan can import a file and see the six figures; the sample company is there to look at during the ${TRIAL_DAYS}-day trial. The supplier list, invoice list, IMS actions, Excel export and reminders come with ${lowest?.name ?? "Business"} and up. On ${gstAddon.soldOn.map((p) => p.name).join(" or ")}, add GST Credit for ${money(gstAddon.month.INR ?? 0, "INR")} a month or ${money(gstAddon.year.INR ?? 0, "INR")} a year for the whole organization, GST extra.` },
 ];
 
 const product = {
@@ -200,6 +200,7 @@ const faqLd = {
           <li>IMS recommendations and your decisions, kept across imports</li>
           <li>Excel export and supplier reminders</li>
           <li>The 180-day exposure from Helm’s payment records</li>
+          <li>Recoveries: each waiting invoice gets an owner and is closed only when a later GSTR-2B carries it, counted as credit secured</li>
         </ul>
       </div>
       <div class="sheet p-6">
@@ -214,7 +215,7 @@ const faqLd = {
         </ul>
       </div>
     </div>
-    <p class="mt-6 text-base font-medium" data-testid="gst-addon-line">On {gstAddon.soldOn.map((p) => p.name).join(" or ")}, add GST Credit for {dollars(gstAddon.monthly)} a month. One price for the whole organization, not per seat.</p>
+    <p class="mt-6 text-base font-medium" data-testid="gst-addon-line">On {gstAddon.soldOn.map((p) => p.name).join(" or ")}, add GST Credit for {money(gstAddon.month.INR ?? 0, "INR")} a month or {money(gstAddon.year.INR ?? 0, "INR")} a year, GST extra ({money(gstAddon.month.USD ?? 0, "USD")} or {money(gstAddon.year.USD ?? 0, "USD")} outside India). One price for the whole organization, not per user.</p>
     <p class="mt-2 text-sm text-muted-foreground">From the same price list as the <a class="link" href="/pricing#add-ons">pricing page</a>. </p>
   </section>
 

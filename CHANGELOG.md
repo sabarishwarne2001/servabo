@@ -6,6 +6,101 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Added — Recoveries (Final session 2A, N-191; the owner's request of 2026-10-27)
+
+- **Recoveries** (Documents → Recoveries, Business and Enterprise): every money issue Servabo finds (GST credit waiting on a
+  supplier, a probable duplicate, a price above the purchase order, a supplier statement difference, a payment deadline)
+  with its amount, its due date, an owner and the next steps, from Found to Being fixed to **Verified**, which only evidence
+  grants. "Not money: <reason>" is recorded and never counted. Other plans see the counts and what was found.
+- **"Recovered, verified"** on the value receipt and the monthly summary, beside what was found and never added to it; Helm's
+  outcomes are counted in it once. The GST digest says how many issues need an owner; Getting started links to the page.
+
+### Changed — the open decisions, settled with the owner's authority (2026-10-27)
+
+- **ERP auto-post waits for a person** when a supplier's upload through a request link completed a case (N-197).
+- **The pilot offer:** one month on Business for up to 3 seats at ₹9,999 plus GST, credited against the first year (N-198).
+- **The email logo** carries a small white panel, so Gmail's phone apps in dark mode show it clearly (N-199).
+
+### Fixed
+
+- **"Re-plan now" in Helm** waits a moment for a plan already running instead of saying "already planning" (F-637).
+
+### Changed — Emails show the real Servabo logo (owner request, 2026-10-27; N-199)
+
+- Every email sent as Servabo shows the logo itself (the ribbon mark and the wordmark, light and dark) instead of a plain
+  "S" tile. The picture travels inside the email, so it shows without "load images?" and no email gains a web address.
+
+### Changed — Final session 2A, Phases 6 to 8: the decision, the records, the live prompt (2026-10-27)
+
+- **The Resolution layer ("Recoveries", N-191) was not built in this session**: declined by the session's cut line after
+  the must-haves; it is the first build after the pilots (`docs/product/RESOLUTION-ASSESSMENT.md`).
+- **The live session's prompt (`docs/sessions/FINAL-2-LIVE.md`) rewritten** for what exists now: the fifteen Dodo products in
+  both currencies and the rupee journey, the safety jobs' stale alert in the production rehearsal, the red-team documents
+  through real models, the accuracy report on real invoices, the deletion warnings in a real inbox. Final session 2T adds
+  TRINETRA's phase.
+- **The deletion-warning job honours `run-job --now` outside production**, so the "last chance" email can be seen without
+  waiting 25 days.
+- The hand-over to Final session 2B (`docs/hardening/HANDOFF.md`) and the owner's guide (`docs/FINAL-SESSIONS.md`).
+
+### Added — Final session 2A, Phase 5: the proof kit (2026-10-27)
+
+- **`scripts/accuracy_report.py`** measures extraction accuracy on real documents against a truth sheet the customer fills
+  (`scripts/accuracy_truth_template.csv`): accuracy by field, documents with every key field right, how many wrong fields
+  went to review, and every miss. A Markdown report fit to show a customer.
+- **`docs/product/PILOT-PLAYBOOK.md`**: how to run a 30-day paid pilot with a distributor, from day-1 documents to the case
+  study.
+
+### Security — Final session 2A, Phase 3: prompt injection, mapped and tested (2026-10-27)
+
+- **The map** (`docs/hardening/PROMPT-INJECTION.md`): every way outside text enters, every model that reads it, every effect,
+  and six invariants enforced by tests that walk the code.
+- **An email address read from an invoice is never written to until a person confirms it** (Helm, Settings, Suppliers and
+  customers). Existing addresses need one confirmation (N-195).
+- **Helm never pays, approves a payment, releases a hold or marks paid on its own**, in any mode (N-196).
+- No automatic approval rests on a document that reads like instructions to the AI (English, Hindi, money commands).
+- Every prompt that reads a document fences it as data; outbound emails bound every value from a document; a QR code whose
+  invoice number is a sentence is not read.
+
+### Added — Final session 2A, Phase 4: leftovers (2026-10-27)
+
+- **Warning emails after a deletion** (N-164): the owners and admins of a deleted workspace or organization are emailed at once
+  ("will be erased on <date>; restore until then") and 5 days before the erasure ("last chance").
+- **The upload tray on a conversation takes a zip**, by the same path as the Documents page.
+- The GST speed test names the slow step when it fails (the budget is unchanged); migration `k1a6`'s downgrade is proven with rows.
+
+### Fixed — Final session 2A, Phases 1 to 4 (CI)
+
+- ERP pages answered a Free organization "not found" instead of naming the plans that include ERP posting (F-630).
+- The website's pages showing rupees loaded 100 KB of extra fonts for the ₹ sign; only the Latin fonts load now.
+
+### Added — Final session 2A, Phase 2: safety jobs that cannot stop silently (2026-10-26)
+
+- **Every server cron job reports its runs to the app** (sweeps, backups, restore drill, uptime check). When one has not
+  succeeded within its deadline, or never reported a day after start, the operator is emailed once a day (and
+  `ALERT_WEBHOOK` hears it); Platform admin, Background jobs, shows it in red; readiness says `safety_jobs: degraded`
+  but the site stays up; `preflight.py --online` names it.
+- **`servabo-install-host-jobs`** installs the cron files and proves every job can report (RUNBOOK 9.6). New settings:
+  `SAFETY_JOB_REPORT_TOKEN`, `ALERT_WEBHOOK`, `SAFETY_JOBS_UNWATCHED`. The sweeps stay on cron (N-194).
+
+### Added — Final session 2A, Phase 1: sellable in India (2026-10-26)
+
+- **Prices in rupees and yearly** (N-187), per seat: Starter ₹1,499 or $49 a month, ₹14,990 or $490 a year; Business ₹4,999
+  or $299 a month, ₹49,990 or $2,990 a year; Enterprise ₹14,999 or $799 a month (all in `docs/hardening/TENANCY-AND-PLANS.md`,
+  margins in `docs/hardening/COSTS.md` §4). Fifteen Dodo products (`scripts/dodo_setup.py`); GST Credit sold monthly and
+  yearly in both currencies.
+- **Rupee checkout**: billing country India, UPI and RuPay, a GSTIN required and pre-filled from the organization's own GSTR-2B.
+  Before paying, a monthly total above ₹15,000 (with GST) says Indian banks ask the payer to approve each such payment, and offers
+  yearly instead.
+- **14-day trial** with 100 documents and 200 pages; **"Developer" is now called Starter** (the plan key stays `developer`).
+- **Custom domains are included in Business and Enterprise**; the $199 add-on is retired. **The Tally Prime file is on Starter**.
+- **The website shows rupees by default** with a switch to dollars.
+
+### Fixed — Final session 2A, Phase 1
+
+- A seat or plan change moved a rupee or yearly subscriber onto dollar monthly billing (F-627).
+- A seat increase whose charge failed was applied unpaid; a rupee subscriber was quoted the dollar seat price (F-628).
+- The margin test never checked yearly prices (F-626); the payment confirmation named the plan by its key (F-629).
+
 ### Docs — Final session 2T: TRINETRA finished for Business and Enterprise (2026-10-26)
 
 - **TRINETRA gets its own session** (N-190): `docs/sessions/FINAL-2T-TRINETRA.md`, after 2A and before 2B. It fixes the review's

@@ -6,7 +6,7 @@ THE DEFECT THIS CLOSES
 `custom_domains.py` and `warehouse_sync.py` checked a ROLE and nothing else.
 A Free organization's owner could claim `ai.acme.com`, have it verified,
 receive a certificate, and register a Snowflake destination with a nightly
-push — the two add-ons priced at $199 and $300 a month, delivered for nothing,
+push — the two add-ons then priced at $199 and $300 a month, delivered for nothing,
 because the only question either router asked was "is this person the owner".
 
 THE TWO GRANT SOURCES
@@ -66,27 +66,73 @@ STATE_NOT_GRANTED = "NOT_GRANTED"
 
 
 @dataclass(frozen=True)
+class AddonPrice:
+    """One way an add-on is sold: a currency, an interval and the gateway product that charges it (N-187)."""
+
+    currency: str
+    interval: str  # "month" | "year"
+    amount_micros: int
+    #: `settings` attribute holding the gateway product id. An attribute NAME,
+    #: not a value: product ids differ between test and live mode.
+    product_setting: str
+
+    def product_id(self) -> Optional[str]:
+        return getattr(settings, self.product_setting, None) or None
+
+
+@dataclass(frozen=True)
 class AddonOffer:
     """What an add-on is, what it costs, and what losing it does."""
 
     key: str
     display_name: str
     description: str
-    monthly_price_micros: int
-    currency: str
-    #: `settings` attribute holding the gateway product id. An attribute NAME,
-    #: not a value: product ids differ between test and live mode.
-    product_setting: str
+    #: Every price it is sold at (Final session 2A, N-187). Empty: sold to nobody, only included in plans
+    #: (custom domains since N-187).
+    prices: tuple[AddonPrice, ...]
     #: Plain words for what happens when grace ends. Rendered in notifications
     #: and in the console, so it must be true of `addon_service.halt_resources`.
     halt_effect: str
     resource_noun: str
     #: Plan keys (`quota_tier.key`) whose organizations may buy this add-on. Empty: any plan that does not already
-    #: bundle it. GST Credit is sold to Developer only: Free chooses a plan first, Business and Enterprise include it.
+    #: bundle it. GST Credit is sold to Starter (`developer`) only: Free chooses a plan first, Business and Enterprise
+    #: include it.
     sold_on_tiers: tuple[str, ...] = ()
+
+    def price(self, currency: str = "USD", interval: str = "month") -> Optional[AddonPrice]:
+        return next((p for p in self.prices if (p.currency, p.interval) == (currency, interval)), None)
+
+    @property
+    def monthly_price_micros(self) -> int:
+        """The dollar monthly price (0 when it is not sold in dollars monthly)."""
+        price = self.price("USD", "month")
+        return price.amount_micros if price is not None else 0
+
+    @property
+    def currency(self) -> str:
+        return "USD"
+
+    @property
+    def product_setting(self) -> Optional[str]:
+        """The dollar monthly product's setting name (the one every add-on had before N-187)."""
+        price = self.price("USD", "month")
+        return price.product_setting if price is not None else None
+
+    @property
+    def sold(self) -> bool:
+        return bool(self.prices)
+
+    def price_for_product(self, product_id: Optional[str]) -> Optional[AddonPrice]:
+        """The price a gateway product id charges, among this add-on's configured products."""
+        if not product_id:
+            return None
+        return next((p for p in self.prices if p.product_id() == product_id), None)
 
 
 ADDON_CATALOG: dict[str, AddonOffer] = {
+    # Final session 2A (N-187): included in Business and Enterprise, sold to nobody. The $199 add-on and its gateway
+    # product were retired: it was bundled into every paid plan, so nobody could ever buy it. The entry stays because
+    # the custom-domain routes, the grace sweep and the ledger read the add-on's key and words.
     entitlements.CUSTOM_DOMAIN_ADDON: AddonOffer(
         key=entitlements.CUSTOM_DOMAIN_ADDON,
         display_name="Custom domains",
@@ -94,9 +140,7 @@ ADDON_CATALOG: dict[str, AddonOffer] = {
             "Serve Servabo on your own hostname, with TLS certificates issued "
             "and renewed for you and branding shown before sign-in."
         ),
-        monthly_price_micros=199_000_000,
-        currency="USD",
-        product_setting="DODO_ADDON_PRODUCT_CUSTOM_DOMAIN",
+        prices=(),
         halt_effect=(
             "verified hostnames are taken offline. You keep the claim, so no "
             "other organization can take the name"
@@ -110,9 +154,8 @@ ADDON_CATALOG: dict[str, AddonOffer] = {
             "Scheduled exports of usage, documents, assistant and automation "
             "activity into Snowflake, BigQuery, S3 or your own warehouse."
         ),
-        monthly_price_micros=300_000_000,
-        currency="USD",
-        product_setting="DODO_ADDON_PRODUCT_WAREHOUSE_SYNC",
+        # N-187: sold in dollars only (not in rupees).
+        prices=(AddonPrice("USD", "month", 300_000_000, "DODO_ADDON_PRODUCT_WAREHOUSE_SYNC"),),
         halt_effect=(
             "scheduled exports are paused. Destinations and run history are "
             "kept"
@@ -126,9 +169,13 @@ ADDON_CATALOG: dict[str, AddonOffer] = {
             "The full GST Credit list for your GSTR-2B: every supplier and invoice with the Invoice Management "
             "System (IMS) recommendation, your decisions, the Excel export and reminders to suppliers."
         ),
-        monthly_price_micros=49_000_000,
-        currency="USD",
-        product_setting="DODO_ADDON_PRODUCT_GST_CREDIT",
+        # N-145, N-187: per organization; yearly is ten months.
+        prices=(
+            AddonPrice("USD", "month", 49_000_000, "DODO_ADDON_PRODUCT_GST_CREDIT"),
+            AddonPrice("USD", "year", 490_000_000, "DODO_ADDON_PRODUCT_GST_CREDIT_YEARLY"),
+            AddonPrice("INR", "month", 1_499_000_000, "DODO_ADDON_PRODUCT_GST_CREDIT_INR"),
+            AddonPrice("INR", "year", 14_990_000_000, "DODO_ADDON_PRODUCT_GST_CREDIT_YEARLY_INR"),
+        ),
         halt_effect=(
             "the full GST Credit lists return to the preview. Your imports, matches and decisions are kept, "
             "and everything comes back at once when you add it again"
@@ -338,14 +385,41 @@ def addon_access(
     return AddonAccess(addon_key, STATE_NOT_GRANTED, None, None, 0)
 
 
-def purchasable(addon_key: str) -> bool:
-    """Self-serve purchase needs a Merchant-of-Record gateway and a product id."""
+def purchasable(addon_key: str, *, currency: Optional[str] = None, interval: Optional[str] = None) -> bool:
+    """Self-serve purchase needs a Merchant-of-Record gateway and a product id (for this currency and interval, when
+    given; any configured price otherwise)."""
     from app.services.billing.payment_gateway import active_gateway_name
 
+    if active_gateway_name() != "DODO":
+        return False
     offer = offer_for(addon_key)
-    return active_gateway_name() == "DODO" and bool(
-        getattr(settings, offer.product_setting, None)
-    )
+    return any(price.product_id() for price in offer.prices
+               if currency in (None, price.currency) and interval in (None, price.interval))
+
+
+def price_words(addon_key: str, currency: str = "USD") -> str:
+    """The add-on's prices in one phrase, in `currency` when it is sold in it, else in dollars (N-187):
+    "₹1,499 a month or ₹14,990 a year". Read from the catalogue, so no sentence types a price."""
+    from app.services.value_receipt import say_amount
+
+    offer = offer_for(addon_key)
+    shown = currency if any(p.currency == currency for p in offer.prices) else "USD"
+    prices = sorted((p for p in offer.prices if p.currency == shown), key=lambda p: p.interval != "month")
+    return " or ".join(f"{say_amount(p.amount_micros, p.currency)} a {p.interval}" for p in prices)
+
+
+def offered_prices(addon_key: str) -> list[AddonPrice]:
+    """The prices of this add-on whose gateway product is configured, in the catalogue's order."""
+    return [price for price in offer_for(addon_key).prices if price.product_id()]
+
+
+def addon_for_product(product_id: Optional[str]) -> Optional[tuple[str, AddonPrice]]:
+    """A gateway product id -> (add-on key, the price it charges), across every configured add-on price."""
+    for key, offer in ADDON_CATALOG.items():
+        price = offer.price_for_product(product_id)
+        if price is not None:
+            return key, price
+    return None
 
 
 def sold_on(db: Session, addon_key: str) -> list[str]:
@@ -361,7 +435,10 @@ def offered_on_plan(db: Session, *, organization_id: uuid.UUID, addon_key: str) 
     """Whether this organization's plan is one the add-on is sold on (every plan, when the offer names none)."""
     from app.services import quota_service
 
-    keys = offer_for(addon_key).sold_on_tiers
+    offer = offer_for(addon_key)
+    if not offer.sold:
+        return False  # N-187: included in plans only (custom domains), never sold
+    keys = offer.sold_on_tiers
     if not keys:
         return True
     tier = quota_service.resolve_tier(db, organization_id=organization_id)
@@ -384,6 +461,10 @@ __all__ = [
     "ADDON_CATALOG",
     "AddonAccess",
     "AddonOffer",
+    "AddonPrice",
+    "addon_for_product",
+    "offered_prices",
+    "price_words",
     "STATE_ACTIVE",
     "STATE_GRACE",
     "STATE_LAPSED",

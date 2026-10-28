@@ -211,6 +211,8 @@ export interface SubscriptionStateResponse {
   readonly access_state: string;
   /** Campaign session 1: what the server's seat check enforces. */
   readonly plan_key: string | null;
+  /** Final session 2A (N-187): the plan's name as customers see it ("Starter" for the `developer` key). */
+  readonly plan_name?: string | null;
   /** The plan's seats on Free, the purchased quantity on a paid plan; null = no limit. */
   readonly seat_capacity: number | null;
   readonly seat_capacity_source: "PURCHASED" | "PLAN" | "OVERRIDE" | "UNLIMITED";
@@ -320,6 +322,11 @@ export interface PlanListResponse {
   readonly plans: readonly PlanOption[];
   readonly checkout_available?: boolean;
   readonly checkout_unavailable_reason?: string | null;
+  /** Final session 2A (N-187): the currency shown first (INR for an Indian organization). */
+  readonly default_currency?: string;
+  /** N-187: above this monthly total including GST (paise), Indian banks ask to approve each automatic payment. */
+  readonly india_mandate_limit_minor?: number;
+  readonly india_gst_rate_percent?: number;
 }
 
 export const microsToUnits = (micros: number): number => micros / 1_000_000;

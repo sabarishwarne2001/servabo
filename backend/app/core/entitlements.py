@@ -115,6 +115,7 @@ __all__ = [
     "OBLIGATIONS_CAPABILITY",
     # ARCH47-S1:capability-erp-posting-export
     "ERP_POSTING_CAPABILITY",
+    "TALLY_FILE_CAPABILITY",
     # ARCH48-S1:capability-collaborative-review-export
     "COLLABORATIVE_REVIEW_CAPABILITY",
     # ARCH49-S1:capability-process-intelligence-export
@@ -136,6 +137,7 @@ __all__ = [
     "HELM_API_CAPABILITY",
     # Session F: GST Credit
     "GST_CREDIT_CAPABILITY",
+    "RECOVERIES_CAPABILITY",
     "GST_CREDIT_ALL_WORKSPACES_CAPABILITY",
     "CANONICAL_MAX_COST_MICROS",
     "CUSTOM_DOMAIN_ADDON",
@@ -333,6 +335,9 @@ HELM_API_CAPABILITY: str = "capability.helm_api"
 #: and supplier reminders (Business, Enterprise). Importing a GSTR-2B and seeing the headline figures, and the
 #: whole reconciliation of the sample company, need no capability (the GST Credit preview, N-135).
 TRINETRA_CAPABILITY: str = "capability.trinetra"
+#: Final session 2A (N-191). Recoveries: money issues with an owner and a due date, closed only on evidence, and the
+#: "Recovered, verified" ledger (Business, Enterprise). Other plans see the counts and what was found, as a preview.
+RECOVERIES_CAPABILITY: str = "capability.recoveries"
 TRINETRA_ALL_WORKSPACES_CAPABILITY: str = "capability.trinetra_all_workspaces"
 GST_CREDIT_CAPABILITY: str = "capability.gst_credit"
 #: Session F. Enterprise: one reconciliation per GSTIN across every workspace, and `gst:read` API keys.
@@ -362,6 +367,11 @@ OBLIGATIONS_CAPABILITY: str = "capability.obligations"
 #: milestone; Business and Enterprise. Not metered: posting is deterministic
 #: (no model call).
 ERP_POSTING_CAPABILITY: str = "capability.erp_posting"
+
+#: Final session 2A (N-187, closes N-174). The Tally Prime import file on its own: the guided Tally set-up, approved
+#: bills rendered as Tally vouchers and downloaded for a person to import. Starter and up. Every other ERP target and
+#: every automatic posting stays ERP posting (Business and Enterprise).
+TALLY_FILE_CAPABILITY: str = "capability.tally_file"
 
 #: ARCH48-S1:capability-collaborative-review. Real-Time Collaborative Review &
 #: Live Presence: the review hub goes live (queue updates pushed over an
@@ -421,6 +431,7 @@ CAPABILITY_KEYS: tuple[str, ...] = (
     UNIVERSAL_CORROBORATOR_CAPABILITY,
     OBLIGATIONS_CAPABILITY,
     ERP_POSTING_CAPABILITY,
+    TALLY_FILE_CAPABILITY,  # Final session 2A, N-187
     COLLABORATIVE_REVIEW_CAPABILITY,
     PROCESS_INTELLIGENCE_CAPABILITY,  # ARCH49-S1:capability-keys
     EGRESS_LOCKDOWN_CAPABILITY,  # ARCH50-S1:capability-keys
@@ -435,6 +446,7 @@ CAPABILITY_KEYS: tuple[str, ...] = (
     HELM_API_CAPABILITY,
     TRINETRA_CAPABILITY,
     TRINETRA_ALL_WORKSPACES_CAPABILITY,
+    RECOVERIES_CAPABILITY,  # Final session 2A (N-191)
     GST_CREDIT_CAPABILITY,  # Session F
     GST_CREDIT_ALL_WORKSPACES_CAPABILITY,
 )
@@ -445,6 +457,7 @@ ADDON_KEYS: tuple[str, ...] = (CUSTOM_DOMAIN_ADDON, WAREHOUSE_SYNC_ADDON, GST_CR
 
 _ENTITLEMENTS: tuple[Entitlement, ...] = (
     Entitlement(name=TRINETRA_ALL_WORKSPACES_CAPABILITY, description="TRINETRA reports across authorized workspaces; release gated."),
+    Entitlement(name=RECOVERIES_CAPABILITY, description="Recoveries: money issues from found to verified, with an owner, a due date and closure only on evidence. Bundled into a tier."),
     Entitlement(name=TRINETRA_CAPABILITY, description="TRINETRA: reviewed TDS credit evidence assurance; subject to source-validation launch gate."),
     Entitlement(
         name=PLATFORM_KEY,
@@ -472,8 +485,8 @@ _ENTITLEMENTS: tuple[Entitlement, ...] = (
         name=GST_CREDIT_ADDON,
         description=(
             "GST Credit as an add-on: the supplier and invoice lists, IMS recommendations, decisions, the export and "
-            "supplier reminders, for a Developer organization. Bundled with Business and Enterprise (as "
-            "capability.gst_credit); purchasable on Developer only."
+            "supplier reminders, for a Starter organization. Bundled with Business and Enterprise (as "
+            "capability.gst_credit); purchasable on Starter (the `developer` plan) only."
         ),
     ),
     # ARCH31-S0:capability-reconciliation-entitlement
@@ -592,7 +605,7 @@ _ENTITLEMENTS: tuple[Entitlement, ...] = (
         name=AUTOMATIONS_CAPABILITY,
         description=(
             "Automation rules and marketplace workflows: building, changing, testing "
-            "and running them. Bundled into a tier (Developer and up)."
+            "and running them. Bundled into a tier (Starter and up)."
         ),
     ),
     # PHASE1:capability-batch-dispatch-entitlement
@@ -678,6 +691,14 @@ _ENTITLEMENTS: tuple[Entitlement, ...] = (
             "references to CSV/XLSX, EDI X12, UBL 2.1, Tally, SFTP and REST/OData targets (QuickBooks Online, "
             "Zoho Books, Business Central, S/4HANA, NetSuite), with acknowledgement reconciliation. "
             "Bundled into a tier."
+        ),
+    ),
+    # Final session 2A, N-187
+    Entitlement(
+        name=TALLY_FILE_CAPABILITY,
+        description=(
+            "The Tally Prime import file: approved bills as balanced Tally Purchase vouchers, downloaded and imported "
+            "by a person. Bundled into a tier (Starter and up)."
         ),
     ),
     # ARCH48-S1:capability-collaborative-review-entitlement

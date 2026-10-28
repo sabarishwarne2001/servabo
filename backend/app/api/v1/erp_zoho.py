@@ -213,7 +213,10 @@ def tally_setup(workspace_id: uuid.UUID, body: TallySetupIn, db: Session = Depen
                 context: TenantContext = Depends(RequireAdmin)) -> dict[str, Any]:
     """Tally Prime, guided: a download target with the shipped mapping and the customer's own ledger names (3C)."""
     _ws(context, workspace_id)
-    _gate(db, context, "erp.tally.setup")
+    # N-187 (closes N-174): the Tally Prime file is on Starter too, without ERP posting.
+    if not capability_gate.has_capability(db, organization_id=context.organization_id,
+                                          capability_key=entitlements.TALLY_FILE_CAPABILITY):
+        _gate(db, context, "erp.tally.setup")
     from app.services.erp import service, tally_setup as guided
 
     try:

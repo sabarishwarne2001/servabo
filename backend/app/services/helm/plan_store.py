@@ -81,13 +81,23 @@ def _capability(db: Session, book: HelmBook) -> bool:
     return gate.helm_held(db, book.organization_id) or book.kind == v.BOOK_SAMPLE
 
 
+#: How long a person's re-plan waits for a plan already running (a mandate change starts one) before it says
+#: "already planning": a run takes a few seconds, and a refusal for that is a click wasted (spec 78, Final session 2A).
+PERSON_WAIT_S = 20.0
+
+
 def run(db: Session, book: HelmBook, *, triggered_by: str = v.TRIGGER_SCHEDULE, force: bool = False,
-        as_of: Optional[date] = None, time_limit_s: float = planner.DEFAULT_TIME_LIMIT_S) -> Optional[HelmPlan]:
-    """Plan one book. Flushes; the caller commits. None when another run holds the book's lock."""
-    started = time.monotonic()
-    if not _try_lock(db, book.organization_id):
-        logger.info("helm.plan_locked", extra={"book_id": str(book.id)})
-        return None
+        as_of: Optional[date] = None, time_limit_s: float = planner.DEFAULT_TIME_LIMIT_S,
+        wait_s: float = 0.0) -> Optional[HelmPlan]:
+    """Plan one book. Flushes; the caller commits. None when another run holds the book's lock (after waiting up to
+    `wait_s` seconds for it)."""
+    asked = time.monotonic()
+    while not _try_lock(db, book.organization_id):
+        if time.monotonic() - asked >= wait_s:
+            logger.info("helm.plan_locked", extra={"book_id": str(book.id)})
+            return None
+        time.sleep(0.25)
+    started = time.monotonic()   # the plan's own duration, not the wait
     counterparties.sync(db, book, as_of=as_of)
     snapshot = snapshot_store.take(db, book, as_of=as_of)
     mandates = active_mandates(db, book.id)

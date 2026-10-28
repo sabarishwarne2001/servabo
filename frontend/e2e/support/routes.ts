@@ -12,6 +12,7 @@ export interface WorkspacePage {
 
 export const WORKSPACE_PAGES: readonly WorkspacePage[] = [
   { id: "/:orgSlug/:workspaceSlug/trinetra", sub: "trinetra", title: /Credit assurance/, plan: "any", navId: "ws:trinetra" },
+  { id: "/:orgSlug/:workspaceSlug/recoveries", sub: "recoveries", title: /Recoveries/, plan: "any", navId: "ws:recoveries" },
   { id: "/:orgSlug/:workspaceSlug", sub: "", title: /Recent Activity/, plan: "any", navId: "ws:overview" },
   { id: "/:orgSlug/:workspaceSlug/notifications", sub: "notifications", title: /Notifications/, plan: "any", navId: "ws:notifications" },
   { id: "/:orgSlug/:workspaceSlug/work-items", sub: "work-items", title: /Documents Database/, plan: "any", navId: "ws:documents" },
@@ -25,7 +26,8 @@ export const WORKSPACE_PAGES: readonly WorkspacePage[] = [
   { id: "/:orgSlug/:workspaceSlug/batches", sub: "batches", title: /Batch operations/, plan: "business", navId: "ws:batches" },
   { id: "/:orgSlug/:workspaceSlug/procurement", sub: "procurement", title: /Invoice matching/, plan: "business", navId: "ws:procurement" },
   { id: "/:orgSlug/:workspaceSlug/procurement/policies", sub: "procurement/policies", title: /Matching tolerances/, plan: "business", navId: "palette:procurement-policies" },
-  { id: "/:orgSlug/:workspaceSlug/erp", sub: "erp", title: /ERP posting/, plan: "business", navId: "ws:erp" },
+  // N-187 (Final session 2A): Starter opens the page for the Tally Prime file; the rest of ERP posting is Business.
+  { id: "/:orgSlug/:workspaceSlug/erp", sub: "erp", title: /ERP posting/, plan: "developer", navId: "ws:erp" },
   { id: "/:orgSlug/:workspaceSlug/process", sub: "process", title: /Process intelligence/, plan: "enterprise", navId: "ws:process" },
   { id: "/:orgSlug/:workspaceSlug/radar", sub: "radar", title: /Audit radar/, plan: "business", navId: "ws:radar" },
   { id: "/:orgSlug/:workspaceSlug/corroboration", sub: "corroboration", title: /Document corroborator/, plan: "enterprise", navId: "ws:corroboration" },

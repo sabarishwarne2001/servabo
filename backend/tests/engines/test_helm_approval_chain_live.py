@@ -248,8 +248,9 @@ def test_act_mode_never_runs_a_payment_the_chain_covers(client, db_session, tena
     assert _chain(client, tenant, book, [{"above_micros": LAKH, "currency": "INR", "approvals": 2}]).status_code == 200
     actions = _plan(client, tenant, book, act_cap=10 * LAKH)
     big, small = _pay(actions, 500_000), _pay(actions, 40_000)
-    # Within the act cap and on checked facts, the small payment runs on Helm's own say-so...
-    assert small["state"] == v.ACTION_APPROVED and small["approvals"][0]["by_helm"] is True
+    # N-196 (Final session 2A): within the act cap and on checked facts, the small payment still waits for a person
+    # (before, it ran on Helm's own say-so)...
+    assert small["state"] == v.ACTION_PROPOSED and small["needs_approval"] is True
     # ...the one the chain covers waits for two people, and Helm's approval is not one of them.
     assert (big["state"], big["needs_approval"], big["required_approvals"], big["approvals_given"]) == \
         (v.ACTION_PROPOSED, True, 2, 0)
@@ -361,13 +362,18 @@ def test_two_people_approving_at_the_same_moment_both_count(client, db_session, 
 
 
 def test_a_chain_saved_after_helms_own_approval_holds_the_payment_back(client, db_session, tenant, book):
-    """Act mode approved a payment on Helm's own say-so; before the worker ran it, the owner saved a chain
-    that covers it. It must not run on Helm's approval: at execution it goes back to wait for its people."""
+    """A payment was approved before the owner saved a chain that covers it. It must not run on that one approval: at
+    execution it goes back to wait for its people. (N-196, Final session 2A: Helm can no longer approve a payment on its
+    own, so the earlier approval is now a person's; the rule this proves is the same.)"""
     from app.services.helm import executor
 
     _invoice(db_session, tenant, "BIG-9", 500_000, verified=True)
     big = _pay(_plan(client, tenant, book, act_cap=10 * LAKH), 500_000)
-    assert big["state"] == v.ACTION_APPROVED and big["approvals"][0]["by_helm"] is True
+    assert big["state"] == v.ACTION_PROPOSED, "N-196: Helm does not approve a payment on its own"
+    approved = _approve(client, tenant, big, tenant.owner)
+    assert approved.status_code == 200, approved.text
+    big = approved.json()
+    assert big["state"] == v.ACTION_APPROVED
     assert _chain(client, tenant, book, [{"above_micros": LAKH, "currency": "INR", "approvals": 2}]).status_code == 200
     with TestSessionLocal() as db:
         ran = executor.execute(db, action_id=uuid.UUID(big["id"]))

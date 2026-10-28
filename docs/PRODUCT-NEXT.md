@@ -32,7 +32,29 @@ AI model lists and libraries, the GST Monday email and notices, upgrade moments 
 events for GST and workflow runs (docs/product/WEBHOOK-EVENTS.md), warehouse datasets for GST matches and the Helm ledger (Enterprise), global search for GST and
 workflows, resizable sidebars, the new logo, and a sweep of every organization console tab.
 
+## 1b. What Final session 2A did (2026-10-27)
+
+- **Sellable in India** (N-187): prices in rupees and yearly for every plan, rupee checkout with GSTIN, the ₹15,000 mandate
+  notice, a 14-day trial, "Developer" renamed Starter, custom domains in Business and Enterprise, the Tally Prime file on
+  Starter. Margins checked in every currency (COSTS.md §4).
+- **Safety jobs report and alert** (N-194): every cron job on the server reports its runs; a stopped one is emailed once a day.
+- **Prompt injection mapped and tested** (docs/hardening/PROMPT-INJECTION.md): six fixes, six invariants walked in the code.
+- **Leftovers:** deletion warning emails, a zip on a conversation's upload tray, the GST speed test's step timings.
+- **The proof kit:** `scripts/accuracy_report.py` and `docs/product/PILOT-PLAYBOOK.md`.
+- **Recoveries** (N-191, `docs/product/RECOVERIES.md`): money issues from Found to Being fixed to Verified, closed only on
+  evidence, counted once beside what was found. Built in 2A at the owner's request (2026-10-27), with N-197 (ERP auto-post
+  waits for a person on an outside upload) and N-198 (the pilot price) decided.
+- **The email logo** (N-199) and a person's re-plan that waits for a running plan (F-637).
+
 ## 2. A new list, for after the first paying customers
+
+### 2.0 Recoveries, next kinds (N-191 built the first five)
+
+Built: GST credit waiting, duplicates, prices above the order, supplier statement differences, payment deadlines. Next, in
+the order the pilots' numbers suggest: TRINETRA's "TDS not yet in the statement" (Final session 2T adds it through one
+adapter), then quantity differences against the goods receipt, then an assignee's email when an issue is given to them.
+About a day each. No running cost.
+
 
 Best first. "Earns money" says how the idea turns into revenue or protects it. Nothing here changes a price, a plan or a trial until the owner decides it.
 
@@ -65,6 +87,8 @@ recommend it to the next firm. It is the only idea here that sells to many custo
 hold queue and tests. **Run:** the message fees above. **Do it after** customers ask; it is the largest outside dependency on this list.
 
 ### 2.3 An annual price and a rupee price for the GST Credit add-on
+
+**Done in Final session 2A (2026-10-26, N-187):** $49 or $490 a year, ₹1,499 or ₹14,990 a year, each its own Dodo product; every plan has rupee prices too. What follows is the original note.
 
 **Status (2026-10-23):** decided (N-187: ₹1,499 a month or ₹14,990 a year; $490 a year beside $49 a month) and scheduled
 in Final session 2A (`docs/sessions/FINAL-2-UPGRADE.md`), together with rupee prices for every plan.

@@ -1,9 +1,11 @@
 import { create } from "zustand";
 import axios from "axios";
 
+import { isZip } from "@/components/upload/zip";
 import {
   abortUploadSession,
   createBatch,
+  uploadArchive,
   uploadFileResumable,
   type BatchFileInput,
 } from "@/services/api/ingestion";
@@ -53,6 +55,8 @@ export interface TrayFile {
   readonly sessionId?: string;
   readonly workItemId?: string;
   readonly batchItemId?: string;
+  /** Final session 2A: a zip goes up whole and becomes its own batch, which the server unpacks (the Documents page's path). */
+  readonly archiveBatchId?: string;
   readonly error?: string;
 }
 
@@ -119,6 +123,14 @@ export const useUploadTrayStore = create<UploadTrayState>((set, get) => {
     set({ files: patch(get().files, entry.id, { status: "uploading" }) });
 
     try {
+      if (isZip(handle)) {
+        // The same path as the Documents page (spec 118): one upload, then the server adds each document.
+        const batch = await uploadArchive(workspaceId, handle);
+        set({
+          files: patch(get().files, entry.id, { status: "done", uploadedBytes: entry.size, archiveBatchId: batch.id }),
+        });
+        return;
+      }
       const result = await uploadFileResumable(workspaceId, handle, {
         ...(entry.sessionId ? { sessionId: entry.sessionId } : {}),
         ...(entry.batchItemId ? { batchItemId: entry.batchItemId } : {}),
@@ -219,29 +231,32 @@ export const useUploadTrayStore = create<UploadTrayState>((set, get) => {
         files: [...get().files, ...entries],
       });
 
-      const payload: BatchFileInput[] = entries.map((entry) => ({
+      // A zip is its own batch (made by the archive upload), so it is not listed in this one.
+      const payload: BatchFileInput[] = entries.filter((entry) => !isZip(entry)).map((entry) => ({
         client_key: entry.id,
         filename: entry.name,
         size_bytes: entry.size,
       }));
 
-      try {
-        const usedFolder = entries.some((entry) => entry.relativePath.includes("/"));
-        const batch = await createBatch(
-          workspaceId,
-          payload,
-          usedFolder ? "FOLDER" : "FILES",
-        );
-        set({
-          batchId: batch.id,
-          files: get().files.map((file) => {
-            const item = batch.items.find((row) => row.client_key === file.id);
-            return item ? { ...file, batchItemId: item.id } : file;
-          }),
-        });
-      } catch {
-        // A batch is bookkeeping. Without one the files still upload; they
-        // just are not grouped, which is better than refusing the drop.
+      if (payload.length > 0) {
+        try {
+          const usedFolder = entries.some((entry) => entry.relativePath.includes("/"));
+          const batch = await createBatch(
+            workspaceId,
+            payload,
+            usedFolder ? "FOLDER" : "FILES",
+          );
+          set({
+            batchId: batch.id,
+            files: get().files.map((file) => {
+              const item = batch.items.find((row) => row.client_key === file.id);
+              return item ? { ...file, batchItemId: item.id } : file;
+            }),
+          });
+        } catch {
+          // A batch is bookkeeping. Without one the files still upload; they
+          // just are not grouped, which is better than refusing the drop.
+        }
       }
 
       void pump();

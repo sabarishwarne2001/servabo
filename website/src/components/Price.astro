@@ -1,0 +1,16 @@
+---
+/**
+ * A price in rupees and in dollars (Final session 2A, N-187). Rupees show by default; the currency switch
+ * (CurrencySwitch.astro, a radio pair) shows dollars with CSS alone, as the Monthly/Yearly switch does.
+ * Amounts are minor units (paise, cents); a currency with no amount shows `missing` instead.
+ */
+import { money, type Amounts } from "../lib/pricing";
+
+interface Props {
+  amounts: Amounts;
+  class?: string;
+  missing?: string;
+}
+const { amounts, class: className = "", missing = "" } = Astro.props;
+---
+<span class={`cur-inr ${className}`}>{amounts.INR !== null ? money(amounts.INR, "INR") : missing}</span><span class={`cur-usd ${className}`}>{amounts.USD !== null ? money(amounts.USD, "USD") : missing}</span>

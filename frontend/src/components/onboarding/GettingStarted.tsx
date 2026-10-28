@@ -20,6 +20,7 @@ import { getInboundEmail, inboundEmailKeys } from "@/services/api/inboundEmail";
 import {
   automationPath,
   gstPath,
+  recoveriesPath,
   helmPath,
   organizationBillingPath,
   organizationMembersPath,
@@ -235,6 +236,14 @@ export const GettingStarted: React.FC<GettingStartedProps> = ({ workspaceId, org
           <Link to={organizationBillingPath(orgSlug)} className="font-medium underline">
             See the receipt
           </Link>
+          {money.follow_up === "recoveries" ? (
+            <>
+              {" · "}
+              <Link to={recoveriesPath(orgSlug, workspaceSlug)} className="font-medium underline" data-testid="getting-started-recoveries">
+                Follow it in Recoveries
+              </Link>
+            </>
+          ) : null}
         </p>
       ) : null}
       <ol className="mt-4 space-y-3" aria-label="Getting started steps">

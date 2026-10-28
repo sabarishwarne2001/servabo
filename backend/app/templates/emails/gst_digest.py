@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Optional, Sequence
 
 from app.templates.emails.base import BASE_EMAIL_HTML_LAYOUT
-from app.templates.emails.common import esc, esc_attr, single_line
+from app.templates.emails.common import clip, esc, esc_attr, single_line
 from app.templates.emails.trial_notice import TrialFinding, receipt_block
 
 NOT_ADVICE = "Figures come from your own documents and imported GSTR-2B in Servabo. A recommendation, not tax advice."
@@ -31,6 +31,13 @@ def render_gst_digest(
     """Render `(subject, html, text)`. `ValueError` when there is nothing to say."""
     if not single_line(headline or "") or not list(findings):
         raise ValueError("a GST digest with nothing to say is never sent")
+    # Final session 2A (invariant (e)): finding lines name suppliers (GSTR-2B trade names); bounded as well as escaped.
+    import dataclasses
+
+    headline = clip(headline)
+    findings = [dataclasses.replace(f, label=clip(f.label), amount_text=clip(f.amount_text, 60) if f.amount_text else f.amount_text)
+                for f in findings]
+    unlock_line = clip(unlock_line) if unlock_line else unlock_line
     organization = single_line(organization_name)
     subject = single_line(f"Your GST credit this week: {organization}")
     lead = f"Here is where GST credit stands for {organization} in the week of {single_line(week_label)}."

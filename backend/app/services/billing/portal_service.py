@@ -6,7 +6,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
@@ -163,6 +163,7 @@ def _gateway_checkout(
     success_url: Optional[str],
     cancel_url: Optional[str],
     discount_code: Optional[str] = None,
+    indian_buyer: Optional[Any] = None,
 ) -> EphemeralSession:
     """ARCH-30 Tranche 2 (D-10). Checkout through a Merchant of Record.
 
@@ -197,6 +198,8 @@ def _gateway_checkout(
             "quota_tier_key": quota_tier_key,
         },
         **({"discount_code": discount_code} if discount_code else {}),
+        # N-187: a checkout in rupees tells the gateway the buyer is an Indian business (currency, country, tax id).
+        **({"indian_buyer": indian_buyer} if indian_buyer is not None else {}),
     )
     return EphemeralSession(
         url=remote.url,
@@ -386,6 +389,7 @@ def create_checkout_session(
     success_url: Optional[str] = None,
     cancel_url: Optional[str] = None,
     discount_code: Optional[str] = None,  # ARCH50-S1:checkout-discount (a promo code's gateway coupon)
+    indian_buyer: Optional[Any] = None,  # N-187: a checkout in rupees (`currency.indian_buyer`)
 ) -> EphemeralSession:
     # Campaign session 1. A paid plan holds the seats it buys, and the seat check
     # refuses anyone past them: a checkout for fewer seats than the people already
@@ -459,6 +463,7 @@ def create_checkout_session(
             success_url=success_url,
             cancel_url=cancel_url,
             **({"discount_code": discount_code} if discount_code else {}),
+            **({"indian_buyer": indian_buyer} if indian_buyer is not None else {}),
         )
         logger.info(
             "billing.checkout_session_created",

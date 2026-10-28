@@ -67,8 +67,14 @@ def test_the_refusal_for_a_capability_names_the_plans_that_carry_it(db_session: 
 def test_every_addon_has_a_price_a_product_and_a_way_to_get_it(db_session: Session, tenant, key: str) -> None:
     _publish_all(db_session, tenant)
     offer = entitlement_service.offer_for(key)
-    assert offer.monthly_price_micros > 0 and offer.currency == "USD" and offer.display_name
-    assert hasattr(settings, offer.product_setting), f"{key}: {offer.product_setting} is not a setting"
+    assert offer.display_name
+    # Final session 2A (N-187): an add-on is sold at one or more prices (currency and interval), each its own product,
+    # or sold to nobody and only included in plans (custom domains: Business and Enterprise).
+    for price in offer.prices:
+        assert price.amount_micros > 0 and price.currency in ("USD", "INR") and price.interval in ("month", "year")
+        assert hasattr(settings, price.product_setting), f"{key}: {price.product_setting} is not a setting"
+    if not offer.prices:
+        assert entitlement_service.tiers_including(db_session, key), f"{key}: sold to nobody and included in no plan"
     sold_on = entitlement_service.sold_on(db_session, key)
     included = entitlement_service.tiers_including(db_session, key)
     assert sold_on is not None
@@ -94,7 +100,7 @@ def test_the_checkout_sells_that_addons_product_and_nothing_else(dodo, db_sessio
     session = addon_service.create_addon_checkout(db_session, organization_id=tenant.organization.id, addon_key=key)
     assert session.kind == "checkout" and session.url
     created = list(dodo.checkouts.values())[-1]
-    assert created["product_id"] == getattr(settings, offer.product_setting)
+    assert created["product_id"] == offer.price("USD", "month").product_id()
     assert created["metadata"]["addon_key"] == key
 
 
@@ -116,5 +122,6 @@ def test_a_plan_that_includes_the_addon_is_not_sold_it_again(dodo, db_session: S
 def test_a_plan_the_addon_is_not_sold_on_is_told_which_plan_sells_it(dodo, db_session: Session, tenant) -> None:  # noqa: F811
     _publish_all(db_session, tenant)
     put_on_plan(db_session, tenant.organization, "free")
-    with pytest.raises(addon_service.AddonNotOfferedError, match="Developer"):
+    # N-187: the plan that sells GST Credit is shown as "Starter" (its key stays `developer`).
+    with pytest.raises(addon_service.AddonNotOfferedError, match="Starter"):
         addon_service.create_addon_checkout(db_session, organization_id=tenant.organization.id, addon_key=entitlements.GST_CREDIT_ADDON)

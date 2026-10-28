@@ -6,6 +6,7 @@ import type { AddonAccess, AddonKey } from "@/types/entitlements";
 
 export interface AddonAccessResult {
   readonly access: AddonAccess | null;
+  readonly currency: "USD" | "INR";
   readonly isLoading: boolean;
   readonly isError: boolean;
 }
@@ -28,6 +29,8 @@ export const useAddonAccess = (
 
   return {
     access: query.data?.addons.find((addon) => addon.addon_key === addonKey) ?? null,
+    // Final session 2A (N-187): the currency prices are shown in first (rupees for an Indian organization).
+    currency: query.data?.default_currency ?? "USD",
     isLoading: query.isLoading,
     isError: query.isError,
   };

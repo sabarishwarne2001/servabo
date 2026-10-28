@@ -16,7 +16,8 @@
     "check:html": "html-validate \"dist/**/*.html\"",
     "check:a11y": "node scripts/check-a11y.mjs",
     "check:lighthouse": "node scripts/check-lighthouse.mjs",
-    "check": "npm run check:links && npm run check:html && npm run check:a11y",
+    "check:pricing": "node scripts/check-pricing.mjs",
+    "check": "npm run check:links && npm run check:html && npm run check:a11y && npm run check:pricing",
     "screenshots": "node scripts/capture-screenshots.mjs"
   },
   "dependencies": {

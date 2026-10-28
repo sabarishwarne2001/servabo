@@ -111,6 +111,17 @@ export const API_KEY_ENDPOINTS = {
 } as const;
 
 /** PHASE 4 — payment-risk flags (radar): bank-account changes, round totals. */
+// Final session 2A (N-191): Recoveries.
+export const RECOVERIES_ENDPOINTS = {
+  list: (workspaceId: string): string => `${scoped(workspaceId)}/recoveries`,
+  check: (workspaceId: string): string => `${scoped(workspaceId)}/recoveries/check`,
+  detail: (workspaceId: string, issueId: string): string => `${scoped(workspaceId)}/recoveries/${seg(issueId)}`,
+  owner: (workspaceId: string, issueId: string): string => `${scoped(workspaceId)}/recoveries/${seg(issueId)}/owner`,
+  dueDate: (workspaceId: string, issueId: string): string => `${scoped(workspaceId)}/recoveries/${seg(issueId)}/due-date`,
+  notMoney: (workspaceId: string, issueId: string): string => `${scoped(workspaceId)}/recoveries/${seg(issueId)}/not-money`,
+  reopen: (workspaceId: string, issueId: string): string => `${scoped(workspaceId)}/recoveries/${seg(issueId)}/reopen`,
+} as const;
+
 export const PAYMENT_RISK_ENDPOINTS = {
   list: (workspaceId: string): string => `${scoped(workspaceId)}/payment-risk`,
   confirm: (workspaceId: string, flagId: string): string =>

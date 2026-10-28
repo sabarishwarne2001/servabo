@@ -144,17 +144,15 @@ def test_the_email_suits_every_mail_client(name: str) -> None:
 def test_servabo_mail_shows_the_mark_beside_the_name() -> None:
     _, html, _ = EMAILS["verify"]()
     header = html.split('<div class="content"', 1)[0]
-    # The new logo (Final session 1): the navy tile with the ribbon's bright blue "S".
-    assert re.search(
-        r'<span class="mark" aria-hidden="true" style="[^"]*background-color:#0b1a3a[^"]*color:#4f9bff[^"]*">S</span>', header
-    )
-    assert ">Servabo</span>" in header
-    assert "<img" not in header, "no remote image: clients hold them, and some emails must carry no address"
+    # N-199 (owner, 2026-10-27): the real logo (mark and wordmark) replaces the HTML stand-in tile, as a picture
+    # carried inside the message (tests/templates/test_email_logo.py), named "Servabo" for readers without pictures.
+    assert re.search(r'<img class="logo-light" src="cid:servabo-logo-light"[^>]*alt="Servabo"', header)
+    assert not re.search(r'<img [^>]*src="https?:', header), "no remote image: clients hold them, and some emails must carry no address"
 
 
 def test_white_label_mail_has_no_servabo_mark() -> None:
     _, html, _ = EMAILS["helm-briefing"]()
-    assert 'class="mark"' not in html
+    assert 'class="mark"' not in html and "cid:servabo-logo" not in html
     assert ">Example Cloud</span>" in html
 
 

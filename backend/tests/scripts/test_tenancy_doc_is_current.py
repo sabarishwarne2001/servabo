@@ -37,5 +37,5 @@ def test_the_tenancy_document_matches_the_code() -> None:
 def test_the_document_says_what_the_free_plan_is() -> None:
     """A spot check that the generator reads the seed, not a copy of it."""
     text = _generator().render()
-    assert "| Document uploads | 25 (refuse) |" in text
+    assert "| Document uploads | 100 (refuse) |" in text  # N-187: the 14-day trial's 100 documents (was 25)
     assert "| Seats | 2 | purchased seats |" in text

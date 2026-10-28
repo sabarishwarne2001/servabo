@@ -47,6 +47,10 @@ const ErpPosting: React.FC = () => {
   const { orgSlug = "", workspaceSlug = "" } = useParams<{ orgSlug: string; workspaceSlug: string }>();
   const navigate = useNavigate();
   const capability = useCapabilityAccess(workspace?.organizationId ?? "", CAPABILITY.erpPosting);
+  // Final session 2A (N-187, closes N-174): Starter has the Tally Prime file without ERP posting. The page then shows
+  // its Tally target and postings only, and names Business for the rest.
+  const tally = useCapabilityAccess(workspace?.organizationId ?? "", CAPABILITY.tallyFile);
+  const tallyOnly = !capability.granted && tally.granted;
   // Owner rule (Phase 4, F-065): only a workspace admin (or the organization owner) posts to the ERP.
   const canPost = canAdminister(workspace?.role);
   const canPreview = canContribute(workspace?.role);
@@ -59,7 +63,7 @@ const ErpPosting: React.FC = () => {
   const [objectKind, setObjectKind] = useState("");
   const [q, setQ] = useState("");
   const [composing, setComposing] = useState(false);
-  const enabled = Boolean(workspaceId && capability.granted);
+  const enabled = Boolean(workspaceId && (capability.granted || tallyOnly));
   const filters: PostingFilters = {
     ...(state ? { state } : {}), ...(targetId ? { target_id: targetId } : {}), ...(objectKind ? { object_kind: objectKind } : {}),
     ...(q.trim() ? { q: q.trim() } : {}),
@@ -77,7 +81,7 @@ const ErpPosting: React.FC = () => {
     navigate(erpTargetPath(orgSlug, workspaceSlug, detail.target.id));
   };
 
-  if (!capability.granted) {
+  if (!capability.granted && !tallyOnly) {
     return <ErpLocked />;
   }
   const counts = postings.data?.counts_by_state ?? {};
@@ -90,13 +94,19 @@ const ErpPosting: React.FC = () => {
         eyebrow="Workspace"
         title="ERP posting"
         description="Approved outcomes to your system of record — exactly once, done only when the ERP says so."
-        actions={isAdmin && !composing ? (
+        actions={isAdmin && !composing && !tallyOnly ? (
           <button type="button" className={BUTTON_PRIMARY} disabled={!catalog.data}
             onClick={() => { setTab("targets"); setComposing(true); }}>
             <Plus className="h-4 w-4" aria-hidden /> New target
           </button>
         ) : null}
       />
+      {tallyOnly ? (
+        <p className="rounded-lg border border-border bg-muted/30 p-2 text-sm" data-testid="erp-tally-only">
+          Your plan includes the Tally Prime file: set it up under Connect your books, then download each approved bill and import it in
+          Tally. Posting straight into Zoho Books and other ERPs is included on the Business and Enterprise plans.
+        </p>
+      ) : null}
       {exceptions > 0 ? (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-sm">
           {exceptions} posting(s) failed, were rejected, were acknowledged differently or have an unknown outcome — a
@@ -109,7 +119,9 @@ const ErpPosting: React.FC = () => {
       ) : null}
       {catalog.isError ? <p className="text-sm text-destructive">{errorMessage(catalog.error, "Could not load the catalog.")}</p> : null}
       <div className="flex flex-wrap gap-2 border-b border-border/60" role="tablist" aria-label="ERP posting views">
-        {([["postings", "Postings"], ["ready", "Ready to post"], ["targets", "Targets"], ["connect", "Connect your books"], ["lookups", "Lookup tables"]] as const).map(([id, label]) => (
+        {([["postings", "Postings"], ["ready", "Ready to post"], ["targets", "Targets"], ["connect", "Connect your books"], ["lookups", "Lookup tables"]] as const)
+          .filter(([id]) => !(tallyOnly && id === "lookups"))
+          .map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
             className={`border-b-2 px-3 py-2 text-sm font-semibold ${tab === id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
             {label}
@@ -228,9 +240,9 @@ const ErpPosting: React.FC = () => {
         </div>
       ) : null}
 
-      {tab === "connect" ? <ConnectBooks workspaceId={workspaceId} orgSlug={orgSlug} workspaceSlug={workspaceSlug} isAdmin={isAdmin} /> : null}
+      {tab === "connect" ? <ConnectBooks workspaceId={workspaceId} orgSlug={orgSlug} workspaceSlug={workspaceSlug} isAdmin={isAdmin} tallyOnly={tallyOnly} /> : null}
 
-      {tab === "lookups" ? <LookupTables workspaceId={workspaceId} isAdmin={isAdmin} /> : null}
+      {tab === "lookups" && !tallyOnly ? <LookupTables workspaceId={workspaceId} isAdmin={isAdmin} /> : null}
     </div>
   );
 };

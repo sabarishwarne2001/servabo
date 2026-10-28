@@ -45,10 +45,13 @@ heartbeat() {
         "${HEARTBEAT_BASE}/${HEARTBEAT_UUID_COMPOSE_BACKUP}$1" \
         || echo "HEARTBEAT_PING_FAILED: could not reach the monitor" >&2
 }
+REPORT="$(dirname "$0")/servabo-report-run"   # Final session 2A: runs reported to the app (never fails the backup)
 on_exit() {
     local status=$?
     if [[ -n "${PARTIAL}" ]]; then rm -f -- "${PARTIAL}"; fi
     if (( status == 0 )); then heartbeat ""; else heartbeat "/fail"; fi
+    if (( status == 0 )); then "${REPORT}" backup succeeded "backup written and verified"
+    else "${REPORT}" backup failed "exit ${status}; see compose_backup.log"; fi
 }
 
 prune() {
@@ -74,6 +77,7 @@ if [[ "${1:-}" == "--prune-only" ]]; then
 fi
 
 trap on_exit EXIT
+"${REPORT}" backup started
 
 [[ -n "${KEY_FILE}" && -r "${KEY_FILE}" ]] || { echo "SERVABO_BACKUP_KEY_FILE must name a readable passphrase file" >&2; exit 64; }
 [[ -s "${KEY_FILE}" ]] || { echo "the backup key file is empty" >&2; exit 64; }

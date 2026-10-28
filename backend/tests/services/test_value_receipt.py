@@ -200,7 +200,8 @@ def test_the_figures_come_in_the_stated_order(db_session, world):
         "gst_waiting", "gst_at_risk_180", "gst_claimable",
         "time_machine_confirmed_INR", "time_machine_likely_INR", "time_machine_potential_INR",
         "duplicate_payments_INR", "duplicate_payments_unpriced", "bank_account_changes",
-        "overcharges_INR", "helm_value_held_INR",
+        # N-191 (Final session 2A): on a plan with Recoveries, Helm's value ledger is counted in "Recovered, verified".
+        "overcharges_INR", "recovered_verified_INR",
     ]
     f = found(body)
     assert (f["gst_waiting"]["amount_micros"], f["gst_waiting"]["count"], f["gst_waiting"]["suppliers"]) == (
@@ -215,7 +216,7 @@ def test_the_figures_come_in_the_stated_order(db_session, world):
     assert f["duplicate_payments_unpriced"]["count"] == 1 and f["duplicate_payments_unpriced"]["amount_micros"] is None
     assert f["bank_account_changes"]["count"] == 2
     assert (f["overcharges_INR"]["amount_micros"], f["overcharges_INR"]["count"]) == (1_500 * M, 2)
-    assert (f["helm_value_held_INR"]["amount_micros"], f["helm_value_held_INR"]["honesty"]) == (4_000 * M, "confirmed")
+    assert (f["recovered_verified_INR"]["amount_micros"], f["recovered_verified_INR"]["honesty"]) == (4_000 * M, "confirmed")
     assert body["headline"] == "In your trial Servabo read 5 documents and found ₹720 of GST credit waiting on 1 supplier."
     assert body["also_on_business"] == []
 
@@ -227,7 +228,7 @@ def test_every_money_figure_links_to_the_page_that_holds_its_evidence(db_session
     assert f["time_machine_likely_INR"]["source"] == f"/{org}/helm/time-machine"
     assert f["duplicate_payments_INR"]["source"] == f"/{org}/{ws}/radar" == f["bank_account_changes"]["source"]
     assert f["overcharges_INR"]["source"] == f"/{org}/{ws}/procurement"
-    assert f["helm_value_held_INR"]["source"] == f"/{org}/helm"
+    assert f["recovered_verified_INR"]["source"] == f"/{org}/{ws}/recoveries"   # N-191
     assert all(item["source"].startswith("/") for item in vr.receipt(db_session, world.organization.id, "trial",
                                                                       now=NOW)["found"])
 
@@ -264,8 +265,9 @@ def test_rupees_and_dollars_are_two_findings_and_never_added(db_session, world):
               finished=NOW - DAY / 4)
     db_session.commit()
     f = found(vr.receipt(db_session, world.organization.id, "trial", now=NOW))
-    assert f["helm_value_held_INR"]["amount_micros"] == 4_000 * M
-    assert f["helm_value_held_USD"]["amount_micros"] == 300 * M and f["helm_value_held_USD"]["amount_text"] == "$300"
+    # N-191: Helm's value ledger is part of "Recovered, verified" on a plan with Recoveries; still one finding per currency.
+    assert f["recovered_verified_INR"]["amount_micros"] == 4_000 * M
+    assert f["recovered_verified_USD"]["amount_micros"] == 300 * M and f["recovered_verified_USD"]["amount_text"] == "$300"
     assert f["time_machine_confirmed_INR"]["amount_micros"] == 10 * M
     assert f["time_machine_confirmed_USD"]["amount_micros"] == 25 * M
 
@@ -318,11 +320,11 @@ def test_business_is_not_told_what_business_adds(db_session, world):
     assert vr.receipt(db_session, world.organization.id, "trial", now=NOW)["also_on_business"] == []
 
 
-def test_the_trial_window_ends_at_the_trials_end_and_starts_seven_days_before(db_session, world):
+def test_the_trial_window_ends_at_the_trials_end_and_starts_fourteen_days_before(db_session, world):
     org = world.organization
     ends = NOW + 2 * DAY
     body = vr.receipt(db_session, org.id, "trial", now=NOW)
-    assert datetime.fromisoformat(body["period_start"]) == ends - 7 * DAY
+    assert datetime.fromisoformat(body["period_start"]) == ends - 14 * DAY  # N-187: a 14-day trial (was 7)
     assert datetime.fromisoformat(body["period_end"]) == NOW
     after = vr.receipt(db_session, org.id, "trial", now=NOW + 5 * DAY)           # the trial is over: the window is fixed
     assert datetime.fromisoformat(after["period_end"]) == ends
@@ -382,6 +384,17 @@ def test_the_receipt_reads_and_never_writes(db_session, world):
     assert before == after
 
 
+def test_an_indian_starter_organization_is_offered_the_add_on_in_rupees(db_session, world):
+    """N-187: an organization whose oldest workspace is in India sees the add-on's rupee prices."""
+    put_on_plan(db_session, world.organization, "developer")
+    for workspace in db_session.query(Workspace).filter(Workspace.organization_id == world.organization.id):
+        workspace.timezone = "Asia/Kolkata"
+    db_session.flush()
+    vr.forget(world.organization.id)
+    body = vr.receipt(db_session, world.organization.id, "trial", now=NOW)
+    assert body["gst_add_on_line"] == "GST Credit add-on (₹1,499 a month or ₹14,990 a year) or Business: GST's supplier list"
+
+
 def test_a_developer_organization_is_offered_the_gst_credit_add_on_or_business(db_session, world):
     """Session H: on Developer the GST list is not only a Business feature, it is also a $49 add-on, and the receipt says so."""
     from app.services.billing import addon_service
@@ -389,7 +402,8 @@ def test_a_developer_organization_is_offered_the_gst_credit_add_on_or_business(d
     put_on_plan(db_session, world.organization, "developer")
     vr.forget(world.organization.id)
     body = vr.receipt(db_session, world.organization.id, "trial", now=NOW)
-    assert body["gst_add_on_line"] == "GST Credit add-on ($49/month) or Business: GST's supplier list"
+    # N-187: the catalogue's prices, monthly and yearly, in the organization's currency (dollars here).
+    assert body["gst_add_on_line"] == "GST Credit add-on ($49 a month or $490 a year) or Business: GST's supplier list"
     assert "GST's supplier list" not in body["also_on_business"]          # said once, in the add-on's own line
     assert "Helm's full planning" in body["also_on_business"]
 

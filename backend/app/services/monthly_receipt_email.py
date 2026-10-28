@@ -126,8 +126,11 @@ def send_for(db: Session, organization: Any, *, period: str, label: str, now: da
         return Outcome(len(found), 0, 0)
 
     base = settings.FRONTEND_URL.rstrip("/")
+    # Recoveries (N-191): what was recovered and verified always has its line beside what was found (never added).
+    recovered = [f for f in found if f["key"].startswith("recovered_verified_")][:1]
+    shown = [f for f in found if f not in recovered][:MAX_FINDINGS - len(recovered)] + recovered
     findings = [TrialFinding(label=f["label"], amount_text=f.get("amount_text"), url=f"{base}{f['source']}")
-                for f in found[:MAX_FINDINGS]]
+                for f in shown]
     workspaces = value_receipt._workspaces(db, organization.id)  # noqa: SLF001
     subject, html_body, text_body = render_monthly_receipt(
         organization_name=organization.name, month_label=label, headline=body["headline"], findings=findings,

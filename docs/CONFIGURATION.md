@@ -14,7 +14,7 @@ in the containers unless you add it to the service's `environment:` in `docker-c
 is not read by any code, is missing from this page, or is one production cannot run without and
 is missing from `.env.production.template` (or does not stop the app from starting when unset).
 
-320 settings. Columns: name, type, default, where it appears (`example` =
+325 settings. Columns: name, type, default, where it appears (`example` =
 `.env.example`, `production` = `.env.production.template`, `guard` = checked by the production
 guard), and the comment written above it in the code.
 
@@ -77,6 +77,9 @@ guard), and the comment written above it in the code.
 | `OPERATOR_ALERT_EMAILS` | `str` | `''` | example, production, guard | Who is emailed (through the platform relay) about dead background jobs, gateway events that will never be applied, bursts of server errors and duplicate gateway subscriptions. Comma-separated addresses. Required in prod… |
 | `OPERATOR_ALERT_5XX_THRESHOLD` | `int` | `20` | production | Server errors (5xx answers, all API processes together) in five minutes that count as a burst worth an alert. |
 | `OPERATOR_ALERT_REPEAT_MINUTES` | `int` | `60` | production | The same alert is emailed again at most this often while it keeps happening. |
+| `ALERT_WEBHOOK` | `str` | `''` | example, production | Final session 2A (Phase 2). Also tell this address when a safety job is stale: a Healthchecks.io check's failure address works (it accepts the POST and emails or texts you). The host watchdog reads the same name from sw… |
+| `SAFETY_JOB_REPORT_TOKEN` | `SecretStr \| None` | `None` | example, production | The shared secret the host's safety jobs (sweeps, backup, restore drill, uptime heartbeat) send with each run report (`POST /api/v1/ops/safety-jobs/{name}/runs`, header `X-Servabo-Report-Token`); the same value goes in … |
+| `SAFETY_JOBS_UNWATCHED` | `str` | `'dr-heartbeat,base-backup,pitr-drill'` | example, production | Safety jobs this deployment does not run (comma-separated names), so they are not watched. The three point-in-time-recovery jobs are switched off on a Docker Compose server (RUNBOOK 9.6, N-012). |
 | `FRONTEND_URL` | `str` | `'http://localhost:3000'` | example, production, guard |  |
 | `WEBSITE_URL` | `str` | `'https://servabo.app'` | production | Website session (B7): the public website (pricing, terms, privacy, refunds). Emails link its legal pages; the fallback domain is https://getservabo.com. |
 | `EMAIL_ENCRYPTION_KEYS` | `Optional[SecretStr]` | `None` | example, production, guard |  |
@@ -318,13 +321,15 @@ guard), and the comment written above it in the code.
 | `DODO_WEBHOOK_TOLERANCE_SECONDS` | `int` | `1800` | — | 30 minutes. Must exceed Dodo's early retry intervals (immediate, 5s, 5m, 30m) so a legitimate late delivery still verifies, without leaving a captured request replayable indefinitely. |
 | `DODO_LIVEMODE` | `bool` | `False` | example, production, guard |  |
 | `DODO_MAX_WEBHOOK_BODY_BYTES` | `int` | `512 * 1024` | — |  |
-| `DODO_ADDON_PRODUCT_CUSTOM_DOMAIN` | `str \| None` | `None` | example, production | Dodo product ids for purchasable add-ons. Test and live ids differ, so these are environment values, never literals in code. Unset means the add-on is not self-serve on this deployment and the console says so. |
-| `DODO_ADDON_PRODUCT_WAREHOUSE_SYNC` | `str \| None` | `None` | example, production |  |
+| `DODO_ADDON_PRODUCT_WAREHOUSE_SYNC` | `str \| None` | `None` | example, production | Dodo product ids for purchasable add-ons. Test and live ids differ, so these are environment values, never literals in code. Unset means the add-on is not self-serve on this deployment and the console says so. Final ses… |
 | `DODO_ADDON_PRODUCT_GST_CREDIT` | `str \| None` | `None` | example, production |  |
+| `DODO_ADDON_PRODUCT_GST_CREDIT_YEARLY` | `str \| None` | `None` | example, production |  |
+| `DODO_ADDON_PRODUCT_GST_CREDIT_INR` | `str \| None` | `None` | example, production |  |
+| `DODO_ADDON_PRODUCT_GST_CREDIT_YEARLY_INR` | `str \| None` | `None` | example, production |  |
 | `BILLING_ADDON_GRACE_DAYS` | `int` | `14` | — | D-6. Days existing add-on resources keep working after the grant ends. |
 | `BILLING_ON_HOLD_GRACE_DAYS` | `int` | `13` | — | D-11. Days of full access after a renewal failure. Matches Dodo's default Payment Retries recovery window, so access ends when retries do. |
 | `BILLING_LAPSED_TIER_KEY` | `str` | `'free'` | — | The tier an organization falls back to when its subscription ends. |
-| `FREE_TRIAL_DAYS` | `int` | `7` | — | N-052 (owner decision). Free is a trial of this many days per owner account, counted from the account's first organization; after it, new work needs a paid plan (app/services/trial_service.py). |
+| `FREE_TRIAL_DAYS` | `int` | `14` | — | N-052 (owner decision). Free is a trial of this many days per owner account, counted from the account's first organization; after it, new work needs a paid plan (app/services/trial_service.py). Final session 2A (N-187):… |
 | `BILLING_DODO_SEAT_PRORATION_MODE` | `str` | `'prorated_immediately'` | example | ARCH-30 Tranche 3. How Dodo bills a mid-cycle seat change. Dodo documents that the three "_immediately" modes charge now and move the renewal date; do_not_bill keeps the date and bills the new quantity at renewal. |
 | `BILLING_DEFAULT_CURRENCY` | `str` | `'USD'` | example, production |  |
 | `BILLING_DEFAULT_QUOTA_TIER_KEY` | `str \| None` | `None` | — |  |

@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { History } from "lucide-react";
 
 import { ConditionsEditor, CUSTOM_TEMPLATE } from "@/components/helm/ConditionsEditor";
-import { EditableReadback, fromMicros, toMicros } from "@/components/helm/EditableReadback";
+import { EditableReadback } from "@/components/helm/EditableReadback";
 import { errorMessage } from "@/services/api/errors";
 import { createHelmMandate, previewHelmMandate, updateHelmMandate } from "@/services/api/helm";
 import type { HelmMandate, MandatePreview } from "@/types/helm";
@@ -16,9 +16,9 @@ import type { HelmMandate, MandatePreview } from "@/types/helm";
  * person presses the button, and only when the validator has nothing left to say.
  *
  * New mandates start in Propose mode (brief §2). Editing an existing one also sets how Helm acts:
- * Watch (only report), Propose (a person approves each action) or Act (Helm runs an action alone
- * within the act cap; at 0, which is the default, every payment still asks). Owners and admins
- * only; the server checks it again.
+ * Watch (only report), Propose (a person approves each action) or Act (Helm runs holds, reminders,
+ * requests and tasks alone; Final session 2A, N-196: every payment decision still asks a person, so
+ * there is no act cap to set any more). Owners and admins only; the server checks it again.
  */
 
 type Params = Record<string, unknown>;
@@ -42,7 +42,7 @@ export interface EditorStart {
 const MODES: { value: Mode; label: string; help: string }[] = [
   { value: "watch", label: "Watch", help: "Helm reports when the mandate drifts, and proposes nothing." },
   { value: "propose", label: "Propose", help: "Helm proposes each action; a person approves it." },
-  { value: "act", label: "Act", help: "Helm runs actions on its own up to the act cap; anything above it asks." },
+  { value: "act", label: "Act", help: "Helm holds payments, sends reminders and requests, and creates tasks on its own. Paying, approving, releasing a hold and marking paid always ask a person." },
 ];
 
 const autonomyOf = (spec: Record<string, unknown> | null | undefined): Autonomy => {
@@ -53,14 +53,9 @@ const autonomyOf = (spec: Record<string, unknown> | null | undefined): Autonomy 
 const AutonomyFields: React.FC<{
   readonly name: string;
   readonly value: Autonomy;
-  readonly currency: string;
   readonly onChange: (next: Autonomy) => void;
   readonly disabled: boolean;
-}> = ({ name, value, currency, onChange, disabled }) => {
-  const [cap, setCap] = useState(value.act_cap ? fromMicros(value.act_cap.amount_micros) : "0");
-  const [capCurrency, setCapCurrency] = useState(value.act_cap?.currency ?? currency);
-  const capProblem = toMicros(cap) === null ? "Write the cap as an amount, for example 25000 or 0." : null;
-
+}> = ({ name, value, onChange, disabled }) => {
   const setMode = (mode: Mode): void =>
     onChange({ mode, act_cap: mode === "act" ? value.act_cap : null });
 
@@ -83,48 +78,10 @@ const AutonomyFields: React.FC<{
       </div>
       <p className="helm-muted text-xs">{MODES.find((m) => m.value === value.mode)?.help}</p>
       {value.mode === "act" ? (
-        <div className="flex flex-wrap items-end gap-2">
-          <label className="text-xs">
-            <span className="helm-label block">Act cap</span>
-            <input
-              className="helm-input helm-figure mt-1 w-32"
-              inputMode="decimal"
-              value={cap}
-              aria-describedby={`helm-cap-help-${name}`}
-              onChange={(event) => {
-                setCap(event.target.value);
-                const micros = toMicros(event.target.value);
-                if (micros !== null) {
-                  onChange({ mode: "act", act_cap: { amount_micros: micros, currency: capCurrency.toUpperCase() } });
-                }
-              }}
-            />
-          </label>
-          <label className="text-xs">
-            <span className="helm-label block">Currency</span>
-            <input
-              className="helm-input helm-figure mt-1 w-16 uppercase"
-              maxLength={3}
-              value={capCurrency}
-              onChange={(event) => {
-                setCapCurrency(event.target.value);
-                const micros = toMicros(cap);
-                if (micros !== null && /^[A-Za-z]{3}$/.test(event.target.value)) {
-                  onChange({ mode: "act", act_cap: { amount_micros: micros, currency: event.target.value.toUpperCase() } });
-                }
-              }}
-            />
-          </label>
-          <p id={`helm-cap-help-${name}`} className="helm-muted basis-full text-xs">
-            The largest single action Helm may run without asking. At 0, every payment still asks; holds and reminders
-            run alone.
-          </p>
-          {capProblem ? (
-            <p role="alert" className="basis-full text-xs text-red-600 dark:text-red-400">
-              {capProblem}
-            </p>
-          ) : null}
-        </div>
+        <p className="helm-muted text-xs" data-testid="helm-act-note">
+          Every payment decision waits for a person, whatever this mandate says: what Helm reads from documents can be
+          wrong or planted.
+        </p>
       ) : null}
     </fieldset>
   );
@@ -191,7 +148,6 @@ export const MandateEditor: React.FC<{
   const ready = problems.length === 0 && !check.isPending;
   // A custom condition (Enterprise) is built in a rows editor rather than by pressing chips.
   const custom = start.template === CUSTOM_TEMPLATE;
-  const currency = String(((params.floor ?? params.threshold) as { currency?: string } | undefined)?.currency ?? "INR");
 
   const change = (param: string, value: unknown): void => {
     const next = { ...params, [param]: value };
@@ -222,7 +178,6 @@ export const MandateEditor: React.FC<{
         <AutonomyFields
           name={mandate.title}
           value={autonomy}
-          currency={currency}
           disabled={save.isPending}
           onChange={(next) => {
             setAutonomy(next);

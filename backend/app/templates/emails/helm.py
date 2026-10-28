@@ -13,7 +13,7 @@ from typing import Any, Mapping, Optional, Sequence
 
 from app.services.helm import money
 from app.templates.emails.base import BASE_EMAIL_HTML_LAYOUT
-from app.templates.emails.common import esc, esc_attr, single_line
+from app.templates.emails.common import clip, esc, esc_attr, single_line
 
 #: Escalating tone for receivables reminders (level 1 friendly, 2 firm, 3 final).
 REMINDER_TONES = {
@@ -60,6 +60,8 @@ def _wrap(subject: str, brand_name: str, content_html: str, footer: str) -> str:
 
 def render_dispute(*, organization_name: str, supplier_name: str, invoice_number: str, currency: str,
                    lines: Sequence[DisputeLine], overcharge_micros: int) -> tuple[str, str, str]:
+    # Final session 2A (invariant (e)): values read from documents are bounded as well as escaped.
+    supplier_name, invoice_number = clip(supplier_name), clip(invoice_number, 80)
     subject = single_line(f"Invoice {invoice_number or ''}: billed above the agreed price".replace("  ", " "))
     rows_text = []
     rows_html = []
@@ -67,8 +69,9 @@ def render_dispute(*, organization_name: str, supplier_name: str, invoice_number
         agreed = money.say(line.agreed_micros, currency)
         billed = money.say(line.billed_micros, currency)
         po = f" (PO {line.po_number})" if line.po_number else ""
-        rows_text.append(f"- {single_line(line.description)}{single_line(po)}: agreed {agreed} a unit, billed {billed}")
-        rows_html.append(f"<li>{esc(line.description)}{esc(po)}: agreed {esc(agreed)} a unit, billed {esc(billed)}</li>")
+        description, po = clip(line.description), clip(po, 100)
+        rows_text.append(f"- {description}{po}: agreed {agreed} a unit, billed {billed}")
+        rows_html.append(f"<li>{esc(description)}{esc(po)}: agreed {esc(agreed)} a unit, billed {esc(billed)}</li>")
     total = money.say(overcharge_micros, currency)
     text = (f"Dear {supplier_name},\n\nInvoice {invoice_number} bills these lines above the price agreed on the "
             f"purchase order:\n" + "\n".join(rows_text) + f"\n\nIn all, {total} more than agreed. Please send a "
@@ -165,8 +168,9 @@ def render_reconciliation(*, organization_name: str, supplier_name: str, stateme
     """The reconciliation email for one supplier statement: each difference in their terms, then the
     balances, and a request to correct the statement or say where our records differ."""
     subject = single_line(f"Statement reconciliation: our account at {statement_date}")
+    supplier_name = clip(supplier_name)  # Final session 2A (invariant (e))
     items = [ReconciliationItem.of(raw) for raw in differences]
-    sentences = [s for s in (item.sentence(currency) for item in items) if s]
+    sentences = [clip(s, 400) for s in (item.sentence(currency) for item in items) if s]
     balances = None
     if their_balance_micros is not None and our_balance_micros is not None \
             and their_balance_micros != our_balance_micros:
@@ -189,6 +193,7 @@ def render_reconciliation(*, organization_name: str, supplier_name: str, stateme
 
 def render_reminder(*, organization_name: str, customer_name: str, invoice_number: str, currency: str,
                     amount_micros: int, due_date: str, days_overdue: int, level: int) -> tuple[str, str, str]:
+    customer_name, invoice_number = clip(customer_name), clip(invoice_number, 80)  # Final session 2A (invariant (e))
     tone_title, tone = REMINDER_TONES.get(max(1, min(3, level)), REMINDER_TONES[1])
     amount = money.say(amount_micros, currency)
     subject = single_line(f"{tone_title}: invoice {invoice_number} ({amount}) is overdue")
@@ -206,6 +211,7 @@ def render_reminder(*, organization_name: str, customer_name: str, invoice_numbe
 
 def render_document_request(*, organization_name: str, supplier_name: str, document_title: str, valid_until: str,
                             upload_url: str) -> tuple[str, str, str]:
+    supplier_name, document_title = clip(supplier_name), clip(document_title, 120)  # Final session 2A (invariant (e))
     subject = single_line(f"Please send your renewed {document_title}")
     text = (f"Dear {supplier_name},\n\nOur copy of your {document_title} is valid until {valid_until}. Please upload "
             f"the renewed document with this secure link (it works once):\n{upload_url}\n\nRegards,\n"
@@ -222,6 +228,9 @@ def render_document_request(*, organization_name: str, supplier_name: str, docum
 def render_briefing(*, brand_name: str, organization_name: str, book_name: str, week_of: str,
                     plan_lines: Sequence[str], risk_lines: Sequence[str], value_line: str, waiting: int,
                     cockpit_url: str, preferences_url: str) -> tuple[str, str, str]:
+    # Final session 2A (invariant (e)): plan and risk lines name counterparties and invoices read from documents.
+    plan_lines, risk_lines = [clip(line, 400) for line in plan_lines], [clip(line, 400) for line in risk_lines]
+    value_line = clip(value_line)
     subject = single_line(f"Helm briefing for {book_name}, week of {week_of}")
     plan_text = "\n".join(f"- {line}" for line in plan_lines) or "- Nothing to pay or chase this week."
     risk_text = "\n".join(f"- {line}" for line in risk_lines) or "- No risks Helm can see."

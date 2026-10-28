@@ -16,6 +16,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, case, func, or_, select, text, update
 from sqlalchemy.orm import Session
@@ -82,6 +83,38 @@ def jobs_summary(db: Session = Depends(get_read_db)) -> JobsSummary:
         totals["dead"] += dead
         totals["expired_leases"] += expired
     return JobsSummary(generated_at=generated_at, totals=JobsTotals(**totals), by_type=by_type)
+
+
+class SafetyJobStatus(BaseModel):
+    name: str
+    label: str
+    schedule: str
+    state: str = Field(description="OK, STALE, NEVER_RAN, WAITING or UNWATCHED")
+    deadline_hours: float
+    last_success_at: Optional[datetime] = None
+    last_failure_at: Optional[datetime] = None
+    last_started_at: Optional[datetime] = None
+    last_outcome: Optional[str] = None
+    last_detail: Optional[str] = None
+    run: str = Field(description="The command that runs the job once by hand on the server")
+
+
+class SafetyJobsResponse(BaseModel):
+    jobs: list[SafetyJobStatus]
+    degraded: bool
+
+
+@router.get("/safety", response_model=SafetyJobsResponse,
+            summary="The host's safety jobs: last success, deadline, what to run (Final session 2A)")
+def safety_jobs_status(db: Session = Depends(get_read_db)) -> SafetyJobsResponse:
+    """Every safety job cron runs on the server (sweeps, backup, restore drill, uptime heartbeat), as last reported:
+    OK, STALE (no success within its deadline), NEVER_RAN (nothing reported a day after the app started watching),
+    WAITING (the first day) or UNWATCHED (switched off on this deployment)."""
+    from app.services.ops import safety_jobs
+
+    rows = safety_jobs.statuses(db)
+    return SafetyJobsResponse(jobs=[SafetyJobStatus(**r) for r in rows],
+                              degraded=any(r["state"] in (safety_jobs.STALE, safety_jobs.NEVER) for r in rows))
 
 
 @router.get("/dead", response_model=DeadJobList, summary="The dead-letter queue")

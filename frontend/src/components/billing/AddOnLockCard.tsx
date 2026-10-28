@@ -4,7 +4,7 @@ import { Clock, Loader2, Lock } from "lucide-react";
 
 import { createAddonCheckoutSession } from "@/services/api/entitlements";
 import { BUTTON_PRIMARY, HINT, SECTION_TITLE, SURFACE } from "@/components/ui/primitives";
-import type { AddonAccess } from "@/types/entitlements";
+import type { AddonAccess, AddonPriceOption } from "@/types/entitlements";
 import { formatTimestampDate, numberFormat } from "@/utils/displayTime";
 import AskPlanOwners from "@/components/billing/AskPlanOwners";
 
@@ -24,6 +24,31 @@ export const formatAddonPrice = (micros: number, currency: string): string =>
     maximumFractionDigits: 0,
   }).format(micros / 1_000_000);
 
+/**
+ * Final session 2A (N-187). The add-on's prices in the currency the organization sees first (rupees for an Indian
+ * organization), else in dollars; monthly first.
+ */
+export const addonPricesIn = (addon: AddonAccess, currency: "USD" | "INR" = "USD"): AddonPriceOption[] => {
+  const all = [...(addon.prices ?? [])];
+  const pick = all.some((p) => p.currency === currency) ? currency : "USD";
+  return all.filter((p) => p.currency === pick).sort((a, b) => (a.interval === "month" ? -1 : 1) - (b.interval === "month" ? -1 : 1));
+};
+
+/** The monthly price in the organization's currency ("₹1,499"), else the dollar monthly price. */
+export const addonMonthlyPrice = (addon: AddonAccess, currency: "USD" | "INR" = "USD"): string => {
+  const monthly = addonPricesIn(addon, currency).find((p) => p.interval === "month");
+  return monthly ? formatAddonPrice(monthly.unit_amount * 10_000, monthly.currency) : formatAddonPrice(addon.monthly_price_micros, addon.currency);
+};
+
+/** "₹1,499 a month or ₹14,990 a year"; the dollar monthly price when the server sent no price list. */
+export const addonPriceLine = (addon: AddonAccess, currency: "USD" | "INR" = "USD"): string => {
+  const prices = addonPricesIn(addon, currency);
+  if (prices.length === 0) {
+    return `${formatAddonPrice(addon.monthly_price_micros, addon.currency)} a month`;
+  }
+  return prices.map((p) => `${formatAddonPrice(p.unit_amount * 10_000, p.currency)} a ${p.interval}`).join(" or ");
+};
+
 const formatDay = (iso: string | null): string | null =>
   iso ? formatTimestampDate(iso) : null;
 
@@ -37,6 +62,8 @@ export interface PurchaseProps {
   readonly addon: AddonAccess;
   readonly canPurchase: boolean;
   readonly label: string;
+  /** N-187: the currency to buy in (the organization's default); a yearly button appears when it is sold yearly. */
+  readonly currency?: "USD" | "INR";
 }
 
 export const PurchaseAction: React.FC<PurchaseProps> = ({
@@ -44,9 +71,14 @@ export const PurchaseAction: React.FC<PurchaseProps> = ({
   addon,
   canPurchase,
   label,
+  currency,
 }) => {
+  const prices = addonPricesIn(addon, currency ?? "USD").filter((p) => p.purchasable);
+  const buyIn = prices[0]?.currency;
+  const yearly = prices.find((p) => p.interval === "year");
   const checkout = useMutation({
-    mutationFn: () => createAddonCheckoutSession(organizationId, addon.addon_key),
+    mutationFn: (interval: "month" | "year") =>
+      createAddonCheckoutSession(organizationId, addon.addon_key, { ...(buyIn ? { currency: buyIn } : {}), interval }),
     onSuccess: (session) => {
       window.location.assign(session.url);
     },
@@ -70,11 +102,21 @@ export const PurchaseAction: React.FC<PurchaseProps> = ({
         type="button"
         className={BUTTON_PRIMARY}
         disabled={checkout.isPending}
-        onClick={() => checkout.mutate()}
+        onClick={() => checkout.mutate("month")}
       >
         {checkout.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
         {label}
       </button>
+      {yearly ? (
+        <button
+          type="button"
+          className="block text-xs font-semibold text-primary underline"
+          disabled={checkout.isPending}
+          onClick={() => checkout.mutate("year")}
+        >
+          Or pay yearly: {formatAddonPrice(yearly.unit_amount * 10_000, yearly.currency)} a year
+        </button>
+      ) : null}
       {checkout.isError ? (
         <p role="alert" className="text-xs text-destructive">
           Couldn't start checkout. Try again, or contact support if it keeps failing.
@@ -96,6 +138,27 @@ export const AddOnLockCard: React.FC<AddOnLockCardProps> = ({
   canPurchase,
 }) => {
   const price = formatAddonPrice(addon.monthly_price_micros, addon.currency);
+
+  if (addon.prices !== undefined && addon.prices.length === 0 && addon.included_in.length > 0) {
+    // N-187: an add-on that is only included in plans (custom domains: Business and Enterprise) is an upgrade.
+    return (
+      <section className={`${SURFACE} p-6`} aria-labelledby={`lock-${addon.addon_key}`}>
+        <div className="flex items-start gap-4">
+          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <Lock className="h-4 w-4" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1 space-y-2">
+            <h2 id={`lock-${addon.addon_key}`} className={SECTION_TITLE}>
+              {addon.display_name} come with {addon.included_in.join(" and ")}
+            </h2>
+            <p className="max-w-prose text-sm text-muted-foreground">{addon.description}</p>
+            <p className="text-sm text-foreground">Upgrade to {addon.included_in[0]} to use them. {canPurchase ? "" : ""}</p>
+            {canPurchase ? null : <p className={HINT}><AskPlanOwners toDo="upgrade the plan" /></p>}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className={`${SURFACE} p-6`} aria-labelledby={`lock-${addon.addon_key}`}>

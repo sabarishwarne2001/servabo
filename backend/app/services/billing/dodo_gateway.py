@@ -160,6 +160,32 @@ EVENT_TYPE_MAP: dict[str, str] = {
 }
 
 
+
+def indian_checkout_fields(buyer: Any) -> dict[str, Any]:
+    """The fields of Dodo's `POST /checkouts` that make a checkout an Indian business purchase (Final session 2A, N-187).
+
+    Documented by Dodo (docs.dodopayments.com: api-reference/checkout-sessions/create, features/payment-methods/india,
+    features/b2b-payments; read through search extracts on 2026-10-26, the pages could not be opened from the build
+    sandbox, so Final session 2B confirms them against Dodo's test mode):
+
+    * `billing_currency: "INR"` and a billing address in `IN`: Indian cards, RuPay and UPI are offered in rupees.
+      Dodo applies `billing_currency` only with Adaptive Currency on; the rupee products are priced in INR themselves.
+    * `feature_flags.allow_tax_id` and `require_tax_id`: the buyer must give a tax id (Dodo refuses `require_tax_id`
+      without `allow_tax_id`). Dodo prints the buyer's tax id on a B2B invoice; whether it also splits CGST, SGST and
+      IGST is not documented (NEEDS-OWNER N-193).
+    * `tax_id`: the organization's GSTIN when Servabo knows it, pre-filled and still editable by the buyer.
+    * `mandate_min_amount_inr_paise` is NOT sent: Dodo's default ₹15,000 floor applies (N-192).
+    """
+    fields: dict[str, Any] = {
+        "billing_currency": "INR",
+        "billing_address": {"country": "IN"},
+        "feature_flags": {"allow_tax_id": True, "require_tax_id": True, "allow_customer_editing_tax_id": True},
+    }
+    gstin = getattr(buyer, "gstin", None)
+    if gstin:
+        fields["tax_id"] = gstin
+    return fields
+
 class DodoGatewayError(GatewayPermanentError):
     """A Dodo API call failed in a way that will not succeed on retry."""
 
@@ -521,9 +547,12 @@ class DodoGateway:
         """Change the seat quantity on a live subscription, then re-fetch (D-9).
 
         Dodo's change-plan requires the product id even when only the quantity
-        changes; the caller passes the product of the tier the subscription is
-        pinned to. The response body is not trusted for state: the subscription
-        is re-fetched so `state_version` orders this write against webhooks.
+        changes; the caller passes the product the subscription is billed on (F-627). The response body is not
+        trusted for state: the subscription is re-fetched so `state_version` orders this write against webhooks.
+
+        Final session 2A: `on_payment_failure: prevent_change`, as for an upgrade. A seat increase is charged at once;
+        when that charge fails (above an Indian card or UPI mandate, for example) Dodo must refuse the change rather
+        than apply it unpaid and leave the subscription for dunning to chase. Releasing seats charges nothing.
         """
         if int(seats) < 1:
             raise DodoGatewayError("Dodo subscriptions need at least one unit.")
@@ -545,6 +574,7 @@ class DodoGateway:
                 "product_id": product_id,
                 "quantity": int(seats),
                 "proration_billing_mode": proration_mode,
+                "on_payment_failure": "prevent_change",
             },
         )
         return self.fetch_subscription(subscription_id)
@@ -777,6 +807,7 @@ class DodoGateway:
         metadata: Optional[Mapping[str, str]] = None,
         idempotency_key: Optional[str] = None,
         discount_code: Optional[str] = None,
+        indian_buyer: Optional[Any] = None,
     ) -> EphemeralSession:
         if not price_id:
             raise GatewayNotConfiguredError(
@@ -810,6 +841,8 @@ class DodoGateway:
             body["customer"] = {"email": customer_email}
         if discount_code:
             body["discount_code"] = discount_code  # ARCH50-S1:checkout-discount
+        if indian_buyer is not None:
+            body.update(indian_checkout_fields(indian_buyer))
 
         payload = self._post("/checkouts", body)
 

@@ -372,7 +372,7 @@ test.describe("Billing", () => {
   test("plan cards show the four tiers at the confirmed prices", async ({ page }) => {
     await page.goto(org("C", "billing"));
     await expect(page.getByRole("radio", { name: /^Free/ })).toBeVisible();
-    await expect(page.getByRole("radio", { name: /^Developer.*\$49/ })).toBeVisible();
+    await expect(page.getByRole("radio", { name: /^Starter.*\$49/ })).toBeVisible(); // N-187: "Developer" is shown as "Starter"
     await expect(page.getByRole("radio", { name: /^Business.*\$299/ })).toBeVisible();
     await expect(page.getByRole("radio", { name: /^Enterprise.*Current plan.*\$799/ })).toBeDisabled();
   });

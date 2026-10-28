@@ -508,6 +508,9 @@ export interface HelmCounterparty {
   msme_label: string;
   msme_protected: boolean;
   contact_email: string | null;
+  /** Final session 2A (N-195): only a confirmed address is ever emailed; one read from a document is a suggestion. */
+  contact_confirmed?: boolean;
+  contact_source?: "DOCUMENT" | "PERSON" | null;
   behaviour: Record<string, unknown>;
 }
 

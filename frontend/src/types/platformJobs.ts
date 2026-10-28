@@ -46,3 +46,25 @@ export interface JobRetryResult {
   readonly id: string;
   readonly status: string;
 }
+
+/** Final session 2A (Phase 2): a safety job the server's cron runs, as it last reported. */
+export interface SafetyJobStatus {
+  readonly name: string;
+  readonly label: string;
+  readonly schedule: string;
+  /** OK, STALE (no success within its deadline), NEVER_RAN, WAITING (the first day) or UNWATCHED (switched off here). */
+  readonly state: "OK" | "STALE" | "NEVER_RAN" | "WAITING" | "UNWATCHED";
+  readonly deadline_hours: number;
+  readonly last_success_at: string | null;
+  readonly last_failure_at: string | null;
+  readonly last_started_at: string | null;
+  readonly last_outcome: string | null;
+  readonly last_detail: string | null;
+  /** The command that runs it once by hand on the server. */
+  readonly run: string;
+}
+
+export interface SafetyJobsResponse {
+  readonly jobs: readonly SafetyJobStatus[];
+  readonly degraded: boolean;
+}

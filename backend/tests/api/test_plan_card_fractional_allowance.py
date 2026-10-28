@@ -33,7 +33,7 @@ def test_free_storage_reaches_the_plan_card_as_a_quarter_of_a_gigabyte(client, d
 def test_whole_allowances_stay_whole_numbers(client, db_session: Session, tenant) -> None:
     put_on_plan(db_session, tenant.organization, "free")
     quantities = _entitlements(client, tenant, "free")
-    assert quantities["document.upload"] == 25
+    assert quantities["document.upload"] == 100  # N-187 (25 before)
     assert isinstance(quantities["document.upload"], int)
     assert quantities["limit.seats"] == 2
     assert isinstance(quantities["limit.seats"], int)

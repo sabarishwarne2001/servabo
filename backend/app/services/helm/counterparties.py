@@ -159,6 +159,8 @@ def sync(db: Session, book: HelmBook, *, as_of: Optional[date] = None) -> int:
                 msme_category=category, msme_source=(v.MSME_SOURCE_CERTIFICATE if category else
                                                      v.MSME_SOURCE_DOCUMENT if facts["udyam"] else None),
                 contact_email=facts["contact"], tax_id=facts["tax_id"], behaviour=facts["behaviour"],
+                # N-195: an address read from a document is a suggestion, never a recipient, until a person confirms it.
+                contact_source=v.CONTACT_SOURCE_DOCUMENT if facts["contact"] else None,
             ).on_conflict_do_nothing(constraint="uq_helm_counterparties_book_key"))
             continue
         row.role = facts["role"]
@@ -175,6 +177,7 @@ def sync(db: Session, book: HelmBook, *, as_of: Optional[date] = None) -> int:
                 row.msme_source = v.MSME_SOURCE_DOCUMENT
         if facts["contact"] and not row.contact_email:
             row.contact_email = facts["contact"]
+            row.contact_source = v.CONTACT_SOURCE_DOCUMENT  # a suggestion until a person confirms it (N-195)
         row.updated_at = now
     db.flush()
     return len(derived)

@@ -4,7 +4,7 @@
     cached(db, organization_id, period)      the same, kept in Redis for ten minutes per organization and period
     forget(organization_id)                  drops the kept copies (tests, and a new import is allowed to show at once)
 
-`period` is "trial" (the organization's trial window: the seven days that end at `organizations.trial_ends_at`)
+`period` is "trial" (the organization's trial window: the FREE_TRIAL_DAYS (14) days that end at `organizations.trial_ends_at`)
 or "month" (the current calendar month in the time zone of the organization's oldest workspace; organizations
 have no time zone of their own, N-141).
 
@@ -139,7 +139,7 @@ def _zone(name: Optional[str]) -> ZoneInfo:
 
 def window(organization: Organization, workspaces: list[Workspace], period: str,
            now: datetime) -> tuple[datetime, datetime, str]:
-    """`[start, end)` in UTC and the zone name. The trial window is the seven days ending at the trial's end
+    """`[start, end)` in UTC and the zone name. The trial window is the trial's length (FREE_TRIAL_DAYS) ending at its end
     (clipped to now); the month is the calendar month in the zone of the oldest workspace."""
     if period not in PERIODS:
         raise ReceiptError("period must be trial or month")
@@ -353,6 +353,35 @@ def _overcharges(db: Session, ids: list[uuid.UUID], start: datetime, end: dateti
     return out
 
 
+def _recovered(db: Session, workspaces: list[Workspace], start: datetime, end: datetime, zone: ZoneInfo,
+               page) -> list[dict[str, Any]]:
+    """Recoveries (N-191): every outcome evidence proved in the period, Helm's and Recoveries' together and each counted
+    once (`recoveries.ledger`). It replaces "Value Helm held" for an organization that has Recoveries, so one rupee is
+    never shown on two lines; it is never added to what was found."""
+    from app.services.recoveries import ledger
+
+    first = start.astimezone(zone).date()
+    last = (end - timedelta(microseconds=1)).astimezone(zone).date()
+    counted = ledger.rows(db, [w.id for w in workspaces], first=first, last=last, all_helm=True)
+    by_currency: dict[str, list[int]] = {}
+    lead: dict[str, tuple[int, Optional[uuid.UUID]]] = {}
+    for row in counted:
+        entry = by_currency.setdefault(row.currency, [0, 0])
+        entry[0] += 1
+        entry[1] += row.amount_micros
+        if row.amount_micros > lead.get(row.currency, (-1, None))[0]:
+            lead[row.currency] = (row.amount_micros, row.workspace_id)
+    out = []
+    for currency in sorted(by_currency):
+        count, total = by_currency[currency]
+        found = _finding(f"recovered_verified_{currency}", f"Recovered, verified ({_plural(count, 'outcome')} with evidence)",
+                         source=page(lead[currency][1], "recoveries"), count=count, amount_micros=total, currency=currency,
+                         honesty=helm_v.HONESTY_CONFIRMED)
+        if found:
+            out.append(found)
+    return out
+
+
 def _helm_value(db: Session, organization_id: uuid.UUID, sample_ids: list[uuid.UUID], start: datetime, end: datetime,
                 zone: ZoneInfo, path: str) -> list[dict[str, Any]]:
     first = start.astimezone(zone).date()
@@ -395,6 +424,8 @@ def _phrase(finding: dict[str, Any]) -> str:
         return f"flagged {_plural(count, 'supplier bank-account change')} before payment"
     if key.startswith("overcharges_"):
         return f"found {amount} of overcharges against purchase orders"
+    if key.startswith("recovered_verified_"):
+        return f"recovered {amount}, verified with evidence"
     return f"held {amount} with evidence"
 
 
@@ -443,9 +474,13 @@ def _gst_add_on_line(db: Session, organization_id: uuid.UUID) -> Optional[str]:
     if entitlement_service.addon_access(db, organization_id=organization_id,
                                         addon_key=entitlements.GST_CREDIT_ADDON).can_maintain:
         return None
+    from app.services.billing import currency as currency_service
+
     offer = entitlement_service.offer_for(entitlements.GST_CREDIT_ADDON)
-    return (f"{offer.display_name} add-on ({_SYMBOLS.get(offer.currency, '')}{offer.monthly_price_micros // 1_000_000}"
-            f"/month) or Business: GST's supplier list")
+    # N-187: the catalogue's prices in the organization's currency.
+    prices = entitlement_service.price_words(entitlements.GST_CREDIT_ADDON,
+                                             currency_service.default_currency(db, organization_id))
+    return f"{offer.display_name} add-on ({prices}) or Business: GST's supplier list"
 
 
 # ------------------------------------------------------------------------------------------------ the receipt
@@ -491,7 +526,9 @@ def receipt(db: Session, organization_id: uuid.UUID, period: str, *, now: Option
             found += _bank_changes(db, ids, start, end, page)
         if has(entitlements.RECONCILIATION_CAPABILITY):
             found += _overcharges(db, ids, start, end, page)
-        if helm_gate.helm_held(db, organization_id):
+        if has(entitlements.RECOVERIES_CAPABILITY):
+            found += _recovered(db, workspaces, start, end, zone, page)
+        elif helm_gate.helm_held(db, organization_id):
             found += _helm_value(db, organization_id, sample_ids, start, end, zone, helm_path)
 
     return {

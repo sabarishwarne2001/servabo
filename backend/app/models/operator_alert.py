@@ -30,6 +30,8 @@ OPERATOR_ALERT_KINDS: tuple[str, ...] = (
     "PAYMENT_REVERSED",
     # Session B: the nightly check found stored Helm promises a full recomputation does not produce.
     "HELM_LEDGER_DRIFT",
+    # Final session 2A: a host safety job (a sweep, the backup, the restore drill, the heartbeat) has not succeeded in time.
+    "SAFETY_JOB_STALE",
 )
 
 

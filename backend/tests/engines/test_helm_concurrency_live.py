@@ -730,6 +730,24 @@ def test_re_plan_clicked_three_times_at_once_never_duplicates_an_action(api, db_
     assert _shape(_live_actions(db_session, book_id)) == actions_before
 
 
+def test_re_plan_waits_for_a_background_plan_instead_of_refusing(api, db_session) -> None:
+    """Spec 78 once got "Helm is already planning" (409): a person pressed Re-plan while the plan a mandate change had
+    started still held the organization's lock. A person's re-plan now waits a moment for that run to finish."""
+    book, _cockpit, _items = _planned(api, db_session)
+    organization_id = db_session.get(HelmBook, uuid.UUID(book["id"])).organization_id
+    holder = TestSessionLocal()
+    holder.execute(select(func.pg_advisory_xact_lock(func.hashtextextended(f"helm-plan:{organization_id}", 0))))
+
+    def background_run_finishes() -> None:
+        time.sleep(1.5)
+        holder.rollback()
+        holder.close()
+
+    threading.Thread(target=background_run_finishes).start()
+    response = api.post(f"/books/{book['id']}/plan")
+    assert response.status_code == 200, response.text
+
+
 # ---------------------------------------------------------------------------
 # 4. Mandates and settings
 # ---------------------------------------------------------------------------

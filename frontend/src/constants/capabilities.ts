@@ -41,6 +41,8 @@ export const CAPABILITY = {
   obligations: "capability.obligations",
   // ARCH47-S2:capability-constant
   erpPosting: "capability.erp_posting",
+  // Final session 2A (N-187): the Tally Prime import file on its own, Starter and up.
+  tallyFile: "capability.tally_file",
   // ARCH48-S2:capability-constant
   collaborativeReview: "capability.collaborative_review",
   // ARCH49-S2:capability-constant
@@ -69,6 +71,8 @@ export const CAPABILITY = {
   trinetraAllWorkspaces: "capability.trinetra_all_workspaces",
   trinetra: "capability.trinetra",
   gstCredit: "capability.gst_credit",
+  // Final session 2A (N-191): Recoveries, Business and Enterprise.
+  recoveries: "capability.recoveries",
   gstCreditAllWorkspaces: "capability.gst_credit_all_workspaces",
 } as const;
 

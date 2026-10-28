@@ -43,7 +43,7 @@ async function upgradeOnStripe(page: Page, customer: Customer): Promise<void> {
   expect(checkout).toMatchObject({ quota_tier_key: "developer", seats: 1 });
   standIn("subscribe", customer.orgSlug, "--plan", "developer", "--seats", "1");  // paid at the gateway
   await page.goto(customer.org("billing"));
-  await expect(page.locator("main")).toContainText(/Developer/);
+  await expect(page.locator("main")).toContainText(/Starter/); // N-187: "Developer" is shown as "Starter"
 }
 
 test.describe("Journey: a solo user upgrades to Developer and uses the API", () => {
@@ -103,15 +103,15 @@ test.describe("Journey: a solo user upgrades to Developer and uses the API", () 
       await page.getByTestId("plan-cta-developer").click();
       await page.getByRole("button", { name: "Continue to payment" }).click();
       await expect(page).toHaveURL(new RegExp(`^${DODO_ORIGIN.replace(/\./g, "\\.")}/checkout/`), { timeout: 20_000 });
-      await expect(page.locator("body")).toContainText("Developer × 1: USD 49.00 per month");
+      await expect(page.locator("body")).toContainText("Starter × 1: USD 49.00 per month"); // N-187
       await page.getByRole("button", { name: "Pay", exact: true }).click();
       // Back in Servabo: confirmed once Dodo's webhook has been reconciled, then the plan is named.
       const returned = page.getByTestId("checkout-return");
       await expect(returned).toBeVisible({ timeout: 20_000 });
       await expect(returned).toContainText("Payment confirmed", { timeout: 60_000 });
-      await expect(page.getByTestId("checkout-confirmed-plan")).toContainText(/developer plan with 1 seat/i);
+      await expect(page.getByTestId("checkout-confirmed-plan")).toContainText(/starter plan with 1 seat/i); // N-187
       await returned.getByRole("link", { name: "Back to billing" }).click();
-      await expect(page.locator("main")).toContainText(/Developer/);
+      await expect(page.locator("main")).toContainText(/Starter/); // N-187: "Developer" is shown as "Starter"
     } else {
       await upgradeOnStripe(page, customer);
     }

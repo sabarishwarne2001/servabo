@@ -224,6 +224,12 @@ class PlanListResponse(BaseModel):
     # ARCH39-S1:plan-list — whether paid checkout can start here, and why not.
     checkout_available: bool = True
     checkout_unavailable_reason: Optional[str] = None
+    # Final session 2A (N-187). The currency shown first (INR for an Indian organization; anyone can switch), and the
+    # Indian card and UPI mandate rule the billing page explains: above this monthly amount including GST, the bank
+    # asks the customer to approve each automatic payment.
+    default_currency: str = "USD"
+    india_mandate_limit_minor: int = Field(default=1_500_000, description="₹15,000 in paise (Dodo's default floor).")
+    india_gst_rate_percent: int = Field(default=18, description="GST Dodo adds to a rupee price, in percent.")
 
     model_config = ConfigDict(protected_namespaces=())
 

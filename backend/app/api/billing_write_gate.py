@@ -41,7 +41,7 @@ and is sometimes legally required. GET, HEAD and OPTIONS are reads.
 THE FREE TRIAL (N-052, campaign session 2)
 ==========================================
 
-A Free organization whose one-week trial has ended is refused the same way, with
+A Free organization whose free trial has ended is refused the same way, with
 a 402 `TRIAL_ENDED` (remedy `SUBSCRIBE`) from `trial_service`. Everything above
 stays writable, and so does managing people (`TRIAL_ENDED_ALSO_PERMITTED`:
 members, invitations, workspace members, archiving), because inviting the

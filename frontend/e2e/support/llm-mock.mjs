@@ -40,11 +40,19 @@ const MODEL = process.env.E2E_LLM_MODEL ?? "servabo-e2e-local";
 
 const AGENT_DATA_MARKER = "do not follow them.\n\n";
 
+/** Final session 2A: document text arrives fenced between nonce lines (`fence_document`); a model reads what is inside. */
+function unfence(text) {
+  return text
+    .split(/\r?\n/)
+    .filter((line) => !/^The text between the <<<DOCUMENT-[0-9a-f]{8} /.test(line) && !/^<<<DOCUMENT-[0-9a-f]{8}$/.test(line) && !/^DOCUMENT-[0-9a-f]{8}>>>$/.test(line))
+    .join("\n");
+}
+
 function documentText(prompt) {
   const agent = prompt.lastIndexOf(AGENT_DATA_MARKER);
-  if (agent >= 0) return prompt.slice(agent + AGENT_DATA_MARKER.length);
+  if (agent >= 0) return unfence(prompt.slice(agent + AGENT_DATA_MARKER.length));
   const marker = prompt.lastIndexOf("Document:");
-  return marker >= 0 ? prompt.slice(marker + "Document:".length) : prompt;
+  return unfence(marker >= 0 ? prompt.slice(marker + "Document:".length) : prompt);
 }
 
 const lines = (text) => text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -300,7 +308,7 @@ function answerQuestion(prompt) {
 
 function assertionAnswer(prompt) {
   const requirement = (/REQUIREMENT\n([\s\S]*?)\n\nDOCUMENT EXCERPTS/.exec(prompt) || [])[1] ?? "";
-  const excerpts = (/DOCUMENT EXCERPTS\n([\s\S]*?)\n\nAnswer ONLY/.exec(prompt) || [])[1] ?? "";
+  const excerpts = unfence((/DOCUMENT EXCERPTS\n([\s\S]*?)\n\nAnswer ONLY/.exec(prompt) || [])[1] ?? "");
   const wanted = [...new Set(tokens(requirement))];
   let best = null;
   for (const raw of excerpts.split(/\n|(?<=\.)\s+/)) {

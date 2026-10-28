@@ -219,7 +219,12 @@ def list_plans(
         )
 
     not_ready = portal_service.gateway_readiness()
+    from app.services.billing import currency as _currency
+
     return PlanListResponse(
+        default_currency=_currency.default_currency(db, context.organization_id),
+        india_mandate_limit_minor=_currency.MANDATE_FLOOR_PAISE,
+        india_gst_rate_percent=_currency.GST_RATE_PERCENT,
         checkout_available=not_ready is None,
         checkout_unavailable_reason=not_ready,
         organization_id=context.organization_id,
@@ -227,6 +232,13 @@ def list_plans(
         as_of=moment,
         plans=plans,
     )
+
+
+def _plan_name(db: Session, organization_id: uuid.UUID) -> Optional[str]:
+    """The current plan's display name (Final session 2A, N-187: `developer` is shown as Starter)."""
+    tier = quota_service.resolve_tier(db, organization_id=organization_id, at=datetime.now(timezone.utc))
+    return tier.display_name if tier else None
+
 
 
 @router.get(
@@ -269,6 +281,7 @@ def get_subscription_state(
             db, organization_id=context.organization_id
         ).value,
         plan_key=capacity.plan_key,
+        plan_name=_plan_name(db, context.organization_id),
         seat_capacity=capacity.capacity,
         seat_capacity_source=capacity.source,
         seats_pending_invitations=capacity.pending_invitations,
@@ -715,6 +728,10 @@ def create_checkout_session(
             interval=payload.interval or "month", currency=payload.currency or "USD", seats=payload.seats,
             price_id=payload.price_id, promo_code=payload.promo_code)
         price_id = prepared.price_id
+    # N-187: a checkout in rupees is an Indian business purchase (UPI and RuPay, the buyer's GSTIN).
+    from app.services.billing import currency as _currency
+
+    buyer = _currency.indian_buyer(db, context.organization_id, prepared.price.currency if prepared else None)
     try:
         session = portal_service.create_checkout_session(
             db,
@@ -725,6 +742,7 @@ def create_checkout_session(
             success_url=payload.success_url,
             cancel_url=payload.cancel_url,
             **({"discount_code": prepared.discount_code} if prepared is not None and prepared.discount_code else {}),
+            **({"indian_buyer": buyer} if buyer is not None else {}),
         )
     except portal_service.PaidSubscriptionActiveError as exc:
         raise HTTPException(
@@ -980,6 +998,23 @@ def _gateway_refusal(exc: Exception, organization_id: uuid.UUID) -> HTTPExceptio
         "billing.seat_change_refused",
         extra={"organization_id": str(organization_id), "error": type(exc).__name__},
     )
+    if _is_payment_refusal(exc):
+        # Final session 2A (N-187 rule 8). The extra seats are charged at once, and Dodo refuses the change when that
+        # charge fails (`on_payment_failure: prevent_change`). In India the usual reason is the card or UPI mandate:
+        # an automatic payment above the amount the customer approved needs a new approval. Said plainly, with the
+        # place to approve it, never left to a dunning email.
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "MANDATE_APPROVAL_NEEDED",
+                "message": (
+                    "Your bank or UPI app has to approve the new amount before the extra seats can be charged. "
+                    "Nothing was charged and your seats are unchanged. Open Manage payment method, approve the new "
+                    "amount, then add the seats again."
+                ),
+                "details": {"action": "PORTAL"},
+            },
+        )
     return HTTPException(
         status_code=status.HTTP_409_CONFLICT,
         detail={
@@ -988,6 +1023,14 @@ def _gateway_refusal(exc: Exception, organization_id: uuid.UUID) -> HTTPExceptio
             "details": {"reason": str(exc)[:300]},
         },
     )
+
+
+def _is_payment_refusal(exc: Exception) -> bool:
+    """Dodo refused a seat change because its charge failed (a mandate limit, a declined payment). Dodo's exact
+    wording is unverified (Final session 2B checks it, DODO-LOCAL-TEST.md journey I); these words are its documented
+    ones for India's mandates and failed payments."""
+    words = str(exc).lower()
+    return any(w in words for w in ("mandate", "payment failed", "payment_failed", "insufficient", "declined"))
 
 
 @router.put(

@@ -159,6 +159,7 @@ const RedactionStudio = lazy(
 );
 const Trinetra = lazy(() => import("@/pages/trinetra/Trinetra"));
 const GstCredit = lazy(() => import("@/pages/gst/GstCredit"));
+const Recoveries = lazy(() => import("@/pages/recoveries/Recoveries"));
 const ProcurementCaseQueue = lazy(
   () => import("@/pages/procurement/CaseQueue"),
 );
@@ -598,6 +599,8 @@ function AppRoutes() {
                 />
                 <Route path={ROUTE_PATTERNS.workspaceTrinetra} element={<Trinetra />} />
                 <Route path={ROUTE_PATTERNS.workspaceGst} element={<GstCredit />} />
+                {/* Final session 2A (N-191): Recoveries. The page itself shows a preview on a plan without it. */}
+                <Route path={ROUTE_PATTERNS.workspaceRecoveries} element={<Recoveries />} />
                 <Route
                   path={ROUTE_PATTERNS.workspaceProcurementPolicies}
                   element={<TolerancePolicyEditor />}

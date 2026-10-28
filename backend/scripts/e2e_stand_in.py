@@ -281,13 +281,25 @@ def _dodo_catalogue(db) -> list[str]:
             "product_id": tier.gateway_price_id, "name": tier.display_name, "interval": interval,
             "price": int(tier.unit_amount_micros) // 10_000, "currency": tier.currency or "USD"})
         added.append(tier.gateway_price_id)
-    for offer in ADDON_CATALOG.values():  # Session H: an add-on is one product per organization
-        product_id = getattr(settings, offer.product_setting, None)
-        if product_id:
+    # N-187: the price books' products (rupees, yearly), each with its own currency and interval.
+    from app.services.revops import price_books
+
+    for price in price_books.published_prices(db):
+        if price.gateway_price_id and price.gateway_price_id not in added:
             _dodo_call("POST", "/_fake/product", {
-                "product_id": product_id, "name": offer.display_name, "interval": "Month",
-                "price": int(offer.monthly_price_micros) // 10_000, "currency": offer.currency})
-            added.append(product_id)
+                "product_id": price.gateway_price_id, "name": price.tier_key.title() if price.tier_key != "developer" else "Starter",
+                "interval": "Year" if price.interval == "year" else "Month",
+                "price": price.unit_amount_micros // 10_000, "currency": price.currency})
+            added.append(price.gateway_price_id)
+    for offer in ADDON_CATALOG.values():  # Session H: an add-on is one product per organization
+        for price in offer.prices:  # N-187: each currency and interval is its own product
+            product_id = price.product_id()
+            if product_id:
+                _dodo_call("POST", "/_fake/product", {
+                    "product_id": product_id, "name": offer.display_name,
+                    "interval": "Year" if price.interval == "year" else "Month",
+                    "price": int(price.amount_micros) // 10_000, "currency": price.currency})
+                added.append(product_id)
     return added
 
 
@@ -626,7 +638,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--signature", choices=["not_checked", "checked", "does_not_match"], default="not_checked",
                         help="einvoice-qr: the state of the QR code's signature on the document")
     parser.add_argument("--now", help="run-job: the clock the job sees (ISO 8601 with an offset), for the jobs that read it "
-                                      "(gst.digest, gst.notices); ignored in production")
+                                      "(gst.digest, gst.notices, compliance.deletion_notices); ignored in production")
     parser.add_argument("--addon", default="addon.gst_credit", help="cancel-addon, addon-grace-ends: the add-on key")
     parser.add_argument("--backdate-days", type=int, default=0,
                         help="trial-ends: also move this organization's usage events that many days back, so the "

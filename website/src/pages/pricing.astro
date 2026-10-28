@@ -1,6 +1,8 @@
 ---
 import Base from "../layouts/Base.astro";
 import ClosingCta from "../components/ClosingCta.astro";
+import CurrencySwitch from "../components/CurrencySwitch.astro";
+import Price from "../components/Price.astro";
 import { APP, SITE, absolute } from "../config/site";
 import {
   ADDONS,
@@ -12,7 +14,7 @@ import {
   TRIAL_DAYS,
   USAGE_BILLING,
   allowanceText,
-  dollars,
+  money,
 } from "../lib/pricing";
 
 const free = PLANS.find((p) => p.key === "free")!;
@@ -25,7 +27,7 @@ function noteFor(planKey: string, note: string): string {
   return planKey === "free" ? "hard limit during the trial" : note;
 }
 
-/** "Business and Enterprise", "Developer, Business and Enterprise". */
+/** "Business and Enterprise", "Starter, Business and Enterprise". */
 const list = (names: string[]): string => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
 
 const faqs = [
@@ -36,6 +38,7 @@ const faqs = [
   { q: "Can we change plans or cancel?", a: "Upgrade at any time: it takes effect immediately, and the confirmation screen shows the exact amount charged for the rest of the period before you confirm. A downgrade takes effect at your next renewal. Cancel any time: your plan stays active to the end of the period you paid for and nothing more is charged." },
   { q: "Do you offer refunds?", a: "Every new paid subscription has a 14-day money-back guarantee on its first payment, once per organization; a duplicate or mistaken charge is always refunded in full. The refund and cancellation policy has the details." },
   { q: "Who will charge my card, and what about tax?", a: `${SITE.merchantOfRecord} is our merchant of record: it processes your payment, calculates and collects the tax that applies where you are, and issues your invoice. Your card statement names ${SITE.merchantOfRecord}.` },
+  { q: "How do we pay in rupees, and what about GST?", a: "In India you pay in rupees by UPI, RuPay or an Indian card. 18% GST is added on top at checkout, and you give your GSTIN there so the invoice can carry it. Indian banks ask you to approve each automatic payment above ₹15,000; if your monthly total is above that, paying yearly needs one approval a year." },
 ];
 
 const offerCatalog = {
@@ -46,18 +49,22 @@ const offerCatalog = {
   itemListElement: paid.map((p) => ({
     "@type": "Offer",
     name: p.name,
-    price: (p.monthly / 100).toFixed(2),
-    priceCurrency: "USD",
-    priceSpecification: { "@type": "UnitPriceSpecification", price: (p.monthly / 100).toFixed(2), priceCurrency: "USD", unitText: "per seat per month", billingDuration: "P1M" },
+    price: ((p.month.INR ?? 0) / 100).toFixed(2),
+    priceCurrency: "INR",
+    priceSpecification: [
+      { "@type": "UnitPriceSpecification", price: ((p.month.INR ?? 0) / 100).toFixed(2), priceCurrency: "INR", unitText: "per user per month, GST extra", billingDuration: "P1M" },
+      { "@type": "UnitPriceSpecification", price: (p.monthly / 100).toFixed(2), priceCurrency: "USD", unitText: "per user per month", billingDuration: "P1M" },
+    ],
   })),
 };
 ---
-<Base title="Pricing" description={`Servabo pricing: ${paid.map((p) => `${p.name} ${dollars(p.monthly)}`).join(", ")} per seat per month, a ${TRIAL_DAYS}-day trial with no card, yearly plans, and a 14-day money-back guarantee.`} structuredData={[offerCatalog]}>
+<Base title="Pricing" description={`Servabo pricing: ${paid.map((p) => `${p.name} ${money(p.month.INR ?? 0, "INR")}`).join(", ")} per user per month, GST extra (${paid.map((p) => money(p.monthly, "USD")).join(", ")} outside India), a ${TRIAL_DAYS}-day trial with no card, yearly plans, and a 14-day money-back guarantee.`} structuredData={[offerCatalog]}>
   <div class="pricing-root">
     <section class="page pt-16 text-center sm:pt-20" aria-labelledby="pricing">
       <p class="eyebrow">Pricing</p>
-      <h1 id="pricing" class="display mx-auto mt-4 max-w-3xl">Per seat. Every price shown is the price you pay.</h1>
-      <p class="lede mx-auto mt-6 max-w-2xl">Start with a {TRIAL_DAYS}-day trial, no card needed. Pick a plan when you are ready; add seats as your team grows.</p>
+      <h1 id="pricing" class="display mx-auto mt-4 max-w-3xl">Per user, per month. Every price shown is the price you pay.</h1>
+      <p class="lede mx-auto mt-6 max-w-2xl">Start with a {TRIAL_DAYS}-day trial, no card needed. Pick a plan when you are ready; add users as your team grows. In India: prices in rupees, GST extra.</p>
+      <div class="mt-8"><CurrencySwitch /></div>
       {HAS_YEARLY && (
         <fieldset class="interval-switch mx-auto mt-10 inline-flex rounded-xl border border-border bg-card p-1 shadow-elevation-1">
           <legend class="sr-only">Billing interval</legend>
@@ -80,14 +87,14 @@ const offerCatalog = {
             <p class="mt-2 min-h-[3rem] text-sm leading-relaxed text-muted-foreground">{p.for}</p>
             <div class="mt-6">
               {p.monthly === 0 ? (
-                <p><span class="figure text-4xl font-semibold">$0</span> <span class="text-sm text-muted-foreground">for {TRIAL_DAYS} days</span></p>
+                <p><span class="figure text-4xl font-semibold"><span class="cur-inr">₹0</span><span class="cur-usd">$0</span></span> <span class="text-sm text-muted-foreground">for {TRIAL_DAYS} days</span></p>
               ) : (
                 <>
-                  <p class="price-month"><span class="figure text-4xl font-semibold">{dollars(p.monthly)}</span> <span class="text-sm text-muted-foreground">per seat / month, billed monthly</span></p>
-                  {p.yearly !== null ? (
-                    <p class="price-year"><span class="figure text-4xl font-semibold">{dollars(p.yearly)}</span> <span class="text-sm text-muted-foreground">per seat / year, billed yearly</span></p>
+                  <p class="price-month"><Price amounts={p.month} class="figure text-4xl font-semibold" /> <span class="text-sm text-muted-foreground">per user / month, billed monthly<span class="cur-inr">, GST extra</span></span></p>
+                  {p.year.INR !== null || p.year.USD !== null ? (
+                    <p class="price-year"><Price amounts={p.year} class="figure text-4xl font-semibold" /> <span class="text-sm text-muted-foreground">per user / year, billed yearly<span class="cur-inr">, GST extra</span></span></p>
                   ) : (
-                    <p class="price-year text-sm leading-relaxed text-muted-foreground"><span class="figure text-4xl font-semibold text-foreground">{dollars(p.monthly)}</span> per seat / month. Yearly by agreement: <a class="link" href={enterpriseYearlyMail}>email us</a>.</p>
+                    <p class="price-year text-sm leading-relaxed text-muted-foreground"><Price amounts={p.month} class="figure text-4xl font-semibold text-foreground" /> per user / month. Yearly by agreement: <a class="link" href={enterpriseYearlyMail}>email us</a>.</p>
                   )}
                 </>
               )}
@@ -103,8 +110,8 @@ const offerCatalog = {
           </article>
         ))}
       </div>
-      <p class="mt-6 text-center text-sm text-muted-foreground">Prices exclude taxes; {SITE.merchantOfRecord}, our merchant of record, calculates and collects tax at checkout.</p>
-      <p class="mt-1 text-center text-sm text-muted-foreground">Enterprise is per seat and self-serve, like every plan. A yearly Enterprise agreement is arranged <a class="link" href={enterpriseYearlyMail}>by email</a>.</p>
+      <p class="mt-6 text-center text-sm text-muted-foreground">Prices exclude taxes: in India 18% GST is added at checkout, and you can give your GSTIN there. {SITE.merchantOfRecord}, our merchant of record, calculates and collects the tax and issues the invoice.</p>
+      <p class="mt-1 text-center text-sm text-muted-foreground">Enterprise is per user and self-serve, like every plan. A yearly Enterprise agreement is arranged <a class="link" href={enterpriseYearlyMail}>by email</a>.</p>
     </section>
 
     <section class="page mt-16" aria-labelledby="trial">
@@ -132,8 +139,8 @@ const offerCatalog = {
           <tbody>
             <tr class="border-b border-border bg-muted/50"><th scope="rowgroup" colspan={PLANS.length + 1} class="px-5 py-2.5 font-mono text-xs uppercase tracking-wider text-muted-foreground">Price</th></tr>
             <tr class="border-b border-border">
-              <th scope="row" class="px-5 py-3 font-medium">Per seat</th>
-              {PLANS.map((p) => <td class="px-5 py-3 figure">{p.monthly ? `${dollars(p.monthly)} / month` : `$0 for ${TRIAL_DAYS} days`}{p.yearly ? <span class="block text-xs text-muted-foreground">or {dollars(p.yearly)} / year</span> : null}</td>)}
+              <th scope="row" class="px-5 py-3 font-medium">Per user</th>
+              {PLANS.map((p) => <td class="px-5 py-3 figure">{p.monthly ? <><Price amounts={p.month} /> / month</> : <><span class="cur-inr">₹0</span><span class="cur-usd">$0</span> for {TRIAL_DAYS} days</>}{p.year.INR !== null || p.year.USD !== null ? <span class="block text-xs text-muted-foreground">or <Price amounts={p.year} /> / year</span> : null}</td>)}
             </tr>
             <tr class="border-b border-border bg-muted/50"><th scope="rowgroup" colspan={PLANS.length + 1} class="px-5 py-2.5 font-mono text-xs uppercase tracking-wider text-muted-foreground">Allowances</th></tr>
             {allowanceKeys.map((key) => (
@@ -169,12 +176,16 @@ const offerCatalog = {
 
     <section id="add-ons" class="page mt-20 scroll-mt-24" aria-labelledby="addons-title">
       <h2 id="addons-title" class="h2">Add-ons</h2>
-      <p class="lede mt-3 max-w-2xl">Extras you add to a plan. One price for the whole organization, not per seat, billed monthly on its own.</p>
+      <p class="lede mt-3 max-w-2xl">Extras you add to a plan. One price for the whole organization, not per user, billed monthly or yearly on its own.</p>
       <div class="mt-8 grid gap-5 md:grid-cols-3">
         {ADDONS.map((a) => (
           <article class="sheet flex flex-col p-7" aria-labelledby={`addon-${a.key.replace(".", "-")}`} data-addon={a.key}>
             <h3 id={`addon-${a.key.replace(".", "-")}`} class="text-lg font-semibold">{a.name}</h3>
-            <p class="mt-3"><span class="figure text-3xl font-semibold">{dollars(a.monthly)}</span> <span class="text-sm text-muted-foreground">a month for the organization</span></p>
+            {a.sold ? (
+              <p class="mt-3"><Price amounts={a.month} class="figure text-3xl font-semibold" missing="Not sold in rupees" /> <span class="text-sm text-muted-foreground">a month for the organization</span>{a.year.INR !== null || a.year.USD !== null ? <span class="block text-sm text-muted-foreground">or <Price amounts={a.year} missing="—" /> a year</span> : null}</p>
+            ) : (
+              <p class="mt-3 text-sm font-semibold">Included in {list(a.includedIn.map((p) => p.name))}</p>
+            )}
             <p class="mt-3 text-sm leading-relaxed text-muted-foreground">{a.words}</p>
             <ul class="mt-5 space-y-2 text-sm leading-relaxed">
               {a.includedIn.length > 0 && <li class="flex gap-2"><span class="text-success" aria-hidden="true">✓</span><span>Included in {list(a.includedIn.map((p) => p.name))}</span></li>}

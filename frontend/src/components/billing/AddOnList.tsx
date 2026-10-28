@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 
 import AskPlanOwners from "@/components/billing/AskPlanOwners";
-import { PurchaseAction, formatAddonPrice } from "@/components/billing/AddOnLockCard";
+import { PurchaseAction, addonPriceLine } from "@/components/billing/AddOnLockCard";
 import { HINT, SECTION_TITLE, SURFACE } from "@/components/ui/primitives";
 import { getOrganizationEntitlements } from "@/services/api/entitlements";
 import { entitlementKeys } from "@/services/api/queryKeys";
@@ -44,6 +44,7 @@ export const AddOnList: React.FC<{ readonly organizationId: string; readonly isO
   if (!data || data.addons.length === 0) {
     return null;
   }
+  const currency = data.default_currency ?? "USD";
   return (
     <section className={`${SURFACE} space-y-4 p-6`} aria-labelledby="addons-title" data-testid="billing-addons">
       <div>
@@ -69,8 +70,11 @@ export const AddOnList: React.FC<{ readonly organizationId: string; readonly isO
               <div className="min-w-0 max-w-prose space-y-1">
                 <p className="text-sm font-medium text-foreground">{addon.display_name}</p>
                 <p className={HINT}>{addon.description}</p>
-                {addon.state !== "ACTIVE" ? (
-                  <p className={HINT}>{formatAddonPrice(addon.monthly_price_micros, addon.currency)} a month</p>
+                {addon.state !== "ACTIVE" && (addon.prices ?? []).length > 0 ? (
+                  <p className={HINT}>{addonPriceLine(addon, currency)}</p>
+                ) : null}
+                {addon.state !== "ACTIVE" && (addon.prices ?? []).length === 0 && addon.included_in.length > 0 ? (
+                  <p className={HINT}>Included with {addon.included_in.join(" and ")}.</p>
                 ) : null}
               </div>
               <div className="space-y-2 text-right">
@@ -83,6 +87,7 @@ export const AddOnList: React.FC<{ readonly organizationId: string; readonly isO
                     addon={addon}
                     canPurchase={isOwner}
                     label={`Add ${addon.display_name}`}
+                    currency={currency}
                   />
                 ) : null}
               </div>

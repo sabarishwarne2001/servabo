@@ -70,6 +70,7 @@ _DISPLAY_NAMES = {
     entitlements.OBLIGATIONS_CAPABILITY: "Obligations and calendar feeds",
     # ARCH47-S1:capability-display
     entitlements.ERP_POSTING_CAPABILITY: "ERP posting",
+    entitlements.TALLY_FILE_CAPABILITY: "The Tally Prime import file",  # Final session 2A, N-187
     # ARCH48-S1:capability-display
     entitlements.COLLABORATIVE_REVIEW_CAPABILITY: "Real-time collaborative review",
     # ARCH49-S1:capability-display
@@ -89,6 +90,7 @@ _DISPLAY_NAMES = {
     # Session F
     entitlements.GST_CREDIT_CAPABILITY: "GST Credit: supplier and invoice lists, IMS recommendations, export",
     entitlements.GST_CREDIT_ALL_WORKSPACES_CAPABILITY: "GST Credit across every workspace",
+    entitlements.RECOVERIES_CAPABILITY: "Recoveries: money issues with an owner, closed only on evidence",
     # PHASE1:capability-display
     entitlements.BATCH_DISPATCH_CAPABILITY: "Batch operations and integrity-verified export packages",
     # PHASE2:capability-display

@@ -1,7 +1,8 @@
 /**
  * Campaign session 2: the operator's Background jobs console (platform superadmins).
  *
- *   Overview   what is waiting, running, retrying and dead, per job type, and the oldest wait
+ *   Overview   the server's safety jobs (Final session 2A: red when one is late), then what is waiting, running,
+ *              retrying and dead, per job type, and the oldest wait
  *   Dead       jobs that failed every attempt (the dead-letter queue): the error, the organization,
  *              and a retry that sends the job round again once the cause is fixed
  *
@@ -20,6 +21,8 @@ import { TabList, TabPanel, useUrlTab, type TabDefinition } from "@/components/u
 import { errorMessage } from "@/services/api/errors";
 import { getDeadJobs, getJobsSummary, platformJobKeys, retryDeadJob } from "@/services/api/platformJobs";
 import { formatNumber, formatTimestamp } from "@/utils/displayTime";
+
+import { SafetyJobsPanel } from "./SafetyJobsPanel";
 
 type Tab = "overview" | "dead";
 const TABS: readonly TabDefinition<Tab>[] = [
@@ -92,6 +95,7 @@ const JobsConsole: React.FC = () => {
       <TabList label="Background jobs" idBase="jobs" tabs={TABS} value={tab} onChange={setTab} />
 
       <TabPanel idBase="jobs" id={tab} className="space-y-6">
+      {tab === "overview" ? <SafetyJobsPanel /> : null}
       {summary.isLoading ? <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading…</div> : null}
       {summary.isError ? <p role="alert" className="text-sm text-destructive">{errorMessage(summary.error, "The job summary could not be loaded.")}</p> : null}
 

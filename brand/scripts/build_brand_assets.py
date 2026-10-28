@@ -244,6 +244,29 @@ def png(svg: str, size: int, path: Path, *, width: int | None = None, height: in
                      output_width=width or size, output_height=height or size)
 
 
+#: The email logo: 40 px tall on the page (three times that in the file), with 4 px of panel around it.
+EMAIL_LOGO_HEIGHT, EMAIL_LOGO_PAD, EMAIL_SCALE = 40, 4, 3
+
+
+def email_logo(svg: str, path: Path, *, panel: bool) -> None:
+    from PIL import Image, ImageDraw
+
+    view_w = float(svg.split('viewBox="0 0 ', 1)[1].split(" ", 1)[0])
+    inner_h = EMAIL_LOGO_HEIGHT * EMAIL_SCALE
+    inner_w = round(inner_h * view_w / 32)
+    pad = EMAIL_LOGO_PAD * EMAIL_SCALE
+    buffer = path.with_suffix(".tmp.png")
+    png(svg, 0, buffer, width=inner_w, height=inner_h)
+    logo = Image.open(buffer).convert("RGBA")
+    canvas = Image.new("RGBA", (inner_w + 2 * pad, inner_h + 2 * pad), (255, 255, 255, 0))
+    if panel:
+        ImageDraw.Draw(canvas).rounded_rectangle((0, 0, canvas.width - 1, canvas.height - 1), radius=8 * EMAIL_SCALE,
+                                                 fill=(255, 255, 255, 255))
+    canvas.alpha_composite(logo, (pad, pad))
+    canvas.save(path, optimize=True)
+    buffer.unlink()
+
+
 def og_card(path: Path, *, dark: bool, headline: str, sub: str) -> None:
     """A 1200 x 630 Open Graph card: the logo, one headline and one line under it."""
     d, width, upm, cap = wordmark_paths()
@@ -330,6 +353,14 @@ def main() -> None:
         png(mark, 180, public / "apple-touch-icon.png")
         png(mark, 192, public / "icon-192.png")
         png(mark, 512, public / "icon-512.png")
+
+    # Emails carry the logo as a picture inside the message (N-199; backend/app/templates/emails/inline_images.py),
+    # at three times its 40 px email height.
+    # The light one sits on its own white rounded panel, baked in: a client that darkens the card but ignores the
+    # stylesheet (Gmail's phone apps) still shows dark lettering on white. The dark one has the same size, transparent.
+    for suffix, ink in (("light", INK), ("dark", PAPER)):
+        email_logo(logo_svg(text=ink), ROOT / f"backend/app/templates/emails/assets/servabo-logo-{suffix}.png",
+                   panel=suffix == "light")
 
     # The browser tests upload a real PNG as a sample image document and as an organization logo.
     png(mark, 256, ROOT / "frontend/e2e/support/servabo-mark.png")

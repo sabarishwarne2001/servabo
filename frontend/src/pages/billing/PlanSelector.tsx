@@ -77,7 +77,9 @@ export const PlanSelector: React.FC<PlanSelectorProps> = ({
   const [seats, setSeats] = useState<number>(Math.max(currentSeats, floor));
   const [confirming, setConfirming] = useState(false);
   const [interval, setBillingInterval] = useState<"month" | "year">("month");
-  const [currency, setCurrency] = useState<"USD" | "INR">("USD");
+  // Final session 2A (N-187): the server says which currency this organization sees first (rupees for an Indian
+  // organization); a choice made here wins.
+  const [chosenCurrency, setCurrency] = useState<"USD" | "INR" | null>(null);
   const [promoCode, setPromoCode] = useState("");
   const [promoQuote, setPromoQuote] = useState<PromoQuote | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
@@ -101,6 +103,8 @@ export const PlanSelector: React.FC<PlanSelectorProps> = ({
 
   const hasPriceBooks = plans.some((plan) => (plan.prices ?? []).length > 0);
   const currencies = Array.from(new Set(plans.flatMap((plan) => (plan.prices ?? []).map((p) => p.currency))));
+  const serverDefault = data?.default_currency === "INR" ? "INR" : "USD";
+  const currency: "USD" | "INR" = chosenCurrency ?? (currencies.includes(serverDefault) ? serverDefault : "USD");
   const priceFor = (plan: PlanOption): PlanPriceOption | null =>
     (plan.prices ?? []).find((p) => p.interval === interval && p.currency === currency) ?? null;
 
@@ -477,6 +481,17 @@ export const PlanSelector: React.FC<PlanSelectorProps> = ({
             </div>
           )}
 
+          {!selectedIsFree && (
+            <MandateNotice
+              price={hasPriceBooks ? priceFor(selected) : null}
+              seats={seats}
+              limitMinor={data?.india_mandate_limit_minor ?? 1_500_000}
+              gstPercent={data?.india_gst_rate_percent ?? 18}
+              yearlyAvailable={(selected.prices ?? []).some((p) => p.interval === "year" && p.currency === currency)}
+              onChooseYearly={() => { setBillingInterval("year"); setPromoQuote(null); setConfirming(false); }}
+            />
+          )}
+
           {checkoutError && (
             <p role="alert" className="text-sm text-destructive">
               {checkoutError}
@@ -669,6 +684,40 @@ const PlanFeatureList: React.FC<{ readonly plan: PlanOption; readonly previous: 
  * a published price, Enterprise included; a tier without one is a deployment
  * that has not configured its gateway product yet, and says exactly that.
  */
+/**
+ * Final session 2A (N-187 rule 8). Indian cards and UPI pay a subscription through an e-mandate, and Indian banks ask
+ * the customer to approve each automatic payment above ₹15,000. When a monthly rupee total including GST is above it,
+ * say so in one line before checkout and offer yearly (one approval a year). Read from Dodo's India payment page
+ * (docs.dodopayments.com, features/payment-methods/india, through search extracts on 2026-10-26).
+ */
+export const MandateNotice: React.FC<{
+  price: PlanPriceOption | null;
+  seats: number;
+  limitMinor: number;
+  gstPercent: number;
+  yearlyAvailable: boolean;
+  onChooseYearly: () => void;
+}> = ({ price, seats, limitMinor, gstPercent, yearlyAvailable, onChooseYearly }) => {
+  if (!price || price.currency !== "INR" || price.interval !== "month") {return null;}
+  const totalMinor = Math.round((price.unit_amount * seats * (100 + gstPercent)) / 100);
+  if (totalMinor <= limitMinor) {return null;}
+  const rupees = (minor: number): string => numberFormat({ style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(minor / 100);
+  return (
+    <p className="flex flex-wrap items-start gap-1.5 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-900 dark:text-amber-200"
+       data-testid="india-mandate-notice">
+      <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" aria-hidden />
+      <span>
+        Your monthly total with GST is {rupees(totalMinor)}. Indian banks ask you to approve each automatic payment above{" "}
+        {rupees(limitMinor)}, so your bank will ask you every month.
+        {yearlyAvailable ? " Paying yearly needs one approval a year." : ""}
+      </span>
+      {yearlyAvailable ? (
+        <button type="button" className="font-semibold underline" onClick={onChooseYearly}>Pay yearly instead</button>
+      ) : null}
+    </p>
+  );
+};
+
 /** ARCH50-S2:plan-prices. A plan's price for the chosen interval and currency from the plan price books. */
 function formatBookPrice(price: PlanPriceOption | null, interval: string, currency: string): string {
   if (price === null) {

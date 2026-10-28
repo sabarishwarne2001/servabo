@@ -41,6 +41,27 @@ def test_yearly_prices_are_the_seeds_and_enterprise_has_none() -> None:
     assert all(p["interval"] == "month" for p in plans["enterprise"]["prices"]), "Enterprise yearly is by agreement"
 
 
+def test_every_plan_price_in_every_currency_is_exported() -> None:
+    """Final session 2A (N-187): rupee and dollar prices, monthly and yearly, from the seed's one table."""
+    plans = {p["key"]: p for p in export.build()["plans"]}
+    for price in seed.PLAN_PRICES:
+        listed = {"interval": price["interval"], "currency": price["currency"],
+                  "unit_amount": price["unit_amount_micros"] // 10_000}
+        assert listed in plans[price["tier"]]["prices"], listed
+    assert {"interval": "month", "currency": "INR", "unit_amount": 149_900} in plans["developer"]["prices"]
+
+
+def test_the_add_ons_carry_their_prices_and_custom_domains_are_not_sold() -> None:
+    addons = {a["key"]: a for a in export.build()["addons"]}
+    gst = addons["addon.gst_credit"]
+    assert {"interval": "year", "currency": "INR", "unit_amount": 1_499_000} in gst["prices"]
+    assert {"interval": "month", "currency": "USD", "unit_amount": 4_900} in gst["prices"]
+    assert gst["sold_on"] == ["developer"]
+    domains = addons["addon.custom_domain"]
+    assert domains["prices"] == [] and domains["sold_on"] == []
+    assert domains["included_in"] == ["business", "enterprise"]
+
+
 def test_without_usage_billing_every_bill_overage_limit_is_a_hard_ceiling() -> None:
     document = export.build("DODO")
     assert document["billing"]["usage_billing"] is False
@@ -48,7 +69,8 @@ def test_without_usage_billing_every_bill_overage_limit_is_a_hard_ceiling() -> N
         for allowance in plan["allowances"]:
             assert allowance["overage_policy"] != "ALLOW_AND_BILL", (plan["key"], allowance)
     ocr = {p["key"]: next(a for a in p["allowances"] if a["key"] == "ocr.page") for p in document["plans"]}
-    assert ocr["business"] == {"key": "ocr.page", "limit_quantity": 40000, "period": "MONTH", "overage_policy": "REFUSE"}
+    # N-187 (Final session 2A): 6,000 pages a Business seat (was 40,000), sized for the rupee prices.
+    assert ocr["business"] == {"key": "ocr.page", "limit_quantity": 6000, "period": "MONTH", "overage_policy": "REFUSE"}
 
 
 def test_with_usage_billing_the_seed_policies_stand() -> None:

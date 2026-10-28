@@ -587,6 +587,14 @@ const CounterpartyRow: React.FC<{ readonly row: HelmCounterparty; readonly writa
     },
     onError: (error) => toast.error(errorMessage(error, "Helm could not save this.")),
   });
+  const confirmContact = useMutation({
+    mutationFn: (email: string) => updateHelmCounterparty(organizationId, book.id, row.id, { contact_email: email }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: helmKeys.counterparties(organizationId, book.id) });
+      toast.success("Confirmed. Helm and GST reminders may now email this address.");
+    },
+    onError: (error) => toast.error(errorMessage(error, "Helm could not save this.")),
+  });
   const confirmed = row.msme_source === "PERSON" ? row.msme_category ?? "" : "";
   return (
     <tr className="helm-hairline border-t">
@@ -596,6 +604,32 @@ const CounterpartyRow: React.FC<{ readonly row: HelmCounterparty; readonly writa
       </th>
       <td className="py-2 pr-3 text-xs">{row.role === "SUPPLIER" ? "Supplier" : row.role === "CUSTOMER" ? "Customer" : "Both"}</td>
       <td className="py-2 pr-3 text-xs">{row.msme_label}</td>
+      <td className="py-2 pr-3 text-xs" data-testid="counterparty-email">
+        {row.contact_email ? (
+          <>
+            <span className="helm-figure block break-all">{row.contact_email}</span>
+            {row.contact_confirmed ? (
+              <span className="helm-muted">Confirmed</span>
+            ) : (
+              <>
+                <span className="helm-muted block">Read from a document. Not emailed until you confirm it.</span>
+                {writable ? (
+                  <button
+                    type="button"
+                    className="helm-btn mt-1 h-7 min-h-0 px-2 text-xs"
+                    disabled={confirmContact.isPending}
+                    onClick={() => confirmContact.mutate(row.contact_email ?? "")}
+                  >
+                    Use this address for {row.name}
+                  </button>
+                ) : null}
+              </>
+            )}
+          </>
+        ) : (
+          <span className="helm-muted">None</span>
+        )}
+      </td>
       <td className="py-2">
         {row.role !== "CUSTOMER" ? (
           <label>
@@ -656,7 +690,8 @@ export const HelmSettings: React.FC = () => {
         </h2>
         <p className="helm-muted mt-1 text-xs">
           Confirm which suppliers are micro or small enterprises: Helm pays them within the legal limit (MSMED Act section
-          15). A supplier whose category is not confirmed is treated as micro or small, to be safe.
+          15). A supplier whose category is not confirmed is treated as micro or small, to be safe. An email address read from
+          an invoice is never written to until you confirm it: a document can print any address.
         </p>
         {suppliers.length === 0 ? (
           <p className="mt-3 text-sm">None yet. They appear as Helm reads your invoices.</p>
@@ -668,6 +703,7 @@ export const HelmSettings: React.FC = () => {
                   <th scope="col" className="py-1 pr-3">Name</th>
                   <th scope="col" className="py-1 pr-3">Role</th>
                   <th scope="col" className="py-1 pr-3">MSME status</th>
+                  <th scope="col" className="py-1 pr-3">Email</th>
                   <th scope="col" className="py-1">Confirm</th>
                 </tr>
               </thead>

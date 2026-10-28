@@ -87,7 +87,7 @@ export const CheckoutReturn: React.FC = () => {
               <CheckCircle2 className="mx-auto h-10 w-10 text-primary" aria-hidden="true" />
               <h1 className="mt-3 text-lg font-semibold">Payment confirmed</h1>
               <p className="mt-1.5 text-sm text-muted-foreground" data-testid="checkout-confirmed-plan">
-                You&apos;re on the {state.data?.plan_key ?? sub?.quota_tier_key} plan with {state.data?.seats_purchased}{" "}
+                You&apos;re on the {state.data?.plan_name ?? state.data?.plan_key ?? sub?.quota_tier_key} plan with {state.data?.seats_purchased}{" "}
                 {state.data?.seats_purchased === 1 ? "seat" : "seats"}. The receipt is under Billing → Invoices.
               </p>
             </>

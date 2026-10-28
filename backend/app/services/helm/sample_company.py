@@ -896,6 +896,8 @@ def _set_contact(db: Session, book: HelmBook, name: str, email: str) -> None:
     for row in db.execute(select(HelmCounterparty).where(HelmCounterparty.book_id == book.id,
                                                          HelmCounterparty.display_name == name)).scalars():
         row.contact_email = email
+        # The sample company's contacts are set up as if its owner had typed them (N-195), so its demo can send.
+        row.contact_source = "PERSON"
     db.flush()
 
 

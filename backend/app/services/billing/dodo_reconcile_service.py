@@ -158,11 +158,9 @@ def _addon_key_for(snapshot: DodoSubscriptionSnapshot) -> Optional[str]:
                 f"{declared!r}."
             )
         return str(declared)
-    if snapshot.product_id:
-        for key, offer in entitlement_service.ADDON_CATALOG.items():
-            if getattr(settings, offer.product_setting, None) == snapshot.product_id:
-                return key
-    return None
+    # N-187: an add-on is sold at several prices (dollars and rupees, monthly and yearly), each its own product.
+    found = entitlement_service.addon_for_product(snapshot.product_id)
+    return found[0] if found is not None else None
 
 
 def _tier_key_for(db: Session, snapshot: DodoSubscriptionSnapshot) -> str:

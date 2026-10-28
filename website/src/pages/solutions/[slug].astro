@@ -4,7 +4,7 @@ import PlanBadge from "../../components/PlanBadge.astro";
 import ClosingCta from "../../components/ClosingCta.astro";
 import engines from "../../data/engines.json";
 import { SOLUTIONS, type Solution } from "../../data/solutions";
-import { dollars, lowestPlanWith, PLANS } from "../../lib/pricing";
+import { money, lowestPlanWith, PLANS } from "../../lib/pricing";
 
 export function getStaticPaths() {
   return SOLUTIONS.map((solution) => ({ params: { slug: solution.slug }, props: { solution } }));
@@ -87,7 +87,7 @@ const recommended = used
       ))}
     </ul>
     <p class="mt-6 text-muted-foreground">
-      Everything on this page is included in <strong class="text-foreground">{recommended.name}</strong>, {dollars(recommended.monthly)} per seat per month.
+      Everything on this page is included in <strong class="text-foreground">{recommended.name}</strong>, {money(recommended.month.INR ?? 0, "INR")} per user per month, GST extra ({money(recommended.monthly, "USD")} outside India).
       <a href="/pricing" class="link">Compare plans</a>
     </p>
   </section>

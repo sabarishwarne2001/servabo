@@ -26,6 +26,17 @@ _INJECTION_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("exfiltration", re.compile(r"\b(list|show|reveal|summari[sz]e)\s+(every|all)\s+"
                                 r"(document|file|workspace|tenant)", re.I)),
     ("delimiter", re.compile(r"\[/?INST\]|<\|im_(start|end)\|>|###\s*(system|instruction)", re.I)),
+    # Final session 2A (Phase 3): the same override in Hindi ("ignore all previous instructions").
+    ("override", re.compile(r"(पिछले|पहले\s+के|ऊपर\s+के)\s+(सभी\s+)?निर्देश\S*\s+(को\s+)?(अनदेखा|नज़रअंदाज़|नजरअंदाज)")),
+    # Final session 2A (Phase 3): a document commanding a money decision. Phrased as orders, so an ordinary invoice's
+    # "please pay within 30 days to the account below" does not match.
+    ("finance_action", re.compile(r"\bmark\s+(this|the|that|all)\s+(tds\s+)?(invoice|invoices|bill|credit|payment)s?\s+"
+                                  r"(as\s+)?(paid|settled|confirmed|received)\b", re.I)),
+    ("finance_action", re.compile(r"\b(stop|pause|disable|cancel)\s+(all\s+)?(the\s+)?(payment\s+|gst\s+)?reminders\b", re.I)),
+    ("finance_action", re.compile(r"\b(approve|release|pay)\s+(this|the)\s+(invoice|payment|bill)\s+"
+                                  r"(automatically|immediately|without\s+(review|approval|checking))\b", re.I)),
+    ("finance_action", re.compile(r"\b(change|update|replace)\s+(the\s+)?(supplier'?s?\s+|vendor'?s?\s+|our\s+)?bank\s+"
+                                  r"(account|details)\s+(to|with)\b", re.I)),
 )
 
 

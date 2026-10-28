@@ -302,9 +302,16 @@ def load(db: Session, workspace_id: uuid.UUID, source_kind: str, source_id: uuid
 
 
 def eligible(db: Session, workspace_id: uuid.UUID, *, since: Optional[datetime] = None,
-             kinds: Sequence[str] = v.SOURCE_KINDS, limit: int = 200) -> list[Outcome]:
-    """Approved outcomes (newest first), optionally approved at or after `since` (the auto-post horizon)."""
-    from app.models.cases import Case
+             kinds: Sequence[str] = v.SOURCE_KINDS, limit: int = 200, for_auto: bool = False) -> list[Outcome]:
+    """Approved outcomes (newest first), optionally approved at or after `since` (the auto-post horizon).
+
+    `for_auto` (N-197, Final session 2A): what auto-post may post. A case that completed while it holds a document an
+    outside party uploaded (a supplier, through a request link) waits for a person: it is posted by hand, or
+    automatically once a person closes it."""
+    from sqlalchemy import exists
+
+    from app.models.cases import Case, CaseDocument
+    from app.services.cases import vocabulary as case_v
     from app.models.procurement import ProcurementCase
     from app.models.tables import ExtractedTable
 
@@ -328,6 +335,9 @@ def eligible(db: Session, workspace_id: uuid.UUID, *, since: Optional[datetime] 
                                                      Case.completed_at.is_not(None))
         if since:
             q = q.where(Case.completed_at >= since)
+        if for_auto:
+            outside = exists().where(CaseDocument.case_id == Case.id, CaseDocument.source == case_v.SOURCE_REQUEST)
+            q = q.where((Case.status == case_v.CASE_CLOSED) | ~outside)
         found += [(at or epoch, v.SOURCE_CASE, i) for i, at in db.execute(q.limit(limit)).all()]
     out = []
     for _, kind, ident in sorted(found, key=lambda x: x[0], reverse=True)[:limit]:

@@ -11,6 +11,15 @@ from pydantic import BaseModel, Field
 AddonState = Literal["ACTIVE", "GRACE", "LAPSED", "NOT_GRANTED"]
 
 
+class AddonPriceOption(BaseModel):
+    """One price an add-on is sold at (Final session 2A, N-187)."""
+
+    currency: Literal["USD", "INR"]
+    interval: Literal["month", "year"]
+    unit_amount: int = Field(description="Minor units (cents or paise).")
+    purchasable: bool = Field(description="True when its gateway product is configured on this deployment.")
+
+
 class AddonAccessResponse(BaseModel):
     addon_key: str
     display_name: str
@@ -28,8 +37,10 @@ class AddonAccessResponse(BaseModel):
     can_maintain: bool
     live_resource_count: int
     halt_effect: str
-    monthly_price_micros: int
+    monthly_price_micros: int = Field(description="The dollar monthly price; 0 when the add-on is not sold in dollars "
+                                                  "monthly (custom domains are sold to nobody since N-187).")
     currency: str
+    prices: list[AddonPriceOption] = Field(default_factory=list, description="N-187. Every price it is sold at.")
     purchasable: bool = Field(
         description="True when an owner can buy this add-on self-serve right now."
     )
@@ -40,7 +51,7 @@ class AddonAccessResponse(BaseModel):
     sold_on: list[str] = Field(
         default_factory=list,
         description=(
-            "Plans that may buy this add-on, when it is sold on particular plans only (GST Credit: Developer). "
+            "Plans that may buy this add-on, when it is sold on particular plans only (GST Credit: Starter). "
             "Empty: any plan that does not already include it."
         ),
     )
@@ -49,6 +60,8 @@ class AddonAccessResponse(BaseModel):
 class OrganizationEntitlementsResponse(BaseModel):
     organization_id: uuid.UUID
     as_of: datetime
+    default_currency: Literal["USD", "INR"] = Field(
+        default="USD", description="N-187. The currency this organization sees prices in first (INR for India).")
     addons: list[AddonAccessResponse]
     # ARCH35-S1:capabilities-listed. `useCapabilityAccess` has always read this
     # field; until ARCH-35 it did not exist, so every capability-gated page
@@ -66,4 +79,4 @@ class OrganizationEntitlementsResponse(BaseModel):
     )
 
 
-__all__ = ["AddonAccessResponse", "AddonState", "OrganizationEntitlementsResponse"]
+__all__ = ["AddonAccessResponse", "AddonPriceOption", "AddonState", "OrganizationEntitlementsResponse"]

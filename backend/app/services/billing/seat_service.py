@@ -396,9 +396,13 @@ def seat_price_disclosure(
         tier_key=subscription.quota_tier_key,
     )
 
-    if entry is None:
-        unit_price: Optional[int] = None
-        unit: Optional[str] = None
+    billed = billed_seat_price(db, subscription)
+    if billed is not None:
+        # N-187: the billed product's price (rupees or yearly), which is what Dodo charges per seat.
+        unit_price, unit, price_source = billed[0], f"seat per {billed[2]}", PRICE_SOURCE_BOOK
+    elif entry is None:
+        unit_price = None
+        unit = None
         price_source = PRICE_SOURCE_UNPRICED
         logger.error(
             "billing.seat_disclosure_unpriced",
@@ -443,14 +447,20 @@ def seat_price_disclosure(
             # resolved the product any other way could quote a number
             # for a different plan than the one the write would move
             # the customer to, which is worse than quoting nothing.
-            tier = db.get(QuotaTier, subscription.quota_tier_id)
-            if tier is None or not tier.gateway_price_id:
+            from app.services.billing import currency as currency_service
+
+            # F-627: the product the write uses (the one billed now), so the preview quotes the same change.
+            product_id = currency_service.billed_product_id(subscription)
+            if not product_id:
+                tier = db.get(QuotaTier, subscription.quota_tier_id)
+                product_id = tier.gateway_price_id if tier is not None else None
+            if not product_id:
                 raise LookupError(
                     "tier has no gateway price id; nothing to preview"
                 )
             dodo_preview = _dodo.get_dodo_gateway().preview_change_plan(
                 subscription_id=subscription.gateway_subscription_id,
-                product_id=tier.gateway_price_id,
+                product_id=product_id,
                 quantity=after,
                 # The SAME mode the write will use. Previewing
                 # `prorated_immediately` and then writing whatever the
@@ -505,7 +515,7 @@ def seat_price_disclosure(
         seats_after=after,
         unit_price_micros=unit_price,
         unit=unit,
-        currency=(entry_currency(db, subscription) if entry is not None else "USD"),
+        currency=(billed[1] if billed is not None else entry_currency(db, subscription) if entry is not None else "USD"),
         price_book_id=subscription.price_book_id if entry is not None else None,
         price_book_version=(
             subscription.price_book.version
@@ -519,6 +529,25 @@ def seat_price_disclosure(
         period_start=period_start,
         period_end=period_end,
     )
+
+
+def billed_seat_price(db: Session, subscription: Subscription) -> Optional[tuple[int, str, str]]:
+    """What one seat costs on the product the gateway bills this subscription on: (micros, currency, interval), or None.
+
+    Final session 2A (N-187): a Dodo subscription may be billed in rupees or yearly, and Dodo charges the product's
+    price, not the dollar seat entry of the usage price book. None when it cannot be read (not Dodo, the gateway
+    unreachable, an unknown product); the caller then falls back to the price book."""
+    if str(subscription.gateway or "").upper() != "DODO":
+        return None
+    from app.services.billing import currency as currency_service
+    from app.services.revops import price_books
+
+    try:
+        price = price_books.price_of_product(db, currency_service.billed_product_id(subscription))
+    except Exception:  # noqa: BLE001 - a quote falls back to the price book rather than failing
+        logger.warning("billing.billed_seat_price_unavailable", extra={"subscription_id": str(subscription.id)})
+        return None
+    return (int(price.unit_amount_micros), price.currency, price.interval) if price is not None else None
 
 
 def entry_currency(db: Session, subscription: Subscription) -> str:
@@ -643,15 +672,22 @@ def _write_seats_at_gateway(
         from app.models.quota_tier import QuotaTier
         from app.services.billing.payment_gateway import get_payment_gateway
 
-        tier = db.get(QuotaTier, subscription.quota_tier_id)
-        if tier is None or not tier.gateway_price_id:
+        from app.services.billing import currency as currency_service
+
+        # F-627 (Final session 2A): the product the subscription is billed on now (its currency and interval), not the
+        # plan's dollar monthly product, which would have moved a rupee or yearly subscriber onto dollar monthly.
+        product_id = currency_service.billed_product_id(subscription)
+        if not product_id:
+            tier = db.get(QuotaTier, subscription.quota_tier_id)
+            product_id = tier.gateway_price_id if tier is not None else None
+        if not product_id:
             raise SeatError(
                 f"Subscription {subscription.id} is pinned to a tier with no gateway "
                 "price id; the seat count cannot be changed at the gateway."
             )
         dodo_snapshot = get_payment_gateway(subscription.gateway).set_subscription_seats(
             subscription_id=subscription.gateway_subscription_id,
-            product_id=tier.gateway_price_id,
+            product_id=product_id,
             seats=seats,
             proration_mode=str(settings.BILLING_DODO_SEAT_PRORATION_MODE),
         )
@@ -734,11 +770,13 @@ def set_purchased_seats(
 
     current = int(subscription.seats_purchased)
     if seats > current and confirmed_unit_price_micros is not None:
-        entry = invoice_service.seat_price_entry(
+        billed = billed_seat_price(db, subscription)
+        entry = None if billed is not None else invoice_service.seat_price_entry(
             db, price_book_id=subscription.price_book_id, tier_key=subscription.quota_tier_key
         )
-        if entry is not None:
-            unit = int(Decimal(str(entry.unit_price_micros)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+        if billed is not None or entry is not None:
+            unit = billed[0] if billed is not None else int(
+                Decimal(str(entry.unit_price_micros)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
             if unit != int(confirmed_unit_price_micros):
                 raise SeatPriceChangedError(
                     "The seat price changed since it was shown. Review the new price and confirm again."

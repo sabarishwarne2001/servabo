@@ -128,8 +128,13 @@ def evaluate(
     if _at_least(workspace_role, WorkspaceRole.CONTRIBUTOR):
         note = None
         if not gst_gate.full_access(db, workspace):
+            from app.core import entitlements as _entitlements
+            from app.services.billing import entitlement_service as _addons
+
+            # N-187: the plan that sells the add-on by its customer-facing name ("Starter"), from the published plans.
+            sold_on = " or ".join(_addons.sold_on(db, _entitlements.GST_CREDIT_ADDON)) or "Starter"
             note = ("Your plan shows the headline figures from a GSTR-2B. The supplier and invoice lists, the portal recommendations and the "
-                    "export come with Business, or with the GST Credit add-on on Developer.")
+                    f"export come with Business, or with the GST Credit add-on on {sold_on}.")
         add("gst", "Import a GSTR-2B and see which suppliers have not reported your invoices", tick_gst(db, workspace.id), note)
     if organization_role in HELM_ROLES:
         note = None
@@ -147,4 +152,8 @@ def evaluate(
     money = None
     if organization_role in HELM_ROLES:  # the roles that may read the value receipt (owner, admin, billing)
         money = first_money(db, organization.id)
+        if money is not None:
+            # Recoveries (N-191): the money step links to where found money is followed until it is recovered.
+            money = {**money, "follow_up": "recoveries" if capability_gate.has_capability(
+                db, organization_id=organization.id, capability_key=entitlements.RECOVERIES_CAPABILITY) else None}
     return {"steps": steps, "done": sum(1 for s in steps if s["done"]), "total": len(steps), "money": money}

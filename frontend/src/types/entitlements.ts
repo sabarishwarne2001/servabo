@@ -11,6 +11,14 @@ export type AddonKey = "addon.custom_domain" | "addon.warehouse_sync" | "addon.g
 
 export type AddonState = "ACTIVE" | "GRACE" | "LAPSED" | "NOT_GRANTED";
 
+/** Final session 2A (N-187): one price an add-on is sold at. `unit_amount` is in cents or paise. */
+export interface AddonPriceOption {
+  readonly currency: "USD" | "INR";
+  readonly interval: "month" | "year";
+  readonly unit_amount: number;
+  readonly purchasable: boolean;
+}
+
 export interface AddonAccess {
   readonly addon_key: AddonKey;
   readonly display_name: string;
@@ -26,14 +34,18 @@ export interface AddonAccess {
   readonly currency: string;
   readonly purchasable: boolean;
   readonly included_in: readonly string[];
-  /** Session H: plans that may buy it when it is sold on particular plans only (GST Credit: Developer). */
+  /** Session H: plans that may buy it when it is sold on particular plans only (GST Credit: Starter). */
   readonly sold_on: readonly string[];
+  /** N-187: every price it is sold at (empty: included in plans only, never sold, as custom domains). */
+  readonly prices?: readonly AddonPriceOption[];
 }
 
 export interface OrganizationEntitlements {
   readonly organization_id: string;
   readonly as_of: string;
   readonly addons: readonly AddonAccess[];
+  /** N-187: the currency this organization sees prices in first (INR for an Indian organization). */
+  readonly default_currency?: "USD" | "INR";
   /** ARCH35-S3:capabilities-typed. Tier-bundled capability keys held. */
   readonly capabilities: readonly string[];
   /** HM-S1: capability key -> display names of the published plans that include it. */

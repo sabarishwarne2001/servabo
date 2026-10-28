@@ -359,6 +359,13 @@ REGISTRY: dict[str, TableRule] = {
                        note="The record of what Helm proposed, who approved it and the amount."),
     "helm_value_events": _r(Kind.MONEY, Erasure.SCRUB, Sweep.DETACH, OrgPurge.KEEP, export="helm_value_events", links=(_WI,),
                             scrub={"evidence": {}}, note="The receipt's ledger of value found."),
+    # Final session 2A (N-191): Recoveries. The issue's title and details quote the document (a supplier, a number);
+    # the outcome is a money record like Helm's value events.
+    "recovery_issues": _r(Kind.MONEY, Erasure.SCRUB, Sweep.DETACH, OrgPurge.KEEP, export="recovery_issues", links=(_WI,),
+                          scrub={"title": "Erased document", "details": {}, "evidence": {}, "close_reason": None},
+                          note="An issue's state (owner, due date, a person's reason); the facts stay in the engines' tables."),
+    "recovery_outcomes": _r(Kind.MONEY, Erasure.SCRUB, Sweep.DETACH, OrgPurge.KEEP, export="recovery_outcomes", links=(_WI,),
+                            scrub={"evidence": {}}, note="Recovered, verified: the outcomes evidence proved, counted once."),
     "helm_tasks": _r(Kind.CONTENT, Erasure.SCRUB, Sweep.CASCADE, OrgPurge.CASCADE, why=_DERIVED_WHY, links=(_WI,),
                      scrub={"title": "Erased document", "body": "", "decision_note": None},
                      note="Helm's to-do notes quote the document."),
@@ -413,6 +420,8 @@ REGISTRY: dict[str, TableRule] = {
                note="Job payloads carry ids and the stored file key, not document text; finished jobs age out."),
     "monthly_receipt_sends": _r(Kind.MONEY, Erasure.KEEP, Sweep.NONE, OrgPurge.KEEP, why=_NO + "a send record: a period, a count"),
     "gst_notice_sends": _r(Kind.MONEY, Erasure.KEEP, Sweep.NONE, OrgPurge.KEEP, why=_NO + "a send record: a kind, a key, a count"),
+    "deletion_notice_sends": _r(Kind.MONEY, Erasure.KEEP, Sweep.NONE, OrgPurge.KEEP,
+                                why=_NO + "a send record: what was deleted, when, which warning, a count"),
 
     # ----------------------------------------------------------------- ERP
     "erp_targets": _secret("Holds the connection and its credentials."),
@@ -477,6 +486,7 @@ REGISTRY: dict[str, TableRule] = {
 
     # ----------------------------------------------------------------- Servabo's own operation
     "operator_alerts": _platform(), "server_error_minutes": _platform(), "dr_drills": _platform(), "dr_heartbeats": _platform(),
+    "safety_job_runs": _platform("Final session 2A: what the host's cron jobs last reported; no tenant data."),
     "slo_definitions": _platform(), "slo_measurements": _platform(), "slo_observations": _platform(),
     "price_books": _platform(), "price_book_entries": _platform(), "plan_price_books": _platform(), "plan_price_book_entries": _platform(),
     "quota_tiers": _platform(), "quota_tier_entries": _platform(), "platform_licences": _platform(), "promo_codes": _platform(),

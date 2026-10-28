@@ -556,6 +556,9 @@ jobs:
       - name: Accessibility in both themes, no sideways scroll, no console errors under the CSP
         run: npm run check:a11y
 
+      - name: Prices in rupees by default, dollars on the switch (N-187)
+        run: npm run check:pricing
+
       - name: Lighthouse at least 95 on home, pricing and Helm
         run: npm run check:lighthouse
 

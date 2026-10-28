@@ -177,13 +177,19 @@ def _entries(tiers: dict[str, Any], key: str) -> dict[str, dict[str, Any]]:
 
 
 def _price_table(seed: Any) -> str:
+    """Per plan, every price it is sold at (N-187: rupees for India, dollars for the world; monthly and yearly)."""
+    symbol = {"INR": "₹", "USD": "$"}
     rows = []
     for key in PLAN_ORDER:
-        terms = seed.COMMERCIALS[key]
-        amount = int(terms["unit_amount_micros"]) / 1_000_000
-        price = "$0" if amount == 0 else f"${amount:,.0f} per seat per {terms['billing_interval']}"
-        rows.append([seed.PLACEHOLDER_TIERS[key]["display_name"], price])
-    return _table(["Plan", "Price"], rows)
+        prices = sorted((p for p in seed.PLAN_PRICES if p["tier"] == key),
+                        key=lambda p: (p["currency"] != "INR", p["interval"] != "month"))
+        if not prices:
+            rows.append([seed.PLACEHOLDER_TIERS[key]["display_name"], "₹0 / $0"])
+            continue
+        words = "; ".join(f"{symbol[p['currency']]}{int(p['unit_amount_micros']) / 1_000_000:,.0f} per seat per "
+                          f"{p['interval']}" for p in prices)
+        rows.append([seed.PLACEHOLDER_TIERS[key]["display_name"], words])
+    return _table(["Plan", "Price (GST or other tax added by the merchant of record)"], rows)
 
 
 def _allowance_table(seed: Any) -> str:
@@ -258,10 +264,14 @@ def _addon_table(seed: Any) -> str:
         for plan in PLAN_ORDER:
             if key in _entries(tiers, plan):
                 cells.append("included")
-            elif plan == "free":
+            elif plan == "free" or not offer.sold or (offer.sold_on_tiers and plan not in offer.sold_on_tiers):
                 cells.append("—")
             else:
-                cells.append(f"${offer.monthly_price_micros / 1_000_000:,.0f}/month")
+                # N-187: every price it is sold at, rupees first (the target market).
+                symbol = {"INR": "₹", "USD": "$"}
+                ordered = sorted(offer.prices, key=lambda p: (p.currency != "INR", p.interval != "month"))
+                cells.append(" or ".join(f"{symbol[p.currency]}{p.amount_micros / 1_000_000:,.0f}/{p.interval}"
+                                         for p in ordered))
         rows.append([f"{offer.display_name} (`{key}`)", *cells])
     return _table(["Add-on", *[tiers[k]["display_name"] for k in PLAN_ORDER]], rows)
 

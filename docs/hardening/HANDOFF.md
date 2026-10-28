@@ -701,14 +701,19 @@ the R2 bucket, the mail login, Groq and Dodo, and `--send-test-email you@yourcom
 *Done when:* preflight says READY and `https://app.servabo.app/api/v1/health/ready` says ready.
 
 **Step 8 — Create the plans in Dodo (test mode) and publish them.**
-RUNBOOK §9.2 step 8: `dodo_setup.py --create-test-products` creates the five plan products and three
-add-ons (Session H added GST Credit) and prints eight lines for `.env.production`; then `dodo_setup.py` must say OK for all eight;
-then the two seed commands and the first administrator. *Done when:* signed in as a new user, the
-Billing page shows Developer $49, Business $299 and Enterprise $799 per seat.
+RUNBOOK §9.2 step 8: `dodo_setup.py --create-test-products` creates the **fifteen** products (Final session 2A, N-187):
+ten plan products (Starter, Business and Enterprise in dollars and in rupees, monthly and yearly; Enterprise monthly only)
+and five add-on products (GST Credit in both currencies, monthly and yearly; warehouse sync in dollars) and prints fifteen
+lines for `.env.production`; then `dodo_setup.py` must say OK for all fifteen; then the two seed commands and the first
+administrator. *Done when:* signed in as a new user whose workspace is in India's time zone, the Billing page opens in
+rupees and shows Starter ₹1,499, Business ₹4,999 and Enterprise ₹14,999 per user; switching the currency shows $49,
+$299 and $799.
 
 **Step 9 — Connect Dodo's webhooks and buy a plan with a test card.**
 RUNBOOK §9.2 step 9: add the webhook endpoint in Dodo (Test Mode), put its secret in
-`DODO_WEBHOOK_SECRET`, restart. Then, as a new customer, buy Developer with Dodo's test card.
+`DODO_WEBHOOK_SECRET`, restart. Then, as a new customer, buy Starter with Dodo's test card, and once more **in rupees**
+with Dodo's test UPI id (`success@upi`) or Indian test card, giving a GSTIN at checkout: check that Dodo's invoice shows
+that GSTIN and the CGST and SGST (or IGST) lines (N-193).
 *Done when:* back in Servabo the page says "Payment confirmed", Billing shows the plan and the
 invoice "issued by Dodo Payments", and its "Download invoice" opens Dodo's PDF. Also try: upgrade to
 Business (the amount shown is what is charged), a refund from Dodo's dashboard (the invoice says
@@ -719,16 +724,22 @@ end). Compare what you see with `docs/billing/DODO.md` §6 and note anything dif
 **Step 10 — Backups, scheduled jobs and monitoring (same day as step 7).**
 RUNBOOK §9.4 and §9.6: create `/etc/servabo/backup.key` and copy it into your password manager
 **now**; set `SERVABO_BACKUP_MIRROR_CMD` to copy backups to another provider; install the sweeper
-cron files; create the free Healthchecks.io checks (uptime, backup, restore drill, retention sweep)
-and set `ALERT_WEBHOOK`. Run one backup and one restore drill by hand. *Done when:* the drill
-prints its restore time and every Healthchecks.io check is green.
+cron files with `sudo /srv/servabo/backend/deploy/bin/servabo-install-host-jobs` (Final session 2A: it checks cron is
+running, installs the files, and proves each job can report to the app; set `SAFETY_JOB_REPORT_TOKEN` to the same value
+in `.env.production` and `/etc/servabo/sweepers.env` first); create the free Healthchecks.io checks (uptime, backup,
+restore drill, retention sweep) and set `ALERT_WEBHOOK`. Run one backup and one restore drill by hand. Then **stop cron
+on purpose** (`sudo systemctl stop cron`) and wait: the next day an email "Safety job stopped" (or "never reported")
+arrives at `OPERATOR_ALERT_EMAILS`, Platform admin, Background jobs, shows the jobs in red, and
+`/api/v1/health/ready` says `"safety_jobs": "degraded"` while the site stays up. Start cron again
+(`sudo systemctl start cron`). *Done when:* the install prints "Ready", the drill prints its restore time, every
+Healthchecks.io check is green, and the stopped-cron email arrived and cleared after cron restarted.
 
 **Step 11 — Go live with Dodo.**
 Only after step 4 says verified and step 9 worked. In Dodo, switch off Test Mode, create the same
-eight products in live mode (same prices: plan products per seat, recurring, tax not included), a
+fifteen products in live mode (same prices and currencies: plan products per seat, recurring, tax not included), a
 live webhook endpoint (same URL) and a live API key. In `.env.production`: the live key, the live
-webhook secret, the eight live product ids, `DODO_LIVEMODE=true`; restart, and run the seed commands
-again (step 8). Buy one seat of Developer with your own card, then refund it from Dodo's dashboard.
+webhook secret, the fifteen live product ids, `DODO_LIVEMODE=true`; restart, and run the seed commands
+again (step 8). Buy one seat of Starter in rupees with your own UPI or card, then refund it from Dodo's dashboard.
 *Done when:* your own live payment shows in Billing and the refund shows as "Refunded".
 
 **Step 12 — Before the first customer.**
@@ -1021,7 +1032,8 @@ _Decision N-189. Docs-only change; no code, no migration (head `tr1a2_review_out
 
 **What landed after the 2A prompt was written.**
 - **PR #39** redesigned the Documents and AI Assistant consoles (`docs/ui/documents-assistant-upgrade.md`; `GET …/work-items/counts`).
-  Its browser spec reused the number 122, and it wrote no campaign record.
+  Its browser spec reused the number 122, and it wrote no campaign record. **Closed in Final session 2A:** the spec is now
+  `139-premium-documents-assistant.spec.ts`; the counts row in COVERAGE.csv says what its test proves; FINDINGS has the record.
 - **PR #40, TRINETRA** (`docs/trinetra/`, N-188, F-619 to F-625): reviewed TDS evidence for invoices on which a customer withheld tax.
   It has four tables, 20 routes, a LIGHT job, a Helm annotation and reminder hold, a website page, and CI run 40282980125 and
   `main` #478 green. Live processing is off; customers see a synthetic preview.
@@ -1086,3 +1098,74 @@ has one: **Final session 2T**, `docs/sessions/FINAL-2T-TRINETRA.md`, run after 2
 wording (about an hour) and the owner sets the mode to "on". TCS, payroll TDS, filing, portal access and tax advice are out of scope on
 purpose. Final session 2A keeps only TRINETRA's plan row and copy and its existing paths in the injection map; its numbers start at
 N-191.
+
+## Final session 2A → Final session 2B (2026-10-27)
+
+Final session 2A (`docs/sessions/FINAL-2-UPGRADE.md`, PR
+[sabarishwarne2001/servabo#43](https://github.com/sabarishwarne2001/servabo/pull/43)) made Servabo sellable in India, made the
+safety jobs report and alert, mapped and tested prompt injection, and built the proof kit. Findings F-626 to F-636 and decisions
+N-191 to N-198 are in FINDINGS.md and NEEDS-OWNER.md; the injection map is `docs/hardening/PROMPT-INJECTION.md`; the commercial
+reading is `docs/product/COMMERCIAL-READINESS.md`. Everything below was proven in the cloud against **stand-ins** (a stand-in
+Dodo, a model stand-in, an SMTP catcher). **Nothing of it has met the real service.** Final session 2T (TRINETRA) runs before
+2B and adds its own section after this one. The live prompt (`docs/sessions/FINAL-2-LIVE.md`) has been rewritten to match.
+
+### 1. What Final session 2B must try for real
+
+| Feature | Settings | Turn it on locally | The stand-in that proved it here | A real success looks like |
+| --- | --- | --- | --- | --- |
+| **Rupee and yearly prices** (N-187; DODO.md, DODO-LOCAL-TEST.md journey I) | `GATEWAY_PRICE_ID_*` (with `_YEARLY`, `_INR`, `_YEARLY_INR`), `DODO_ADDON_PRODUCT_GST_CREDIT*`: fifteen products | `python scripts/dodo_setup.py --create-test-products`, paste the lines, `python scripts/dodo_setup.py` until all fifteen are OK; an organization whose workspace is in Asia/Kolkata | `tests/fakes/fake_dodo.py` (checkout, seat change, yearly, rupees; F-627, F-628); browser specs 32 and 137 | Billing in rupees; Business × 3 monthly quotes ₹17,696 with GST and shows the ₹15,000 approval note with yearly offered; Dodo's page offers UPI and RuPay and a tax ID pre-filled with the GSTIN; a fourth seat stays on the rupee product |
+| **The buyer's GSTIN and the tax split on Dodo's invoice** (N-193, OPEN) | none | Journey I, then open Dodo's invoice PDF | Nothing can stand in: Dodo's documentation does not say | Write down whether the invoice prints the buyer's GSTIN and splits CGST and SGST or IGST. If not, N-193 stays OPEN with what it shows: Indian buyers who claim input credit need the owner's own GST invoice |
+| **Custom domains only on Business and Enterprise** (N-187) | none | Organization → Branding & custom domains on a Starter, then a Business organization | `tests/api/test_starter_packaging.py`; the add-on lock card | Starter: "Custom domains come with Business and Enterprise", nothing to buy; Business: the domain form |
+| **Safety jobs report and alert** (RUNBOOK §9.6; N-194) | `SAFETY_JOB_REPORT_TOKEN` (the same in `.env.production` and `/etc/servabo/sweepers.env`), `SERVABO_PUBLIC_URL`, optional `ALERT_WEBHOOK`, `SAFETY_JOBS_UNWATCHED` (default: the three PITR jobs), `OPERATOR_ALERT_EMAILS` | The production rehearsal in WSL 2: `servabo-install-host-jobs`, then stop cron 20 minutes (the uptime job's 15-minute deadline) and run `handle_safety_jobs({})` in the worker | `tests/services/test_safety_jobs.py`, `tests/operational/test_install_host_jobs.py`, `test_host_cron_lines.py` (the wrappers against a fake report endpoint), the jobs console spec | The installer ends "Ready"; every job shows "install check"; the uptime job succeeds every minute; with cron stopped, one "Safety job stopped: Uptime heartbeat …" email (and webhook post), `/health/ready` `"safety_jobs": "degraded"` with 200; cron restarted clears it |
+| **Prompt injection through real models** (PROMPT-INJECTION.md) | `GROQ_API_KEY`; a BYOK key | Write the corpus's `injection` cases to a folder (FINAL-2-LIVE Phase 3 has the one-liner); an Enterprise organization with Helm in Act mode | Every model call stood in; `tests/engines/test_injection_corpus_live.py` counts every effect before and after; the six invariant tests | Nothing changes beyond ordinary processing; every document with the instruction is held for a person; no email to `exfil@attacker.example`; what each model answered is recorded |
+| **A learned address is a suggestion** (N-195, F-631) | none | Helm → Settings → Suppliers and customers, after an invoice with a supplier email | `test_learned_contact_needs_confirmation_live.py`, HelmSettings tests | The address shows with "Use this address for …"; no reminder goes until it is pressed; after it, the reminder arrives |
+| **A person decides every Helm payment** (N-196, F-633) | none | A mandate in Act mode | `tests/services/helm/test_guard.py`, `test_prompt_injection_no_money_moves_alone.py` | Act mode still asks before scheduling, approving, releasing a hold on or marking paid |
+| **Accuracy report** (Phase 5) | none | 30 to 50 real invoices in a fresh workspace and the filled truth sheet; `python scripts/accuracy_report.py --workspace <id> --truth truth.csv --out accuracy.md` before any correction | `tests/scripts/test_accuracy_report.py` (synthetic extractions) | A figure per field and for the key fields, the misses listed, how many wrong fields went to review; published in LIVE-VERIFICATION.md and COMMERCIAL-READINESS.md, never rounded up |
+| **Deletion warnings** (N-164) | the mail relay | Delete a throwaway workspace; `python scripts/e2e_stand_in.py run-job --job compliance.deletion_notices`, then again with `--now` 26 days later | `tests/api/test_deletion_notices.py` (fake relay, controlled clock) | Owners and admins get "… will be erased on <date>" once and "Last chance: …" once; Restore ends them; members get nothing |
+| **The real logo in every email** (N-199) | none | Any email in a real inbox (the verification email is the first) | `tests/templates/test_email_logo.py` (the header, the sent message's inline pictures); screenshots in Chromium, light and dark | The ribbon mark and "servabo" at the top, with no "load images?" prompt for it, in Gmail (web and phone), Outlook and Apple Mail; the light-lettered version in dark mode where the client supports it. In Gmail's phone app in dark mode, the logo on its small white panel (N-199) |
+| **Recoveries** (N-191; docs/product/RECOVERIES.md) | none (Business) | Documents → Recoveries, on the owner's real workspace and on the sample company | `tests/api/test_recoveries.py` (every closure rule, the double count, isolation, the Starter preview); browser spec 140 (a payment deadline on the sample company from Found to Verified, axe light and dark) | One real issue walked from Found to Verified on the owner's data (a GST invoice a later GSTR-2B carries, or a credit note against an overcharge); "Recovered, verified" on the receipt equals the issue's outcome; nothing counted for a "Not money" close |
+| **ERP auto-post and outside uploads** (N-197) | auto-post on a target | A case a supplier completes through a request link | `tests/api/test_erp_auto_post_outside_upload.py` | The case waits in the ERP console's "Ready" list for a person; closing it posts it |
+| **A zip in the global upload tray** | none | The upload button in the top bar, on a page other than Documents | Browser spec 138 | The tray shows one archive row, then every document read |
+| **The safety-job checks in `preflight.py --online`** | as above | `python scripts/preflight.py --online` against the rehearsal | `tests/scripts/test_preflight.py` | Late jobs named; none when all report |
+
+### 2. Commands Final session 2B can use
+
+All in `backend/`; development and test databases only, except where it says production.
+
+| Command | What it is for | Throwaway organization only? |
+| --- | --- | --- |
+| `python scripts/dodo_setup.py [--create-test-products]` | Check or create the fifteen test-mode products; refuses live mode | No (test account only) |
+| `python scripts/accuracy_report.py --workspace ID --truth CSV [--out MD] [--json] [--tag T]` | Measured accuracy against a truth sheet (`scripts/accuracy_truth_template.csv`); only reads | No |
+| `python scripts/e2e_stand_in.py run-job --job compliance.deletion_notices [--now ISO]` | Send the deletion warnings that are due; `--now` plays the clock outside production | **Yes**: it emails the owners and admins of every deleted workspace or organization |
+| `python scripts/e2e_stand_in.py run-job --job ops.safety_jobs` | Run the hourly safety-job check now (development) | No (it alerts the operator) |
+| `sudo [SERVABO_ROOT=PATH] backend/deploy/bin/servabo-install-host-jobs [--check] [--venv]` | Install and check the host cron jobs (production or the rehearsal) | n/a |
+| `deploy/bin/servabo-report-run NAME started\|succeeded\|failed [DETAIL]` | What each cron wrapper calls to report a run; never fails the job | n/a |
+| `python scripts/e2e_stand_in.py run-job --job recoveries.sweep` | Bring Recoveries up to date now, supplier statements included (as "Check now" on the page) | No |
+| `python -c "from tests.fixtures.corpus import MANIFEST, build; …"` | Write the red-team documents to a folder (the full line is in FINAL-2-LIVE Phase 3) | n/a |
+
+### 3. What was not reached, in the order to do it next
+
+Everything the brief listed was built in this session, at the owner's request of 2026-10-27: Recoveries (N-191), N-197
+(auto-post waits for a person on an outside upload), N-198 (the pilot price), the email logo (N-199) and F-637 (a
+person's re-plan waits for a running plan). What remains needs the real world, which a cloud session cannot reach:
+
+1. **The real services** in §1 (Dodo, real models, real inboxes, a real server's cron): Final session 2B.
+2. **The sweeps' first real success (N-194, by design):** the installer sends only "install check" reports for sweeps that
+   change data or send email, so the first real success is the first night's run on the server.
+3. **The full browser and backend suites** ran on the ready PR's CI, not all locally (STATE says whether it was green).
+
+### 4. What is unverified, in plain words
+
+- **Dodo in rupees**: UPI, RuPay, the tax ID field, the ₹15,000 mandate behaviour and the invoice's GST lines come from Dodo's
+  documentation and search extracts, not from a real checkout (N-192, N-193).
+- **The prices themselves** are the owner's delegated decision (N-187); no Indian customer has paid them yet.
+- **Real cron on a real host**: the wrappers and the installer were run against a fake report endpoint and a fake crontab;
+  no real cron has reported to a real app, and no real alert email or webhook post has arrived.
+- **Real models against the red-team documents**: every test stood the model in. The invariants do not rely on the model,
+  but what Groq or a customer's model answers is unknown.
+- **The injection patterns** recognise English, Hindi and four money commands; a new phrasing in another language is not
+  flagged (the autonomy hold depends on it; the other invariants do not).
+- **The accuracy figure**: the script is tested on synthetic data; there is no figure on real invoices yet.
+- **The deletion warnings in a real inbox** (Gmail and Outlook).
+- **The logo in real inboxes** (N-199): seen in a browser rendering only, including a darkened card without the
+  stylesheet (as Gmail's phone apps show dark mode), where the light logo's own white panel keeps it readable.

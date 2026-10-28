@@ -263,7 +263,7 @@ id, a plain description, the result and its evidence:
 | `idempotency` | the action key has not already run |
 | `cash` | the P10 cash path stays above every active floor after this payment |
 | `gst` | (GST Credit) pass when the supplier reported the invoice in GSTR-2B; needs approval when it did not and a GSTR-2B for its month was imported; not applicable when the invoice carries no GST or none was imported (`_gst_check`) |
-| `autonomy` | in Act mode, the amount is within the mandate's act cap; otherwise approval |
+| `autonomy` | a payment decision (schedule, approve, release a hold, mark paid) needs approval in every mode (N-196, Final session 2A); any other action in Act mode passes; otherwise approval |
 
 It runs at plan time and again in `helm.execute`; a check that now fails blocks the action and
 re-plans. **Certificate** (`helm/certificate.py`): canonical JSON (sorted keys, no spaces, money as

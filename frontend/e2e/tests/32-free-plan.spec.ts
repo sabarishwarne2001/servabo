@@ -1,6 +1,6 @@
 /**
- * THE FREE PLAN (campaign session 1): a deliberately small taste. Per month 25
- * documents, 50 OCR pages, 30 assistant messages; 10 MB per file, 10 pages per
+ * THE FREE PLAN (campaign session 1): a deliberately small taste. Per month 100
+ * documents, 200 OCR pages (Final session 2A, N-187: the 14-day trial allowance), 30 assistant messages; 10 MB per file, 10 pages per
  * document; one workspace; two seats. The screen where the allowance is spent says
  * where the organization stands; a refusal says why and what to do next.
  *
@@ -21,7 +21,7 @@ test.describe("Free: uploads", () => {
     await page.goto(ws("P"));
     const allowance = page.getByTestId("plan-allowance");
     await expect(allowance).toContainText("Free plan");
-    await expect(allowance).toContainText(/of 25 documents this month/);
+    await expect(allowance).toContainText(/of 100 documents this month/); // N-187
     await expect(allowance).toContainText("files up to 10 MB, 10 pages");
 
     // Eleven pages: the server refuses before anything is stored or charged.
@@ -60,12 +60,13 @@ test.describe("Free: plan cards", () => {
   test("the cards list the counts a customer plans by, per seat on paid plans", async ({ page }) => {
     await page.goto(org("P", "billing"));
     const free = page.getByRole("list", { name: "Free allowances" });
-    await expect(free).toContainText("25 documents uploaded / month");
+    await expect(free).toContainText("100 documents uploaded / month"); // N-187
     await expect(free).toContainText("30 assistant messages / month");
     await expect(free).toContainText("Files up to 10 MB");
     await expect(free).toContainText("2 seats (owner included)");
-    const developer = page.getByRole("list", { name: "Developer allowances" });
-    await expect(developer).toContainText("500 documents uploaded / month per seat");
+    // N-187 (Final session 2A): the `developer` plan is shown as "Starter".
+    const developer = page.getByRole("list", { name: "Starter allowances" });
+    await expect(developer).toContainText("300 documents uploaded / month per seat"); // N-187: Starter allowance
     await expectHealthyPage(page);
   });
 });

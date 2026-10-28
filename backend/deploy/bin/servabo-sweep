@@ -72,6 +72,9 @@ LOG_FILE="${SERVABO_LOG_DIR}/sweep_${NAME}.log"
 LOCK_FILE="${LOCK_DIR}/sweep_${NAME}.lock"
 
 STARTED_AT="$(date -u +%s)"
+# Final session 2A (Phase 2): every run is reported to the app, which alerts when a job stops. Never fails the sweep.
+REPORT="$(dirname "$0")/servabo-report-run"
+"${REPORT}" "${NAME}" started 2>> "${LOG_FILE}"
 
 {
     echo "=== $(date -u +%FT%TZ) | sweep ${NAME} | args: $* ==="
@@ -162,5 +165,11 @@ fi
 
 echo "SWEEP_WRAPPER_DONE | ${NAME} | status=${STATUS} outcome=${OUTCOME} duration=${DURATION}s" \
     >> "${LOG_FILE}"
+
+if [[ "${OUTCOME}" == "ok" ]]; then
+    "${REPORT}" "${NAME}" succeeded "exit ${STATUS} after ${DURATION}s" 2>> "${LOG_FILE}"
+else
+    "${REPORT}" "${NAME}" failed "exit ${STATUS} after ${DURATION}s; see ${LOG_FILE}" 2>> "${LOG_FILE}"
+fi
 
 exit "${STATUS}"

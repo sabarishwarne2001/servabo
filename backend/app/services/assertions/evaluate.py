@@ -289,9 +289,13 @@ def build_llm_prompt(plan: Any, chunks: Sequence[Chunk]) -> str:
         if used >= MAX_CONTEXT_CHARS:
             break
 
+    from app.services.fenced_context import fence_document
+
     return _LLM_INSTRUCTIONS.format(
         sentence=(getattr(plan, "sentence", "") or "").strip(),
-        context="\n\n".join(parts) if parts else "(no text was retrieved)",
+        # Final session 2A (invariant (c)): the excerpts are data, fenced between nonce lines.
+        context=(fence_document("\n\n".join(parts), what="the document's excerpts").render_for_prompt()
+                 if parts else "(no text was retrieved)"),
     )
 
 

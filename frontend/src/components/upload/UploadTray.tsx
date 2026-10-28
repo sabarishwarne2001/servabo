@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from "react";
+
+import ArchiveProgress from "@/components/upload/ArchiveProgress";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -73,6 +75,19 @@ const StatusIcon: React.FC<{ status: TrayFile["status"] }> = ({ status }) => {
 };
 
 const TrayRow: React.FC<{ file: TrayFile }> = ({ file }) => {
+  const workspaceId = useUploadTrayStore((state) => state.workspaceId);
+  if (file.archiveBatchId && workspaceId) {
+    // Final session 2A: a zip shows the same parent row as on the Documents page (its documents as they are added).
+    return (
+      <li className="px-3 py-2 text-xs" data-testid="tray-archive">
+        <ArchiveProgress workspaceId={workspaceId} batchId={file.archiveBatchId} fileName={file.name} />
+      </li>
+    );
+  }
+  return <FileRow file={file} />;
+};
+
+const FileRow: React.FC<{ file: TrayFile }> = ({ file }) => {
   const pause = useUploadTrayStore((state) => state.pause);
   const resume = useUploadTrayStore((state) => state.resume);
   const retry = useUploadTrayStore((state) => state.retry);

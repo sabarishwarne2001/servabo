@@ -41,7 +41,7 @@ test.describe("Journey: plan, invoices, refund and cancellation on Dodo", () => 
       standIn("subscribe", customer.orgSlug, "--plan", "developer", "--seats", "1");
       await signInAs(page, customer.email);
       await page.goto(customer.org("billing"));
-      await expect(page.locator("main")).toContainText("You're on Developer", { timeout: 20_000 });
+      await expect(page.locator("main")).toContainText("You're on Starter", { timeout: 20_000 }); // N-187: "Developer" is shown as "Starter"
 
       // The upgrade: Dodo prices the rest of the period, the owner confirms that exact amount.
       await page.getByTestId("plan-cta-business").click();
@@ -67,7 +67,7 @@ test.describe("Journey: plan, invoices, refund and cancellation on Dodo", () => 
       await expect(page.getByTestId("plan-change-date")).toBeVisible({ timeout: 20_000 });
       await page.getByRole("button", { name: /^Schedule the change for / }).click();
       const scheduled = page.getByTestId("scheduled-plan-change");
-      await expect(scheduled).toContainText("Changing to Developer", { timeout: 20_000 });
+      await expect(scheduled).toContainText("Changing to Starter", { timeout: 20_000 });
       await scheduled.getByRole("button", { name: "Keep the current plan" }).click();
       await expect(scheduled).toHaveCount(0, { timeout: 20_000 });
 

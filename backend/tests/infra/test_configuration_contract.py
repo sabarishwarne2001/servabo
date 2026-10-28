@@ -74,7 +74,8 @@ DYNAMIC_LOOKUP_MODULES: dict[str, str] = {
     "app/core/byok_providers.py": "platform_setting=",
     # Each add-on names its Dodo product setting (`product_setting=`); the entitlement, add-on
     # and reconciliation services read it with getattr(settings, offer.product_setting).
-    "app/services/billing/entitlement_service.py": "product_setting=",
+    # Final session 2A (N-187): each price is an `AddonPrice(currency, interval, amount, "<setting name>")`.
+    "app/services/billing/entitlement_service.py": "AddonPrice(\"",
 }
 
 #: Settings read by something that is not Python, so (a) cannot see it in the source.
@@ -102,6 +103,13 @@ NOT_SETTINGS: dict[str, tuple[str, str]] = {
     # Website and payments session (C11): yearly products, read by the same seed.
     "GATEWAY_PRICE_ID_DEVELOPER_YEARLY": ("backend/scripts/seed_quota_tiers.py", "GATEWAY_PRICE_ID_DEVELOPER_YEARLY"),
     "GATEWAY_PRICE_ID_BUSINESS_YEARLY": ("backend/scripts/seed_quota_tiers.py", "GATEWAY_PRICE_ID_BUSINESS_YEARLY"),
+    # Final session 2A (N-187): the rupee products, read by the same seed.
+    "GATEWAY_PRICE_ID_DEVELOPER_INR": ("backend/scripts/seed_quota_tiers.py", "GATEWAY_PRICE_ID_DEVELOPER_INR"),
+    "GATEWAY_PRICE_ID_BUSINESS_INR": ("backend/scripts/seed_quota_tiers.py", "GATEWAY_PRICE_ID_BUSINESS_INR"),
+    "GATEWAY_PRICE_ID_ENTERPRISE_INR": ("backend/scripts/seed_quota_tiers.py", "GATEWAY_PRICE_ID_ENTERPRISE_INR"),
+    "GATEWAY_PRICE_ID_DEVELOPER_YEARLY_INR": ("backend/scripts/seed_quota_tiers.py",
+                                              "GATEWAY_PRICE_ID_DEVELOPER_YEARLY_INR"),
+    "GATEWAY_PRICE_ID_BUSINESS_YEARLY_INR": ("backend/scripts/seed_quota_tiers.py", "GATEWAY_PRICE_ID_BUSINESS_YEARLY_INR"),
     "GATEWAY_PRICE_ID_BUSINESS": ("backend/scripts/seed_quota_tiers.py", "GATEWAY_PRICE_ID_BUSINESS"),
     "GATEWAY_PRICE_ID_ENTERPRISE": ("backend/scripts/seed_quota_tiers.py", "GATEWAY_PRICE_ID_ENTERPRISE"),
     "SEED_ADMIN_EMAIL": ("backend/scripts/seed_admin.py", "SEED_ADMIN_EMAIL"),

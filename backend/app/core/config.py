@@ -214,6 +214,17 @@ class Settings(BaseSettings):
     OPERATOR_ALERT_5XX_THRESHOLD: int = 20
     #: The same alert is emailed again at most this often while it keeps happening.
     OPERATOR_ALERT_REPEAT_MINUTES: int = 60
+    #: Final session 2A (Phase 2). Also tell this address when a safety job is stale: a Healthchecks.io check's failure
+    #: address works (it accepts the POST and emails or texts you). The host watchdog reads the same name from
+    #: sweepers.env. Empty: email only.
+    ALERT_WEBHOOK: str = ""
+    #: The shared secret the host's safety jobs (sweeps, backup, restore drill, uptime heartbeat) send with each run
+    #: report (`POST /api/v1/ops/safety-jobs/{name}/runs`, header `X-Servabo-Report-Token`); the same value goes in
+    #: /etc/servabo/sweepers.env. Empty: reports are refused, and every job reads "never reported" a day after start.
+    SAFETY_JOB_REPORT_TOKEN: SecretStr | None = None
+    #: Safety jobs this deployment does not run (comma-separated names), so they are not watched. The three
+    #: point-in-time-recovery jobs are switched off on a Docker Compose server (RUNBOOK 9.6, N-012).
+    SAFETY_JOBS_UNWATCHED: str = "dr-heartbeat,base-backup,pitr-drill"
 
     @property
     def operator_alert_recipients(self) -> list[str]:
@@ -893,9 +904,13 @@ class Settings(BaseSettings):
     # Dodo product ids for purchasable add-ons. Test and live ids differ, so
     # these are environment values, never literals in code. Unset means the
     # add-on is not self-serve on this deployment and the console says so.
-    DODO_ADDON_PRODUCT_CUSTOM_DOMAIN: str | None = None
+    # Final session 2A (N-187): one product per currency and interval it is sold at; custom domains are no longer sold
+    # (included in Business and Enterprise), so DODO_ADDON_PRODUCT_CUSTOM_DOMAIN was removed.
     DODO_ADDON_PRODUCT_WAREHOUSE_SYNC: str | None = None
     DODO_ADDON_PRODUCT_GST_CREDIT: str | None = None
+    DODO_ADDON_PRODUCT_GST_CREDIT_YEARLY: str | None = None
+    DODO_ADDON_PRODUCT_GST_CREDIT_INR: str | None = None
+    DODO_ADDON_PRODUCT_GST_CREDIT_YEARLY_INR: str | None = None
     # D-6. Days existing add-on resources keep working after the grant ends.
     BILLING_ADDON_GRACE_DAYS: int = 14
     # D-11. Days of full access after a renewal failure. Matches Dodo's default
@@ -905,8 +920,9 @@ class Settings(BaseSettings):
     BILLING_LAPSED_TIER_KEY: str = "free"
     # N-052 (owner decision). Free is a trial of this many days per owner account,
     # counted from the account's first organization; after it, new work needs a
-    # paid plan (app/services/trial_service.py).
-    FREE_TRIAL_DAYS: int = 7
+    # paid plan (app/services/trial_service.py). Final session 2A (N-187): 14 days (was 7), so that one monthly
+    # GSTR-2B (published on the 14th) falls inside every trial.
+    FREE_TRIAL_DAYS: int = 14
     # ARCH-30 Tranche 3. How Dodo bills a mid-cycle seat change. Dodo documents
     # that the three "_immediately" modes charge now and move the renewal date;
     # do_not_bill keeps the date and bills the new quantity at renewal.

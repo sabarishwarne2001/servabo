@@ -71,13 +71,19 @@ def test_each_plan_is_at_least_as_generous_as_the_one_below(lower: str, higher: 
 def test_a_higher_plan_never_costs_less_per_seat(lower: str, higher: str) -> None:
     commercials = _seed().COMMERCIALS
     assert commercials[higher]["unit_amount_micros"] >= commercials[lower]["unit_amount_micros"]
+    # N-187: and in every currency and interval both plans are sold in.
+    prices = {(p["tier"], p["currency"], p["interval"]): p["unit_amount_micros"] for p in _seed().PLAN_PRICES}
+    for (tier, currency, interval), amount in prices.items():
+        if tier == lower and (higher, currency, interval) in prices:
+            assert prices[(higher, currency, interval)] >= amount, (higher, currency, interval)
 
 
 def test_the_free_plan_is_the_small_one_the_owner_asked_for() -> None:
-    """Campaign session 1: the target is a taste, not a free product."""
+    """Campaign session 1: the target is a taste, not a free product. Final session 2A (N-187): a 14-day trial with
+    100 documents and 200 OCR pages, so that one monthly GSTR-2B cycle fits inside it (was 25 and 50)."""
     free = _rows("free")
-    assert free["document.upload"]["max_quantity"] == "25"
-    assert free["ocr.page"]["max_quantity"] == "50"
+    assert free["document.upload"]["max_quantity"] == "100"
+    assert free["ocr.page"]["max_quantity"] == "200"
     assert free["assistant.message"]["max_quantity"] == "30"
     assert free["limit.seats"]["max_quantity"] == "2"
     assert free["limit.workspaces"]["max_quantity"] == "1"

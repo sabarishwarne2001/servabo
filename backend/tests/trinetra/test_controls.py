@@ -207,9 +207,12 @@ def test_migration_down_up_with_populated_trinetra_rows(
     config.set_main_option("sqlalchemy.url", TEST_DB_URL)
     command.downgrade(config, "k1a7_pack_check_dismissals")
     command.upgrade(config, "head")
+    from alembic.script import ScriptDirectory
+
+    # Back at the single head (named by Alembic, so a later migration does not break this test).
     assert (
         db_session.execute(text("select version_num from alembic_version")).scalar()
-        == "tr1a2_review_outcomes"
+        == ScriptDirectory.from_config(config).get_current_head()
     )
     assert db_session.query(TrinetraCredit).count() == 0
     assert db_session.get(Workspace, workspace_id) is not None

@@ -257,6 +257,10 @@ class EmailService:
 
         message.set_content(text_body)
         message.add_alternative(html_body, subtype="html")
+        # The Servabo logo travels inside the message when the HTML refers to it (N-199).
+        from app.templates.emails.inline_images import attach
+
+        attach(message, html_body)
 
         return self._send_message(config, message)
 

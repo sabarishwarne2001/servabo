@@ -24,3 +24,18 @@ def handle_operator_alerts(payload: dict[str, Any]) -> dict[str, Any]:
         sent = operator_alert_service.send_due(db)
         db.commit()
     return {"outcome": "COMPLETED", "alerts_refreshed": refreshed, "alerts_emailed": sent}
+
+
+def handle_safety_jobs(payload: dict[str, Any]) -> dict[str, Any]:
+    """`ops.safety_jobs` (hourly): record one alert a day per stale host safety job, then email what is due."""
+    from app.db.session import SessionLocal
+    from app.services import operator_alert_service
+    from app.services.ops import safety_jobs
+
+    with SessionLocal() as db:
+        result = safety_jobs.check(db)
+        db.commit()
+    with SessionLocal() as db:
+        sent = operator_alert_service.send_due(db)
+        db.commit()
+    return {"outcome": "COMPLETED", **result, "alerts_emailed": sent}

@@ -2287,7 +2287,9 @@ own choice; the product does not stop it (a warning on the retention screen is a
 `--apply`) now purges an archived workspace or organization **30 days** after archiving (`ARCHIVED_PURGE_GRACE_DAYS`; until then Restore
 works): documents through the sweep's path, conversations, settings, stored files. Money records and the audit trail stay. An organization is
 **deleted 72 months** after archiving (`ARCHIVED_FINAL_DELETE_MONTHS`, matching N-163). The owner must schedule the command (RUNBOOK).
-Not done: an email to the owner at day 1 and day 25 of the 30 ("your data will be deleted on ...").
+Not done: an email to the owner at day 1 and day 25 of the 30 ("your data will be deleted on ..."). **Done in Final session 2A (Phase 4):** the owners and admins get one email
+at once ("will be erased on <date>; restore until then") and one 5 days before the purge ("last chance to restore"), each once, from
+the hourly `compliance.deletion_notices` job; a restore stops them (`tests/api/test_deletion_notices.py`).
 
 ## N-165 — The final deletion never shortens the audit trail (DECIDED (Final 1))
 
@@ -2364,7 +2366,7 @@ HSN or SAC code and a tax code looked up in the workspace's `taxes` table (`GST1
 **Zoho's pages could not be opened from the build sandbox**: data-centre hosts, scope names, the token and revoke paths and the bill's GST fields are from
 the documentation as it was known and a search summary on 2026-10-22. Final session 2 runs the connection against a real Zoho Books India trial.
 
-## N-174 — Tally Prime, guided (DECIDED (Final 1)); OPEN: should it come to Developer?
+## N-174 — Tally Prime, guided (DECIDED (Final 1)); CLOSED by N-187: the Tally file is on Starter (Final 2A)
 
 A guided form (company and five ledger names) makes a download target in Tally's format with the shipped mapping: one balanced Purchase voucher per bill, CGST
 and SGST to their own Input ledgers for a supplier in the buyer's state, IGST to one ledger for another state. It is the ERP posting capability, so it is on
@@ -2565,3 +2567,132 @@ GST Credit), with nothing left behind. Phase T in Final session 2A would only ha
 
 Phase T moved from 2A into 2T. 2A keeps only TRINETRA's plan row and copy (prices, rupees, "Starter") and its existing paths in
 the prompt-injection map. 2A's numbers start at N-191.
+
+## N-191 — Evidence-to-Resolution: build a thin "Recoveries" layer (DECIDED (Final 2A); built)
+
+Phase 0B (`docs/product/RESOLUTION-ASSESSMENT.md`) traced seven money issues through today's product. Three of the first six close on a
+click or not at all, or have no owner and due date (an invoice above its order, a supplier statement difference, GST credit at risk);
+duplicates count as recovered only through Helm. Every kind's detection and rupee figure is already stored, so a read model, closure rules
+and one outcome ledger (extending Helm's value ledger) are enough, and "Recovered, verified" can be shown beside "Found". All four tests
+hold, so a thin layer named **Recoveries** (Found → Being fixed → Verified) is built as Phase 6, **after** the must-have phases. First cut:
+GST credit at risk, duplicates and prices above the order, plus Helm's existing outcomes. Left out: supplier statement differences (not
+stored today; Helm work first) and changed bank accounts (not countable money; a person's call). TRINETRA's cases join through one adapter in
+Final session 2T, as "TDS not yet in the statement", never as cash.
+**Built in Final session 2A** at the owner's request of 2026-10-27 ("build it in this session"): `docs/product/RECOVERIES.md`.
+
+## N-192 — How rupees, the mandate and the tax ID work at checkout (DECIDED (Final 2A))
+
+N-187 rules 7 and 8, built:
+- **Which currency first.** Servabo keeps no billing address (Dodo does), so "billing country India" is read from what it
+  holds: a GSTIN as the billing account's tax ID, or a past checkout in rupees. Without either, an organization whose oldest
+  workspace is in `Asia/Kolkata` sees rupees; an organization already paying in dollars keeps dollars. Anyone can switch on
+  the billing page; the website shows rupees by default with a dollar switch (no geolocation). No migration was needed.
+- **The ₹15,000 mandate floor is not raised at checkout** (`mandate_min_amount_inr_paise` is not sent). A larger mandate asks a
+  customer to authorize more than they buy, which reads as alarming at checkout, and a payment above ₹15,000 still needs the
+  customer's approval each time under India's e-mandate rules. Instead the billing page says so before a monthly rupee total
+  above ₹15,000 with GST and offers yearly; the seat panel warns before a seat change above it; and a seat increase whose
+  charge Dodo refuses is answered "approve the new amount" with the payment method link (never applied unpaid, F-628).
+- **A rupee checkout requires a tax ID** (`require_tax_id`), pre-filled with the organization's GSTIN when known (the billing
+  account's tax ID, else its latest GSTR-2B). Servabo sells to GST-registered businesses; a buyer without a GSTIN can still edit
+  the field. Dodo applies `billing_currency` only with Adaptive Currency on; the rupee products are priced in INR themselves.
+- **Unverified until Final session 2B:** the field names (from Dodo's API reference through search extracts), Dodo's wording
+  when a charge is refused above the mandate, and whether UPI mandates follow the same floor (Dodo's pages disagree).
+
+## N-193 — The buyer's GSTIN on Dodo's invoice (OPEN until Final session 2B)
+
+A business buying in rupees needs a tax invoice with its GSTIN, so it can claim the 18% GST as input credit. Dodo's B2B
+documentation says the buyer's tax ID and business name are printed on the invoice; whether it **splits CGST, SGST and IGST**
+is not documented (docs.dodopayments.com: features/invoice-generation, features/b2b-payments; search extracts, 2026-10-26).
+Final session 2B buys once in rupees with a GSTIN (DODO-LOCAL-TEST journey I) and records what the PDF shows. If it is not a
+valid GST tax invoice, the options are, in order of effort: (1) ask Dodo whether a GST-compliant invoice can be enabled;
+(2) Servabo issues its own GST invoice for rupee sales (needs Servabo's own GST registration and numbering); (3) an Indian
+gateway for rupee sales. Nothing is built for any of them now.
+
+## N-194 — The safety sweeps stay on the server's cron; the app now watches them (DECIDED (Final 2A))
+
+**Question.** The brief asked whether the nightly sweeps should move from the server's cron into the app's own scheduler
+(`worker-scheduler`), so a missing or stopped cron cannot silently stop retention, erasure, reminders and backups.
+
+**Decision: keep them on cron, and make cron's silence impossible to miss.** Reasons, in plain words:
+
+- **Backups and the restore drill must run outside the app.** A backup that runs inside the app stops when the app is
+  broken, which is exactly when it matters; the drill restores into a scratch database with the Postgres tools on the host.
+- **The sweeps already run in their own short-lived container** (`SERVABO_RUNNER`, F-006) with file locks, logs, metrics
+  and Healthchecks pings that `tests/operational/test_host_cron_lines.py` proves line by line. Moving thirteen sweeps into
+  the scheduler would change how each one is locked, timed out and retried at the very end of the release, with no test
+  history in that shape.
+- **The real risk was silence, and that is now covered in the app**: every cron run reports to the app
+  (`POST /api/v1/ops/safety-jobs/{job}/runs`, with `SAFETY_JOB_REPORT_TOKEN`); the hourly `ops.safety_jobs` check emails
+  `OPERATOR_ALERT_EMAILS` (and posts to `ALERT_WEBHOOK`) once a day per job that has not succeeded within its deadline, or
+  has never reported a day after the app started watching; readiness says `safety_jobs: degraded` without taking the site
+  down; Platform admin, Background jobs, lists them in red; `scripts/preflight.py --online` names them. A server where cron
+  was never installed is reported a day after the first start.
+- **`servabo-install-host-jobs`** installs the files and proves the reporting path. It does **not** run the sweeps at
+  install time: several change data or send email (the invitation sweep, the retention purge) and have no dry-run mode.
+  It sends each job a "started" report marked "install check" (which never counts as a success) and runs the read-only
+  uptime check for real.
+
+**Revisit** if the deployment moves off a single server (Kubernetes CronJobs would replace cron, with the same reports).
+
+## N-195 — An email address read from a document is used only after a person confirms it (DECIDED (Final 2A))
+
+**Why:** a document can print any address (F-631). Servabo now keeps a learned address as a suggestion and emails only
+addresses an owner or admin typed or confirmed (Helm, Settings, Suppliers and customers: "Use this address"). This is the
+brief's invariant (b), decided by the brief itself.
+
+**The cost, in plain words:** every supplier and customer address Servabo had already learned is treated as unconfirmed,
+because the old data cannot tell a typed address from a learned one. GST reminders, supplier document requests and Helm's
+emails to those contacts wait until you confirm each one once. The sample company is set up as confirmed.
+
+**Your choice later (optional):** if you would rather trust addresses on documents from suppliers you already pay, say so;
+it would be a per-supplier switch, not a return to trusting every document.
+
+## N-196 — Helm never takes a payment decision alone, in any mode (DECIDED (Final 2A))
+
+The brief's invariant (a): no action "can approve a payment, pay, release a hold on a payment ... or mark an invoice paid on
+its own. A person always does." Helm's Act mode used to pay alone within an **act cap** (₹0 by default) and to release holds
+and mark invoices paid alone (F-633). Now scheduling, approving, releasing a hold and marking paid always wait for a person;
+Act mode still holds payments, sends reminders and requests, and creates tasks alone. The act cap is no longer shown in the
+mandate editor; stored caps are kept but no longer let anything pay.
+
+**If you want it back** for small amounts from suppliers you trust, that is a new decision: it would need a list of trusted
+suppliers and bank accounts a person confirmed, so a document alone could never steer it.
+
+## N-197 — Should ERP auto-post skip a case that completed because of an outside upload? (DECIDED (owner, delegated, 2026-10-27): option 2; built)
+
+When an admin turns ERP auto-post on and lets it post completed cases, a case that completes on its own (a supplier's
+upload through a request link) is posted to the accounting system without a person looking (docs/hardening/PROMPT-INJECTION.md,
+section 4). It posts a bill or a payment reference as data, never a payment, and auto-post is off until an admin turns it on.
+**Options:** (1) leave it: the admin chose auto-post for cases; (2) never auto-post a case whose last document came from
+outside (a request link or email-in) until a person opens it; (3) show such cases in the review queue first. Recommendation:
+(2). Nothing is built until you choose.
+
+**Decided and built (Final session 2A, under the owner's delegated authority of 2026-10-27): option (2).** Auto-post never
+posts a case that completed while it holds a document an outside party uploaded through a request link; it waits for a
+person, who posts it by hand from the ERP console or closes the case (a closed case auto-posts as before). Email-in is not
+counted as "outside": it accepts only senders an admin allowed. `erp/sources.eligible(for_auto=True)`;
+`tests/api/test_erp_auto_post_outside_upload.py`.
+
+## N-198 — The pilot offer: price and terms of a 30-day paid pilot (DECIDED (owner, delegated, 2026-10-27))
+
+`docs/product/PILOT-PLAYBOOK.md` describes a 30-day paid pilot on Business. **You decide:** the pilot price (suggested shape:
+a fixed first-month price, credited against the first year if they stay), how many seats it covers, and whether a CA who
+introduces a customer gets anything. Nothing in the product changes for a pilot: it is an ordinary Business subscription.
+
+**Decided (Final session 2A, under the owner's delegated authority of 2026-10-27).** One month on **Business for up to 3
+seats at ₹9,999 plus GST** (the list price for 3 seats is ₹14,997), paid in advance through the ordinary checkout, and
+**credited in full against the first yearly plan** if the customer continues within 30 days of the pilot's end. A CA who
+introduces a pilot customer gets nothing in money (no referral fee: it keeps the CA's advice independent); they get a free
+Starter seat for as long as the customer stays. Change any of these freely: nothing in the product depends on them (a pilot
+is an ordinary Business subscription; the credit is applied by hand in Dodo when the yearly plan is bought).
+
+## N-199 — Every email shows the real Servabo logo (DECIDED (owner, 2026-10-27); built by Final session 2A)
+
+**Your request:** incoming emails showed the old logo (a navy tile with a plain "S"); the current logo should be in every
+email. **Built:** every email sent as Servabo now shows the logo itself (the ribbon mark and the "servabo" wordmark), in a
+light and a dark version. It travels **inside the email** as a small picture (about 19 KB each), not as a link to a web
+address, so Gmail, Outlook and Apple Mail show it without "load images?" and security emails still carry no web address.
+Mail an organization sends under its own brand shows its own name, as before. **Not yet seen in a real inbox:** Final
+session 2B looks at it in Gmail, Outlook and Apple Mail, light and dark. Dark mode in the Gmail phone apps ignores the
+stylesheet that swaps the two pictures, so the light picture carries its own small white rounded panel: its dark lettering
+stays readable on a darkened card (checked in a browser with the card darkened and the stylesheet removed).

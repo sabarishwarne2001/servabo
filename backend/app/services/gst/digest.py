@@ -61,10 +61,13 @@ def unlock_line(db: Session, organization_id: uuid.UUID) -> Optional[str]:
     if notices.full_access(db, organization_id):
         return None
     if entitlement_service.offered_on_plan(db, organization_id=organization_id, addon_key=entitlements.GST_CREDIT_ADDON):
+        from app.services.billing import currency as currency_service
+
         offer = entitlement_service.offer_for(entitlements.GST_CREDIT_ADDON)
-        dollars = offer.monthly_price_micros // 1_000_000
-        symbol = "$" if offer.currency == "USD" else f"{offer.currency} "
-        return f"Unlock the lists: {offer.display_name} add-on, {symbol}{dollars} a month"
+        # N-187: the catalogue's prices, in the organization's currency (rupees for an Indian organization).
+        prices = entitlement_service.price_words(entitlements.GST_CREDIT_ADDON,
+                                                 currency_service.default_currency(db, organization_id))
+        return f"Unlock the lists: {offer.display_name} add-on, {prices}"
     names = entitlement_service.tiers_including(db, entitlements.GST_CREDIT_ADDON)
     return f"Unlock the lists: GST Credit comes with {' and '.join(names)}" if names else "Unlock the lists: see your plan options"
 
@@ -101,6 +104,24 @@ def top_waiting_suppliers(db: Session, organization_id: uuid.UUID, limit: int = 
         .group_by(name).order_by(func.sum(GstMatch.itc_micros).desc().nullslast(), name).limit(limit)).all()]
 
 
+def needs_owner_finding(db: Session, organization: Any) -> Any:
+    """Recoveries (N-191): one line, "3 issues worth ₹2,40,000 need an owner", linking to them; None when every issue has
+    an owner or the plan does not include Recoveries."""
+    from app.services.recoveries import service as recoveries
+    from app.templates.emails.trial_notice import TrialFinding
+
+    found = recoveries.needs_owner(db, organization.id)
+    if not found:
+        return None
+    count = found["count"]
+    from app.services.value_receipt import say_amount
+
+    worth = f" worth {say_amount(found['amount_micros'], 'INR')}" if found["amount_micros"] > 0 else ""
+    url = f"{settings.FRONTEND_URL.rstrip('/')}/{organization.slug}/{found['workspace_slug']}/recoveries"
+    return TrialFinding(label=f"{count} money issue{'s' if count != 1 else ''}{worth} need{'s' if count == 1 else ''} an owner",
+                        amount_text=None, url=url)
+
+
 def recipients(db: Session, organization_id: uuid.UUID) -> list[str]:
     from app.models.organization import MembershipStatus, OrganizationMember
     from app.models.user import User
@@ -135,6 +156,11 @@ def send_for(db: Session, organization: Any, *, week: str) -> tuple[bool, int, i
         top = top_waiting_suppliers(db, organization.id, limit=1)
         if top:
             findings = findings[:2] + [TrialFinding(label=f"Waiting on {top[0][0]}", amount_text=notices.money(top[0][1]), url=gst_url)]
+    owned = needs_owner_finding(db, organization)
+    if owned:   # Recoveries (N-191): always one of the lines the email shows
+        from app.templates.emails.trial_notice import MAX_FINDINGS
+
+        findings = findings[:MAX_FINDINGS - 1] + [owned]
     year, number = (int(part) for part in week.split("-W"))
     monday = date.fromisocalendar(year, number, 1)
     line = unlock_line(db, organization.id)

@@ -406,18 +406,29 @@ curl -fsS https://app.example.com/api/v1/health/ready      # {"status":"ready"} 
 **8. Create the plans and the first administrator, once** *(not run here)*.
 
 Plans first. The plan names, limits and prices are defined in `backend/scripts/seed_quota_tiers.py`
-(Developer $49, Business $299 and Enterprise $799 per seat per month; Developer $490 and Business
-$2,990 per seat per year; add-ons: custom domains $199 and warehouse sync $300 a month);
-**confirm them before launch (N-011)**. Each is a product in your Dodo account. In **test mode**,
-let the setup script create them and print their ids:
+(`PLAN_PRICES`; decided in N-187, Final session 2A). Per user (seat), GST or other tax added by Dodo:
+
+| | Starter (key `developer`) | Business | Enterprise |
+| --- | --- | --- | --- |
+| India, monthly | ₹1,499 | ₹4,999 | ₹14,999 |
+| India, yearly | ₹14,990 | ₹49,990 | by agreement |
+| Elsewhere, monthly | $49 | $299 | $799 |
+| Elsewhere, yearly | $490 | $2,990 | by agreement |
+
+Add-ons, one price per organization: **GST Credit** (Starter only) ₹1,499 a month or ₹14,990 a year, $49 a month
+or $490 a year; **warehouse sync** (Starter, dollars only) $300 a month. **Custom domains are not an add-on any
+more**: they are included in Business and Enterprise (N-187). Each price is its own product in your Dodo account:
+**fifteen** in all. In **test mode**, let the setup script create them and print their ids:
 
 ```bash
 $COMPOSE exec -T web python scripts/dodo_setup.py --create-test-products
 ```
 
-Paste the eight lines it prints (`GATEWAY_PRICE_ID_DEVELOPER`, `_BUSINESS`, `_ENTERPRISE`,
-`_DEVELOPER_YEARLY`, `_BUSINESS_YEARLY`, `DODO_ADDON_PRODUCT_CUSTOM_DOMAIN`,
-`DODO_ADDON_PRODUCT_WAREHOUSE_SYNC`, `DODO_ADDON_PRODUCT_GST_CREDIT`) into `.env.production`, run `$COMPOSE up -d`, then check them:
+Paste the fifteen lines it prints into `.env.production`: the plan products `GATEWAY_PRICE_ID_DEVELOPER`,
+`_BUSINESS`, `_ENTERPRISE`, `_DEVELOPER_YEARLY`, `_BUSINESS_YEARLY`, and the rupee ones `_DEVELOPER_INR`,
+`_BUSINESS_INR`, `_ENTERPRISE_INR`, `_DEVELOPER_YEARLY_INR`, `_BUSINESS_YEARLY_INR`; the add-ons
+`DODO_ADDON_PRODUCT_WAREHOUSE_SYNC`, `DODO_ADDON_PRODUCT_GST_CREDIT`, `_GST_CREDIT_YEARLY`, `_GST_CREDIT_INR` and
+`_GST_CREDIT_YEARLY_INR`. Run `$COMPOSE up -d`, then check them:
 
 ```bash
 $COMPOSE exec -T web python scripts/dodo_setup.py      # every line must say OK
@@ -657,6 +668,10 @@ SERVABO_LOG_DIR=/srv/servabo/logs
 LOCK_DIR=/srv/servabo/locks
 SERVABO_BACKUP_DIR=/srv/servabo/backups
 SERVABO_BACKUP_KEY_FILE=/etc/servabo/backup.key
+# Final session 2A: every job reports its runs to the app at this address, with this secret (the SAME value as
+# SAFETY_JOB_REPORT_TOKEN in .env.production; generate: python3 -c "import secrets; print(secrets.token_urlsafe(32))").
+SERVABO_PUBLIC_URL=https://app.example.com
+SAFETY_JOB_REPORT_TOKEN="paste-the-same-token-as-in-env-production"
 # Copy every backup off this server (the file path arrives as $1):
 # SERVABO_BACKUP_MIRROR_CMD='aws s3 cp "$1" s3://YOUR-BACKUP-BUCKET/servabo/'
 # A free Healthchecks.io account emails you when a job fails or does not run. One check per job:
@@ -664,8 +679,7 @@ SERVABO_BACKUP_KEY_FILE=/etc/servabo/backup.key
 # HEARTBEAT_UUID_COMPOSE_BACKUP=<check id>
 # HEARTBEAT_UUID_COMPOSE_RESTORE_DRILL=<check id>
 # HEARTBEAT_UUID_COMPLIANCE=<check id>
-# Is the site up? A check with a 1-minute period and a 5-minute grace (N-017):
-# SERVABO_PUBLIC_URL=https://app.example.com
+# Is the site up? A check with a 1-minute period and a 5-minute grace (N-017; it uses SERVABO_PUBLIC_URL above):
 # HEARTBEAT_UUID_UPTIME=<check id>
 # Every sweep can ping its own check too: HEARTBEAT_UUID_<NAME> (for example HEARTBEAT_UUID_ERP_POSTINGS).
 # The hourly watchdog reports any of the thirteen sweeps without a success in 26 hours; to be told,
@@ -681,8 +695,21 @@ sudo install -m 644 /srv/servabo/backend/deploy/cron.d/servabo-compose-backups /
 sudo sed -i -E 's/^([^#].*servabo-sweep (dr-heartbeat|base-backup|pitr-drill).*)$/# \1/' /etc/cron.d/servabo-sweepers
 ```
 
+Or let one command do the three `install` lines and check everything (Final session 2A):
+
+```bash
+sudo /srv/servabo/backend/deploy/bin/servabo-install-host-jobs
+```
+
+It says OK or FIX for each step: cron installed and running (it starts a stopped one), the `servabo` user,
+`sweepers.env` readable and holding `SERVABO_PUBLIC_URL` and `SAFETY_JOB_REPORT_TOKEN`, the two cron files installed with the
+point-in-time-recovery lines switched off, and then every job once, safely: the uptime check runs for real, and each other
+job sends the app a "started" report marked "install check" (it never counts as a success, so a job whose real run never
+comes is still reported). The sweeps themselves are not run by it: some change data or send email and have no dry-run
+(N-194). It ends with "Ready" or the list of things to fix; run it again after fixing them. `--check` changes nothing.
+
 Do **not** install `servabo-backups`: that file is for a server with Python and the Postgres tools
-installed directly, not for Compose. Check it works now, not at 3 a.m.:
+installed directly, not for Compose (the install command refuses two backup schedules). Check it works now, not at 3 a.m.:
 
 ```bash
 /srv/servabo/backend/deploy/bin/servabo-sweep compliance --report    # prints each tenant's retention policy, changes nothing
@@ -691,6 +718,18 @@ tail -n 20 /srv/servabo/logs/sweep_compliance.log                      # a "SWEE
 
 After the first night, look at the logs in `/srv/servabo/logs` (`sweep_*.log`,
 `compose_backup.log`, `compose_restore_drill.log`), or better, let the monitor tell you.
+
+**Know when a safety job stops (Final session 2A).** Every cron job above reports each run to the app
+(`servabo-report-run`; it never fails the job). Inside the stack, the hourly `ops.safety_jobs` check compares each job's
+last success with its deadline (a nightly sweep 26 hours, the hourly obligations sweep 3 hours, the ERP and process
+sweeps 1 hour, the restore drill 8 days, the uptime check 15 minutes) and, once a day per job, emails
+`OPERATOR_ALERT_EMAILS` "Safety job stopped: … has not succeeded since …" (or "never reported", a day after the app
+first started watching), and posts the same line to `ALERT_WEBHOOK` when that is set in `.env.production`. Platform
+admin, Background jobs, lists every job with its last success and the command that runs it by hand, in red when one is
+late; `/api/v1/health/ready` adds `"safety_jobs": "degraded"` and still answers 200 (a stopped sweep must not take the
+site down); `python scripts/preflight.py --online` names the late jobs. The three point-in-time-recovery jobs are not
+watched on Compose (`SAFETY_JOBS_UNWATCHED`). When the email comes: `systemctl status cron`, `grep CRON /var/log/syslog`,
+the job's log in `/srv/servabo/logs`, then run the job once by hand; the next successful run clears it.
 
 **Know when something breaks (campaign session 4).** The app emails the addresses in
 `OPERATOR_ALERT_EMAILS` (in `.env.production`; required, the app refuses to start without it) through
@@ -892,7 +931,16 @@ Deleting a workspace or an organization archives it; its data is purged later by
 books, the Helm ledger, invoices, usage) and the audit trail stay; an organization itself is deleted 72 months after archiving
 (`ARCHIVED_PURGE_GRACE_DAYS`, `ARCHIVED_FINAL_DELETE_MONTHS`; the CGST Act s.36 books period). Look first without changing anything:
 `$COMPOSE run --rm ... python scripts/sweep_compliance.py --archived` (a dry run prints what it would do). The final deletion refuses, and
-says so, while an audit entry is younger than 400 days: the audit trail is never shortened.
+says so, while an audit entry is younger than 400 days: the audit trail is never shortened. The organization's owners and admins
+are emailed twice (Final session 2A): at once ("will be erased on <date>; restore until then") and 5 days before the erasure ("last
+chance"), by the hourly `compliance.deletion_notices` job inside the stack; nothing to install.
+
+**Recoveries (Final session 2A, N-191).** The hourly `recoveries.sweep` job inside the stack queues one small sweep per
+Business and Enterprise workspace (skipping one whose sweep is still waiting), and each brings that workspace's
+Recoveries up to date with the engines (supplier statements included); nothing to install. Each workspace is its own
+job, so one that fails is retried and shows in the dead-job alert like any other, and documents never wait behind the
+whole sweep. To run it now: `python scripts/e2e_stand_in.py run-job --job recoveries.sweep` (development), or "Check
+now" on the page.
 
 ### 9.12 GST credit notices, the Monday digest, and Zoho Books Connect (Final session 1)
 
@@ -929,7 +977,7 @@ one-line fix and where to click. It never prints a secret (at most "set", or the
 `--json` gives machine-readable output. `--online` adds read-only calls (database, Redis, storage bucket, SMTP login without sending, Groq's model list,
 Dodo's product list, Postmark's server record); against a **live** Dodo account it refuses unless you add `--i-mean-live` (it still only reads).
 `--send-test-email you@example.com` sends exactly one message. It checks: the environment and URLs, the production guard, database, Redis, storage (and R2's EU
-endpoint), the mail relay, the Groq, Gemini and encryption keys, Dodo (test or live agree, the webhook secret, all eight product ids), email-in, Zoho,
+endpoint), the mail relay, the Groq, Gemini and encryption keys, Dodo (test or live agree, the webhook secret, all fifteen product ids), email-in, Zoho,
 error tracking, the NIC key, the backup key and folder, `ALERT_WEBHOOK`, `OPERATOR_ALERT_EMAILS` and the CPU-only image.
 
 ### 9.15 Webhook events for GST and workflow runs, warehouse datasets, pack checks, and the logo (Final session 1)

@@ -28,10 +28,14 @@ ping_monitor() {
         || echo "HEARTBEAT_PING_FAILED: could not reach the monitor" >&2
 }
 
+REPORT="$(dirname "$0")/servabo-report-run"   # Final session 2A: the app hears that cron and this check are alive
+
 if body="$(curl -fsS -m 15 "${BASE_URL%/}/api/v1/health/ready" 2>&1)"; then
     ping_monitor ""
+    "${REPORT}" uptime succeeded "ready"
     exit 0
 fi
 echo "UPTIME_CHECK_FAILED: ${BASE_URL%/}/api/v1/health/ready: ${body:0:300}" >&2
 ping_monitor "/fail"
+"${REPORT}" uptime failed "readiness answered: ${body:0:200}"
 exit 1

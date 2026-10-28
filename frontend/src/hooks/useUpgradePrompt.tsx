@@ -88,6 +88,7 @@ export function useUpgradePrompt(
       onClose={() => setPending(null)}
       addon={pending?.addonKey ? addonFor(pending.addonKey) : null}
       organizationId={organizationId}
+      addonCurrency={entitlements.data?.default_currency ?? "USD"}
     />
   );
 
