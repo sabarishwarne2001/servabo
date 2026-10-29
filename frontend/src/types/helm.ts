@@ -286,6 +286,19 @@ export interface HelmCockpit {
   mandates: HelmMandate[];
   /** mandate id -> its key figure, one point a day for the last 30 days, oldest first. */
   trends?: Record<string, TrendPoint[]>;
+  /** Final session 2T: customer reminders held because the customer withheld the tax (nothing left to chase in cash). */
+  withholding_holds?: HelmWithholdingHold[];
+}
+
+export interface HelmWithholdingHold {
+  action_id: string;
+  title: string;
+  workspace_id: string | null;
+  workspace_slug: string | null;
+  /** The TRINETRA case whose review or withdrawal releases the reminder. */
+  case_id: string | null;
+  reason: string | null;
+  release: string;
 }
 
 export interface TrendPoint {
@@ -519,6 +532,8 @@ export interface HelmPromise {
     case_id: string;
     reviewed_micros: string | null;
     reminder_held: boolean;
+    /** The cash still due after the tax the customer withheld, in millionths (null when it cannot be told). */
+    cash_due_micros?: string | null;
     note: string;
   };
   id: string;

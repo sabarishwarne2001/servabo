@@ -456,9 +456,9 @@ CAPABILITY_KEYS: tuple[str, ...] = (
 ADDON_KEYS: tuple[str, ...] = (CUSTOM_DOMAIN_ADDON, WAREHOUSE_SYNC_ADDON, GST_CREDIT_ADDON)
 
 _ENTITLEMENTS: tuple[Entitlement, ...] = (
-    Entitlement(name=TRINETRA_ALL_WORKSPACES_CAPABILITY, description="TRINETRA reports across authorized workspaces; release gated."),
+    Entitlement(name=TRINETRA_ALL_WORKSPACES_CAPABILITY, description="TRINETRA reports and approval chains across the workspaces a person may read (Enterprise)."),
     Entitlement(name=RECOVERIES_CAPABILITY, description="Recoveries: money issues from found to verified, with an owner, a due date and closure only on evidence. Bundled into a tier."),
-    Entitlement(name=TRINETRA_CAPABILITY, description="TRINETRA: reviewed TDS credit evidence assurance; subject to source-validation launch gate."),
+    Entitlement(name=TRINETRA_CAPABILITY, description="TRINETRA: checks that TDS customers withheld reached the tax statement, with reviewed evidence. Live access follows the deployment mode (off, pilot, on)."),
     Entitlement(
         name=PLATFORM_KEY,
         description=(

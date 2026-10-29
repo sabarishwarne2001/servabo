@@ -20,7 +20,7 @@ from app.services.automation import actions as action_registry
 from app.services.automation import flow_service
 from app.services.automation.triggers import TRIGGERS_BY_KEY, available_for
 
-CATEGORIES = ("Invoices", "Compliance", "GST", "Follow-ups", "Team")
+CATEGORIES = ("Invoices", "Compliance", "GST", "TDS credit", "Follow-ups", "Team")
 
 INVOICE = {"field": "classification_details.document_classification", "operator": "EQUALS", "value": "Invoice"}
 
@@ -197,6 +197,30 @@ RECIPES: tuple[dict[str, Any], ...] = (
         "fill_ins": [],
         "rule": _rule("GST credit at risk: tell admins", ["gst.reversal_risk"], [
             _step("notify.role", roles=["ADMIN", "BILLING"], title="GST credit at risk",
+                  message="{{trigger.label}}: {{document.filename}}", priority="WARNING"),
+        ]),
+    },
+    {
+        "id": "tds-gap-assign",
+        "title": "Assign TDS gaps above ₹50,000 to your accountant",
+        "summary": "When tax a customer withheld is not in your statement and the gap is large, the invoice goes to the person you choose, due in three days.",
+        "category": "TDS credit",
+        "icon": "user",
+        "fill_ins": [_fill("actions.0.config.assignee_email", "member_email", "Accountant",
+                           "Choose the person who reviews TDS gaps.")],
+        "rule": _rule("Large TDS gap: assign the accountant", ["trinetra.case.gap_found"], [
+            _step("review.assign", assignee_email="", reason="A TDS gap above ₹50,000 to check.", due_in_hours=72),
+        ], groups=[[{"field": "event.amount", "operator": "GREATER_THAN", "value": "50000", "currency": "INR"}]]),
+    },
+    {
+        "id": "tds-evidence-tell",
+        "title": "Tell admins when a TDS confirmation loses its evidence",
+        "summary": "The invoice behind a confirmed withholding changed; your admins are told so it can be confirmed again.",
+        "category": "TDS credit",
+        "icon": "alert",
+        "fill_ins": [],
+        "rule": _rule("TDS evidence changed: tell admins", ["trinetra.case.evidence_stale"], [
+            _step("notify.role", roles=["ADMIN"], title="TDS confirmation needs another look",
                   message="{{trigger.label}}: {{document.filename}}", priority="WARNING"),
         ]),
     },

@@ -6,6 +6,7 @@ and each is a small function here so a test can prove its rule:
   documents  any document in the workspace (an upload, a zip, or an email)         (workspace contributors and above)
   read       any document Servabo has finished reading                              (everyone)
   gst        a GSTR-2B has been imported in the workspace                           (workspace contributors and above)
+  trinetra   a statement has been imported into TRINETRA in the workspace                (workspace administrators)
   helm       the organization has a Helm book (the sample company counts)           (organization owners, admins, billing)
   recipe     a rule exists in the workspace (turning on a recipe creates one)       (workspace administrators)
   invite     the organization has a second member (invited or active)               (organization owners and admins)
@@ -26,13 +27,14 @@ from sqlalchemy.orm import Session
 from app.models.automation import AutomationRule
 from app.models.gst import GstReturn
 from app.models.helm import HelmBook
+from app.models.trinetra import TrinetraStatement
 from app.models.organization import Organization, OrganizationMember, OrganizationRole
 from app.models.work_item import WorkItem
 from app.models.workspace import Workspace, WorkspaceRole
 
-__all__ = ["STEP_KEYS", "evaluate", "first_money", "tick_documents", "tick_gst", "tick_helm", "tick_invite", "tick_read", "tick_recipe"]
+__all__ = ["STEP_KEYS", "evaluate", "first_money", "tick_documents", "tick_gst", "tick_helm", "tick_invite", "tick_read", "tick_recipe", "tick_trinetra"]
 
-STEP_KEYS: tuple[str, ...] = ("documents", "read", "gst", "helm", "recipe", "invite")
+STEP_KEYS: tuple[str, ...] = ("documents", "read", "gst", "trinetra", "helm", "recipe", "invite")
 
 _ORDER = {WorkspaceRole.VIEWER: 0, WorkspaceRole.CONTRIBUTOR: 1, WorkspaceRole.ADMIN: 2}
 HELM_ROLES = frozenset({OrganizationRole.OWNER, OrganizationRole.ADMIN, OrganizationRole.BILLING})
@@ -57,6 +59,13 @@ def tick_read(db: Session, workspace_id: uuid.UUID) -> bool:
 
 def tick_gst(db: Session, workspace_id: uuid.UUID) -> bool:
     return db.execute(sa.select(sa.func.count()).select_from(GstReturn).where(GstReturn.workspace_id == workspace_id)).scalar_one() > 0
+
+
+def tick_trinetra(db: Session, workspace_id: uuid.UUID) -> bool:
+    """A statement snapshot is in place: the point where a customer's TDS can first be compared with the tax statement."""
+    return db.execute(
+        sa.select(sa.func.count()).select_from(TrinetraStatement).where(TrinetraStatement.workspace_id == workspace_id, TrinetraStatement.active.is_(True))
+    ).scalar_one() > 0
 
 
 def tick_helm(db: Session, organization_id: uuid.UUID) -> bool:
@@ -92,7 +101,8 @@ def first_money(db: Session, organization_id: uuid.UUID) -> Optional[dict[str, A
         except Exception:  # noqa: BLE001 - a receipt that cannot be built must never break the checklist
             continue
         lead = next(
-            (f for f in receipt.get("found", []) if f.get("honesty") in (None, helm_v.HONESTY_CONFIRMED) and f.get("amount_micros")),
+            (f for f in receipt.get("found", []) if f.get("honesty") in (None, helm_v.HONESTY_CONFIRMED) and f.get("amount_micros")
+                 and not str(f.get("key", "")).startswith("tds_")),   # a TDS line is never "money found"
             None,
         )
         if lead:
@@ -136,6 +146,18 @@ def evaluate(
             note = ("Your plan shows the headline figures from a GSTR-2B. The supplier and invoice lists, the portal recommendations and the "
                     f"export come with Business, or with the GST Credit add-on on {sold_on}.")
         add("gst", "Import a GSTR-2B and see which suppliers have not reported your invoices", tick_gst(db, workspace.id), note)
+    if _at_least(workspace_role, WorkspaceRole.ADMIN):
+        from app.services.trinetra import mode as trinetra_mode
+
+        live = trinetra_mode.state(db, organization.id)
+        note = None
+        if live.reason == "not_entitled":
+            note = "Checking TDS credit comes with Business or Enterprise."
+        elif live.reason == "not_enrolled":
+            note = "TRINETRA is in a pilot and your organization is not enrolled yet; the synthetic examples show how it works."
+        elif live.reason == "off":
+            note = "TRINETRA is not open yet; the synthetic examples show how it works."
+        add("trinetra", "Check that the TDS your customers withheld reached your tax statement", tick_trinetra(db, workspace.id), note)
     if organization_role in HELM_ROLES:
         note = None
         if not helm_gate.helm_held(db, organization.id):

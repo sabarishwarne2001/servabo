@@ -17,7 +17,7 @@ import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -747,7 +747,34 @@ def cockpit(db: Session, who: Viewer, book: HelmBook) -> dict[str, Any]:
         "value_held": value.totals(db, book) if readable else None,
         "mandates": list_mandates(db, who, book),
         "trends": instrument_trends(db, book),
+        "withholding_holds": withholding_holds(actions, _workspace_slugs(db, actions)) if readable else [],
     }
+
+
+def withholding_holds(actions, slugs: Optional[Mapping[Any, str]] = None) -> list[dict[str, Any]]:
+    """Reminders held for withholding review (TRINETRA, Final 2T): blocked reminders whose Guard failed the
+    `withholding` check. Each names its TRINETRA case: reviewing or withdrawing that case releases it."""
+    held = []
+    for a in actions:
+        if a.kind != v.ACTION_SEND_REMINDER or a.state != v.ACTION_BLOCKED:
+            continue
+        check = next((c for c in (a.guard or {}).get("checks", [])
+                      if c.get("id") == "withholding" and c.get("result") == v.CHECK_FAIL), None)
+        if check is None:
+            continue
+        held.append({"action_id": str(a.id), "title": a.title, "workspace_id": str(a.workspace_id) if a.workspace_id else None,
+                     "workspace_slug": (slugs or {}).get(a.workspace_id),
+                     "case_id": (check.get("evidence") or {}).get("case_id"), "reason": check.get("detail"),
+                     "release": "Review or withdraw the withholding case in TRINETRA; Helm re-plans on its own."})
+    return held
+
+
+def _workspace_slugs(db: Session, actions) -> dict[Any, str]:
+    """The slugs of the workspaces the held reminders belong to, so the cockpit can link to each case's TRINETRA page."""
+    ids = {a.workspace_id for a in actions if a.workspace_id}
+    if not ids:
+        return {}
+    return {wid: slug for wid, slug in db.execute(select(Workspace.id, Workspace.slug).where(Workspace.id.in_(ids))).all()}
 
 
 #: Days of history behind each instrument's small trend.

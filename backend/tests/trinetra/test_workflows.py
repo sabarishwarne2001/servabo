@@ -5,7 +5,7 @@ from io import BytesIO
 import uuid
 import pytest
 from openpyxl import load_workbook
-from tests.trinetra.test_api import world  # noqa: F401
+from tests.trinetra.test_api import world, really_change  # noqa: F401
 from tests.security.plans import put_on_plan
 from app.models.trinetra import TrinetraCredit, TrinetraDecision, TrinetraProfile
 
@@ -71,8 +71,7 @@ def test_corrected_invoice_invalidates_and_reconfirmation_preserves_history(
 ):
     url, body, credit, statement, decision = import_and_allocate(client, tenant, world)
     invoice = world[1]
-    invoice.updated_at = datetime.now(timezone.utc) + timedelta(seconds=1)
-    db_session.commit()
+    really_change(db_session, invoice)
     path = url + "/credits/" + credit["id"]
     changed = client.get(path, headers=tenant.owner.headers).json()
     assert changed["status"] == "EVIDENCE_NEEDED" and changed["posted_micros"] == "0"
@@ -123,8 +122,7 @@ def test_changed_statement_is_unknown_until_new_confirmed_snapshot(
 ):
     url, _, credit, statement, _ = import_and_allocate(client, tenant, world)
     source = world[2]
-    source.updated_at = datetime.now(timezone.utc) + timedelta(seconds=1)
-    db_session.commit()
+    really_change(db_session, source)
     before = client.get(
         url + "/credits/" + credit["id"], headers=tenant.owner.headers
     ).json()
@@ -534,8 +532,7 @@ def test_changed_statement_cannot_be_imported_using_old_preview(
     )
     assert preview.status_code == 200, preview.text
     statement["source_version"] = preview.json()["source_version"]
-    world[2].updated_at = datetime.now(timezone.utc) + timedelta(seconds=2)
-    db_session.commit()
+    really_change(db_session, world[2])
     assert (
         client.post(
             url + "/reviewed-statements", headers=tenant.owner.headers, json=statement

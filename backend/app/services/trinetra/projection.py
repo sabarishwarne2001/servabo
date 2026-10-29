@@ -13,7 +13,7 @@ def reviewed_withholding(row, value):
         review.get("withholding_confirmed")
         and review.get("invoice_version") == row.source_version
         and value.get("source_current")
-        and row.state not in ("WITHDRAWN", "DISPUTED")
+        and row.state not in ("WITHDRAWN", "DISPUTED", "UNRESOLVED")
         and required
         and all(e.get("current") for e in required)
         and amount is not None

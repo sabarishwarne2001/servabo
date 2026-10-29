@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 
-from tests.trinetra.test_api import world  # noqa: F401
+from tests.trinetra.test_api import world, really_change  # noqa: F401
 from tests.trinetra.test_workflows import setup_case
 from app.models.trinetra import TrinetraCredit
 from app.services.helm import hands
@@ -47,8 +47,7 @@ def test_confirmed_withholding_does_not_require_government_posting(
     assert detail["cash_projection"]["cash_received_micros"] is None
     assert detail["cash_projection"]["unexplained_micros"] is None
     # Freshness failure must not make a stale deduction look verified.
-    world[2].updated_at = datetime.now(timezone.utc) + timedelta(seconds=1)
-    db_session.commit()
+    really_change(db_session, world[2])
     detail = client.get(path, headers=tenant.owner.headers).json()
     assert detail["cash_projection"]["reviewed_withholding_micros"] is None
 
@@ -93,8 +92,7 @@ def test_helm_never_sends_gross_reminder_for_reviewed_withholding(
         )
     assert sent == []
     # A stale confirmation also requires review, rather than silently resuming gross chasing.
-    world[2].updated_at = datetime.now(timezone.utc) + timedelta(seconds=1)
-    db_session.commit()
+    really_change(db_session, world[2])
     with pytest.raises(hands.HandError, match="withholding"):
         hands.send_reminder(
             db_session, action=action, book=SimpleNamespace(kind="WORKSPACE")
@@ -141,3 +139,88 @@ def test_helm_projection_is_scoped_and_keeps_commercial_amount(
     assert (
         "withholding_review" not in annotate(db_session, outsider, [dict(original)])[0]
     )
+
+
+# --- Final 2T, Phase 1.1: Helm chases the cash still owed, never the tax the customer withheld -------------
+
+
+def test_the_snapshot_learns_the_reviewed_withholding_even_when_trinetra_is_off(
+    client, tenant, world, db_session, monkeypatch
+):
+    from app.core.config import settings
+    from app.services.trinetra.helm_adapter import withholding_for
+
+    _, case, _ = confirmed_case(client, tenant, world)
+    ids = [world[1].id]
+    found = withholding_for(db_session, tenant.organization.id, ids)[world[1].id]
+    assert (found.case_id, found.reviewed_micros) == (case["id"], 2_000_000_000)
+    # The safety property does not depend on the mode or the plan: switched off, the same figure still stands.
+    monkeypatch.setattr(settings, "TRINETRA_LIVE_ENABLED", False)
+    assert withholding_for(db_session, tenant.organization.id, ids)[world[1].id].reviewed_micros == 2_000_000_000
+    # Stale evidence keeps the hold but the amount becomes unknown (never "nothing withheld").
+    really_change(db_session, world[2])
+    stale = withholding_for(db_session, tenant.organization.id, ids)[world[1].id]
+    assert stale.case_id == case["id"] and stale.reviewed_micros is None
+    # Withdrawing releases it.
+    db_session.get(TrinetraCredit, uuid.UUID(case["id"])).state = "WITHDRAWN"
+    db_session.flush()
+    assert withholding_for(db_session, tenant.organization.id, ids) == {}
+
+
+def test_the_reminder_hand_allows_the_net_cash_and_refuses_the_withheld_tax(
+    client, tenant, world, db_session, monkeypatch
+):
+    _, case, _ = confirmed_case(client, tenant, world)
+    sent = []
+    monkeypatch.setattr(hands, "send_mail", lambda *a, **k: sent.append(k) or True)
+
+    def action(amount):
+        return SimpleNamespace(
+            organization_id=tenant.organization.id,
+            workspace_id=tenant.workspace.id,
+            work_item_id=world[1].id,
+            counterparty_key=None,
+            currency="INR",
+            amount_micros=amount,
+            params={"to": "synthetic@example.invalid"},
+        )
+
+    book = SimpleNamespace(kind="WORKSPACE")
+    # The invoice is for 1,18,000 with 2,000 withheld: asking for the 1,16,000 still owed is fine.
+    hands.send_reminder(db_session, action=action(116_000_000_000), book=book)
+    assert len(sent) == 1
+    # Asking for the gross, which includes the withheld tax, is refused.
+    with pytest.raises(hands.HandError, match="withholding"):
+        hands.send_reminder(db_session, action=action(118_000_000_000), book=book)
+    assert len(sent) == 1
+
+
+def test_the_snapshot_marks_the_receivable_and_a_stale_confirmation_holds_the_reminder(
+    client, tenant, world, db_session
+):
+    from types import SimpleNamespace as NS
+
+    from app.services.helm import snapshot as snap
+    from app.services.helm import snapshot_store
+
+    _, case, _ = confirmed_case(client, tenant, world)
+
+    def receivable(work_item):
+        return snap.Receivable(
+            promise_id="p1", work_item_id=str(work_item.id), workspace_id=str(tenant.workspace.id),
+            document="inv.pdf", document_number="TR-1", counterparty_key=None, counterparty_name="Customer",
+            currency="INR", amount_micros=118_000_000_000, invoice_date=None, due_date=None, status="OPEN",
+            paid_on=None, confidence="VERIFIED")
+
+    book = NS(organization_id=tenant.organization.id)
+    [marked] = snapshot_store._with_withholding(db_session, book, [receivable(world[1])])
+    assert (marked.withheld_micros, marked.withholding_case_id, marked.withholding_hold) == (
+        2_000_000_000, case["id"], None)
+    assert marked.cash_due_micros == 116_000_000_000 and not marked.reminder_held
+    # An invoice with no withholding is untouched.
+    [plain] = snapshot_store._with_withholding(db_session, book, [receivable(world[2])])
+    assert plain.withholding_case_id is None and plain.withheld_micros == 0
+    # Stale evidence: the amount is not known, so the reminder is held, not sent for the gross.
+    really_change(db_session, world[2])
+    [stale] = snapshot_store._with_withholding(db_session, book, [receivable(world[1])])
+    assert stale.withholding_hold == "UNKNOWN_AMOUNT" and stale.reminder_held

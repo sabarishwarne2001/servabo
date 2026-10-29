@@ -41,7 +41,8 @@ export type ExportDataset =
   | "ASSISTANT_TURNS"
   | "AUTOMATION_RUNS"
   | "GST_MATCHES"
-  | "HELM_LEDGER";
+  | "HELM_LEDGER"
+  | "TRINETRA_CASES";
 export type ScheduleCadence = "DAILY" | "WEEKLY" | "MONTHLY";
 export type SyncTrigger = "SCHEDULED" | "MANUAL";
 export type SyncStatus = "RUNNING" | "SUCCEEDED" | "PARTIAL" | "FAILED";
@@ -61,12 +62,14 @@ export const EXPORT_DATASETS: readonly ExportDataset[] = [
   "AUTOMATION_RUNS",
   "GST_MATCHES",
   "HELM_LEDGER",
+  "TRINETRA_CASES",
 ] as const;
 
 /** Datasets that need a plan capability (Enterprise): the server answers 402 without it. */
 export const DATASET_CAPABILITY: Readonly<Partial<Record<ExportDataset, string>>> = {
   GST_MATCHES: "capability.gst_credit_all_workspaces",
   HELM_LEDGER: "capability.helm_all_workspaces",
+  TRINETRA_CASES: "capability.trinetra_all_workspaces",
 };
 
 export const SCHEDULE_CADENCES: readonly ScheduleCadence[] = [
@@ -89,6 +92,7 @@ export const DATASET_LABELS: Record<ExportDataset, string> = {
   AUTOMATION_RUNS: "Automation runs",
   GST_MATCHES: "GST matches",
   HELM_LEDGER: "Helm promise ledger",
+  TRINETRA_CASES: "TDS credit cases",
 };
 
 export const DATASET_HINTS: Record<ExportDataset, string> = {
@@ -104,6 +108,8 @@ export const DATASET_HINTS: Record<ExportDataset, string> = {
     "How each supplier record matched your invoices, with the credit it is worth, across every workspace. Ids and figures only, no supplier names.",
   HELM_LEDGER:
     "Every promise Helm found in your documents and whether it was kept, across every workspace. No names or document text.",
+  TRINETRA_CASES:
+    "Each TDS case and where it stands in your tax statement, across every workspace. Ids, states and figures only: no PAN, TAN or names.",
 };
 
 export const STATUS_LABELS: Record<SyncStatus, string> = {

@@ -108,13 +108,18 @@ const PromiseRow: React.FC<{
               Commercial balance · includes reviewed withholding{" "}
               {formatInrMicros(promise.withholding_review.reviewed_micros)}
             </p>
+            {promise.withholding_review.cash_due_micros !== undefined && promise.withholding_review.cash_due_micros !== null ? (
+              <p data-testid="helm-cash-due">
+                Cash still due from the customer: {formatInrMicros(promise.withholding_review.cash_due_micros)}
+              </p>
+            ) : null}
             <p>{promise.withholding_review.note}</p>
             {workspaceSlug && (
               <Link
                 className="helm-accent underline"
                 to={`${trinetraPath(orgSlug, workspaceSlug)}?case=${encodeURIComponent(promise.withholding_review.case_id)}`}
               >
-                Review withholding · reminder held
+                {promise.withholding_review.reminder_held ? "Review withholding · reminder held" : "Review withholding"}
               </Link>
             )}
           </div>

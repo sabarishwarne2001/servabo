@@ -2,7 +2,6 @@
 
 import logging
 from datetime import datetime, timezone, timedelta
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -10,20 +9,27 @@ logger = logging.getLogger(__name__)
 def document_changed(
     db, *, workspace_id, organization_id=None, reason="document_changed"
 ):
-    if not settings.TRINETRA_LIVE_ENABLED or workspace_id is None:
+    from app.services.trinetra import mode
+
+    if mode.deployment_mode() == mode.OFF or workspace_id is None:
         return
     try:
         from app.models.workspace import Workspace
-        from app.models.trinetra import TrinetraProfile
         from app.services import job_service
 
         with db.begin_nested():
             workspace = db.get(Workspace, workspace_id)
             if not workspace or workspace.is_sample:
                 return
+            if not mode.live_for(db, workspace.organization_id):
+                return
+            # Something to compare: a case that is still open. Otherwise a changed document queues nothing.
+            from app.services.trinetra.service import OPEN_STATES
+            from app.models.trinetra import TrinetraCredit
+
             if (
-                not db.query(TrinetraProfile.id)
-                .filter_by(workspace_id=workspace_id)
+                not db.query(TrinetraCredit.id)
+                .filter(TrinetraCredit.workspace_id == workspace_id, TrinetraCredit.state.in_(OPEN_STATES))
                 .first()
             ):
                 return

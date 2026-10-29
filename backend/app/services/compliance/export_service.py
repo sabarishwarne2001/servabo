@@ -55,8 +55,15 @@ DOWNLOAD_URL_TTL_SECONDS: int = 900
 #: `data_map.REGISTRY[table].export`, and `tests/services/test_data_map.py` keeps the two in step.
 #: "org" = the table has organization_id; "workspace" = it has workspace_id and is reached through `workspaces`.
 GENERIC_SECTIONS: dict[str, tuple[str, str, tuple[str, ...]]] = {
-    "trinetra_profiles": ("trinetra_profiles", "org", ("pan_ciphertext", "pan_fingerprint", "identity_salt_ciphertext")),
+    "trinetra_profiles": ("trinetra_profiles", "org", ("pan_ciphertext", "pan_fingerprint", "identity_salt_ciphertext", "org_pan_fingerprint")),
     "trinetra_statements": ("trinetra_statements", "org", ()),
+    "trinetra_suggestions": ("trinetra_suggestions", "org", ("deductor_key",)),
+    "trinetra_deductors": ("trinetra_deductors", "org", ("deductor_key",)),
+    "trinetra_pairings": ("trinetra_pairings", "org", ()),
+    "trinetra_inquiries": ("trinetra_inquiries", "org", ()),
+    "trinetra_approvals": ("trinetra_approvals", "org", ()),
+    "trinetra_outcomes": ("trinetra_outcomes", "org", ()),
+    "trinetra_policies": ("trinetra_policies", "org", ()),
     "trinetra_credits": ("trinetra_credits", "org", ("deductor_key",)),
     "trinetra_decisions": ("trinetra_decisions", "org", ()),
     "gst_returns": ("gst_returns", "org", ()),

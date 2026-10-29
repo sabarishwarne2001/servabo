@@ -75,6 +75,10 @@ WEBHOOK_EVENT_TYPES: Final[FrozenSet[str]] = frozenset(
         # supplier's name, an invoice number, an error message or a rule's name. Each is sent once per occurrence.
         "gst.return.imported",
         "trinetra.case.reviewed",
+        # Final session 2T (Phase 7.7; app/services/trinetra/events.py). PUBLIC, Enterprise only: ids, states and amounts (integer
+        # micros with their currency), never a PAN, a TAN, an invoice number or a customer's name. Once per case revision.
+        "trinetra.case.gap_found",
+        "trinetra.case.closed",
         "gst.invoice.at_risk",
         "gst.supplier.not_reported",
         "automation.run.failed",

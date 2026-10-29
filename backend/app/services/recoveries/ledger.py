@@ -132,6 +132,7 @@ CATEGORY_OF_KIND: dict[str, tuple[str, ...]] = {
     v.OVERCHARGE: (v.OVERCHARGE_RECOVERED,),
     v.PAYMENT_DEADLINE: (v.LATE_FEE_AVOIDED,),
     v.STATEMENT_DIFFERENCE: (),
+    v.TDS_CREDIT: (),             # evidence a credit appears in the statement; never a recovered outcome
 }
 
 __all__ = ["CATEGORY_OF_KIND", "Row", "dedupe_key", "for_issue", "record", "rows", "totals", "withdraw"]

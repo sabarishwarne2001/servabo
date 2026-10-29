@@ -3847,3 +3847,86 @@ sweeps nothing itself; each job sweeps its own workspace, so other jobs run in b
 `test_the_hourly_job_queues_one_sweep_per_workspace_and_sweeps_none_itself` (failed first: the job had no fan-out);
 the Recoveries, worker and scheduler tests pass; the cause is read from the code, the worker's single process and the
 sweep's local timing (6 s for 8 workspaces), and the CI run on the fix is the check that the browser suite holds.
+
+## F-641 — Helm would remind a customer for the tax the customer had already withheld (P0)
+
+**Found:** TRINETRA records that a customer withheld, say, ₹2,000 of a ₹1,50,000 invoice as tax. Helm's "chase overdue customers"
+mandate still reminded the customer for the whole ₹1,50,000, and when the whole invoice was withheld it proposed a reminder for
+nothing. **Fix:** the reminder asks for the net cash only; when no cash is left to chase, or the withheld amount cannot be told, the
+reminder is a Guard block with a plain reason (not a failed action), and the cockpit lists it with the case that releases it.
+**Proof:** `tests/services/helm/test_withholding_hold.py` (failed first), `tests/trinetra/test_helm_adapter.py`.
+
+## F-642 — "The invoice changed" meant "someone touched its row" (P0)
+
+**Found:** a rename, a summary, a tag, a reprocess with the same fields or a no-op healing bumped `updated_at`, so a confirmed
+withholding silently turned into "evidence needed". **Fix:** an invoice, a piece of evidence or a statement is versioned by a
+fingerprint of what it is (the stored file, the fields TRINETRA reads, the document-role facts); a touch leaves it current, a real
+change does not. A migration re-stamps existing cases without changing a decision. **Proof:** `tests/trinetra/test_versions.py`,
+`test_version_migration.py` (failed first).
+
+## F-643 — A seller that was not the profile's entity could produce a 500 (P0)
+
+**Found:** creating a case from an invoice whose seller facts disagreed with the profile (a GSTIN carrying another PAN, or a seller
+name that did not match) reached the database check and answered 500 instead of saying why. **Fix:** a seller check before the case
+is made: the PAN inside the seller's GSTIN must match the profile, and a differing seller name needs a person's explicit
+confirmation. **Proof:** `tests/trinetra/test_seller_check.py` (failed first).
+
+## F-644 — Plan capacities were not enforced for TRINETRA (P1)
+
+**Found:** profiles, active statement snapshots, open cases and inquiries had no per-plan limits. **Fix:** capacities read through
+the plan-limits table (Business 2 profiles, 12 active snapshots, 500 open cases, 50 inquiries a month; Enterprise 10, 60, 5,000,
+500), counted as active or open, raised with a plain "what to do next" hint. **Proof:** `tests/trinetra/test_capacities.py`.
+
+## F-645 — The same company could have a TRINETRA profile in two workspaces, double counting its tax (P0)
+
+**Found:** one PAN could be a profile in two workspaces of one organization, so the same credit was counted twice in the
+organization's totals. **Fix:** one legal entity, one profile per organization, by a keyed fingerprint with a per-organization
+random salt (the PAN is never decrypted across workspaces); a clear 409 names the workspace that holds it. The organization view
+counts each entity once, even for profiles that predate the rule. **Proof:** `tests/trinetra/test_one_entity_one_profile.py`,
+`tests/trinetra/test_integrations.py` (organization view).
+
+## F-646 — There was only an on/off switch for live TRINETRA (P1)
+
+**Found:** `TRINETRA_LIVE_ENABLED` was a yes/no for the whole deployment, so there was no way to run a supervised pilot with named
+organizations. **Fix:** three modes (off, pilot, on), shipping as pilot; one helper `live_for(organization)` is used by every gate;
+a platform administrator enrols an organization with a recorded reason; the old setting remains as an alias. The safety hold on
+Helm's reminders does not depend on the mode. **Proof:** `tests/trinetra/test_modes.py`.
+
+## F-647 — The "recompute" job did nothing (P1)
+
+**Found:** `trinetra.recompute` recomputed a summary and threw it away, so nobody was ever told when a confirmed withholding lost
+its evidence, an import left a possible missing posting, or a case went past its due date. **Fix:** it now says what is new, once per
+case revision, to the organization's owners and administrators (and to rules and Enterprise webhooks that listen), and nothing is
+queued when no case is open. **Proof:** `tests/trinetra/test_notices.py`, `tests/trinetra/test_case_events.py` (failed first: the job
+sent nothing).
+
+## F-648 — The case list asked the database a question per case (P1)
+
+**Found:** listing cases queried profiles, statements, documents and decisions once per case. **Fix:** the list reads them in
+batches, so the number of queries does not grow with the number of cases (a test pins it at the same count for 1 and 100 cases).
+**Proof:** `tests/trinetra/test_case_list_batches.py`.
+
+## F-649 — Who sees the write forms (not a defect)
+
+**Checked:** the screens showed the write forms to roles the server refuses. The server was already right (a workspace administrator
+writes; a viewer reads); the screens now follow it and a test pins that the two agree. **Proof:**
+`tests/trinetra/test_write_forms_match_the_server.py`.
+
+## F-650 — The summary slowed down quadratically with the number of cases (P1)
+
+**Found:** with 5,000 cases the summary took 28 s, because each case searched its statement's rows and allocations again. A large
+business would have seen a spinner instead of its list. **Fix:** one index of postings and one of allocations per summary, looked
+up per case; 2.6 s at 5,000 cases, with the same figures as before. **Proof:** `tests/performance/test_trinetra_budgets.py` (failed
+first at 28 s against a 5 s budget), `tests/trinetra/test_case_list_batches.py` (the batched list equals the one-case path).
+Also found by the isolation sweep: a case's inquiries for an unknown case answered an empty list; it now answers 404 like every
+other case route (`tests/trinetra/test_isolation_sweep.py`).
+
+## F-651 — A viewer was offered the statement import form (P2)
+
+**Found:** writing browser spec 142 (by role). The Statements tab showed the whole import form to a viewer; the server refused every
+save (403), so the screen offered what it would not allow (F-649 had covered the other forms but not this tab). **Fix:** the tab now
+tells a viewer that only a workspace administrator imports a statement. **Proof:** spec 142 ("a viewer reads the cases … but is offered no
+way to write", with the server asked too). Not proven by a failing run first: the spec was written after the fix in the same step.
+Also found by the browser specs: the organization view's totals were a scrollable region with nothing the keyboard could reach (axe,
+`scrollable-region-focusable`); it is now focusable (spec 144, light and dark). And the isolation sweep: an unknown case's inquiries
+answered an empty 200 instead of 404 (F-650's commit).

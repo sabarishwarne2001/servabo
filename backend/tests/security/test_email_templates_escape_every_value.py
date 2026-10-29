@@ -128,6 +128,9 @@ DOCUMENT_PARAMS = {
     "render_briefing": {"plan_lines", "risk_lines", "value_line"},
     "render_missing_invoices": {"supplier_name", "lines"},
     "render_gst_digest": {"headline", "findings", "unlock_line"},
+    # Final session 2T: a customer's name and an invoice number reach the TDS inquiry and the Monday TDS line.
+    "render_inquiry": {"customer_name", "invoice_number", "period_label", "document_label"},
+    "render_trinetra_digest": {"headline", "lines"},
 }
 DOCUMENT_RENDERERS = set(DOCUMENT_PARAMS)
 LONG = "Planted " + "Z" * 5000

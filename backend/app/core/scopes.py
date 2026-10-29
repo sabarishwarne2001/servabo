@@ -142,6 +142,7 @@ _GST_KEY_ROUTES: tuple[str, ...] = ("/summary", "/suppliers", "/records")
 
 ROUTE_SCOPE_MAP: dict[tuple[str, str], ApiKeyScope] = {
     ("GET", "/organizations/{organization_id}/trinetra/summary"): ApiKeyScope.TRINETRA_READ,
+    ("GET", "/organizations/{organization_id}/trinetra/cases"): ApiKeyScope.TRINETRA_READ,
     ("GET", "/organizations/{organization_id}"): ApiKeyScope.ORGANIZATIONS_READ,
     ("GET", "/organizations/{organization_id}/workspaces"): ApiKeyScope.WORKSPACES_READ,
     ("POST", "/organizations/{organization_id}/workspaces"): ApiKeyScope.WORKSPACES_WRITE,

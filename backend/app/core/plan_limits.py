@@ -49,8 +49,14 @@ class PlanLimit:
 
 _PLAN_LIMITS: tuple[PlanLimit, ...] = (
     PlanLimit("limit.trinetra_profiles", "profiles", "TRINETRA legal-entity profiles per organization."),
-    PlanLimit("limit.trinetra_snapshots", "snapshots", "Retained TRINETRA statement snapshots per organization."),
-    PlanLimit("limit.trinetra_cases", "cases", "Retained TRINETRA credit cases per organization."),
+    PlanLimit("limit.trinetra_snapshots", "snapshots",
+              "Active TRINETRA statement snapshots per organization (one per legal entity and tax year; a new import "
+              "supersedes the old one at no cost)."),
+    PlanLimit("limit.trinetra_cases", "cases",
+              "Open TRINETRA credit cases per organization (closing a case frees its slot; closed cases and "
+              "superseded snapshots count against a much higher retention ceiling)."),
+    PlanLimit("limit.trinetra_inquiries_per_month", "inquiries",
+              "Customer TDS inquiries a person sends from TRINETRA in a calendar month, per organization."),
     PlanLimit(
         name=SEATS_LIMIT,
         unit="seats",

@@ -225,6 +225,12 @@ def guard(action: ActionView, snapshot: Snapshot, mandates: Sequence[base.Active
     else:
         checks.append(_skip("gst", "GST credit secured", "Not a payment."))
 
+    # withholding (TRINETRA): a reminder never chases the tax a customer withheld ----------------------------
+    if action.kind == v.ACTION_SEND_REMINDER:
+        held = _withholding_check(action, snapshot)
+        if held is not None:
+            checks.append(held)
+
     # account ----------------------------------------------------------------------------------
     checks.append(base.check("account", "The organization is writable", snapshot.account_writable,
                              detail="The organization is active and paid up." if snapshot.account_writable else
@@ -313,6 +319,37 @@ def guard(action: ActionView, snapshot: Snapshot, mandates: Sequence[base.Active
     passed = not any(c.result == v.CHECK_FAIL for c in checks)
     needs = any(c.result == v.CHECK_APPROVAL for c in checks)
     return GuardResult(passed=passed, needs_approval=needs, checks=checks)
+
+
+def _withholding_check(action: ActionView, snapshot: Snapshot) -> Optional[base.Check]:
+    """A customer reminder asks for cash, not for tax the customer withheld and a person reviewed in TRINETRA. It fails
+    (a block with a plain reason, never a failed send) when nothing is left to chase in cash, when the withheld amount is
+    not known because the evidence went stale, or when the reminder's amount still includes the withheld tax. Not
+    applicable (no check at all) for an invoice with no reviewed withholding."""
+    receivable = snapshot.receivable(action.promise_id) if action.promise_id else None
+    if receivable is None or not receivable.withholding_case_id:
+        return None
+    title = "Held for withholding review"
+    evidence = {"case_id": receivable.withholding_case_id, "withheld_micros": receivable.withheld_micros,
+                "cash_due_micros": receivable.cash_due_micros}
+    if receivable.withholding_hold is not None:
+        return base.Check("withholding", title, v.CHECK_FAIL,
+                          "A TDS withholding was confirmed on this invoice, but the evidence behind it changed, so how "
+                          "much of the balance is withheld tax is not known. Review the case in TRINETRA before "
+                          "reminding the customer.", evidence)
+    if receivable.cash_due_micros <= 0:
+        return base.Check("withholding", title, v.CHECK_FAIL,
+                          f"The balance of {money.say(receivable.amount_micros, receivable.currency)} is TDS the "
+                          "customer withheld, which TRINETRA shows as reviewed; there is no cash left to chase. "
+                          "Release the hold by withdrawing or re-reviewing the case in TRINETRA.", evidence)
+    if int(action.amount_micros or 0) > receivable.cash_due_micros:
+        return base.Check("withholding", title, v.CHECK_FAIL,
+                          f"This reminder asks for {money.say(int(action.amount_micros or 0), receivable.currency)}, "
+                          f"which includes {money.say(receivable.withheld_micros, receivable.currency)} withheld as "
+                          "TDS. Helm re-plans it for the cash still owed.", evidence)
+    return base.Check("withholding", title, v.CHECK_PASS,
+                      f"{money.say(receivable.withheld_micros, receivable.currency)} was withheld as TDS; the reminder "
+                      "asks only for the cash still owed.", evidence)
 
 
 def _gst_check(payable) -> base.Check:

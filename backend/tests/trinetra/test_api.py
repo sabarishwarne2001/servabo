@@ -4,7 +4,18 @@ import pytest
 from app.core.config import settings
 from app.models.trinetra import TrinetraDecision, TrinetraStatement
 from tests.security.plans import put_on_plan
-from tests.services.gst.helpers import book_invoice, SUPPLIER_A
+from tests.services.gst.helpers import book_invoice
+from app.services.gst import builder as gst_builder
+
+#: The seller's GSTIN carries the seller's PAN (characters 3 to 12), as a real one does.
+SUPPLIER_A = gst_builder.make_gstin("27", "ABCDE1234F")
+
+
+def really_change(db, item):
+    """A real change to a document: its stored file is replaced. (Since Final 2T a touch of the row, such as a rename or
+    a bumped updated_at, is not a change; see tests/trinetra/test_versions.py.)"""
+    item.stored_filename = item.stored_filename + ".replaced"
+    db.commit()
 
 
 @pytest.fixture()
@@ -40,7 +51,7 @@ def test_sample_has_consistent_totals_and_no_live_write(client, tenant):
     r = client.get(url, headers=tenant.viewer.headers)
     assert r.status_code == 200, r.text
     data = r.json()
-    assert len(data["items"]) == 9
+    assert len(data["items"]) == 13            # nine from M0-M6, four more for the whole money model (Final 2T)
     assert int(data["expected_micros"]) == sum(
         int(i["expected_micros"] or 0) for i in data["items"]
     )

@@ -1,68 +1,65 @@
 # TRINETRA launch gates
 
-> **Plan (N-190, 2026-10-26):** Final session 2T (`docs/sessions/FINAL-2T-TRINETRA.md`) finishes TRINETRA for Business and
-> Enterprise and replaces the single switch with three modes (off, pilot, on). Final session 2B proves the statement readers on
-> real files. Then the owner's CA reads the wording, and the owner sets the mode to "on". This page is updated by 2T.
+_Updated in Final session 2T (2026-10-28). The order is fixed: **2T** finished the product in code and tests; **2B** proves what only a
+real file or service can prove; then the owner's chartered accountant reads the wording; then the owner sets the mode to "on"._
 
-**Release status: gated implementation; not approved for live tax processing.**
-`TRINETRA_LIVE_ENABLED=false` is the default in code, examples and production compose.
-Do not enable it merely because synthetic tests pass.
+**Release status: finished in code and tests, in pilot mode; not approved for open release.**
+`TRINETRA_MODE=pilot` is the default in code, the examples and the production compose: an organization is live only when a platform
+administrator enrolls it (`/admin/trinetra/pilot`, with a reason, audited). Do not set `on` merely because the tests pass.
+`TRINETRA_LIVE_ENABLED` is the old on/off setting, kept as an alias that wins when it is set; leave it unset.
 
-## External evidence still required
+## What is proven, and what only a real file or service can prove
 
-- Authoritative commencement, transition and download guidance was reached and
-  reviewed on 25 October 2026. See [LEGAL-SOURCES.md](LEGAL-SOURCES.md). This does
-  not establish the structure or meaning of any particular exported file.
-- Obtain authorized, legally usable historical/current statement exports. Validate
-  every supported layout and ambiguous-column rule. No official parser is shipped
-  as supported; human transcription must not be marketed as one.
-- Have a tax adviser review transition/event dates, period labels, sample examples,
-  section references and the wording of all financial conclusions. The current
-  examples assert no rate or eligibility rule.
-- Run an authorized customer pilot with reconciled invoice, bank, advice, accounting
-  and statement evidence. Confirm data residency, retention and legal holds with the
-  customer's owner and accountant. Do not use live data in this development environment.
+| Claim | Proven by | Still needed |
+|---|---|---|
+| Arithmetic, scoping, versions, approvals, notices, isolation, privacy, limits | Backend tests, synthetic data (`TEST-PLAN.md`) | Nothing, except the finish-line runs |
+| The template and AIS readers read what a person typed or exported | Synthetic fixtures; the AIS columns are confirmed by the person in a mapping preview | 2B: the owner's own AIS CSV |
+| **The Form 26AS and Form 168 readers read a real download** | **Nothing.** Written from secondary sources (the official hosts were unreachable); registered unverified | **2B: the owner's own Form 26AS / Form 168 text**, never put in the repository or a chat |
+| The Zoho Books read finds invoices with TDS | A mocked Zoho (`test_zoho_tds.py`) | 2B: the owner's real Zoho Books organization, read-only |
+| An inquiry reaches a real inbox and the secure link works | Tests with a mail catcher | 2B: one real send to the owner's own address |
+| A real case end to end (invoice, bank, advice, statement, review) | Synthetic browser specs 136 and 141 to 144 | 2B: the owner's own data, in pilot mode |
+| The wording is acceptable to a tax professional | Not claimed | The owner's chartered accountant reads `/trinetra` and the in-app text for about an hour |
 
-## Product acceptance still open
+## The owner's gates
 
-These are limitations, not external verification already completed:
+1. **Final session 2B** (`docs/sessions/FINAL-2-LIVE.md`, TRINETRA phase) marks each COMPLETION row "Verified in 2B" or "Differs"
+   and fixes or records every difference. A reader that differs stays `unverified` (and refusing) until it is fixed.
+2. **The accountant's read.** Give the accountant the website's `/trinetra` page, `docs/trinetra/USER-GUIDE.md` and a login to a
+   pilot organization. They check the words "possible gap", "TDS now visible in your statement", "expected deduction", the examples,
+   the disclaimer on every export, and that nothing reads as advice on a rate, a section or a claim. Wording changes are code changes
+   in `frontend/src/pages/trinetra/model.ts` and the website; a session makes them.
+3. **Open the pilot to a named customer.** `PUT /admin/trinetra/pilot/{organization_id}` with a reason (the exact command is in RUNBOOK, "TRINETRA";
+   `scripts/preflight.py` shows how many are enrolled). Confirm data residency and retention with that customer's owner.
+4. **Open it to every Business and Enterprise organization.** Set `TRINETRA_MODE=on`, restart the API and the workers, run
+   `preflight.py` (it must say the mode is on and name the readers still unverified, if any), and set the website's
+   `PUBLIC_TRINETRA_STATUS=available` and rebuild. Until then the website says "rolling out". This is HANDOFF's launch checklist, step 13.
+5. **Rolling back:** set `TRINETRA_MODE=pilot` (or `off`) and restart. Recorded withholding keeps holding Helm's reminders in every
+   mode, so a customer is never chased for tax a customer already withheld; export dossiers first if a migration is to be reversed.
 
-- Automatic ERP-derived expectations and verified official CSV/XLSX/TXT/PDF parsers.
-- Full treatment of credit notes, reversals and advances; current unsupported signed
-  amounts are refused for allocation and require accountant review.
-- Pilot validation of the reviewed Helm annotation and reminder hold. Confirmed
-  withholding is shown separately from cash; commercial totals are not silently
-  netted and no bank settlement is rewritten. Unsupported signed adjustments stay gated.
-- Production-ready multi-stage approval policy and an authorized inquiry-send path.
-  Current drafts send nothing and consume no outbound-inquiry quota.
-- Real-source validation of later gap-closure metrics and self-reported review time.
-  Synthetic tests prove the comparison rules; no customer savings, recovery, refund
-  or time-saving claim has been established.
-- Pilot validation of document source comparison, source selection at scale, and
-  the complete role/plan matrix in a browser.
+## Bounded claims (the website, the app and the sales conversation)
 
-## Deployment checklist after acceptance
+Servabo may say: it **checks whether the tax your customers withheld reached your tax statement**, shows what is missing as
+**things to investigate**, keeps the evidence and the history, and shows "TDS now visible in your statement" when a later statement
+contains a credit that was missing. Servabo must not say: that it recovers or refunds money, that a credit is guaranteed or allowed,
+that it is connected to the government, TRACES or the e-filing portal, that it files anything, that it gives tax advice, or that a
+gap means anyone did something wrong. A chartered accountant decides what a business may claim.
+
+## Deployment checklist
 
 1. Back up and restore-test the database; retain an evidence export for rollback.
-2. Apply `alembic upgrade head`; confirm exactly one head and no new migration drift.
-3. Publish additive tier versions through the existing publisher. Run the plan seed's
-   dry-run/help first; inspect the generated delta. Existing subscriptions pin their
-   versions: use the established reviewed carry-forward procedure. Do not rewrite
-   subscription prices or invent payment product IDs.
-4. Verify Business grants `capability.trinetra`, Enterprise also grants
-   `capability.trinetra_all_workspaces`, and the agreed capacities are present.
-5. Retain valid platform encryption keys and test rotation. JWT rotation is unrelated
-   to the per-profile identity salt. Restart API and LIGHT workers on the same revision.
-6. Keep `TRINETRA_LIVE_ENABLED=false` until the above evidence is approved, then enable
-   only for the authorized deployment/pilot. Confirm sample workspaces remain immutable.
-7. Review job failures in the existing jobs console and scoped run-status API. Check
-   stale-source banners, export audit events and compliance export/erasure in staging.
-8. Before rollback, export history; `tr1a2_review_outcomes` adds comparison/time/source
-   links and `tr1a1_credit_assurance` adds the tables, key scope and webhook vocabulary.
-   Downgrading both removes TRINETRA data and its key/webhook subscriptions. Disable
-   the flag first. Existing recorded withholding continues to hold gross reminders
-   while its rows remain, even after a flag disable or plan downgrade.
+2. Apply `alembic upgrade head`; confirm exactly one head (`tr2t10_recoveries_tds_kind` at the end of 2T) and no migration drift.
+3. Publish the additive tier versions through the existing publisher (dry run first; existing subscriptions keep their pins and
+   the reviewed carry-forward applies). Business grants `capability.trinetra`; Enterprise also `capability.trinetra_all_workspaces`;
+   the capacities are Business 2 profiles, 12 snapshots, 500 cases, 50 inquiries a month and Enterprise 10, 60, 5,000.
+   `docs/hardening/TENANCY-AND-PLANS.md` and the website's `pricing.json` are generated from the same seed.
+4. Retain valid platform encryption keys and test rotation (both PAN and identity-salt columns, and the per-organization salt, are in
+   the sweep). Restart the API and the workers on the same revision; `trinetra.sweep` runs hourly and says each thing once.
+5. Keep `TRINETRA_MODE=pilot`. Enrol the first organization only after gates 1 and 2.
+6. Check the jobs console for `trinetra.recompute` and `trinetra.sweep`, the stale-source banner, export audit events, and the
+   compliance export and erasure in staging.
+7. Before rollback, export dossiers. `tr2t4` deletes file-sourced snapshots on downgrade, `tr2t6` the pairings and closes UNRESOLVED
+   cases as EXPLAINED, `tr2t7` the inquiries, policies, approvals and closure ledger, `tr2t10` the Recoveries issues of kind TDS credit.
+   `tr1a1` and `tr1a2` remove the original tables. Each migration's docstring says what is lost.
 
-No production deployment, provider product creation, real email, government filing
-or payment was performed during implementation. Validation evidence belongs in
-[TEST-PLAN.md](TEST-PLAN.md), including failures and untested items.
+No production deployment, provider product creation, real email, government filing or payment was performed during implementation.
+Validation evidence belongs in [TEST-PLAN.md](TEST-PLAN.md), including failures and untested items.

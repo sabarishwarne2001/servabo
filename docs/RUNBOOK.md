@@ -1002,32 +1002,55 @@ edit the mark's drawing in that script (its geometry is described in `brand/READ
 recreation of the supplied picture (N-176). A workspace with no logo of its own shows the Servabo mark.
 # TRINETRA deployment supplement
 
-TRINETRA remains off by default (`TRINETRA_LIVE_ENABLED=false`). Read
-`docs/trinetra/LAUNCH-GATES.md` before authorizing a pilot; synthetic test success
-does not authorize processing live tax records. No portal credentials are needed.
+_Rewritten in Final session 2T (2026-10-28)._ TRINETRA (the "TDS credit" page: did the tax a customer withheld reach the business's tax
+statement) ships in **pilot** mode: `TRINETRA_MODE=pilot` (the default). Read `docs/trinetra/LAUNCH-GATES.md` before enrolling anyone;
+synthetic test success does not authorize processing live tax records, and the Form 26AS, Form 168 and AIS readers are unverified until
+Final session 2B reads a real file. No portal credentials are needed or accepted.
 
-From the backend environment, inspect and apply the additive migrations with
-`alembic heads` (one head), `alembic upgrade head`, then
-`python scripts/check_migration_drift.py`. The new head is `tr1a2_review_outcomes`.
-Back up first. Rollback to `k1a7_pack_check_dismissals` drops TRINETRA evidence and
-history and removes its API-key scope and event subscriptions; export dossiers first.
+**The three modes.** `off`: nobody is live, everyone sees the synthetic examples. `pilot`: only an organization you enrolled is live
+(and only if its plan, Business or Enterprise, includes it). `on`: every Business and Enterprise organization is live. Change it in
+`.env.production` and restart the API and the workers. `TRINETRA_LIVE_ENABLED` is the old yes/no setting; leave it unset (when set it
+wins: true means on, false off). `python scripts/preflight.py` prints the mode, how many organizations are enrolled and which readers are
+still unverified.
 
-Use the existing versioned publisher without changing payment products or prices:
-`python scripts/seed_quota_tiers.py --dry-run`, inspect Business/Enterprise additions,
-then `python scripts/seed_quota_tiers.py`. Existing subscriptions remain pinned.
-Inspect `python scripts/seed_quota_tiers.py --carry-forward --dry-run` before the
-owner-operated `--carry-forward` command; it admits only no-worse, same-price changes.
-Never use `--allow-unpriced` to claim a paid production plan is purchasable.
+**Enrol or withdraw an organization** (on the server, from the backend folder; the reason is at least 10 characters and is kept in the
+audit log of that organization):
 
-API and LIGHT workers need the same code/flag version. Reconciliation jobs use the
-existing jobs console and `/trinetra/reconciliation/{job_id}` status route. A 409
-`TRINETRA_SOURCE_REVIEW_REQUIRED` means the deliberate launch gate is still closed.
-Source-change 409s need a fresh preview/review; quota 409s need an administrator.
-Use the platform encryption-rotation sweep before retiring an encryption key;
-both PAN and the per-profile identity salt must be rewritten and verified.
+```bash
+python scripts/trinetra_pilot.py list
+python scripts/trinetra_pilot.py enrol --organization acme-inc --reason "Pilot with the owner's own files; CA has read the wording"
+python scripts/trinetra_pilot.py withdraw --organization acme-inc --reason "Pilot over; the customer asked to stop"
+```
 
-A `HELM_WITHHOLDING_REVIEW` failure means a reviewed deduction holds the gross cash
-reminder. Inspect the case, source freshness and separate advice/accounting amounts.
-Do not mark an invoice paid to bypass this hold. Disabling TRINETRA or downgrading a
-plan does not silently release recorded holds. An authorized review can clear the
-confirmation or withdraw an unsupported expectation with a reason.
+The same is available to a platform administrator over the API (`GET /api/v1/admin/trinetra/pilot`,
+`PUT /api/v1/admin/trinetra/pilot/{organization_id}`, `POST .../withdraw`, each with a `reason`). The organization's own TRINETRA page
+shows "in a pilot, not enrolled yet" until you do, and the live page after. A 409 `TRINETRA_NOT_ENROLLED` is that; a 409
+`TRINETRA_SOURCE_REVIEW_REQUIRED` means the mode is `off`.
+
+**Migrations** (`tr1a1`, `tr1a2`, then `tr2t1` to `tr2t10`; one head, `tr2t10_recoveries_tds_kind`): `alembic heads`, `alembic upgrade head`,
+then `python scripts/check_migration_drift.py`. Back up first. Rolling back drops TRINETRA evidence and history and removes its API-key
+scope and event subscriptions; each migration's docstring says exactly what its downgrade deletes. Export dossiers first.
+
+**Plans.** Use the existing versioned publisher without changing payment products or prices: `python scripts/seed_quota_tiers.py --dry-run`,
+inspect the Business and Enterprise additions (`limit.trinetra_profiles`, `_snapshots`, `_cases`, `_inquiries_per_month`), then run it.
+Existing subscriptions remain pinned; inspect `--carry-forward --dry-run` before the owner-operated `--carry-forward`. Never use
+`--allow-unpriced` to claim a paid production plan is purchasable.
+
+**Jobs.** The API and the LIGHT worker need the same code version. Three jobs: `trinetra.recompute` (per workspace, debounced, queued again when a document changes; it now says
+what is new: a notice per case revision, `trinetra.case.*` events), `trinetra.sweep` (hourly: the 30-day "still unresolved" notice and
+the Monday line at 09:00 in each organization's zone, each once), the reconciliation run (`/trinetra/reconciliation/{job_id}` status). The claim ledger `trinetra_notice_sends` means a retried or doubled job never says a thing twice; to see why
+a notice did not go, look there for the organization, kind and key (a case and revision, or an ISO week). Notices are in-app and the
+Monday line is email through the platform mail settings.
+
+**What an owner may see in support.** "Case not found" on a link is a case that was closed out of the working set (older than three tax
+years) or erased with its invoice; a 409 on a decision is a stale revision (reload); a 402 is the plan; a 422 on a statement file
+names the row or heading, never the content. An inquiry refused "no confirmed email contact" needs the customer's email confirmed in
+Helm first (a learned address is never a recipient); "egress policy" means the organization's lockdown blocks the mail server.
+
+Use the platform encryption-rotation sweep before retiring an encryption key; the PAN, the per-profile identity salt and the
+per-organization salt must all be rewritten and verified.
+
+A `HELM_WITHHOLDING_REVIEW` failure means a reviewed deduction holds the gross cash reminder. Inspect the case, source freshness and
+the separate advice and accounting amounts. Do not mark an invoice paid to bypass this hold. Switching the mode, disabling TRINETRA or
+downgrading a plan does not silently release recorded holds; an authorized review can clear the confirmation or withdraw an
+unsupported expectation with a reason.

@@ -88,7 +88,9 @@ const money = (amounts: readonly RecoveryAmount[]): string =>
   amounts.length === 0 ? "—" : amounts.map((a) => formatHelmMoney(a.amount_micros, a.currency)).join(" · ");
 
 const exposure = (issue: RecoveryIssue): string =>
-  issue.exposure_micros !== null && issue.exposure_micros !== undefined && issue.currency
+  issue.kind === "TDS_CREDIT"
+    ? "Possible gap in your tax statement, not cash"
+    : issue.exposure_micros !== null && issue.exposure_micros !== undefined && issue.currency
     ? formatHelmMoney(issue.exposure_micros, issue.currency)
     : "Amount not read";
 
@@ -201,7 +203,9 @@ const IssueDetail: React.FC<{
   // Organization owners and admins reach every workspace as derived admins (no membership row): they can own an issue too.
   const people = [...new Map((members.data?.items ?? []).filter((m) => m.status === "ACTIVE")
     .map((m) => [m.user.id, m] as const)).values()];
-  const word = issue.kind === "STATEMENT_DIFFERENCE" ? "Explained" : "Not money";
+  // A statement difference and a TDS gap are not money to recover: they are explained, never counted.
+  const explained = issue.kind === "STATEMENT_DIFFERENCE" || issue.kind === "TDS_CREDIT";
+  const word = explained ? "Explained" : "Not money";
   const href = (scope: string, path: string): string =>
     scope === "helm" ? `${helmPath(orgSlug)}/${path}` : `${workspacePath(orgSlug, workspaceSlug)}/${path}`;
 
@@ -323,7 +327,13 @@ const IssueDetail: React.FC<{
               maxLength={2000}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder={issue.kind === "STATEMENT_DIFFERENCE" ? "How the difference is explained" : "Why this is not money to recover"}
+              placeholder={
+                issue.kind === "TDS_CREDIT"
+                  ? "How the gap is explained"
+                  : issue.kind === "STATEMENT_DIFFERENCE"
+                    ? "How the difference is explained"
+                    : "Why this is not money to recover"
+              }
             />
             <div className="flex flex-wrap items-center gap-3">
               <button

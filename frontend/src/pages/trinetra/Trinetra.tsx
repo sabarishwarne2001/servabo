@@ -8,12 +8,29 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Eye, Search, ShieldCheck, X } from "lucide-react";
 import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
+import { useGrantedCapabilities } from "@/hooks/useGrantedCapabilities";
 import PageHeader from "@/components/ui/PageHeader";
+import StatusPill from "@/components/ui/StatusPill";
+import { TabList, TabPanel, useUrlTab, type TabDefinition } from "@/components/ui/Tabs";
 import { BUTTON_SECONDARY, INPUT, SELECT, SURFACE } from "@/components/ui/primitives";
+import { CAPABILITY } from "@/constants/capabilities";
+import { useResolvedTenant } from "@/routes/TenantContext";
+import { organizationBillingPath } from "@/routes/tenantPaths";
 import { rupees } from "./format";
-import { getTrinetraAccess, getTrinetraCockpit } from "@/services/api/trinetra";
+import { getTrinetraAccess, getTrinetraCockpit, listTaxProfiles } from "@/services/api/trinetra";
+import AccessNotice from "./AccessNotice";
+import Approvals from "./Approvals";
+import CaseInsight from "./CaseInsight";
+import Closures from "./Closures";
+import Exceptions from "./Exceptions";
+import FreshnessBanner from "./FreshnessBanner";
+import ImportStatement from "./ImportStatement";
+import Kpis from "./Kpis";
+import { statusTone, statusWords } from "./model";
+import Suggestions from "./Suggestions";
+import Tutorial from "./Tutorial";
+import Waterfall from "./Waterfall";
 
-const words = (s: string) => s.toLowerCase().replaceAll("_", " ");
 const stages = [
   "Invoice",
   "Bank receipt",
@@ -24,11 +41,15 @@ const stages = [
 
 function Cockpit() {
   const workspace = useActiveWorkspace();
+  const { organization } = useResolvedTenant();
   const id = workspace?.workspaceId ?? "";
-  const [sample, setSample] = useState(true);
+  // The examples are the safe start. Someone who chose a view keeps it; a live organization that already has a legal entity
+  // lands on its own workspace.
+  const [chosen, setChosen] = useState<boolean | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [year, setYear] = useState("");
+  const [entity, setEntity] = useState("");
   const [sort, setSort] = useState("customer");
   const [selected, setSelected] = useState<string | null>(null);
   const [page, setPage] = useState(0);
@@ -37,11 +58,35 @@ function Cockpit() {
     queryFn: () => getTrinetraAccess(id),
     enabled: Boolean(id),
   });
+  const live = Boolean(access.data?.live_enabled && access.data.entitled);
+  const profiles = useQuery({
+    queryKey: ["trinetra", id, "profiles"],
+    queryFn: () => listTaxProfiles(id),
+    enabled: Boolean(id) && live,
+  });
+  const sample = chosen ?? !(live && (profiles.data?.items.length ?? 0) > 0);
+  const setSample = (value: boolean) => setChosen(value);
   const result = useQuery({
     queryKey: ["trinetra", id, "cockpit", sample],
     queryFn: () => getTrinetraCockpit(id, sample),
     enabled: Boolean(id),
   });
+  const capabilities = useGrantedCapabilities(workspace?.organizationId ?? "");
+  const enterprise = capabilities.granted.has(CAPABILITY.trinetraAllWorkspaces);
+  const canWrite = workspace?.role === "ADMIN";
+  const showTabs = live && !sample;
+  const tabIds = enterprise
+    ? (["cases", "statements", "suggestions", "exceptions", "approvals", "closures"] as const)
+    : (["cases", "statements", "suggestions", "exceptions", "closures"] as const);
+  const [tab, setTab] = useUrlTab(tabIds);
+  const tabs: TabDefinition<(typeof tabIds)[number]>[] = [
+    { id: "cases", label: "Cases" },
+    { id: "statements", label: "Statements" },
+    { id: "suggestions", label: "Suggestions" },
+    { id: "exceptions", label: "Reversals" },
+    ...(enterprise ? [{ id: "approvals" as const, label: "Approvals" }] : []),
+    { id: "closures", label: "Closures" },
+  ];
   const data = result.data;
   const rows = useMemo(
     () =>
@@ -49,6 +94,7 @@ function Cockpit() {
         .filter(
           (r) =>
             (!year || String(r.year) === year) &&
+            (!entity || r.profile_id === entity) &&
             (!status || r.status === status) &&
             `${r.reference} ${r.counterparty}`.toLowerCase().includes(query.toLowerCase()),
         )
@@ -61,92 +107,35 @@ function Cockpit() {
                 : -1
               : a.counterparty.localeCompare(b.counterparty),
         ),
-    [data, query, status, year, sort],
+    [data, query, status, year, entity, sort],
   );
   const current = data?.items.find((r) => r.id === selected);
-  const live = access.data?.live_enabled && access.data.entitled;
-  return (
-    <div className="space-y-6 p-4 sm:p-6">
-      <PageHeader
-        icon={Eye}
-        eyebrow="TRINETRA"
-        title="Credit assurance"
-        description="Trace withheld tax from invoice to government statement."
-        badge={
-          <span className="rounded-full border border-border px-3 py-1 text-xs">
-            {sample ? "Illustrative synthetic data" : "Reviewed evidence"}
-          </span>
-        }
-        actions={
-          live ? (
-            <button
-              className={BUTTON_SECONDARY}
-              onClick={() => {
-                setSample(!sample);
-                setSelected(null);
+  const cases = (
+    <>
+      {!sample && live && canWrite && <WorkspaceEvidence workspaceId={id} />}
+      {!sample && live && canWrite && <ExportEvidence workspaceId={id} />}
+      {!sample && live && canWrite && <ReconciliationRun workspaceId={id} />}
+      <div className="flex flex-wrap gap-3">
+        {!sample && live && (profiles.data?.items.length ?? 0) > 0 && (
+          <label className="text-sm">
+            Show one legal entity
+            <select
+              className={`${SELECT} ml-2`}
+              value={entity}
+              onChange={(e) => {
+                setEntity(e.target.value);
                 setPage(0);
               }}
             >
-              {sample ? "Your workspace" : "Explore examples"}
-            </button>
-          ) : undefined
-        }
-      />
-      <section
-        className={`${SURFACE} flex gap-3 p-4 text-sm`}
-        aria-label="Evidence and availability"
-      >
-        <ShieldCheck className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-        <div>
-          <p className="font-medium">
-            {sample
-              ? "Explore the evidence chain without uploading tax documents"
-              : "Evidence reflects the selected imported snapshot"}
-          </p>
-          <p className="mt-1 text-muted-foreground">
-            {!live
-              ? "Live access is awaiting official-source and tax-adviser validation. Business and Enterprise are the intended live plans. "
-              : ""}
-            A gap is an investigation item. It is not a tax refund or a legally claimable credit.
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {data?.as_of
-              ? `Evidence as of ${data.as_of}. Later postings require a new reviewed snapshot.`
-              : "No statement has been imported."}
-          </p>
-        </div>
-      </section>
-      {!sample && live && workspace?.role === "ADMIN" && <WorkspaceEvidence workspaceId={id} />}
-      {!sample && live && workspace?.role === "ADMIN" && <ExportEvidence workspaceId={id} />}
-      {!sample && live && workspace?.role === "ADMIN" && <ReconciliationRun workspaceId={id} />}
-      <details className={`${SURFACE} p-4 text-sm`}>
-        <summary className="cursor-pointer font-semibold">
-          Getting started with credit evidence
-        </summary>
-        <ol className="mt-3 list-decimal space-y-2 pl-5">
-          <li>
-            Confirm the receiving entity and source period. Upload documents through Documents;
-            ordinary access, retention and intake limits apply.
-          </li>
-          <li>
-            Record only a supported withholding expectation. Bank shortfalls do not establish TDS;
-            tax basis and eligibility may remain unknown.
-          </li>
-          <li>
-            Compare Helm bank receipts, customer advice and accounting evidence. Link the originals
-            so another reviewer can inspect them.
-          </li>
-          <li>
-            Preview the selected statement scope and manually checked rows. Official file layouts
-            are not yet supported.
-          </li>
-          <li>
-            Allocate posted amounts with a reason, request clarification through the existing
-            document discussion, and export a dossier for accountant review.
-          </li>
-        </ol>
-      </details>
-      <div className="flex flex-wrap gap-3">
+              <option value="">All entities</option>
+              {profiles.data?.items.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} · {p.pan_masked}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="text-sm">
           Tax period
           <select
@@ -192,30 +181,20 @@ function Cockpit() {
         </div>
       ) : data ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {[
-              ["Supported expected withholding", rupees(data.expected_micros)],
-              ["Allocated uploaded postings", rupees(data.posted_micros)],
-              ["Possible credit gap", rupees(data.gap_micros)],
-              ["Unresolved cases", String(data.unresolved)],
-            ].map(([label, value]) => (
-              <section key={label} className={`${SURFACE} border-t-2 border-t-primary/50 p-5`}>
-                <p className="text-sm text-muted-foreground">{label}</p>
-                <p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {sample ? "Synthetic reviewed evidence" : "Current evidence only"}
-                </p>
-              </section>
-            ))}
-          </div>
+          <Kpis data={data} sample={sample} />
           {!sample && data.outcomes && (
             <section className={`${SURFACE} p-4 text-sm`} aria-label="Measured review outcomes">
               <p className="font-medium">
-                Confirmed later gap closure: {rupees(data.outcomes.confirmed_gap_closure_micros)} ·{" "}
-                {data.outcomes.confirmed_cases} reviewed cases · {data.outcomes.review_minutes}{" "}
+                TDS now visible in your statement:{" "}
+                {rupees(data.outcomes.now_visible_total_micros ?? "0")} ·{" "}
+                {data.outcomes.now_visible_cases ?? 0} cases · {data.outcomes.review_minutes}{" "}
                 recorded review minutes
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">{data.outcomes.note}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {data.outcomes.ledger_note ?? data.outcomes.note} Confirmed later gap closure:{" "}
+                {rupees(data.outcomes.confirmed_gap_closure_micros)} across{" "}
+                {data.outcomes.confirmed_cases} reviewed cases.
+              </p>
             </section>
           )}
           <ol
@@ -231,7 +210,7 @@ function Cockpit() {
               </li>
             ))}
           </ol>
-          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
             <section className={`${SURFACE} overflow-hidden`} aria-labelledby="credit-queue">
               <div className="space-y-3 border-b border-border p-5">
                 <h2 id="credit-queue" className="font-semibold">
@@ -267,7 +246,7 @@ function Cockpit() {
                       <option value="">All exceptions</option>
                       {[...new Set(data.items.map((r) => r.status))].map((s) => (
                         <option key={s} value={s}>
-                          {words(s)}
+                          {statusWords(s)}
                         </option>
                       ))}
                     </select>
@@ -288,8 +267,8 @@ function Cockpit() {
                           {r.reference} · {r.period ?? `Year starting ${r.year}`}
                         </span>
                       </span>
-                      <span className="text-sm capitalize text-muted-foreground">
-                        {words(r.status)}
+                      <span className="text-sm text-muted-foreground">
+                        {statusWords(r.status)}
                         <span className="block text-xs">{r.age_days} days open</span>
                       </span>
                       <span className="text-sm font-semibold tabular-nums">
@@ -343,6 +322,13 @@ function Cockpit() {
                   <p className="text-xs text-muted-foreground">
                     {current.reference} · {current.period ?? current.year}
                   </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusPill
+                      status={current.status}
+                      tone={statusTone(current.status)}
+                      label={statusWords(current.status)}
+                    />
+                  </div>
                   <dl className="space-y-3 rounded-lg border border-border p-4">
                     {[
                       ["Supported expected", current.expected_micros],
@@ -359,6 +345,11 @@ function Cockpit() {
                     ))}
                   </dl>
                   <p className="text-sm text-muted-foreground">{current.note}</p>
+                  {sample ? (
+                    <Waterfall item={current} />
+                  ) : (
+                    <CaseInsight workspaceId={id} item={current} timeline={false} />
+                  )}
                   <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
                     <h3 className="text-sm font-semibold">Next evidence to review</h3>
                     <p className="mt-2 text-sm">
@@ -386,7 +377,7 @@ function Cockpit() {
                       key={current.id}
                       workspaceId={id}
                       creditId={current.id}
-                      canDecide={workspace?.role === "ADMIN"}
+                      canDecide={canWrite}
                     />
                   )}
                 </>
@@ -400,6 +391,146 @@ function Cockpit() {
           <p className="text-xs text-muted-foreground">{data.note}</p>
         </>
       ) : null}
+    </>
+  );
+  return (
+    <div className="space-y-6 p-4 sm:p-6">
+      <PageHeader
+        icon={Eye}
+        eyebrow="TRINETRA"
+        title="Credit assurance"
+        description="Trace withheld tax from invoice to government statement."
+        badge={
+          <span className="rounded-full border border-border px-3 py-1 text-xs">
+            {sample ? "Illustrative synthetic data" : "Reviewed evidence"}
+          </span>
+        }
+        actions={
+          live ? (
+            <button
+              className={BUTTON_SECONDARY}
+              onClick={() => {
+                setSample(!sample);
+                setSelected(null);
+                setPage(0);
+              }}
+            >
+              {sample ? "Your workspace" : "Explore examples"}
+            </button>
+          ) : undefined
+        }
+      />
+      {access.data && workspace && (
+        <AccessNotice
+          access={access.data}
+          billingPath={organizationBillingPath(organization.organization_slug)}
+        />
+      )}
+      {access.isError && (
+        <p role="alert" className={`${SURFACE} p-4 text-sm`}>
+          Access to TDS credit could not be checked.{" "}
+          <button className={BUTTON_SECONDARY} onClick={() => void access.refetch()}>
+            Try again
+          </button>
+        </p>
+      )}
+      <section
+        className={`${SURFACE} flex gap-3 p-4 text-sm`}
+        aria-label="Evidence and availability"
+      >
+        <ShieldCheck className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+        <div>
+          <p className="font-medium">
+            {sample
+              ? "Explore the evidence chain without uploading tax documents"
+              : "Evidence reflects the selected imported snapshot"}
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            A gap is an investigation item. It is not a tax refund or a legally claimable credit.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {data?.as_of
+              ? `Evidence as of ${data.as_of}. Later postings require a new reviewed snapshot.`
+              : "No statement has been imported."}
+          </p>
+        </div>
+      </section>
+      {showTabs && data && <FreshnessBanner asOf={data.as_of} items={data.items} />}
+      {live && (
+        <Tutorial
+          workspaceId={id}
+          profiles={profiles.data?.items.length ?? 0}
+          items={sample ? [] : (data?.items ?? [])}
+          hasStatement={!sample && Boolean(data?.as_of)}
+          onOpen={(next) => {
+            setSample(false);
+            setTab(next);
+          }}
+        />
+      )}
+      {sample && (
+        <details className={`${SURFACE} p-4 text-sm`}>
+          <summary className="cursor-pointer font-semibold">
+            Getting started with credit evidence
+          </summary>
+          <ol className="mt-3 list-decimal space-y-2 pl-5">
+            <li>
+              Confirm the receiving entity and source period. Upload documents through Documents;
+              ordinary access, retention and intake limits apply.
+            </li>
+            <li>
+              Record only a supported withholding expectation. Bank shortfalls do not establish TDS;
+              tax basis and eligibility may remain unknown.
+            </li>
+            <li>
+              Compare Helm bank receipts, customer advice and accounting evidence. Link the
+              originals so another reviewer can inspect them.
+            </li>
+            <li>
+              Import your statement from the Servabo template, a Form 26AS or Form 168 text file, or
+              an AIS CSV, after previewing it.
+            </li>
+            <li>
+              Allocate posted amounts with a reason, ask the customer for a document, and export a
+              dossier for accountant review.
+            </li>
+          </ol>
+        </details>
+      )}
+      {showTabs ? (
+        <>
+          <TabList
+            tabs={tabs}
+            value={tab}
+            onChange={setTab}
+            label="TDS credit sections"
+            idBase="trinetra"
+          />
+          <TabPanel idBase="trinetra" id={tab} className="space-y-6">
+            {tab === "cases" && cases}
+            {tab === "statements" &&
+              (!canWrite ? (
+                <section className={`${SURFACE} p-5 text-sm`} aria-label="Import your tax statement">
+                  <p className="font-medium">Only a workspace administrator imports a statement.</p>
+                  <p className="mt-1 text-muted-foreground">
+                    You can read every case and the statement it was compared with. Ask a workspace
+                    administrator to import a new one.
+                  </p>
+                </section>
+              ) : access.data ? (
+                <ImportStatement workspaceId={id} access={access.data} />
+              ) : null)}
+            {tab === "suggestions" && <Suggestions workspaceId={id} canDecide={canWrite} />}
+            {tab === "exceptions" && <Exceptions workspaceId={id} canDecide={canWrite} />}
+            {tab === "approvals" && (
+              <Approvals workspaceId={id} organizationId={workspace?.organizationId ?? ""} />
+            )}
+            {tab === "closures" && <Closures workspaceId={id} />}
+          </TabPanel>
+        </>
+      ) : (
+        cases
+      )}
     </div>
   );
 }

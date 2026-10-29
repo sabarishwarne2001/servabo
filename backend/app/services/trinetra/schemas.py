@@ -28,11 +28,16 @@ class CaseOut(Wire):
     bank_micros: Micros | None
     booked_micros: Micros | None
     advice_micros: Micros | None
+    adjusted_gross_micros: Micros | None = None
+    credit_notes_micros: Micros = 0
+    basis_micros: Micros | None = None
+    basis_source: str | None = None
     candidate_ids: list[str]
     rule_version: str
     note: str
     work_item_id: str | None = None
     statement_work_item_id: str | None = None
+    statement_reader: dict | None = None
     snapshot_id: str | None = None
     source_current: bool = True
     created_at: str
@@ -50,6 +55,15 @@ class OutcomesOut(Wire):
     confirmed_cases: int = 0
     review_minutes: int = 0
     note: str = "No measured outcomes for synthetic examples."
+    now_visible_this_month_micros: Micros = 0
+    now_visible_this_year_micros: Micros = 0
+    now_visible_total_micros: Micros = 0
+    now_visible_cases: int = 0
+    ledger_note: str = ""
+    measured_cycle_cases: int = 0
+    measured_cycle_days_median: float | None = None
+    measured_cycle_days_mean: float | None = None
+    cycle_note: str = ""
 
 
 class SummaryOut(CasesOut):
@@ -121,6 +135,7 @@ class PrintedEvidenceOut(Wire):
 
 
 class DetailOut(CaseOut):
+    match_explanations: list[dict] = Field(default_factory=list)
     printed_evidence: PrintedEvidenceOut
     statement_lines: list[PostingOut]
     bank_evidence: list[BankOut]
@@ -131,8 +146,12 @@ class DetailOut(CaseOut):
 
 class AccessOut(BaseModel):
     live_enabled: bool
+    mode: str
+    enrolled: bool
+    enrolled_since: str | None = None
     entitled: bool
     official_formats: list[str]
+    statement_readers: list[dict] = []
     transcription_format: str
     tcs_supported: bool
 
@@ -157,6 +176,31 @@ class PreviewOut(Wire):
     official_format_verified: bool
 
 
+class FilePreviewOut(Wire):
+    """What a statement file would import, for the reviewer to confirm before anything is saved."""
+
+    reader: str
+    reader_label: str
+    official: bool
+    verified: bool
+    parser_version: str
+    sha256: str
+    tax_year_label: str | None = None
+    tax_year_kind: str | None = None
+    year: int
+    year_matches: bool
+    file_pan_matches: bool | None = None
+    rows: int
+    total_micros: Micros
+    deductors: list[dict]
+    mapping: list[dict]
+    columns: dict | None = None
+    checks: list[dict]
+    ignored: list[str]
+    sample: list[dict]
+    notice: str
+
+
 class RunOut(BaseModel):
     job_id: str
 
@@ -168,6 +212,8 @@ class RunStatusOut(RunOut):
 
 class OrganizationAccessOut(BaseModel):
     live_enabled: bool
+    mode: str
+    enrolled: bool
     entitled: bool
 
 
@@ -182,7 +228,64 @@ class WorkspaceSummaryOut(Wire):
     as_of: str | None
 
 
+class EntitySummaryOut(Wire):
+    """One legal entity across the readable workspaces: counted once. Its name, never its PAN."""
+
+    entity_id: str
+    name: str
+    workspace_ids: list[str]
+    total: int
+    unresolved: int
+    expected_micros: Micros
+    posted_micros: Micros
+    gap_micros: Micros
+
+
+class EntityTotalsOut(Wire):
+    total: int
+    unresolved: int
+    expected_micros: Micros
+    posted_micros: Micros
+    gap_micros: Micros
+
+
 class OrganizationSummaryOut(BaseModel):
     workspaces: list[WorkspaceSummaryOut]
+    entities: list[EntitySummaryOut] = Field(default_factory=list)
+    totals: EntityTotalsOut | None = None
     scope: str
     is_sample: bool
+
+
+class OrganizationCaseOut(Wire):
+    """One case as the Enterprise read API shows it: ids, states and amounts as decimal strings. Never a PAN, a TAN or a hash."""
+
+    id: str
+    workspace_id: str
+    profile_id: str | None
+    reference: str
+    customer: str
+    year: int
+    revision: int
+    review_state: str
+    status: str
+    expected_micros: Micros | None
+    posted_micros: Micros
+    gap_micros: Micros | None
+    currency: str = "INR"
+    source_current: bool
+    age_days: int
+    as_of: str | None
+    created_at: str
+
+
+class OrganizationCasesOut(BaseModel):
+    total: int
+    items: list[OrganizationCaseOut]
+    scope: str
+    is_sample: bool
+
+
+class SuggestionsOut(BaseModel):
+    total: int
+    items: list[dict]

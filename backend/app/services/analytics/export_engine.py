@@ -124,6 +124,8 @@ DATASET_SCHEMA_VERSIONS: dict[str, int] = {
     # Final session 1 (Phase 6): Enterprise datasets, see DATASET_CAPABILITY.
     "GST_MATCHES": 1,
     "HELM_LEDGER": 1,
+    # Final session 2T (Phase 7.8): TRINETRA's cases, masked. Enterprise.
+    "TRINETRA_CASES": 1,
 }
 
 #: Hard ceiling on rows pulled per dataset per run. A tenant with a 90-day
@@ -389,6 +391,40 @@ HELM_LEDGER_SPEC = DatasetSpec(
     ),
 )
 
+TRINETRA_CASES_SPEC = DatasetSpec(
+    dataset="TRINETRA_CASES",
+    version=DATASET_SCHEMA_VERSIONS["TRINETRA_CASES"],
+    description=(
+        "TRINETRA's cases across every workspace: one row per case that was opened, or decided on, in the window. A case is the "
+        "tax a customer withheld from one invoice and where it stands in your imported tax statement. Identifiers, states and "
+        "figures only: no PAN, no TAN, no customer or invoice name, no note or document text. The customer is a stable key you can "
+        "join to your own master data. A gap is an item to check, never money. The invented sample company is never exported. "
+        "Enterprise."
+    ),
+    columns=(
+        ColumnSpec("case_id", "string", "Stable identifier for this case."),
+        ColumnSpec("organization_id", "string", "Owning tenant."),
+        ColumnSpec("workspace_id", "string", "Owning workspace."),
+        ColumnSpec("profile_id", "string", "The legal-entity profile the case belongs to (an opaque id; the PAN is never exported)."),
+        ColumnSpec("work_item_id", "string", "The invoice document the withholding was confirmed on."),
+        ColumnSpec("customer_key", "string", "A stable key for the customer; join to your own master data. Not the customer's name."),
+        ColumnSpec("year", "int64", "The tax year, as the year in which it starts (2025 is 2025-26)."),
+        ColumnSpec("revision", "int64", "The case revision this row describes."),
+        ColumnSpec("review_state", "string", "OPEN, DISPUTED, EXPLAINED, WITHDRAWN, CA_REVIEWED or UNRESOLVED."),
+        ColumnSpec("status", "string", "The comparison status: POSTED, LATE_POSTING, VERIFIED_CORRECTED, AMOUNT_MISMATCH, "
+                                       "DUPLICATE_SUSPECTED, AMBIGUOUS, SUGGESTED, TAN_MISMATCH_SUSPECTED, POSSIBLE_MISSING_POSTING, "
+                                       "EVIDENCE_NEEDED, PENDING_REPORT, DISPUTED, WITHDRAWN, CLOSED_WITH_EXCEPTION or UNRESOLVED."),
+        ColumnSpec("currency", "string", "Always INR."),
+        ColumnSpec("expected_micros", "int64", "The withheld amount the case rests on, INR micros; NULL when the evidence is stale."),
+        ColumnSpec("posted_micros", "int64", "What the active statement shows for this case, INR micros."),
+        ColumnSpec("gap_micros", "int64", "expected less posted when both are known, INR micros; NULL when unknown. Never money."),
+        ColumnSpec("source_current", "bool", "Whether the invoice is still the one the withholding was confirmed on."),
+        ColumnSpec("age_days", "int64", "Days since the case was opened, as of the extraction."),
+        ColumnSpec("created_at", "timestamp", "When the case was opened, UTC."),
+        ColumnSpec("updated_at", "timestamp", "When it last changed (its latest decision), UTC."),
+    ),
+)
+
 DATASET_SPECS: dict[str, DatasetSpec] = {
     spec.dataset: spec
     for spec in (
@@ -398,6 +434,7 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
         AUTOMATION_RUNS_SPEC,
         GST_MATCHES_SPEC,
         HELM_LEDGER_SPEC,
+        TRINETRA_CASES_SPEC,
     )
 }
 
@@ -407,6 +444,7 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
 DATASET_CAPABILITY: dict[str, str] = {
     "GST_MATCHES": "capability.gst_credit_all_workspaces",
     "HELM_LEDGER": "capability.helm_all_workspaces",
+    "TRINETRA_CASES": "capability.trinetra_all_workspaces",
 }
 
 
@@ -763,6 +801,80 @@ def extract_helm_ledger(
     return rows
 
 
+def extract_trinetra_cases(
+    db: Session,
+    *,
+    organization_id: uuid.UUID,
+    window_start: datetime,
+    window_end: datetime,
+    limit: int = MAX_ROWS_PER_DATASET,
+) -> list[dict[str, Any]]:
+    """Cases opened or decided on in the window, across the organization's own workspaces. Nothing unless TRINETRA is live for the
+    organization (the same `live_for` as every gate). Statuses are computed through the service's batched case views."""
+    from sqlalchemy import func
+
+    from app.models.trinetra import TrinetraCredit, TrinetraDecision
+    from app.services.trinetra import directory, mode, service
+
+    if not mode.live_for(db, organization_id):
+        return []
+    latest = (
+        select(TrinetraDecision.credit_id.label("credit_id"), func.max(TrinetraDecision.created_at).label("at"))
+        .where(TrinetraDecision.organization_id == organization_id)
+        .group_by(TrinetraDecision.credit_id)
+        .subquery()
+    )
+    changed = func.greatest(TrinetraCredit.created_at, func.coalesce(latest.c.at, TrinetraCredit.created_at))
+    stmt = (
+        select(TrinetraCredit, changed.label("changed"))
+        .join(Workspace, Workspace.id == TrinetraCredit.workspace_id)
+        .outerjoin(latest, latest.c.credit_id == TrinetraCredit.id)
+        .where(TrinetraCredit.organization_id == organization_id)
+        .where(Workspace.is_sample.is_(False))
+        .where(changed >= window_start)
+        .where(changed < window_end)
+        .order_by(changed.asc(), TrinetraCredit.id.asc())
+        .limit(limit)
+    )
+    found = db.execute(stmt).all()
+    by_workspace: dict[uuid.UUID, list[Any]] = {}
+    for credit, _changed in found:
+        by_workspace.setdefault(credit.workspace_id, []).append(credit)
+    views: dict[str, dict[str, Any]] = {}
+    for workspace_id, credits in by_workspace.items():
+        workspace = db.get(Workspace, workspace_id)
+        for chunk in range(0, len(credits), 500):
+            for item in service.views(db, workspace, credits[chunk : chunk + 500])[0]:
+                views[item["id"]] = item
+    rows: list[dict[str, Any]] = []
+    for credit, at in found:
+        item = views[str(credit.id)]
+        rows.append(
+            {
+                "case_id": str(credit.id),
+                "organization_id": str(credit.organization_id),
+                "workspace_id": _s(credit.workspace_id),
+                "profile_id": _s(credit.profile_id),
+                "work_item_id": _s(credit.work_item_id),
+                "customer_key": directory.name_key(credit.counterparty),
+                "year": credit.year,
+                "revision": credit.revision,
+                "review_state": credit.state,
+                "status": item["status"],
+                "currency": "INR",
+                "expected_micros": item["expected_micros"],
+                "posted_micros": item["posted_micros"],
+                "gap_micros": item["gap_micros"],
+                "source_current": bool(item["source_current"]),
+                "age_days": item["age_days"],
+                "created_at": _iso(credit.created_at),
+                "updated_at": _iso(at),
+                # counterparty, reference, deductor_key, review (notes) and every PAN or TAN are deliberately absent. See the spec.
+            }
+        )
+    return rows
+
+
 EXTRACTORS: dict[str, Callable[..., list[dict[str, Any]]]] = {
     "USAGE_ROLLUPS": extract_usage_rollups,
     "DOCUMENT_METADATA": extract_document_metadata,
@@ -770,6 +882,7 @@ EXTRACTORS: dict[str, Callable[..., list[dict[str, Any]]]] = {
     "AUTOMATION_RUNS": extract_automation_runs,
     "GST_MATCHES": extract_gst_matches,
     "HELM_LEDGER": extract_helm_ledger,
+    "TRINETRA_CASES": extract_trinetra_cases,
 }
 
 
@@ -999,6 +1112,7 @@ __all__ = [
     "extract_document_metadata",
     "extract_gst_matches",
     "extract_helm_ledger",
+    "extract_trinetra_cases",
     "extract_usage_rollups",
     "write_parquet",
 ]

@@ -143,3 +143,14 @@ def test_a_dsn_that_is_not_https_is_refused_in_production():
     assert not any(p.startswith("SENTRY_DSN") for p in production_config_problems(ok, "production"))
     off = settings.model_copy(update={"SENTRY_DSN": ""})
     assert not any(p.startswith("SENTRY_DSN") for p in production_config_problems(off, "production"))
+
+
+def test_a_tan_is_scrubbed_as_a_tan_and_never_reaches_the_ingest():
+    """Final 2T, Phase 9: a deductor's TAN (four letters, five digits, a letter) is a tax identifier like a PAN."""
+    from app.core.error_tracking import scrub_event, scrub_text
+
+    assert scrub_text("deductor ABCD12345E withheld") == "deductor [tan] withheld"
+    assert scrub_text("PAN ABCDE1234F and TAN ABCD12345E") == "PAN [pan] and TAN [tan]"
+    assert "ABCD12345E" not in scrub_text("https://x.example/trinetra?tan=ABCD12345E&x=1")
+    event = scrub_event({"message": "failed for ABCD12345E", "exception": {"values": [{"value": "TAN ABCD12345E rejected"}]}}, {})
+    assert "ABCD12345E" not in str(event)

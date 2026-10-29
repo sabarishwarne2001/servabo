@@ -145,7 +145,6 @@ def test_summary_uses_bounded_database_queries(client, tenant, world, db_session
             taxable=100000,
             extra={"vendor_pan": "ABCDE1234F"},
         )
-        role = db_session.query(DocumentRole).filter_by(work_item_id=invoice.id).one()
         db_session.add(
             TrinetraCredit(
                 organization_id=tenant.organization.id,
@@ -157,7 +156,7 @@ def test_summary_uses_bounded_database_queries(client, tenant, world, db_session
                 deductor_key="opaque",
                 expected_micros=2000000000,
                 reference=f"BOUND-{i}",
-                source_version=service.invoice_version(invoice, role),
+                source_version=service.invoice_version(db_session, tenant.workspace, invoice.id),
             )
         )
     db_session.commit()
@@ -174,7 +173,7 @@ def test_summary_uses_bounded_database_queries(client, tenant, world, db_session
         event.remove(connection, "before_cursor_execute", query)
     assert result["total"] == 100 and result["expected_micros"] == 200000000000
     assert (
-        len(count) <= 9
+        len(count) <= 13  # constant, not per case: Final 2T added the pairings, the closure ledger and the measured cycle
     ), f"{len(count)} queries for 100 cases; per-case database queries are not allowed"
 
 

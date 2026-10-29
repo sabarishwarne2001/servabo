@@ -37,6 +37,9 @@ export const WEBHOOK_EVENT_TYPES = [
   // The engines (any plan with webhooks): ids and figures only, each sent once.
   "gst.return.imported",
   "trinetra.case.reviewed",
+  // TRINETRA (Enterprise): ids, states and amounts only, never a PAN, a TAN, an invoice number or a name.
+  "trinetra.case.gap_found",
+  "trinetra.case.closed",
   "gst.invoice.at_risk",
   "gst.supplier.not_reported",
   "automation.run.failed",

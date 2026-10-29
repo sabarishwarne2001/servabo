@@ -499,12 +499,38 @@ REGISTRY: dict[str, TableRule] = {
     "settings_migration_archive": _platform("One-off archive of settings from an old migration."),
 }
 
-# TRINETRA is evidence content, not a statutory ledger. No GST retention exemption is inferred.
+# TRINETRA is evidence content, not a statutory ledger (N-200, DECIDED Final 2T; a lawyer should confirm). Its reviewed figures
+# are working papers that compare the customer's books (kept in their accounting system) with the government statement (kept at
+# the tax portal); they are not the books themselves. So they go WITH the documents they were built from, unlike GST's imported
+# return rows, which are the statutory record itself (N-163). A legal hold stops the purge; the compliance export offers the
+# dossier before erasure. No GST retention exemption is inferred for TRINETRA.
 REGISTRY.update({
     "trinetra_profiles": _config(export="trinetra_profiles", note="Encrypted PAN; ciphertext excluded from export."),
+    "trinetra_suggestions": _r(Kind.CONTENT, Erasure.DELETE, Sweep.DELETE, OrgPurge.DELETE,
+        note="Working paper (N-200): a suggested expectation, erased with the invoice it came from.",
+        export="trinetra_suggestions", links=(col("work_item_id"),)),
+    "trinetra_pairings": _r(Kind.CONTENT, Erasure.DELETE, Sweep.DELETE, OrgPurge.DELETE,
+        note="Working paper (N-200): a reviewed reversal pairing, erased with its statement.",
+        export="trinetra_pairings", links=(via("statement_id", "trinetra_statements", "id", col("source_work_item_id")),)),
+    "trinetra_inquiries": _r(Kind.CONTENT, Erasure.DELETE, Sweep.DELETE, OrgPurge.DELETE,
+        note="Working paper (N-200): an inquiry about a case, erased with the invoice. The recipient's address is not stored.",
+        export="trinetra_inquiries", links=(via("credit_id", "trinetra_credits", "id", col("work_item_id")), col("reply_work_item_id"))),
+    "trinetra_approvals": _r(Kind.CONTENT, Erasure.DELETE, Sweep.DELETE, OrgPurge.DELETE,
+        note="Working paper (N-200): an approval of a closure, erased with its case.",
+        export="trinetra_approvals", links=(via("credit_id", "trinetra_credits", "id", col("work_item_id")),)),
+    "trinetra_outcomes": _r(Kind.CONTENT, Erasure.DELETE, Sweep.DELETE, OrgPurge.DELETE,
+        note="Working paper (N-200): a confirmed closure, erased with its case.",
+        export="trinetra_outcomes", links=(via("credit_id", "trinetra_credits", "id", col("work_item_id")),)),
+    "trinetra_notice_sends": _r(Kind.MONEY, Erasure.KEEP, Sweep.NONE, OrgPurge.KEEP, why=_NO + "a send record: a kind, a key made of ids, a count"),
+    "trinetra_policies": _config(export="trinetra_policies", note="An Enterprise organization's approval chain for closing cases."),
+    "trinetra_deductors": _config(export="trinetra_deductors", note="A customer's masked TAN mapped to the customer; no TAN is stored."),
+    "trinetra_pilot": _config(note="Which organizations the operator enrolled in the TRINETRA pilot, and why (platform setting)."),
+    "trinetra_org_keys": _secret("The organization's random salt for its one-profile-per-entity fingerprint."),
     "trinetra_statements": _r(Kind.CONTENT, Erasure.DELETE, Sweep.DELETE, OrgPurge.DELETE,
+        note="Working paper (N-200): erased with the statement document it was read from.",
         export="trinetra_statements", links=(col("source_work_item_id"), json_array("evidence_work_item_ids"))),
     "trinetra_credits": _r(Kind.CONTENT, Erasure.DELETE, Sweep.DELETE, OrgPurge.DELETE,
+        note="Working paper (N-200): erased with the invoice or evidence document it was built from.",
         export="trinetra_credits", links=(col("work_item_id"), json_array("evidence_work_item_ids"))),
     "trinetra_decisions": _r(Kind.CONTENT, Erasure.DELETE, Sweep.DELETE, OrgPurge.DELETE,
         export="trinetra_decisions", links=(via("credit_id", "trinetra_credits", "id", col("work_item_id")), json_array("evidence_work_item_ids"))),

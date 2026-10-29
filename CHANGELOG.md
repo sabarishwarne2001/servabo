@@ -6,6 +6,32 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Added — TRINETRA (TDS credit) finished for Business and Enterprise (Final session 2T, 2026-10-28)
+
+- **TRINETRA** checks whether the tax a customer withheld from your invoice reached your tax statement, invoice by invoice, and shows
+  what is missing as a thing to investigate. Never a refund, never advice on a rate or section, never filing. It is on **Business and
+  Enterprise** and ships in **pilot** mode (`TRINETRA_MODE`: off, pilot, on): an organization is live once the operator enrols it
+  (`scripts/trinetra_pilot.py`, or the platform admin API). The official Form 26AS and Form 168 readers are unverified until a real
+  file has been read (Final session 2B).
+- **Bring in your statement** from Servabo's template (CSV or Excel), an AIS CSV (you confirm which column means what) or a Form
+  26AS / Form 168 text download; see everything it read before anything is saved. **Find the invoices to check** from a figure
+  printed on an invoice, an expected-TDS template (for Tally users) or a read-only look at Zoho Books; a person accepts each.
+- **Credit notes, reversals and advances**, closing a case without resolution, a "why was this matched" explanation on every case.
+- **Ask the customer for the document**: a draft a person edits, approves and sends, to a contact confirmed in Helm, once a week per
+  case, within the plan's monthly allowance. **Enterprise approval chains** for closing a case, and "TDS now visible in your
+  statement" (never cash).
+- **It shows up where you already look:** Getting started, search, notifications and the Monday line, the value receipt, rules and
+  recipes ("a gap is found"), Recoveries, Helm. Enterprise adds public events and a read API, a warehouse dataset and an
+  organization view that counts each legal entity once.
+
+### Fixed — TRINETRA (Final session 2T)
+
+- **Helm no longer chases tax the customer already withheld**, including with net-of-TDS reminders and when the evidence is stale (F-641).
+- **A rename or a touch of a document is no longer "a change"; a replaced file is** (F-642). **The seller on the invoice has to be the
+  legal entity** (F-643). **One legal entity, one profile per organization** (F-645), and **the plan's capacities are enforced** (F-644).
+- **The recompute job now does something**: it says what is new (F-647). **The case list asks the database once, not once per case**
+  (F-648), and the summary no longer slows down with the number of cases (28 s to 2.6 s at 5,000 cases, F-650).
+
 ### Added — Recoveries (Final session 2A, N-191; the owner's request of 2026-10-27)
 
 - **Recoveries** (Documents → Recoveries, Business and Enterprise): every money issue Servabo finds (GST credit waiting on a

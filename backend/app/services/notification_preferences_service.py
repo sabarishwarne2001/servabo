@@ -38,6 +38,9 @@ MONTHLY_SUMMARY = "monthly_summary"
 #: Final session 1 (3A): GST credit notices (a GSTR-2B imported, invoices near the 180-day limit, suppliers that have not reported,
 #: IMS actions pending) and the Monday digest. On by default; owners, admins and the billing role.
 GST_CREDIT = "gst_credit"
+#: Final session 2T (Phase 7): TDS-credit notices (a confirmed withholding lost its evidence, an import left a possible missing
+#: posting, a case passed its due date) and the Monday TDS line. On by default; organization owners and administrators.
+TDS_CREDIT = "tds_credit"
 
 
 @dataclass(frozen=True)
@@ -59,6 +62,8 @@ OWNER_AUDIENCE_ROLES: tuple[str, ...] = ("OWNER",)
 HELM_AUDIENCE_ROLES: tuple[str, ...] = ("OWNER", "ADMIN", "BILLING")
 #: Organization roles that get GST credit notices and the Monday digest (Final session 1, 3A): the people who act on it and who pay.
 GST_AUDIENCE_ROLES: tuple[str, ...] = ("OWNER", "ADMIN", "BILLING")
+#: Organization roles that get TDS-credit notices (Final session 2T): the people who act on a case.
+TDS_AUDIENCE_ROLES: tuple[str, ...] = ("OWNER", "ADMIN")
 
 
 CATEGORIES: tuple[Category, ...] = (
@@ -82,6 +87,10 @@ CATEGORIES: tuple[Category, ...] = (
              "A GSTR-2B imported, invoices near the 180-day limit, suppliers that have not reported your invoices, IMS actions "
              "waiting, and a short email every Monday when there is something to report.",
              essential=False, audience="gst"),
+    Category(TDS_CREDIT, "TDS credit",
+             "A confirmed TDS withholding whose evidence changed, an import that leaves a possible missing posting, a case "
+             "past its due date, and a short Monday email when there is something to report.",
+             essential=False, audience="tds"),
     Category(HELM, "Helm",
              "A mandate breached or drifting, a conflict in the plan, a payment action waiting for approval.",
              essential=False, audience="helm"),
@@ -143,6 +152,15 @@ def _sees_gst(db: Session, user_id: uuid.UUID) -> bool:
     return any(str(role).upper() in GST_AUDIENCE_ROLES for role in roles)
 
 
+def _sees_tds(db: Session, user_id: uuid.UUID) -> bool:
+    from app.models.organization import MembershipStatus, OrganizationMember
+
+    roles = [getattr(r, "value", r) for (r,) in db.execute(
+        select(OrganizationMember.role).where(OrganizationMember.user_id == user_id,
+                                              OrganizationMember.status == MembershipStatus.ACTIVE)).all()]
+    return any(str(role).upper() in TDS_AUDIENCE_ROLES for role in roles)
+
+
 def _is_owner(db: Session, user_id: uuid.UUID) -> bool:
     from app.models.organization import MembershipStatus, OrganizationMember
 
@@ -156,6 +174,7 @@ def list_for_user(db: Session, *, user_id: uuid.UUID) -> list[dict[str, Any]]:
     helm = _sees_helm(db, user_id)
     owner = _is_owner(db, user_id)
     gst = _sees_gst(db, user_id)
+    tds = _sees_tds(db, user_id)
     rows = {
         row.category: row.email_enabled
         for row in db.execute(
@@ -172,7 +191,7 @@ def list_for_user(db: Session, *, user_id: uuid.UUID) -> list[dict[str, Any]]:
         }
         for c in CATEGORIES
         if c.audience == "everyone" or (c.audience == "helm" and helm) or (c.audience == "owners" and owner)
-        or (c.audience == "gst" and gst)
+        or (c.audience == "gst" and gst) or (c.audience == "tds" and tds)
     ]
 
 
@@ -208,6 +227,7 @@ __all__ = [
     "USAGE",
     "WORKFLOW",
     "GST_CREDIT",
+    "TDS_CREDIT",
     "EMAILED_PRIORITIES",
     "category",
     "email_enabled",

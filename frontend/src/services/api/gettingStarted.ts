@@ -1,7 +1,7 @@
 /** The first-run checklist (Final session 1, 2C). Every tick is computed by the server from real data. */
 import apiClient from "@/services/api/client";
 
-export type GettingStartedKey = "documents" | "read" | "gst" | "helm" | "recipe" | "invite";
+export type GettingStartedKey = "documents" | "read" | "gst" | "trinetra" | "helm" | "recipe" | "invite";
 
 export interface GettingStartedStep {
   readonly key: GettingStartedKey;

@@ -16,7 +16,8 @@ Closure is only ever on evidence, one rule per kind (docs/product/RECOVERIES.md)
     STATEMENT_DIFFERENCE  the supplier's next statement no longer shows it (never counted as money)
     PAYMENT_DEADLINE      paid on or before the deadline, with the payment evidenced (a fee stated in the terms: LATE_FEE_AVOIDED)
 
-A new kind is one more adapter in ADAPTERS (Final session 2T adds TRINETRA's "TDS not yet in the statement" this way).
+A new kind is one more adapter in ADAPTERS (Final session 2T added TRINETRA's "TDS not yet in the statement" this way).
+    TDS_CREDIT          open cases with a gap; verified only by the accountant's confirmation; never an exposure in cash
 No adapter moves money, approves, pays or releases a hold: they read.
 """
 
@@ -585,7 +586,77 @@ class PaymentDeadline:
         return out
 
 
-ADAPTERS: tuple[Adapter, ...] = (GstCredit(), Duplicate(), Overcharge(), StatementDifference(), PaymentDeadline())
+# ------------------------------------------------------------------------------------------------------------ TDS credit
+
+
+class TdsCredit:
+    """Tax a customer withheld that is not yet in the imported tax statement (TRINETRA; Final session 2T, Phase 7.10).
+
+    One issue per open case with a known gap. The figure is a POSSIBLE CREDIT GAP, kept in `details` and the title: the issue has
+    no exposure in cash, so it is in no "found" money, no "needs an owner" amount and no digest line, and a verified issue records
+    no recovered outcome (it is evidence that a credit appears in the statement, not money). Closure is only on a person's
+    review: the accountant confirmed the tax in the statement (verified), or the case was withdrawn, explained or left
+    unresolved (closed, never counted). Live only while TRINETRA is live for the organization."""
+
+    kind = v.TDS_CREDIT
+    capability = entitlements.TRINETRA_CAPABILITY
+    heavy = True
+
+    @staticmethod
+    def live(db: Session, organization_id: uuid.UUID) -> bool:
+        from app.services.trinetra import mode
+
+        return mode.live_for(db, organization_id)
+
+    def observe(self, db: Session, workspace: Workspace, today: date) -> list[Observation]:
+        from app.services.trinetra import service as trinetra
+        from app.services.trinetra.notices import GAP_STATUSES, money
+
+        if workspace.is_sample:
+            return []
+        out = []
+        for item in trinetra.summary(db, workspace)["items"]:
+            if item["review_state"] not in trinetra.OPEN_STATES or item["status"] not in GAP_STATUSES or not (item["gap_micros"] or 0) > 0:
+                continue
+            out.append(Observation(
+                kind=self.kind, subject_key=item["id"], work_item_id=_uuid(item["work_item_id"]),
+                title=f"TDS not yet in your statement: invoice {item['reference']} ({item['counterparty']}), {money(item['gap_micros'])}"[:500],
+                currency="INR", exposure_micros=None,
+                in_progress=item["review_state"] == "DISPUTED" or item["status"] == "DISPUTED",
+                details={"case_id": item["id"], "work_item_id": item["work_item_id"], "gap_micros": int(item["gap_micros"]),
+                         "expected_micros": int(item["expected_micros"] or 0), "currency": "INR", "year": item["year"],
+                         "status": item["status"], "reference": item["reference"]}))
+        return out
+
+    def judge(self, db: Session, workspace: Workspace, issues: Sequence[RecoveryIssue], today: date) -> list[Verdict]:
+        from app.models.trinetra import TrinetraCredit
+        from app.services.trinetra import service as trinetra
+
+        ids = [i for i in (_uuid(issue.subject_key) for issue in issues) if i]
+        rows = {str(r.id): r for r in db.execute(select(TrinetraCredit).where(
+            TrinetraCredit.workspace_id == workspace.id, TrinetraCredit.id.in_(ids))).scalars()} if ids else {}
+        views = {item["id"]: item for item in trinetra.views(db, workspace, list(rows.values()))[0]} if rows else {}
+        out: list[Verdict] = []
+        for issue in issues:
+            row, item = rows.get(issue.subject_key), views.get(issue.subject_key)
+            if row is None or item is None:
+                out.append(Verdict(issue.id, v.CLOSED, "The case no longer exists."))
+                continue
+            closed = row.state in trinetra.CLOSED_STATES
+            confirmed = row.state == "CA_REVIEWED" and item["status"] in ("POSTED", "LATE_POSTING", "VERIFIED_CORRECTED")
+            if issue.state == v.VERIFIED:
+                if not confirmed:
+                    out.append(Verdict(issue.id, v.BEING_FIXED, "The accountant's confirmation was reopened."))
+                continue
+            if confirmed:
+                out.append(Verdict(issue.id, v.VERIFIED, "The accountant confirmed the tax is in the statement.",
+                                   {"case_id": issue.subject_key, "statement_id": item["snapshot_id"]}))
+            elif closed:
+                out.append(Verdict(issue.id, v.CLOSED, f"The case was closed by a person ({row.state.replace('_', ' ').lower()})."))
+        return out
+
+
+ADAPTERS: tuple[Adapter, ...] = (GstCredit(), Duplicate(), Overcharge(), StatementDifference(), PaymentDeadline(), TdsCredit())
 BY_KIND: dict[str, Adapter] = {a.kind: a for a in ADAPTERS}
 
 

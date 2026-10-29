@@ -20,7 +20,7 @@ import { RingGauge } from "@/components/helm/ui/RingGauge";
 import { Sparkline } from "@/components/helm/ui/Sparkline";
 import { StatusPill } from "@/components/helm/ui/StatusPill";
 import { LoadFailed } from "@/components/common/LoadFailed";
-import { helmPath } from "@/routes/tenantPaths";
+import { helmPath, trinetraPath } from "@/routes/tenantPaths";
 import { errorMessage } from "@/services/api/errors";
 import { getHelmBacktest, getHelmCalendar, getHelmCockpit, helmKeys, listHelmBacktests, replanHelmBook } from "@/services/api/helm";
 import { formatCalendarDate, formatCalendarMonthShort, formatNumber } from "@/utils/displayTime";
@@ -401,7 +401,7 @@ export const HelmCockpit: React.FC = () => {
     return <LoadFailed what="the cockpit" onRetry={() => void cockpit.refetch()} />;
   }
 
-  const { plan, summary, actions, recent, value_held: valueHeld, mandates } = cockpit.data;
+  const { plan, summary, actions, recent, value_held: valueHeld, mandates, withholding_holds: withholdingHolds } = cockpit.data;
   const trends = cockpit.data.trends ?? NO_TRENDS;
   const instruments = summary.instruments ?? [];
   const active = activeOf(mandates);
@@ -800,6 +800,34 @@ export const HelmCockpit: React.FC = () => {
         </section>
         <MemoVisibility visibility={summary.visibility} />
       </div>
+
+      {(withholdingHolds?.length ?? 0) > 0 ? (
+        <section aria-labelledby="helm-held" className="helm-panel p-5" data-testid="helm-withholding-holds">
+          <h2 id="helm-held" className="helm-label">
+            Reminders held for withholding review
+          </h2>
+          <p className="helm-muted mt-1 text-xs">
+            These customers withheld tax from the invoice, so there is no cash left to chase. Helm holds the reminder until a person reviews
+            the case in TDS credit; it re-plans on its own.
+          </p>
+          <ul className="mt-3 divide-y divide-border text-sm">
+            {withholdingHolds?.map((hold) => (
+              <li key={hold.action_id} className="py-2" data-testid="helm-withholding-hold">
+                <span className="font-medium">{hold.title}</span>
+                {hold.reason ? <span className="block text-xs text-muted-foreground">{hold.reason}</span> : null}
+                {hold.case_id && hold.workspace_slug ? (
+                  <Link
+                    className="text-xs font-medium text-primary underline underline-offset-4"
+                    to={`${trinetraPath(orgSlug, hold.workspace_slug)}?case=${encodeURIComponent(hold.case_id)}`}
+                  >
+                    Review the case
+                  </Link>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section aria-labelledby="helm-plan" className="helm-panel min-w-0 p-5" data-tour="plan">
         <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">

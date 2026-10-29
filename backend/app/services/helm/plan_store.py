@@ -218,6 +218,8 @@ def _persist(db: Session, *, book: HelmBook, plan: HelmPlan, proposal: planner.P
         existing.title = candidate.title
         existing.explanation = candidate.explanation
         existing.value_micros = candidate.value_micros
+        if candidate.kind == v.ACTION_SEND_REMINDER:  # a reminder's amount can fall (TDS withheld); its key does not carry it
+            existing.amount_micros = candidate.amount_micros
         existing.params = json.loads(ledger.canonical(candidate.params))
         existing.guard_passed = proposal.result.passed
         existing.needs_approval = proposal.result.needs_approval or need.approvals > 1

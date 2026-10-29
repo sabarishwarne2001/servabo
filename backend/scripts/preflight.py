@@ -32,7 +32,7 @@ from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-OK, MISSING, WRONG, SKIPPED = "OK", "MISSING", "WRONG", "SKIPPED"
+OK, MISSING, WRONG, SKIPPED, WARN = "OK", "MISSING", "WRONG", "SKIPPED", "WARN"
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
 
 
@@ -408,6 +408,44 @@ def check_operations(report: Report, s: Any, strict: bool) -> None:
         report.add(g, "CPU-only image", SKIPPED, "torch is not installed here (the web image carries none)")
 
 
+def probe_trinetra(settings: Any) -> int:
+    """Read-only: how many organizations a platform administrator enrolled in the TRINETRA pilot."""
+    from app.db.session import SessionLocal
+    from app.services.trinetra import mode
+
+    with SessionLocal() as db:
+        return mode.enrolled_count(db)
+
+
+def check_trinetra(report: Report, s: Any, online: bool) -> None:
+    """Final session 2T, Phase 2.3: the TRINETRA mode, how many organizations are enrolled, and a warning when the mode
+    is "on" while an official statement reader is still unverified (Final session 2B proves them on real files)."""
+    from app.services.trinetra import mode, readers
+
+    g, deployment = "TRINETRA", mode.mode_of(s)
+    alias = s.TRINETRA_LIVE_ENABLED
+    detail = f"mode {deployment}" + (" (set through the old TRINETRA_LIVE_ENABLED)" if alias is not None else "")
+    report.add(g, "mode", OK, detail, where=".env (TRINETRA_MODE: off, pilot or on)")
+    if online:
+        try:
+            enrolled = probe_trinetra(s)
+            report.add(g, "pilot organizations", OK, f"{enrolled} enrolled" + ("" if deployment == "pilot" else
+                       " (only mode pilot reads this list)"))
+        except Exception as exc:  # noqa: BLE001
+            report.add(g, "pilot organizations", WRONG, type(exc).__name__, "The database did not answer: fix the database line first.")
+    else:
+        report.add(g, "pilot organizations", SKIPPED, "needs --online (counts the enrolled organizations)")
+    pending = readers.unverified()
+    if deployment == "on" and pending:
+        report.add(g, "statement readers", WARN, "unverified: " + ", ".join(r.key for r in pending),
+                   "Mode on while an official reader is unverified: run Final session 2B (docs/sessions/FINAL-2-LIVE.md) first, "
+                   "or set TRINETRA_MODE=pilot.", "docs/trinetra/LAUNCH-GATES.md")
+    elif pending:
+        report.add(g, "statement readers", OK, f"{len(pending)} official reader(s) unverified (shown as such on every snapshot)")
+    else:
+        report.add(g, "statement readers", OK, "every official reader is verified")
+
+
 def probe_safety_jobs(settings: Any) -> list[dict[str, Any]]:
     """Read-only: what each host safety job last reported (Final session 2A, Phase 2)."""
     from app.db.session import SessionLocal
@@ -487,6 +525,7 @@ def run(settings: Any, *, online: bool = False, i_mean_live: bool = False) -> Re
     check_features(report, settings, online)
     check_operations(report, settings, strict)
     check_safety_jobs(report, settings, strict, online)
+    check_trinetra(report, settings, online)
     return report
 
 
@@ -498,10 +537,11 @@ def render_table(report: Report) -> str:
             group = item.group
             lines += ["", group.upper()]
         lines.append(f"  {item.status:<8} {item.name:<{width}}  {item.detail}")
-        if item.status in (MISSING, WRONG) and item.fix:
+        if item.status in (MISSING, WRONG, WARN) and item.fix:
             lines.append(f"  {'':<8} {'':<{width}}  → {item.fix}" + (f"  [{item.where}]" if item.where else ""))
-    counts = {s: sum(1 for i in report.items if i.status == s) for s in (OK, MISSING, WRONG, SKIPPED)}
-    lines += ["", f"{counts[OK]} OK, {counts[MISSING]} missing, {counts[WRONG]} wrong, {counts[SKIPPED]} skipped. "
+    counts = {s: sum(1 for i in report.items if i.status == s) for s in (OK, MISSING, WRONG, SKIPPED, WARN)}
+    lines += ["", f"{counts[OK]} OK, {counts[MISSING]} missing, {counts[WRONG]} wrong, {counts[SKIPPED]} skipped"
+              + (f", {counts[WARN]} to read" if counts[WARN] else "") + ". "
               + ("READY." if report.ready else "NOT READY: fix the MISSING and WRONG lines above.")]
     return "\n".join(lines).lstrip("\n")
 

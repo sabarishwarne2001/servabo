@@ -14,7 +14,7 @@ in the containers unless you add it to the service's `environment:` in `docker-c
 is not read by any code, is missing from this page, or is one production cannot run without and
 is missing from `.env.production.template` (or does not stop the app from starting when unset).
 
-325 settings. Columns: name, type, default, where it appears (`example` =
+326 settings. Columns: name, type, default, where it appears (`example` =
 `.env.example`, `production` = `.env.production.template`, `guard` = checked by the production
 guard), and the comment written above it in the code.
 
@@ -65,7 +65,8 @@ guard), and the comment written above it in the code.
 | `EMBEDDING_MODEL_NAME` | `str` | `'all-MiniLM-L6-v2'` | example |  |
 | `EMBEDDING_BATCH_SIZE` | `int` | `32` | example |  |
 | `OCR_LANGUAGE` | `str` | `'en'` | example |  |
-| `TRINETRA_LIVE_ENABLED` | `bool` | `False` | example, production | Enables reviewed TRINETRA evidence processing only after official-source and tax-adviser launch sign-off. Synthetic examples remain available while off. |
+| `TRINETRA_MODE` | `Literal['off', 'pilot', 'on']` | `'pilot'` | example, production | TRINETRA (Final 2T, N-201): who gets LIVE evidence processing. "off": nobody (a synthetic preview only). "pilot" (the shipped default): only organizations a platform administrator enrolled. "on": every organization whos… |
+| `TRINETRA_LIVE_ENABLED` | `Optional[bool]` | `None` | — | DEPRECATED alias of TRINETRA_MODE, kept so an old deployment file still means what it said: true is "on", false is "off". Leave it unset; when set it wins over TRINETRA_MODE. |
 | `ML_STUBS` | `bool` | `False` | example | TEST STUBS, not models: hashed bag-of-words embeddings and labelled placeholder OCR text (app/services/ml_stubs.py). For environments that cannot download the PaddleOCR / SentenceTransformers weights. Refused when ENVIR… |
 | `PLATFORM_SMTP_HOST` | `str` | `''` | example, production, guard |  |
 | `PLATFORM_SMTP_PORT` | `int` | `587` | example, production |  |

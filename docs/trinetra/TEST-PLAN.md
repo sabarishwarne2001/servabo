@@ -21,6 +21,34 @@ checks report the final head; green automated runs are not production or legal a
 - `frontend/e2e/tests/135-trinetra.spec.ts`: real API sample flows for Developer,
   Business, Enterprise and viewer; search/selection; direct write denial; keyboard,
   light/dark axe and 390/768/1440 widths under the production CSP.
+- **Final session 2T** (`backend/tests/trinetra/` unless a path is given; every failing test was written before its fix):
+  - `test_modes.py` (off / pilot / on, the old alias, enrolment audit), `test_capacities.py` (working-set counts, retention ceiling,
+    inquiry allowance), `test_one_entity_one_profile.py`, `test_seller_check.py`, `test_write_forms_match_the_server.py`,
+    `test_lifecycle_rule.py`, `test_versions.py` and `test_evidence_lifecycle.py` ("changed" means the evidence changed),
+    `test_version_migration.py` (populated up/down/up of the fingerprint conversion).
+  - `test_statement_readers.py`, `test_statement_files.py` (template, AIS with the mapping choice, Form 26AS/168, every refusal),
+    `test_hostile_files.py` (a corpus of hostile files run through every reader and template: oversized, zip-bomb shaped,
+    NULs, formula cells, a thousand columns, mixed encodings), fixtures in `backend/tests/fixtures/trinetra/` (synthetic).
+  - `test_suggestions.py`, `test_zoho_tds.py` (expectations accepted only by a person; read-only Zoho), `test_money_model.py`
+    (credit notes, reversals and pairings, advances, triggering events, late and duplicate postings, UNRESOLVED),
+    `test_explain.py`, `test_resolution.py` (authorized inquiries, approval chains, closure ledger, measured time),
+    `test_outcomes.py`, `test_helm_adapter.py`.
+  - `test_notices.py`, `test_case_events.py`, `test_integrations.py`, `test_warehouse_dataset.py`, `test_tds_recoveries.py`
+    (Getting started, search, notices and the Monday line, value receipt, rules and webhooks, organization view, holds and egress).
+  - `test_case_list_batches.py` (queries do not grow with cases; the batched list equals the one-case path),
+    `test_privacy.py` (one whole journey with every log captured: no PAN or TAN anywhere), `test_isolation_sweep.py` (every
+    TRINETRA route, read from OpenAPI, by a stranger, a user with no organization and another organization's own ids; the
+    sweep fails if a new route is not covered).
+  - `backend/tests/performance/test_trinetra_budgets.py` (5,000 cases, a 5,000-row import, 100 workspaces; 5 s each),
+    `backend/tests/security/test_prompt_injection_tds_hints.py` and `test_prompt_injection_trinetra_paths.py` (invariant (f) and the
+    new paths in `docs/hardening/PROMPT-INJECTION.md`), `backend/tests/infra/test_error_tracking.py` (TAN pattern),
+    `backend/tests/services/helm/test_withholding_hold.py`.
+  - Browser specs from 141 (`frontend/e2e/tests/`): **141** access by plan and by pilot enrolment (Starter, a Business
+    organization before and after enrolment, the operator-only console); **142** owner, workspace administrator and viewer on
+    Enterprise and the owner on Business, with the server asked too; **143** statement import (template, AIS mapping, official readers
+    shown unverified), suggestions from a filled template accepted by a person, an inquiry draft that cannot be sent without a
+    confirmed contact; **144** the Enterprise approval chain, the organization view per legal entity, axe in light and dark on every
+    tab and at 390 px. Spec 136 now enrols its own organization in the pilot.
 
 ## Required execution
 
@@ -41,7 +69,7 @@ and shipped-dependency audit. Preserve logs outside tracked source and report ex
 counts/failures. Browser runs use synthetic data and local integration stand-ins;
 they do not validate real OCR/model quality, real tax exports or payment providers.
 
-## Executed validation, 26 October 2026
+## Executed validation, 26 October 2026 (PR #40; history)
 
 | Check | Observed result |
 | --- | --- |
@@ -85,7 +113,29 @@ Lighthouse run missed the home/pricing performance budget under concurrent load;
 both PR website CI jobs subsequently passed, including all-category Lighthouse
 scores of at least 95 on home, pricing, Helm, GST and TRINETRA. No threshold changed.
 
-Reproduce browser 135 with the default-disabled API; browser 136 requires an isolated
-synthetic API with `TRINETRA_LIVE_ENABLED=true` and runner `E2E_TRINETRA_LIVE=1`.
-CI runs these in separate stack phases. Local Chromium is `/usr/bin/chromium` via
+Reproduce the browser specs against the shipped default (`TRINETRA_MODE=pilot`): 135 expects an organization nobody enrolled; 136 and
+141 to 144 enrol their own fresh organizations through the platform operator API, so they need no special setting. CI still runs 136
+once more in a stack with the old `TRINETRA_LIVE_ENABLED=true` alias. Local Chromium is `/usr/bin/chromium` via
 `E2E_CHROMIUM_PATH`. No real provider, tax portal, customer data or recipient was used.
+
+## Executed validation, Final session 2T (2026-10-28)
+
+Run in the cloud sandbox (no PaddleOCR, no network to model hosts, no real TRACES or e-filing site); synthetic data only. The full backend
+and browser suites run in CI on the ready PR #44; its result is the final-head record (see the PR's checks). Nothing below is counted
+as passing unless it ran.
+
+| Check | Observed result |
+| --- | --- |
+| TRINETRA backend suite (`tests/trinetra`), isolation, infra, scripts, security, core, models, performance, templates, operational | 2,947 passed, 34 skipped, 7 failed on the first run: four needed to download an embedding model (blocked here), one speed budget (GST import, 10.38 s against 10 s) missed while a browser run shared the machine and passed alone, and two were the owner-set lock check on two TRINETRA row locks, a real defect fixed in this session (the lock check now reads them). All of them pass or are environmental on the rerun. |
+| `tests/api`, `tests/services`, `tests/engines` | 5,380 passed, 37 failed: 33 needed the platform mail relay setting this sandbox did not have and pass with it; 4 needed the embedding model download (blocked). No TRINETRA failure. |
+| Populated whole-chain migration round trip (`test_migration_chain_populated.py`, `test_controls.py`) | Passed: down to before `tr1a1` and up again twice with every TRINETRA table holding a row; one head `tr2t10_recoveries_tds_kind`. |
+| Frontend | typecheck, lint, self-checks and 313 unit tests passed; production build passed. |
+| Website | typecheck, build, links, HTML validation, accessibility (76 views, light and dark, 360 and 1280 px) and the pricing check passed. |
+| Browser specs 135, 136, 141, 142, 143, 144 | All passed against the shipped `TRINETRA_MODE=pilot`; 142 to 144 each took one round of spec fixes (references the matcher normalizes, a strict page-problem policy, a real axe finding on the organization view, now fixed). |
+| Browser specs 73, 120 (Getting started, seven steps) and 92 | Passed after 73 and 120 learned the new step; 92 failed once in CI on an ERP retry and passed locally (not TRINETRA). |
+| `campaign_slices.py --check all` | Exit 0, 0 open or missing rows. |
+| Performance (`PERFORMANCE.md`) | Summary at 5,000 cases 2.58 s; reading a 5,000-row statement 0.06 s; importing it 3.98 s; organization view over 100 workspaces 1.68 s; budget 5 s each. |
+
+**Not run here, and why:** the official statement readers on a real file; the Zoho Books read against a real organization; a real inbox;
+the real-model prompt-injection behaviour; the full browser suite locally (it needs the heavy OCR image; the CI job runs it). Final
+session 2B proves the first three.

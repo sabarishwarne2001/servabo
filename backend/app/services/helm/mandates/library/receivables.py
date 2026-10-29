@@ -95,18 +95,31 @@ def _propose(snapshot: Snapshot, mandate: base.ActiveMandate) -> list[base.Candi
             continue
         overdue = (snapshot.as_of - receivable.due_date).days
         customer = receivable.counterparty_name or "the customer"
+        # TRINETRA (Final 2T): chase the cash still owed, never the tax the customer withheld. A reminder with nothing
+        # left to chase (or with an unknown withheld amount) is still proposed under its usual key; the Guard blocks it
+        # with a plain reason, so it is shown as held and never proposed a second time.
+        withheld = receivable.withheld_micros if not receivable.withholding_hold else 0
+        amount = receivable.amount_micros - withheld if withheld else receivable.amount_micros
+        explanation = (f"{receivable.document} for {money.say(receivable.amount_micros, receivable.currency)} fell "
+                       f"due on {money.day(receivable.due_date)} and no payment has been seen. Reminder {level} "
+                       f"of {len(params.days)}, in a {TONES.get(level, 'firm')} tone.")
+        extra: dict = {}
+        if withheld:
+            extra = {"withheld_micros": withheld, "withholding_case_id": receivable.withholding_case_id}
+            explanation += (f" {money.say(withheld, receivable.currency)} was withheld as TDS and reviewed in TRINETRA; "
+                            f"the reminder asks for the cash still owed, {money.say(amount, receivable.currency)}.")
+        elif receivable.withholding_case_id:
+            extra = {"withholding_case_id": receivable.withholding_case_id}
         out.append(base.Candidate(
             kind=v.ACTION_SEND_REMINDER, mandate=mandate,
             title=f"Remind {customer}: {receivable.document_number or receivable.document} is {overdue} days overdue",
-            explanation=(f"{receivable.document} for {money.say(receivable.amount_micros, receivable.currency)} fell "
-                         f"due on {money.day(receivable.due_date)} and no payment has been seen. Reminder {level} "
-                         f"of {len(params.days)}, in a {TONES.get(level, 'firm')} tone."),
+            explanation=explanation,
             key_parts=(receivable.promise_id, "reminder", level), workspace_id=receivable.workspace_id,
             work_item_id=receivable.work_item_id, promise_id=receivable.promise_id,
-            counterparty_key=receivable.counterparty_key, amount_micros=receivable.amount_micros,
+            counterparty_key=receivable.counterparty_key, amount_micros=amount,
             currency=receivable.currency,
             params={"level": level, "document_number": receivable.document_number,
-                    "due_date": receivable.due_date.isoformat(), "days_overdue": overdue}))
+                    "due_date": receivable.due_date.isoformat(), "days_overdue": overdue, **extra}))
     return out
 
 

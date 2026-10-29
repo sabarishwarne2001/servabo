@@ -1,5 +1,37 @@
 # Project TRINETRA delivery and review record
 
+## Final session 2T (2026-10-28): finished, on Business and Enterprise
+
+Branch `claude/new-session-9f51dc`, pull request [sabarishwarne2001/servabo#44](https://github.com/sabarishwarne2001/servabo/pull/44).
+Everything below the next rule is the record of PR #40 as delivered on 26 October; where it says "gated", "not implemented" or
+"disabled" it is **superseded by this section**. The matrix of every requirement of the owner's brief, with its final status, is
+[COMPLETION.md](COMPLETION.md).
+
+**Delivered:** TRINETRA works like Helm, three-way matching and GST Credit on Business and Enterprise, in code and tests.
+It ships in **pilot** mode (`TRINETRA_MODE=pilot`): an organization is live only when a platform administrator enrolls it.
+
+| Area | What 2T built |
+| --- | --- |
+| P0 defects of the review | The Helm reminder hold also holds *net-of-TDS* reminders and the safety net on stale evidence; "changed" means the evidence changed (content fingerprints, not `updated_at`); the seller on the invoice must be the profile's legal entity (or a person says so); one legal entity, one profile per organization; the case list reads in batches; write forms follow the server; one deliberate data-lifecycle rule (N-203). |
+| Modes and capacities | off / pilot / on with one helper, the platform operator's enrolment console, working-set capacities, `preflight.py` reports mode, enrolments and unverified readers. |
+| Statement readers | Template (CSV/XLSX), AIS CSV with a mapping preview, Form 26AS and Form 168 text downloads (**unverified until Final 2B**), every file previewed before saving, each refusal in words. |
+| Expectations | Printed on an invoice, the expected-TDS template (Tally), a read-only Zoho Books scan; the deductor directory; each accepted only by a person. |
+| Money model | Sourced basis only, credit notes, reversals paired by a person, advances, a triggering event, late and duplicate postings, closed-without-resolution, reject and annotate, field-level explanations. |
+| Resolution | Authorized inquiries (a person presses Send), Enterprise approval chains, the closure ledger "TDS now visible" (never cash), measured review time. |
+| Integrations | Getting started, global search, notification preferences and the Monday line, value receipt, rules and recipes, public events and read API, warehouse dataset, organization view per legal entity, Recoveries, Helm ledger, holds and egress. |
+| Screens and guide | Every capability has a screen; `USER-GUIDE.md`; browser specs 141 to 144 by role and plan with axe in light and dark and at 390 px. |
+| Hardening | Performance budgets (the summary was quadratic: 28 s to 2.6 s at 5,000 cases, F-650), a hostile-file corpus for every reader, isolation sweep over every route, prompt-injection entries with tests, a TAN pattern in the error scrubber, a privacy journey, an updated threat model. |
+| Website | `/trinetra`, the home card and pricing say "Business and Enterprise" with a single "rolling out" switch (`PUBLIC_TRINETRA_STATUS`); no refund, guaranteed-credit or government-connection claim. |
+
+**What is still unproven (stated plainly):** the three official statement readers have never read a real file (the official
+TRACES and e-filing hosts were not reachable from the build environment); the Zoho read has never met a real Zoho Books
+organization; no real inbox received an inquiry. Final session 2B proves them on the owner's own files and marks each COMPLETION row
+"Verified in 2B" or "Differs". The wording still needs the owner's chartered accountant (LAUNCH-GATES.md).
+
+---
+
+## As delivered in PR #40 (26 October 2026; historical)
+
 Date: 26 October 2026. Branch: `hardening/trinetra`. Base:
 `bf8f57f691aec7122d9ebaf4a4e13ae9d22ae19c`. Pull request:
 [sabarishwarne2001/servabo#40](https://github.com/sabarishwarne2001/servabo/pull/40).

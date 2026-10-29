@@ -109,7 +109,7 @@ def build(db, workspace, format):
             s.active,
             s.parser_version,
             s.fingerprint,
-            str(s.source_work_item_id),
+            str(s.source_work_item_id) if s.source_work_item_id else "(uploaded file)",
             s.source_version,
             json.dumps(s.comparison, sort_keys=True),
         ]

@@ -255,3 +255,42 @@ def test_online_names_the_safety_jobs_that_stopped_reporting(boot, monkeypatch):
     assert item.status == preflight.WRONG and item.detail == "late: compliance, backup"
     assert "servabo-install-host-jobs" in item.fix and not report.ready
     assert status_of(preflight.run(boot()), "safety jobs (online)") == preflight.SKIPPED  # offline reads nothing
+
+
+# --- Final session 2T, Phase 2.3: TRINETRA's mode, its pilot, and unverified statement readers ---------------------------------
+
+
+def _trinetra(report):
+    return {i.name: i for i in report.items if i.group == "TRINETRA"}
+
+
+def _unverified_reader(monkeypatch):
+    from app.services.trinetra import readers
+
+    fake = readers.Reader("form26as-text-test", "A test reader", True, "test-v1", "a documentation page", "2026-10-28")
+    monkeypatch.setattr(readers, "REGISTRY", {**readers.REGISTRY, fake.key: fake})
+
+
+def test_preflight_reports_the_trinetra_mode_and_needs_online_to_count_the_pilot(boot):
+    items = _trinetra(preflight.run(boot()))
+    assert items["mode"].status == preflight.OK and "mode pilot" in items["mode"].detail
+    assert items["pilot organizations"].status == preflight.SKIPPED
+    old = _trinetra(preflight.run(boot(TRINETRA_LIVE_ENABLED=False)))
+    assert "mode off" in old["mode"].detail and "TRINETRA_LIVE_ENABLED" in old["mode"].detail
+
+
+def test_mode_on_warns_while_an_official_reader_is_unverified_and_pilot_does_not(boot, monkeypatch):
+    _unverified_reader(monkeypatch)
+    on = preflight.run(boot(TRINETRA_MODE="on"))
+    warned = _trinetra(on)["statement readers"]
+    assert warned.status == preflight.WARN and "form26as-text-test" in warned.detail and "Final session 2B" in warned.fix
+    assert on.ready  # a warning to read, not a missing setting
+    assert "to read" in preflight.render_table(on) and "Final session 2B" in preflight.render_table(on)
+    pilot = _trinetra(preflight.run(boot(TRINETRA_MODE="pilot")))["statement readers"]
+    assert pilot.status == preflight.OK and "unverified" in pilot.detail
+
+
+def test_the_online_check_counts_enrolled_organizations(boot, monkeypatch):
+    monkeypatch.setattr(preflight, "probe_trinetra", lambda s: 3)
+    report = preflight.run(boot(), online=True)
+    assert _trinetra(report)["pilot organizations"].detail.startswith("3 enrolled")

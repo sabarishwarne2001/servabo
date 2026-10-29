@@ -33,9 +33,12 @@ class FakeZoho:
         self.access_tokens: dict[str, float] = {}
         self.organizations: list[dict[str, Any]] = [dict(o) for o in DEFAULT_ORGANIZATIONS]
         self.requests: list[tuple[str, str]] = []
+        self.payment_queries: list[dict[str, str]] = []
         self.token_forms: list[dict[str, str]] = []
         self.revoked: list[str] = []
         self.bills: list[dict[str, Any]] = []
+        #: Customer payments as Zoho's API v3 returns them (TRINETRA reads `tax_amount_withheld`; unverified until Final session 2B).
+        self.payments: list[dict[str, Any]] = []
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -72,6 +75,24 @@ class FakeZoho:
                     if token not in outer.access_tokens or outer.access_tokens[token] < time.time():
                         return self._send(401, {"code": 57, "message": "You are not authorized to perform this operation"})
                     return self._send(200, {"code": 0, "message": "success", "organizations": outer.organizations})
+                if parts.path.startswith("/books/v3/customerpayments"):
+                    token = (self.headers.get("Authorization") or "").replace("Zoho-oauthtoken ", "")
+                    if token not in outer.access_tokens or outer.access_tokens[token] < time.time():
+                        return self._send(401, {"code": 57, "message": "You are not authorized to perform this operation"})
+                    outer.payment_queries.append(dict(query))
+                    tail = parts.path[len("/books/v3/customerpayments"):].strip("/")
+                    if tail:
+                        found = next((p for p in outer.payments if p["payment_id"] == tail), None)
+                        if found is None:
+                            return self._send(404, {"code": 1002, "message": "The payment does not exist."})
+                        return self._send(200, {"code": 0, "message": "success", "payment": found})
+                    page, per_page = int(query.get("page", 1)), int(query.get("per_page", 200))
+                    chosen = [p for p in outer.payments if query.get("date_start", "") <= p["date"] <= (query.get("date_end") or "9999")]
+                    window = chosen[(page - 1) * per_page: page * per_page]
+                    summary = [{k: v for k, v in p.items() if k not in ("invoices", "tax_amount_withheld")} for p in window]
+                    return self._send(200, {"code": 0, "message": "success", "customerpayments": summary,
+                                            "page_context": {"page": page, "per_page": per_page,
+                                                             "has_more_page": page * per_page < len(chosen)}})
                 self._send(404, {"code": 5, "message": "Invalid URL"})
 
             def do_POST(self) -> None:  # noqa: N802

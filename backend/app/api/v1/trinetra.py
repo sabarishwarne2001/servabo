@@ -1,10 +1,12 @@
-"""TRINETRA workspace API. Official imports and live access remain release gated."""
+"""TRINETRA workspace API. Live access follows the deployment mode (off, pilot, on) through services/trinetra/mode.py."""
 
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Literal, Annotated
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel, ConfigDict, Field, AfterValidator
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field, AfterValidator, BeforeValidator
+from sqlalchemy import select as _select
 from sqlalchemy.orm import Session
 from app.api.deps import (
     RequireWorkspaceRole,
@@ -22,7 +24,8 @@ from app.models.trinetra import (
     TrinetraCredit as Credit,
     TrinetraDecision as Decision,
 )
-from app.services.trinetra import service as s, domain as d
+from app.services.trinetra import service as s, domain as d, mode, readers, suggestions as sg, directory as dr
+from app.services.trinetra import approvals as ap, inquiries as iq
 from app.services.trinetra.events import reviewed as announce_review
 from app.services.trinetra.schemas import (
     AccessOut,
@@ -35,10 +38,13 @@ from app.services.trinetra.schemas import (
     DetailOut,
     DraftOut,
     PreviewOut,
+    FilePreviewOut,
+    SuggestionsOut,
     RunOut,
     RunStatusOut,
     OrganizationAccessOut,
     OrganizationSummaryOut,
+    OrganizationCasesOut,
 )
 
 
@@ -48,6 +54,16 @@ def _money(value: str) -> str:
 
 
 Money = Annotated[str, AfterValidator(_money)]
+
+
+def _pan(value):
+    """Upper case, no spaces or hyphens; anything else is left for the pattern to refuse (a 422)."""
+    from app.services.trinetra.seller import normalize_pan
+
+    return (normalize_pan(value) or value) if isinstance(value, str) else value
+
+
+Pan = Annotated[str, BeforeValidator(_pan), Field(pattern=r"^[A-Z]{5}[0-9]{4}[A-Z]$", max_length=10)]
 
 
 def no_cache(response: Response):
@@ -66,7 +82,7 @@ class Strict(BaseModel):
 
 class ProfileIn(Strict):
     name: str = Field(min_length=1, max_length=120)
-    pan: str = Field(pattern=r"^[A-Z]{5}[0-9]{4}[A-Z]$")
+    pan: Pan
 
 
 class LineIn(Strict):
@@ -80,9 +96,16 @@ class ImportIn(Strict):
     source_work_item_id: uuid.UUID
     source_version: str | None = Field(default=None, max_length=60)
     year: int = Field(ge=2000, le=2100)
-    pan: str = Field(pattern=r"^[A-Z]{5}[0-9]{4}[A-Z]$")
+    pan: Pan
     confirmed: bool
     rows: list[LineIn] = Field(min_length=1, max_length=500)
+
+
+class TriggeringEventIn(Strict):
+    """An advance or earlier event, placed in its own tax year by a person (never inferred)."""
+
+    reason: str = Field(min_length=20, max_length=500)
+    evidence_work_item_id: uuid.UUID
 
 
 class CreditIn(Strict):
@@ -94,6 +117,8 @@ class CreditIn(Strict):
     tan: str = Field(pattern=r"^[A-Z]{4}[0-9]{5}[A-Z]$")
     amount: Money
     source_confirmation: str = Field(min_length=10, max_length=1000)
+    seller_name_confirmed: bool = False
+    triggering_event: TriggeringEventIn | None = None
 
 
 class AllocationIn(Strict):
@@ -105,14 +130,27 @@ class AllocationIn(Strict):
 class DecisionIn(Strict):
     revision: int = Field(ge=1)
     action: Literal[
-        "ALLOCATE", "DISPUTED", "EXPLAINED", "WITHDRAWN", "CA_REVIEWED", "REOPEN"
+        "ALLOCATE",
+        "DISPUTED",
+        "EXPLAINED",
+        "WITHDRAWN",
+        "CA_REVIEWED",
+        "REOPEN",
+        "UNRESOLVED",
+        "REJECT_MATCH",
+        "ANNOTATE",
     ]
     reason: str = Field(min_length=10, max_length=1000)
     allocations: list[AllocationIn] = Field(default_factory=list, max_length=100)
     review_minutes: int = Field(default=0, ge=0, le=480, strict=True)
+    #: REJECT_MATCH and ANNOTATE: the statement row concerned, and the annotation's text.
+    snapshot_id: uuid.UUID | None = None
+    line_id: str | None = Field(default=None, pattern=r"^\d{1,4}$")
+    note: str | None = Field(default=None, max_length=500)
 
 
 class ReconfirmIn(Strict):
+    seller_name_confirmed: bool = False
     revision: int = Field(ge=1)
     amount: Money
     reason: str = Field(min_length=10, max_length=1000)
@@ -121,9 +159,22 @@ class ReconfirmIn(Strict):
 class EvidenceIn(Strict):
     work_item_id: uuid.UUID
     kind: Literal[
-        "DEDUCTOR_ADVICE", "ACCOUNTING_RECORD", "CERTIFICATE", "CORRECTION_RESPONSE"
+        "DEDUCTOR_ADVICE",
+        "ACCOUNTING_RECORD",
+        "CERTIFICATE",
+        "CORRECTION_RESPONSE",
+        "CREDIT_NOTE",
+        "TRIGGERING_EVENT",
     ]
     amount: Money | None = None
+
+
+class BasisIn(Strict):
+    """The amount the tax was computed on, ONLY when a document states it. Never computed by Servabo."""
+
+    amount: Money
+    source: Literal["INVOICE", "ACCOUNTING_RECORD", "DEDUCTOR_ADVICE"]
+    evidence_work_item_id: uuid.UUID
 
 
 class ReviewIn(Strict):
@@ -135,17 +186,13 @@ class ReviewIn(Strict):
     reason: str = Field(min_length=10, max_length=1000)
     evidence: list[EvidenceIn] = Field(default_factory=list, max_length=20)
     confirm_receivable: bool = False
+    basis: BasisIn | None = None
+    clear_basis: bool = False
 
 
-def require_source_validation():
-    if not settings.TRINETRA_LIVE_ENABLED:
-        raise HTTPException(
-            409,
-            {
-                "code": "TRINETRA_SOURCE_REVIEW_REQUIRED",
-                "message": "Live access awaits official-source and tax-adviser validation. Explore the synthetic examples.",
-            },
-        )
+def require_source_validation(db, organization_id):
+    """The launch gate: the deployment's mode (off, pilot, on) decides, through the one helper."""
+    mode.require_mode(db, organization_id)
 
 
 def workspace(db, context, wid, *, live=True):
@@ -173,7 +220,7 @@ def workspace(db, context, wid, *, live=True):
         )
         if w.is_sample:
             raise HTTPException(409, "Synthetic examples are read-only.")
-        require_source_validation()
+        require_source_validation(db, w.organization_id)
     return w
 
 
@@ -184,14 +231,19 @@ def access(
     context: TenantContext = Depends(Read),
 ):
     workspace(db, context, workspace_id, live=False)
+    live = mode.state(db, context.organization_id)
     return {
-        "live_enabled": settings.TRINETRA_LIVE_ENABLED,
-        "entitled": capability_gate.has_capability(
-            db,
-            organization_id=context.organization_id,
-            capability_key="capability.trinetra",
-        ),
-        "official_formats": [],
+        "live_enabled": live.live,
+        "mode": live.mode,
+        "enrolled": live.enrolled,
+        "enrolled_since": live.enrolled_since.isoformat() if live.enrolled_since else None,
+        "entitled": live.entitled,
+        # Official layouts proven on a real file (Final session 2B fills this); every reader is listed below with its state.
+        "official_formats": [r.key for r in readers.REGISTRY.values() if r.official and r.verified],
+        "statement_readers": [
+            {"key": r.key, "label": r.label, "official": r.official, "verified": r.verified}
+            for r in readers.REGISTRY.values()
+        ],
         "transcription_format": "human-transcription-v1",
         "tcs_supported": False,
     }
@@ -248,7 +300,7 @@ def import_statement(
     p = s.profile(db, w, body.profile_id)
     if (
         body.source_version is not None
-        and s.document(db, w, body.source_work_item_id).updated_at.isoformat()
+        and s.versions.one(db, w.id, s.document(db, w, body.source_work_item_id).id).statement
         != body.source_version
     ):
         raise HTTPException(
@@ -298,12 +350,740 @@ def preview_statement(
         "pan_masked": p.pan_masked,
         "period": d.tax_period(date(body.year, 4, 1))[1],
         "source_work_item_id": str(source.id),
-        "source_version": source.updated_at.isoformat(),
+        "source_version": s.versions.one(db, w.id, source.id).statement,
         "rows": len(body.rows),
         "total_micros": str(sum(d.money(r.amount) for r in body.rows)),
         "parser_version": "human-transcription-v1",
         "official_format_verified": False,
     }
+
+
+def _statement_file(upload: UploadFile) -> tuple[str, bytes]:
+    """The uploaded statement, read no further than the size bound (the platform's spooling, never the whole body)."""
+    from app.services.file_validation_service import FileValidationError, spool_upload_file
+    from app.services.trinetra.statements.common import MAX_BYTES
+
+    try:
+        handle, _ = spool_upload_file(upload, max_bytes=MAX_BYTES)
+    except FileValidationError as exc:
+        code = "TRINETRA_EMPTY_FILE" if exc.reason.value == "EMPTY" else "TRINETRA_FILE_TOO_LARGE"
+        raise HTTPException(
+            422, {"code": code, "message": f"The file could not be read: {exc}"}
+        ) from exc
+    try:
+        handle.seek(0)
+        return (upload.filename or "statement")[:255], handle.read()
+    finally:
+        handle.close()
+
+
+def _read_statement(upload: UploadFile, reader: str | None, mapping: str | None):
+    import json as _json
+
+    from app.services.trinetra.statements import detect
+    from app.services.trinetra.statements.common import StatementRefused
+
+    filename, data = _statement_file(upload)
+    chosen = None
+    if mapping:
+        try:
+            chosen = _json.loads(mapping)
+            if not isinstance(chosen, dict) or len(chosen) > 16:
+                raise ValueError
+        except ValueError as exc:
+            raise HTTPException(422, "The column mapping could not be read.") from exc
+    try:
+        return detect.read(filename, data, reader=reader, mapping=chosen)
+    except StatementRefused as exc:
+        raise HTTPException(
+            422, {"code": exc.code, "message": exc.message, "row": exc.row, "columns": exc.columns}
+        ) from exc
+
+
+@router.get(P + "/statement-template.{format}")
+def statement_template(
+    workspace_id: uuid.UUID,
+    format: Literal["csv", "xlsx"],
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    """The Servabo template: your own transcription of a statement, never an official format."""
+    from app.services.trinetra.statements import template
+
+    workspace(db, context, workspace_id, live=False)
+    if format == "csv":
+        body, media = template.csv_bytes(), "text/csv"
+    else:
+        body = template.xlsx_bytes()
+        media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return Response(
+        body,
+        media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="servabo-statement-template.{format}"'},
+    )
+
+
+@router.post(P + "/statement-files/preview", response_model=FilePreviewOut)
+def preview_statement_file(
+    workspace_id: uuid.UUID,
+    file: UploadFile = File(...),
+    profile_id: uuid.UUID = Form(...),
+    year: int = Form(..., ge=2000, le=2100),
+    pan: str = Form(...),
+    reader: str | None = Form(default=None, max_length=40),
+    mapping: str | None = Form(default=None, max_length=2000),
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    """What the file would import: the reader, the tax-year label as the file states it, the mapping of each column, every
+    check against the file's own totals, and the rows. Nothing is saved."""
+    from app.services.trinetra import readers
+
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, profile_id)
+    s.check_entity(p, _pan(pan))
+    parsed = _read_statement(file, reader, mapping)
+    info = readers.get(parsed.reader)
+    entity_pan = s.encryption.decrypt_secret(p.pan_ciphertext)
+    totals: dict[str, list[int]] = {}
+    for r in parsed.rows:
+        entry = totals.setdefault(r.tan, [0, 0])
+        entry[0] += 1
+        entry[1] += r.amount_micros
+    unverified = bool(info and info.official and not info.verified)
+    return {
+        "reader": parsed.reader,
+        "reader_label": info.label if info else parsed.reader,
+        "official": bool(info and info.official),
+        "verified": bool(info and info.verified),
+        "parser_version": parsed.parser_version,
+        "sha256": parsed.sha256,
+        "tax_year_label": parsed.label.text if parsed.label else None,
+        "tax_year_kind": parsed.label.kind if parsed.label else None,
+        "year": year,
+        "year_matches": parsed.label is None or parsed.label.year == year,
+        "file_pan_matches": (parsed.file_pan == entity_pan) if parsed.file_pan else None,
+        "rows": len(parsed.rows),
+        "total_micros": str(parsed.total_micros),
+        "deductors": [
+            {"tan_masked": "******" + tan[-4:], "rows": n, "total_micros": str(total)}
+            for tan, (n, total) in sorted(totals.items())
+        ],
+        "mapping": [{"column": c, "meaning": m} for c, m in parsed.mapping],
+        "columns": parsed.columns_info,
+        "checks": [{"name": c.name, "ok": c.ok, "detail": c.detail} for c in parsed.checks],
+        "ignored": parsed.ignored,
+        "sample": [
+            {
+                "line_no": r.line_no,
+                "tan_masked": "******" + r.tan[-4:],
+                "section": r.section,
+                "on": r.on.isoformat() if r.on else None,
+                "status": r.status,
+                "amount_micros": str(r.amount_micros),
+            }
+            for r in parsed.rows[:25]
+        ],
+        "notice": (
+            "Unverified reader: this layout has not yet been proven on a real downloaded file. Check the rows against your "
+            "statement before confirming." if unverified else
+            "Your own transcription: Servabo reads it as you typed it; it is not an official format."
+            if not (info and info.official) else "Official download, read by a verified reader."
+        ),
+    }
+
+
+@router.post(P + "/statement-files", response_model=StatementOut)
+def import_statement_file(
+    workspace_id: uuid.UUID,
+    file: UploadFile = File(...),
+    profile_id: uuid.UUID = Form(...),
+    year: int = Form(..., ge=2000, le=2100),
+    pan: str = Form(...),
+    confirmed: bool = Form(...),
+    expected_sha256: str = Form(..., min_length=64, max_length=64),
+    reader: str | None = Form(default=None, max_length=40),
+    mapping: str | None = Form(default=None, max_length=2000),
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    """Import the previewed file: the same confirm and import path as typed rows, to the same immutable snapshots."""
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, profile_id)
+    parsed = _read_statement(file, reader, mapping)
+    r = s.import_parsed(db, w, p, year, parsed, _pan(pan), confirmed, expected_sha256)
+    db.commit()
+    return {
+        "id": str(r.id),
+        "revision": r.revision,
+        "fingerprint": r.fingerprint,
+        "source_kind": r.parser_version,
+        "active": r.active,
+    }
+
+
+class ScanIn(Strict):
+    profile_id: uuid.UUID
+
+
+class AcceptIn(Strict):
+    source_confirmation: str = Field(min_length=10, max_length=1000)
+    tan: str | None = Field(default=None, pattern=r"^[A-Z]{4}[0-9]{5}[A-Z]$")
+    amount: Money | None = None
+    seller_name_confirmed: bool = False
+
+
+class DismissIn(Strict):
+    reason: str = Field(min_length=10, max_length=1000)
+
+
+class DeductorIn(Strict):
+    profile_id: uuid.UUID
+    tan: str = Field(pattern=r"^[A-Z]{4}[0-9]{5}[A-Z]$")
+    counterparty: str = Field(min_length=1, max_length=120)
+    reason: str = Field(min_length=10, max_length=1000)
+
+
+class DeductorConfirmIn(Strict):
+    counterparty: str = Field(min_length=1, max_length=120)
+    reason: str = Field(min_length=10, max_length=1000)
+
+
+@router.get(P + "/suggestions", response_model=SuggestionsOut)
+def suggestions(
+    workspace_id: uuid.UUID,
+    profile_id: uuid.UUID | None = None,
+    year: int | None = Query(None, ge=2000, le=2100),
+    status: Literal["OPEN", "ACCEPTED", "DISMISSED"] | None = None,
+    offset: int = Query(0, ge=0, le=10000),
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    w = workspace(db, context, workspace_id)
+    return sg.listing(db, w, profile_id=profile_id, year=year, status=status, limit=limit, offset=offset)
+
+
+@router.post(P + "/suggestions/scan")
+def scan_suggestions(
+    workspace_id: uuid.UUID,
+    body: ScanIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    """Look for invoices that print a TDS amount and suggest an expectation for each. Nothing is confirmed."""
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, body.profile_id)
+    counts = sg.scan_hints(db, w, p)
+    db.commit()
+    return counts
+
+
+@router.get(P + "/suggestion-template.{format}")
+def suggestion_template(
+    workspace_id: uuid.UUID,
+    format: Literal["csv", "xlsx"],
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    from app.services.trinetra.statements import expectations
+
+    workspace(db, context, workspace_id, live=False)
+    body = expectations.csv_bytes() if format == "csv" else expectations.xlsx_bytes()
+    media = "text/csv" if format == "csv" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return Response(
+        body, media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="servabo-expected-tds-template.{format}"'},
+    )
+
+
+def _template_lines(upload: UploadFile):
+    from app.services.trinetra.statements import expectations
+    from app.services.trinetra.statements.common import StatementRefused
+
+    filename, data = _statement_file(upload)
+    try:
+        return expectations.read(filename, data)
+    except StatementRefused as exc:
+        raise HTTPException(422, {"code": exc.code, "message": exc.message, "row": exc.row}) from exc
+
+
+@router.post(P + "/suggestions/template/preview")
+def preview_suggestion_template(
+    workspace_id: uuid.UUID,
+    file: UploadFile = File(...),
+    profile_id: uuid.UUID = Form(...),
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, profile_id)
+    results = sg.match_template(db, w, p, _template_lines(file))
+    shown = [{k: v for k, v in r.items() if not k.startswith("_")} for r in results]
+    return {"rows": len(shown), "ok": sum(r["status"] == "OK" for r in shown), "items": shown[:500]}
+
+
+@router.post(P + "/suggestions/template")
+def import_suggestion_template(
+    workspace_id: uuid.UUID,
+    file: UploadFile = File(...),
+    profile_id: uuid.UUID = Form(...),
+    skip_refused: bool = Form(default=False),
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    """Turn the matched rows into SUGGESTIONS. A person still accepts each one."""
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, profile_id)
+    lines = _template_lines(file)
+    results = sg.match_template(db, w, p, lines)
+    out = sg.import_template(db, w, p, lines, results, skip_refused=skip_refused)
+    db.commit()
+    return out
+
+
+class ZohoScanIn(Strict):
+    profile_id: uuid.UUID
+    year: int | None = Field(default=None, ge=2000, le=2100)
+
+
+@router.post(P + "/suggestions/zoho/scan")
+def scan_zoho_suggestions(
+    workspace_id: uuid.UUID,
+    body: ZohoScanIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    """Read the TDS customers withheld from Zoho Books customer payments (read only) and suggest an expectation for each
+    invoice Servabo knows. Unverified until Final session 2B; a person accepts each suggestion."""
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, body.profile_id)
+    counts = sg.scan_zoho(db, w, p, year=body.year)
+    db.commit()
+    return counts
+
+
+@router.post(P + "/suggestions/{suggestion_id}/accept", response_model=CaseOut)
+def accept_suggestion(
+    workspace_id: uuid.UUID,
+    suggestion_id: uuid.UUID,
+    body: AcceptIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    row = sg.locked(db, w, suggestion_id)
+    p = s.profile(db, w, row.profile_id)
+    case = sg.accept(
+        db, w, p, context.user_id, row, source_confirmation=body.source_confirmation, tan=body.tan, amount=body.amount,
+        seller_name_confirmed=body.seller_name_confirmed,
+    )
+    db.commit()
+    return s.view(db, w, case)
+
+
+@router.post(P + "/suggestions/{suggestion_id}/dismiss")
+def dismiss_suggestion(
+    workspace_id: uuid.UUID,
+    suggestion_id: uuid.UUID,
+    body: DismissIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    row = sg.dismiss(db, sg.locked(db, w, suggestion_id), context.user_id, body.reason)
+    db.commit()
+    return sg.view(row)
+
+
+@router.get(P + "/deductors")
+def deductors(
+    workspace_id: uuid.UUID,
+    profile_id: uuid.UUID | None = None,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    from app.models.trinetra import TrinetraDeductor
+
+    w = workspace(db, context, workspace_id)
+    q = db.query(TrinetraDeductor).filter_by(workspace_id=w.id)
+    if profile_id:
+        q = q.filter_by(profile_id=profile_id)
+    return {"items": [dr.view(r) for r in q.order_by(TrinetraDeductor.created_at).limit(500)]}
+
+
+@router.post(P + "/deductors")
+def map_deductor(
+    workspace_id: uuid.UUID,
+    body: DeductorIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, body.profile_id)
+    salt = s.encryption.decrypt_secret(p.identity_salt_ciphertext)
+    row = dr.confirm(db, w, p, context.user_id, s.identity(body.tan, "TAN", salt), "******" + body.tan[-4:],
+                     body.counterparty, body.reason)
+    db.commit()
+    return dr.view(row)
+
+
+@router.post(P + "/deductors/{deductor_id}/confirm")
+def confirm_deductor(
+    workspace_id: uuid.UUID,
+    deductor_id: uuid.UUID,
+    body: DeductorConfirmIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    from app.models.trinetra import TrinetraDeductor
+
+    w = workspace(db, context, workspace_id)
+    row = db.query(TrinetraDeductor).filter_by(id=deductor_id, workspace_id=w.id).first()
+    if row is None:
+        raise HTTPException(404, "Deductor not found.")
+    p = s.profile(db, w, row.profile_id)
+    row = dr.confirm(db, w, p, context.user_id, row.deductor_key, row.tan_masked, body.counterparty, body.reason)
+    db.commit()
+    return dr.view(row)
+
+
+class PairIn(Strict):
+    snapshot_id: uuid.UUID
+    positive_line: int = Field(ge=0, le=100000)
+    negative_line: int = Field(ge=0, le=100000)
+    reason: str = Field(min_length=10, max_length=1000)
+    profile_id: uuid.UUID
+
+
+class UnpairIn(Strict):
+    reason: str = Field(min_length=10, max_length=1000)
+
+
+@router.post(P + "/pairings")
+def pair_reversal(
+    workspace_id: uuid.UUID,
+    body: PairIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    """Pair a reversal (a negative statement row) with the row it reverses. Netting happens only through a pairing a person made."""
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, body.profile_id)
+    row = s.pair_reversal(db, w, p, context.user_id, body.snapshot_id, body.positive_line, body.negative_line, body.reason)
+    db.commit()
+    return {"id": str(row.id), "snapshot_id": str(row.statement_id), "positive_line": row.positive_line,
+            "negative_line": row.negative_line, "active": row.active}
+
+
+@router.post(P + "/pairings/{pairing_id}/withdraw")
+def unpair_reversal(
+    workspace_id: uuid.UUID,
+    pairing_id: uuid.UUID,
+    body: UnpairIn,
+    profile_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    p = s.profile(db, w, profile_id)
+    row = s.unpair_reversal(db, w, p, context.user_id, pairing_id, body.reason)
+    db.commit()
+    return {"id": str(row.id), "active": row.active}
+
+
+@router.get(P + "/exceptions")
+def statement_exceptions(
+    workspace_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    """Reversals in the active statements that nobody has paired: exceptions, never netted on their own."""
+    from app.models.trinetra import TrinetraStatement
+
+    w = workspace(db, context, workspace_id)
+    snaps = db.query(TrinetraStatement).filter_by(workspace_id=w.id, active=True).limit(200).all()
+    pairs = s.active_pairings(db, [x.id for x in snaps])
+    items = []
+    for snap in snaps:
+        for i in s.unpaired_reversals(snap, pairs.get(snap.id, [])):
+            r = snap.rows[i]
+            # The rows this one could reverse: the same deductor's positive rows in the same statement (a person chooses).
+            candidates = [
+                {"line_id": str(j), "amount_micros": str(x["amount_micros"]), "reference": x.get("reference"), "on": x.get("on"),
+                 "section": x.get("section") or None}
+                for j, x in enumerate(snap.rows)
+                if j != i and x["deductor_key"] == r["deductor_key"] and x["amount_micros"] > 0
+            ][:20]
+            items.append({"profile_id": str(snap.profile_id), "snapshot_id": str(snap.id), "line_id": str(i),
+                          "year": snap.year, "section": r.get("section") or None, "on": r.get("on"),
+                          "amount_micros": str(r["amount_micros"]), "reference": r.get("reference"), "candidates": candidates})
+    return {"items": items[:500], "total": len(items),
+            "note": "A reversal or correction stays an exception until a person pairs it with the row it reverses."}
+
+
+class InquiryIn(Strict):
+    document_kind: Literal["CERTIFICATE", "DEDUCTOR_ADVICE", "CORRECTION_RESPONSE"] = "CERTIFICATE"
+    subject: str | None = Field(default=None, min_length=5, max_length=200)
+    body: str | None = Field(default=None, min_length=10, max_length=2000)
+
+
+class InquiryEditIn(Strict):
+    subject: str | None = Field(default=None, min_length=5, max_length=200)
+    body: str | None = Field(default=None, min_length=10, max_length=2000)
+
+
+class InquirySendIn(Strict):
+    override_reason: str | None = Field(default=None, min_length=10, max_length=500)
+
+
+def _inquiry(db, w, inquiry_id):
+    from sqlalchemy import select  # the plain name: the ARCH-05 lock check reads it
+
+    from app.models.trinetra import TrinetraInquiry
+
+    row = db.execute(
+        select(TrinetraInquiry).filter_by(id=inquiry_id, workspace_id=w.id).with_for_update()
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "Inquiry not found.")
+    return row
+
+
+@router.get(P + "/inquiries/allowance")
+def inquiry_allowance(
+    workspace_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    w = workspace(db, context, workspace_id)
+    return {"used": iq.sent_this_month(db, w.organization_id), "limit": iq.allowance(db, w),
+            "note": "Sent inquiries this calendar month, against your plan's monthly allowance."}
+
+
+@router.get(P + "/credits/{credit_id}/inquiries")
+def case_inquiries(
+    workspace_id: uuid.UUID,
+    credit_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    from app.models.trinetra import TrinetraInquiry
+
+    from app.models.trinetra import TrinetraCredit
+
+    w = workspace(db, context, workspace_id)
+    if db.query(TrinetraCredit.id).filter_by(id=credit_id, workspace_id=w.id).first() is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    rows = db.query(TrinetraInquiry).filter_by(credit_id=credit_id, workspace_id=w.id).order_by(TrinetraInquiry.created_at.desc()).limit(50)
+    return {"items": [iq.view(r) for r in rows]}
+
+
+@router.post(P + "/credits/{credit_id}/inquiries")
+def draft_inquiry(
+    workspace_id: uuid.UUID,
+    credit_id: uuid.UUID,
+    body: InquiryIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    case, _ = locked_case(db, w, credit_id)
+    row = iq.create_draft(db, w, case, context.user_id, document_kind=body.document_kind, subject=body.subject, body=body.body)
+    db.commit()
+    return iq.view(row)
+
+
+@router.patch(P + "/inquiries/{inquiry_id}")
+def edit_inquiry(
+    workspace_id: uuid.UUID,
+    inquiry_id: uuid.UUID,
+    body: InquiryEditIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    row = iq.edit_draft(db, _inquiry(db, w, inquiry_id), context.user_id, subject=body.subject, body=body.body)
+    db.commit()
+    return iq.view(row)
+
+
+@router.post(P + "/inquiries/{inquiry_id}/approve")
+def approve_inquiry(
+    workspace_id: uuid.UUID,
+    inquiry_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    row = iq.approve(db, w, _inquiry(db, w, inquiry_id), context.user_id)
+    db.commit()
+    return iq.view(row)
+
+
+@router.post(P + "/inquiries/{inquiry_id}/send")
+def send_inquiry(
+    workspace_id: uuid.UUID,
+    inquiry_id: uuid.UUID,
+    body: InquirySendIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    """Press Send: a person, on an approved draft, to the confirmed contact. Never automatic."""
+    w = workspace(db, context, workspace_id)
+    row = _inquiry(db, w, inquiry_id)
+    case, _ = locked_case(db, w, row.credit_id)
+    sent = iq.send(db, w, case, row, context.user_id, override_reason=body.override_reason)
+    db.commit()
+    return iq.view(sent)
+
+
+@router.post(P + "/inquiries/{inquiry_id}/withdraw")
+def withdraw_inquiry(
+    workspace_id: uuid.UUID,
+    inquiry_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    w = workspace(db, context, workspace_id)
+    row = iq.withdraw(db, _inquiry(db, w, inquiry_id), context.user_id)
+    db.commit()
+    return iq.view(row)
+
+
+class PolicyIn(Strict):
+    threshold: Money
+    actions: list[Literal["CA_REVIEWED", "EXPLAINED", "UNRESOLVED"]] = Field(min_length=1, max_length=3)
+    approver_role: Literal["ADMIN", "OWNER"]
+
+
+class ApprovalDecisionIn(Strict):
+    reason: str = Field(min_length=10, max_length=1000)
+
+
+@router.get(P + "/policy")
+def closure_policy(
+    workspace_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    w = workspace(db, context, workspace_id)
+    return {"policy": ap.view_policy(ap.policy_for(db, w.organization_id)),
+            "available": capability_gate.has_capability(db, organization_id=w.organization_id,
+                                                       capability_key="capability.trinetra_all_workspaces")}
+
+
+@router.put("/organizations/{organization_id}/trinetra/policy")
+def set_closure_policy(
+    organization_id: uuid.UUID,
+    body: PolicyIn,
+    db: Session = Depends(get_db),
+    context: OrganizationContext = Depends(RequireOrgRole([OrganizationRole.OWNER, OrganizationRole.ADMIN])),
+):
+    """Enterprise: which closures need a second person's approval, above what amount, by which role."""
+    mode.require_mode(db, organization_id)
+    row = ap.save_policy(db, organization_id, context.user_id, threshold_micros=d.money(body.threshold),
+                         actions=list(body.actions), approver_role=body.approver_role)
+    db.commit()
+    return ap.view_policy(row)
+
+
+@router.get(P + "/approvals")
+def approvals_list(
+    workspace_id: uuid.UUID,
+    status: Literal["PENDING", "APPROVED", "REJECTED", "STALE"] | None = None,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    from app.models.trinetra import TrinetraApproval
+
+    w = workspace(db, context, workspace_id)
+    q = db.query(TrinetraApproval).filter_by(workspace_id=w.id)
+    if status:
+        q = q.filter_by(status=status)
+    return {"items": [ap.view(r) for r in q.order_by(TrinetraApproval.created_at.desc()).limit(100)]}
+
+
+def _approval(db, w, approval_id):
+    from sqlalchemy import select  # the plain name: the ARCH-05 lock check reads it
+
+    from app.models.trinetra import TrinetraApproval
+
+    row = db.execute(
+        select(TrinetraApproval).filter_by(id=approval_id, workspace_id=w.id).with_for_update()
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "Approval not found.")
+    return row
+
+
+@router.post(P + "/approvals/{approval_id}/approve", response_model=CaseOut)
+def approve_closure(
+    workspace_id: uuid.UUID,
+    approval_id: uuid.UUID,
+    body: ApprovalDecisionIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    from datetime import datetime, timezone
+
+    w = workspace(db, context, workspace_id)
+    approval = _approval(db, w, approval_id)
+    ap.check_can_decide(db, w, approval, context.user_id)
+    case, p = locked_case(db, w, approval.credit_id)
+    if case.revision != approval.case_revision:
+        ap.mark_stale(approval)
+        db.commit()
+        raise HTTPException(409, "The case changed after this approval was asked for, so it no longer applies. Ask again.")
+    s.decide(db, w, case, p, context.user_id, case.revision, approval.action,
+             f"Approved by the {approval.approver_role.lower()}: {body.reason}", [], 0, None, approval=approval)
+    approval.status, approval.decided_by = "APPROVED", context.user_id
+    approval.decided_reason, approval.decided_at = body.reason, datetime.now(timezone.utc)
+    announce_review(db, w, case)
+    db.commit()
+    return s.view(db, w, case)
+
+
+@router.post(P + "/approvals/{approval_id}/reject")
+def reject_closure(
+    workspace_id: uuid.UUID,
+    approval_id: uuid.UUID,
+    body: ApprovalDecisionIn,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Write),
+):
+    from datetime import datetime, timezone
+
+    w = workspace(db, context, workspace_id)
+    approval = _approval(db, w, approval_id)
+    ap.check_can_decide(db, w, approval, context.user_id)
+    approval.status, approval.decided_by = "REJECTED", context.user_id
+    approval.decided_reason, approval.decided_at = body.reason, datetime.now(timezone.utc)
+    db.commit()
+    return ap.view(approval)
+
+
+@router.get(P + "/outcomes")
+def closure_ledger(
+    workspace_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    context: TenantContext = Depends(Read),
+):
+    """The closure ledger by month: TDS now visible in your statement. Never cash recovered."""
+    from sqlalchemy import func as f
+
+    from app.models.trinetra import TrinetraOutcome
+    from app.services.trinetra import outcomes
+
+    w = workspace(db, context, workspace_id)
+    month = f.date_trunc("month", TrinetraOutcome.confirmed_at)
+    rows = (
+        db.query(month, f.sum(TrinetraOutcome.amount_micros), f.count(TrinetraOutcome.id))
+        .filter(TrinetraOutcome.workspace_id == w.id, TrinetraOutcome.was_gap.is_(True))
+        .group_by(month).order_by(month.desc()).limit(36).all()
+    )
+    return {"months": [{"month": m.date().isoformat()[:7], "amount_micros": str(int(total)), "cases": int(n)} for m, total, n in rows],
+            **{k: (str(v) if k.endswith("_micros") else v) for k, v in outcomes.ledger(db, w).items()}}
 
 
 @router.post(P + "/official-statements")
@@ -317,7 +1097,7 @@ def unsupported_statement(
         422,
         {
             "code": "TRINETRA_UNSUPPORTED_FORMAT",
-            "message": "No official file layout has passed source validation. Use Documents for evidence intake and explicitly reviewed transcription; no file was parsed.",
+            "message": "Upload the statement through the statement-file preview (the Servabo template, the Form 26AS / Form 168 text download or the AIS CSV). Nothing was parsed here.",
         },
     )
 
@@ -331,71 +1111,24 @@ def create_credit(
 ):
     w = workspace(db, context, workspace_id)
     p = s.profile(db, w, body.profile_id)
-    source, fact = s.receivable(db, w, p, body.work_item_id)
-    s.invoice_period(fact, body.year)
-    s.lock_capacity(db, w)
-    old = (
-        db.query(Credit)
-        .filter_by(profile_id=p.id, work_item_id=body.work_item_id, year=body.year)
-        .first()
-    )
-    deductor = s.identity(
-        body.tan, "TAN", s.encryption.decrypt_secret(p.identity_salt_ciphertext)
-    )
-    amount = d.money(body.amount)
-    if amount <= 0 or amount > fact.total_micros:
-        raise HTTPException(
-            422,
-            "Expected withholding must be positive and cannot exceed the sourced gross invoice.",
-        )
-    if old:
-        if (old.expected_micros, old.deductor_key, old.reference, old.counterparty) != (
-            amount,
-            deductor,
-            body.reference,
-            body.counterparty,
-        ):
-            raise HTTPException(
-                409,
-                "This source already has an expectation; use the versioned reconfirmation workflow.",
-            )
-        return s.view(db, w, old)
-    if db.query(Credit).filter_by(
-        organization_id=w.organization_id
-    ).count() >= s.capacity(db, w, "cases"):
-        raise HTTPException(409, "Live case limit reached.")
-    role = (
-        db.query(s.DocumentRole)
-        .filter_by(work_item_id=source.id, workspace_id=w.id)
-        .one()
-    )
-    r = Credit(
-        organization_id=w.organization_id,
-        workspace_id=w.id,
-        profile_id=p.id,
+    r = s.create_case(
+        db,
+        w,
+        p,
+        context.user_id,
         work_item_id=body.work_item_id,
         year=body.year,
         counterparty=body.counterparty,
         reference=body.reference,
-        source_version=s.invoice_version(source, role),
-        deductor_key=s.identity(
-            body.tan, "TAN", s.encryption.decrypt_secret(p.identity_salt_ciphertext)
+        tan=body.tan,
+        amount=body.amount,
+        source_confirmation=body.source_confirmation,
+        seller_name_confirmed=body.seller_name_confirmed,
+        triggering_event=(
+            {"reason": body.triggering_event.reason, "evidence_work_item_id": body.triggering_event.evidence_work_item_id}
+            if body.triggering_event
+            else None
         ),
-        expected_micros=d.money(body.amount),
-    )
-    db.add(r)
-    db.flush()
-    db.add(
-        Decision(
-            organization_id=w.organization_id,
-            workspace_id=w.id,
-            credit_id=r.id,
-            actor_id=context.user_id,
-            revision=1,
-            action="EXPECTATION_CONFIRMED",
-            reason=body.source_confirmation,
-            allocations=[],
-        )
     )
     db.commit()
     return s.view(db, w, r)
@@ -414,17 +1147,12 @@ def credits(
     w = workspace(db, context, workspace_id)
     q = db.query(Credit).filter_by(workspace_id=w.id)
     if year:
-        q = q.filter_by(year=year)
+        q = q.filter_by(year=year)  # an explicit year reaches closed history, outside the working set
+    else:
+        q = s.working_set(q)
     response.headers["Cache-Control"] = "no-store"
-    return {
-        "total": q.count(),
-        "items": [
-            s.view(db, w, r)
-            for r in q.order_by(Credit.created_at, Credit.id)
-            .offset(offset)
-            .limit(limit)
-        ],
-    }
+    page = q.order_by(Credit.created_at, Credit.id).offset(offset).limit(limit).all()
+    return {"total": q.count(), "items": s.views(db, w, page)[0]}
 
 
 @router.post(P + "/credits/{credit_id}/decisions", response_model=CaseOut)
@@ -441,18 +1169,33 @@ def decision(
         raise HTTPException(404, "Case not found.")
     p = s.profile(db, w, r.profile_id)
     db.refresh(r)
-    s.decide(
-        db,
-        w,
-        r,
-        p,
-        context.user_id,
-        body.revision,
-        body.action,
-        body.reason,
-        body.allocations,
-        body.review_minutes,
-    )
+    try:
+        s.decide(
+            db,
+            w,
+            r,
+            p,
+            context.user_id,
+            body.revision,
+            body.action,
+            body.reason,
+            body.allocations,
+            body.review_minutes,
+            {"snapshot_id": body.snapshot_id, "line_id": body.line_id, "note": body.note},
+        )
+    except ap.ApprovalNeeded as needed:
+        # Enterprise: this closure needs a second person's approval. It is recorded, and nothing is closed yet.
+        asked = ap.request(db, w, r, context.user_id, body.action, body.reason, needed.policy)
+        db.commit()
+        return JSONResponse(
+            status_code=202,
+            content={
+                "approval_required": True,
+                "approval": ap.view(asked),
+                "message": f"This closure needs the approval of an organization {asked.approver_role.lower()} other than you. "
+                "The request is recorded; nothing is closed until it is approved.",
+            },
+        )
     announce_review(db, w, r)
     db.commit()
     return s.view(db, w, r)
@@ -477,7 +1220,17 @@ def reconfirm(
 ):
     w = workspace(db, context, workspace_id)
     row, p = locked_case(db, w, credit_id)
-    s.reconfirm(db, w, row, p, context.user_id, body.revision, body.amount, body.reason)
+    s.reconfirm(
+        db,
+        w,
+        row,
+        p,
+        context.user_id,
+        body.revision,
+        body.amount,
+        body.reason,
+        body.seller_name_confirmed,
+    )
     announce_review(db, w, row)
     db.commit()
     return s.view(db, w, row)
@@ -501,22 +1254,57 @@ def update_review(
     evidence = []
     if len({item.work_item_id for item in body.evidence}) != len(body.evidence):
         raise HTTPException(422, "Attach each evidence document only once.")
+    previous = {(e.get("work_item_id"), e["kind"]): e for e in (row.review or {}).get("evidence", [])}
+    now_iso = datetime.now(timezone.utc).isoformat()
     for item in body.evidence:
         source = s.document(db, w, item.work_item_id)
+        amount = d.money(item.amount) if item.amount is not None else None
+        if item.kind == "CREDIT_NOTE":
+            note_role = (
+                db.query(s.DocumentRole)
+                .filter_by(work_item_id=source.id, workspace_id=w.id)
+                .first()
+            )
+            if (
+                note_role is None
+                or note_role.role != "CREDIT_NOTE"
+                or note_role.currency != "INR"
+                or not note_role.total_micros
+                or note_role.total_micros <= 0
+            ):
+                raise HTTPException(
+                    422,
+                    "Attach a classified INR credit note with a positive amount. Its amount is read from the document, not typed.",
+                )
+            amount = note_role.total_micros
         evidence.append(
             {
                 "work_item_id": str(source.id),
                 "kind": item.kind,
-                "source_version": source.updated_at.isoformat(),
-                "amount_micros": (
-                    d.money(item.amount) if item.amount is not None else None
-                ),
+                "source_version": s.versions.one(db, w.id, source.id).evidence,
+                "amount_micros": amount,
+                "added_at": (previous.get((str(source.id), item.kind)) or {}).get("added_at") or now_iso,
             }
         )
+    credit_notes = sum(e["amount_micros"] for e in evidence if e["kind"] == "CREDIT_NOTE")
+    if credit_notes:
+        invoice_facts = s.document(db, w, row.work_item_id)
+        gross = (
+            db.query(s.DocumentRole)
+            .filter_by(work_item_id=invoice_facts.id, workspace_id=w.id)
+            .first()
+        )
+        if gross is None or credit_notes > (gross.total_micros or 0):
+            raise HTTPException(
+                422, "Credit notes cannot be worth more than the invoice they reduce."
+            )
+    # A record read from an accounting system (Zoho Books) is not a document the person attaches; it stays.
+    evidence = [e for e in (row.review or {}).get("evidence", []) if not e.get("work_item_id")] + evidence
     prior = [
         asdict(a) for a in s.allocations(db, p, row.year) if a.credit == str(row.id)
     ]
     row.review = {
+        **{k: v for k, v in (row.review or {}).items() if k in s.KEPT_REVIEW_KEYS},
         "owner_id": (
             str(context.user_id)
             if body.assign_to_me
@@ -529,7 +1317,25 @@ def update_review(
         "withholding_confirmed": body.confirm_receivable,
         "invoice_version": row.source_version,
     }
-    row.evidence_work_item_ids = [e["work_item_id"] for e in evidence]
+    if body.clear_basis:
+        row.review.pop("basis", None)
+    if body.basis is not None:
+        allowed = {str(row.work_item_id)} | {e["work_item_id"] for e in evidence if e["work_item_id"]}
+        if str(body.basis.evidence_work_item_id) not in allowed:
+            raise HTTPException(
+                422, "The amount must be stated by the invoice or by a document attached to this case."
+            )
+        micros = d.money(body.basis.amount)
+        if micros <= 0:
+            raise HTTPException(422, "The basis must be positive.")
+        row.review["basis"] = {
+            "micros": micros,
+            "source": body.basis.source,
+            "evidence_work_item_id": str(body.basis.evidence_work_item_id),
+            "by": str(context.user_id),
+            "at": now_iso,
+        }
+    row.evidence_work_item_ids = [e["work_item_id"] for e in evidence if e["work_item_id"]]
     if body.confirm_receivable:
         from app.services.trinetra.projection import reviewed_withholding
 
@@ -572,6 +1378,37 @@ def summary(
     return s.summary(db, w)
 
 
+def _explanations(w, p, row, value, snapshot, used, pairings):
+    """Field by field, why each candidate and each allocated statement row is (or is not) this case's match."""
+    if snapshot is None:
+        return []
+    credit = s.credit(row, w)
+    rows = {x.id: x for x in s.postings(snapshot, w, p, pairings.get(snapshot.id, ()))}
+    mine = {a.posting: a.amount for a in used if a.credit == str(row.id) and a.snapshot == str(snapshot.id)}
+    reader = s._reader_of(snapshot)
+    out = []
+    for line_id in [*mine, *[c for c in value["candidate_ids"] if c not in mine]]:
+        posting = rows.get(line_id)
+        if posting is None:
+            continue
+        free = posting.amount - sum(
+            a.amount for a in used if a.posting == line_id and a.snapshot == str(snapshot.id) and a.credit != str(row.id)
+        )
+        out.append(
+            {
+                "snapshot_id": str(snapshot.id),
+                "line_id": line_id,
+                "role": "allocated" if line_id in mine else "candidate",
+                "allocated_micros": str(mine[line_id]) if line_id in mine else None,
+                "reader": reader["label"] if reader else None,
+                "reader_verified": bool(reader and reader["verified"]),
+                "rule_version": d.VERSION,
+                "checks": d.explain(credit, posting, expected=value["expected_micros"], available=free),
+            }
+        )
+    return out
+
+
 @router.get(P + "/credits/{credit_id}", response_model=DetailOut)
 def detail(
     workspace_id: uuid.UUID,
@@ -602,7 +1439,7 @@ def detail(
                 and a.credit != str(row.id)
             ),
         }
-        for x in s.postings(snapshot, w, p)
+        for x in s.postings(snapshot, w, p, s.active_pairings(db, [snapshot.id] if snapshot else []).get(snapshot.id, ()) if snapshot else ())
         if x.deductor == row.deductor_key
     ]
     from app.services.trinetra.projection import receivable, reviewed_withholding
@@ -617,8 +1454,10 @@ def detail(
     withholding = reviewed_withholding(row, value)
     from app.services.trinetra.fields import printed
 
+    explanations = _explanations(w, p, row, value, snapshot, used, s.active_pairings(db, [snapshot.id] if snapshot else []))
     return {
         **value,
+        "match_explanations": explanations,
         "printed_evidence": printed(
             s.document(db, w, row.work_item_id).extracted_entities
         ),
@@ -783,14 +1622,82 @@ def organization_access(
         )
     ),
 ):
+    live = mode.state(db, organization_id)
     return {
-        "live_enabled": settings.TRINETRA_LIVE_ENABLED,
+        "live_enabled": live.live,
+        "mode": live.mode,
+        "enrolled": live.enrolled,
         "entitled": capability_gate.has_capability(
             db,
             organization_id=organization_id,
             capability_key="capability.trinetra_all_workspaces",
         ),
     }
+
+
+@router.get(
+    "/organizations/{organization_id}/trinetra/cases",
+    response_model=OrganizationCasesOut,
+)
+def organization_cases(
+    organization_id: uuid.UUID,
+    offset: int = Query(0, ge=0, le=10000),
+    limit: int = Query(50, ge=1, le=100),
+    workspace_id: uuid.UUID | None = Query(None),
+    year: int | None = Query(None, ge=2000, le=2100),
+    db: Session = Depends(get_db),
+    context: OrganizationContext = Depends(
+        RequireOrgRole([OrganizationRole.OWNER, OrganizationRole.ADMIN, OrganizationRole.BILLING])
+    ),
+):
+    """Enterprise, read-only (`trinetra:read`): the cases of every workspace the caller may read, oldest first. Ids, states and
+    amounts as decimal strings (millionths of a rupee); never a PAN, a TAN or a document."""
+    from app.services.helm.gate import readable_workspaces
+    from app.workers.tenant_gate import inactive_reason, unpaid_reason
+
+    capability_gate.require_capability(
+        db, context=context, capability_key="capability.trinetra_all_workspaces", operation="trinetra.org.cases"
+    )
+    require_source_validation(db, organization_id)
+    if inactive_reason(db, organization_id=organization_id) or unpaid_reason(db, organization_id=organization_id):
+        raise HTTPException(402, "An active organization subscription is required.")
+    allowed = set(readable_workspaces(db, organization_id=organization_id, user_id=context.user_id, role=context.role))
+    if workspace_id is not None:
+        allowed &= {workspace_id}
+    workspaces = {
+        w.id: w
+        for w in db.query(Workspace).filter(
+            Workspace.organization_id == organization_id, Workspace.id.in_(allowed), Workspace.is_sample.is_(False)
+        )
+    } if allowed else {}
+    if not workspaces:
+        return {"total": 0, "items": [], "scope": ORG_CASES_SCOPE, "is_sample": False}
+    q = db.query(Credit).filter(Credit.organization_id == organization_id, Credit.workspace_id.in_(list(workspaces)))
+    q = q.filter_by(year=year) if year else s.working_set(q)
+    page = q.order_by(Credit.created_at, Credit.id).offset(offset).limit(limit).all()
+    by_workspace: dict = {}
+    for row in page:
+        by_workspace.setdefault(row.workspace_id, []).append(row)
+    views = {}
+    for wid, rows in by_workspace.items():
+        for item in s.views(db, workspaces[wid], rows)[0]:
+            views[item["id"]] = item
+    items = []
+    for row in page:
+        v = views[str(row.id)]
+        items.append(
+            {
+                "id": v["id"], "workspace_id": str(row.workspace_id), "profile_id": v["profile_id"],
+                "reference": v["reference"], "customer": v["counterparty"], "year": v["year"], "revision": v["revision"],
+                "review_state": v["review_state"], "status": v["status"], "expected_micros": v["expected_micros"],
+                "posted_micros": v["posted_micros"], "gap_micros": v["gap_micros"], "source_current": v["source_current"],
+                "age_days": v["age_days"], "as_of": v["as_of"], "created_at": v["created_at"],
+            }
+        )
+    return {"total": q.count(), "items": items, "scope": ORG_CASES_SCOPE, "is_sample": False}
+
+
+ORG_CASES_SCOPE = "Only workspaces readable by the caller. Amounts are decimal strings of millionths of a rupee; a gap is an item to check, never money."
 
 
 @router.get(
@@ -817,7 +1724,7 @@ def organization_summary(
         capability_key="capability.trinetra_all_workspaces",
         operation="trinetra.org.summary",
     )
-    require_source_validation()
+    require_source_validation(db, organization_id)
     if inactive_reason(db, organization_id=organization_id) or unpaid_reason(
         db, organization_id=organization_id
     ):
@@ -826,6 +1733,8 @@ def organization_summary(
         db, organization_id=organization_id, user_id=context.user_id, role=context.role
     )
     results = []
+    profile_items: dict = {}
+    page = []
     for w in (
         db.query(Workspace)
         .filter(
@@ -837,9 +1746,14 @@ def organization_summary(
         .offset(offset)
         .limit(limit)
     ):
+        page.append(w.id)
         if inactive_reason(db, organization_id=organization_id, workspace_id=w.id):
             continue
         result = s.summary(db, w)
+        by_profile = {}
+        for item in result["items"]:
+            by_profile.setdefault(item["profile_id"], []).append(item)
+        profile_items.update(by_profile)
         results.append(
             {
                 "workspace_id": str(w.id),
@@ -857,8 +1771,12 @@ def organization_summary(
                 },
             }
         )
+    entities = s.entities(db, organization_id, page, profile_items)
     return {
         "workspaces": results,
-        "scope": "Only workspaces readable by the current reviewer. Entities remain separate.",
+        "entities": entities,
+        "totals": s.entity_totals(entities),
+        "scope": "Only workspaces readable by the current reviewer. A legal entity is counted once, however many profiles hold its "
+        "PAN; the totals add the entities, never the workspaces twice.",
         "is_sample": False,
     }

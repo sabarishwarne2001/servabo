@@ -39,6 +39,7 @@ export default function ReviewTools({
           revision: data.revision,
           amount: String(form.get("amount")),
           reason,
+          seller_name_confirmed: form.get("sellerName") === "on",
         });
       }
       return updateCreditReview(workspaceId, data.id, {
@@ -49,6 +50,16 @@ export default function ReviewTools({
         due_on: form.get("due") || null,
         reason,
         confirm_receivable: form.get("confirmReceivable") === "on",
+        ...(form.get("clearBasis") === "on" ? { clear_basis: true } : {}),
+        ...(form.get("basisAmount") && form.get("basisDoc")
+          ? {
+              basis: {
+                amount: String(form.get("basisAmount")),
+                source: String(form.get("basisSource")),
+                evidence_work_item_id: String(form.get("basisDoc")),
+              },
+            }
+          : {}),
         evidence: [
           ...evidence,
           ...(document
@@ -171,6 +182,11 @@ export default function ReviewTools({
                   pattern="[0-9]+(\.[0-9]{1,2})?"
                 />
               </label>
+              <label className="flex items-start gap-2">
+                <input type="checkbox" name="sellerName" />
+                The seller's name on the invoice is a different spelling of this legal entity, and I
+                checked it is the same.
+              </label>
               <label className="block">
                 Reconfirmation reason
                 <textarea
@@ -268,6 +284,8 @@ export default function ReviewTools({
                     "ACCOUNTING_RECORD",
                     "CERTIFICATE",
                     "CORRECTION_RESPONSE",
+                    "CREDIT_NOTE",
+                    "TRIGGERING_EVENT",
                   ].map((k) => (
                     <option key={k} value={k}>
                       {k.toLowerCase().replaceAll("_", " ")}
@@ -284,6 +302,51 @@ export default function ReviewTools({
                   className={`${INPUT} mt-1`}
                 />
               </label>
+              <fieldset className="space-y-2 rounded border border-border p-3">
+                <legend className="px-1">The amount the tax was computed on (optional)</legend>
+                <p className="text-xs text-muted-foreground">
+                  Only when an invoice, an accounting record or the customer's advice states it.
+                  Servabo never works it out or checks a rate.
+                  {data.basis_micros
+                    ? ` Currently stated: ${rupees(data.basis_micros)} (${(data.basis_source ?? "").toLowerCase().replaceAll("_", " ")}).`
+                    : ""}
+                </p>
+                <label className="block">
+                  Amount stated (INR)
+                  <input
+                    name="basisAmount"
+                    inputMode="decimal"
+                    pattern="[0-9]+(\.[0-9]{1,2})?"
+                    className={`${INPUT} mt-1`}
+                  />
+                </label>
+                <label className="block">
+                  Stated in
+                  <select name="basisSource" className={`${SELECT} mt-1`}>
+                    <option value="INVOICE">The invoice</option>
+                    <option value="ACCOUNTING_RECORD">An accounting record</option>
+                    <option value="DEDUCTOR_ADVICE">The customer's advice</option>
+                  </select>
+                </label>
+                <label className="block">
+                  The document that states it
+                  <select name="basisDoc" className={`${SELECT} mt-1`} defaultValue="">
+                    <option value="">Not stating one</option>
+                    {data.work_item_id && <option value={data.work_item_id}>The invoice</option>}
+                    {evidence.map((e) => (
+                      <option key={e.work_item_id} value={e.work_item_id}>
+                        {e.kind.toLowerCase().replaceAll("_", " ")}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {data.basis_micros && (
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" name="clearBasis" />
+                    Remove the stated amount
+                  </label>
+                )}
+              </fieldset>
               <label className="block">
                 Review reason
                 <textarea

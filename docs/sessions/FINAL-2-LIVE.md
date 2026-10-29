@@ -1,11 +1,8 @@
 # Final session 2B: everything, for real, on your own PC
 
-> **Do not run this yet.** Final session 2A (`docs/sessions/FINAL-2-UPGRADE.md`) has rewritten this prompt for what exists
-> after it: the rupee prices and the fifteen Dodo products, the safety-job reports and alerts, the prompt-injection documents,
-> the accuracy report, the deletion warnings and Recoveries (the Resolution layer). **Final session 2T**
-> (`docs/sessions/FINAL-2T-TRINETRA.md`) runs next: it adds TRINETRA's phase (Phase 18, its statement readers proven on the
-> owner's own Form 26AS / AIS files) and **removes this note**. The hand-overs are HANDOFF "Final session 2A → Final session 2B"
-> and "Final session 2T → Final session 2B".
+> **Ready to run** (Final session 2T has finished TRINETRA and written Phase 18 below). The hand-overs are HANDOFF "Final session 2A →
+> Final session 2B" and "Final session 2T → Final session 2B"; read both first. Phase 18 proves TRINETRA's statement readers on the
+> owner's own Form 26AS / Form 168 text and AIS CSV, which no earlier session could reach.
 
 | | |
 | --- | --- |
@@ -213,6 +210,9 @@ The owner's list is in `docs/FINAL-SESSIONS.md` §4. In short:
     one row per invoice, what it really says; `C:\servabo-live\accuracy\truth.csv` beside the invoices). Filling it with
     the accountant takes about an hour; without it Phase 3's accuracy figure is **Not checked**;
   - optional: a real GSTR-2B JSON from their CA, an e-invoice PDF with its signed QR code, and NIC's public key.
+  - **for TRINETRA (Phase 18), in `C:\servabo-live\trinetra\`, never in the repository:** their own **Form 26AS text download**
+    (and Form 168), their own **AIS TDS/TCS CSV**, one **real invoice where a customer withheld tax** and, optionally, that customer's
+    TDS advice. Without the statements Phase 18 is **Not checked** and the official readers stay unverified.
 - **For Dodo in rupees:** the **GSTIN they will buy with**, and Dodo's test-mode UPI id or Indian test card (from Dodo's
   testing page; `success@upi` is the usual one).
 - **For the production rehearsal's host jobs:** WSL 2 with Ubuntu (cron runs there). Optional: a free Healthchecks.io
@@ -743,9 +743,64 @@ as `OPEN` with the evidence.
 
 ## 21. Phase 18: TRINETRA
 
-**Final session 2T writes this phase** (its statement readers on the owner's own Form 26AS / AIS files, and everything it
-built). If you find this placeholder, 2T has not run: mark Phase 18 **Not checked (Final session 2T not run)** and tell the
-owner.
+**What it is** (`docs/trinetra/PRODUCT.md`, `docs/trinetra/USER-GUIDE.md`): it checks whether the tax a customer withheld from an
+invoice reached the business's tax statement. Final session 2T built it, finished, on Business and Enterprise, in **pilot** mode
+(`TRINETRA_MODE=pilot`). **Everything below is for real files and services; nothing in it has been proven by any earlier
+session.** The three official readers (Form 26AS text, Form 168 text, AIS CSV) were written from secondary descriptions because
+the official TRACES and e-filing hosts could not be reached; they are registered as **unverified** and refuse real files until
+you have read one here.
+
+**The privacy rule for this phase (not negotiable).** The owner's own statements contain a real PAN and real TANs. **They never go
+into the repository, a commit, a test fixture, the chat, a screenshot or a log.** Keep them in `C:\servabo-live\trinetra\` (outside
+the repository), point the browser at them with the file picker, and when you must describe a result write masked values
+(`******234F`) or counts only. If a test needs a new fixture, make it synthetic. `git status` at the end shows none of them.
+
+**Ask the owner for** (skip what is missing and mark it **Not checked**): their own **Form 26AS text download** (and **Form 168** if
+they have one for Tax Year 2026-27), their own **AIS "TDS/TCS information" CSV**, a **real invoice where a customer withheld
+tax**, and (optional) the customer's TDS advice and a Zoho Books organization with such invoices.
+
+1. **Set the mode.** Pilot mode, as shipped. Enrol the owner's own organization (Business or Enterprise on the live-test stack):
+
+   ```bash
+   python scripts/trinetra_pilot.py enrol --organization <the owner's slug> --reason "Final 2B, real statements"
+   ```
+
+   Run `python scripts/preflight.py`: it must show the mode, one organization enrolled, and the official readers as unverified.
+2. **The legal entity.** Create the owner's profile (real PAN, typed by the owner). Check it is shown masked everywhere, that a
+   second profile for the same PAN in another workspace is refused with a message naming the first, and that the browser's address
+   bar, the network tab and the server logs never carry the PAN.
+3. **The AIS CSV.** Statements → import the owner's AIS CSV. Expect either a preview or the mapping question ("which column
+   means what"); choose the columns, preview again, and compare every figure with the portal's own AIS page: the number of TDS rows,
+   the total, each deductor's masked TAN, the tax-year label, TCS rows left out and counted. **Any difference is a finding.** Import it.
+4. **The Form 26AS text** (and Form 168). Do the same. If the reader refuses, **read the refusal**: it names the row or the heading,
+   not the content. A refusal on a genuine file means the layout differs from the secondary description: record exactly what
+   differs (headings, separators, the year label, how rows continue) in your own words, fix `app/services/trinetra/statements/form26as.py`
+   with a **synthetic** fixture that has the same shape and a failing test first, and re-read the owner's file. When the reader reads
+   the real file correctly and the totals agree with the owner's portal, set `verified_on` for that reader in
+   `app/services/trinetra/readers.py` (today's date) with a note of which file kind and year it was proven on, and the screens drop
+   the "(unverified)" label. If you cannot make it agree, leave it unverified and record it as OPEN with the evidence.
+5. **A real case end to end.** Book one real invoice where a customer withheld tax (Documents), create the expectation from the
+   printed figure or the expected-TDS template, accept it with a reason, allocate it to the real statement row, record the review.
+   Check each figure with the owner's accountant's own numbers. Then make a case that is **missing** from the statement and check it
+   shows as "possible gap" (an investigation item), never as a refund.
+6. **Zoho.** If the owner has a Zoho Books organization with such invoices, connect it read-only and press "Read Zoho Books": the
+   suggestions must match what Zoho shows. Not checked otherwise.
+7. **A real inbox.** Confirm the owner's own address as the customer's contact in Helm, prepare an inquiry, approve it, **press Send**,
+   and read the email in the real inbox: the wording accuses no one, asks only for a document, and the secure link opens the upload
+   page. Upload a file through it; it attaches to that case as evidence and changes nothing else. Check nothing was sent before
+   Send, that a second inquiry the same week is refused without a reason, and that the plan allowance count moved.
+8. **Notices and the rest.** The in-app "TDS credit" notice for the gap, the Monday line (run `trinetra.sweep` with the run-job tool on
+   a Monday after 09:00 in the organization's zone, or say so), the value receipt line, Getting started's step, global search by customer
+   and invoice (never by PAN or TAN: search for the PAN and expect nothing).
+9. **Enterprise, if a second organization is available:** the approval chain (a person cannot approve their own request), the
+   organization view per legal entity.
+10. **Mark the matrix.** Open `docs/trinetra/COMPLETION.md`. For every row whose Evidence says "2B:", and for every row that depends on
+    a real file or service, change the status to **Verified in 2B** (with the date and what you saw) or **Differs** (with what differed and
+    what you did). A row you could not check stays **Built in 2T** and its note says why. Update `docs/trinetra/LAUNCH-GATES.md` and
+    `docs/trinetra/LEGAL-SOURCES.md` (a reader's new status and the file kinds it was proven on).
+11. **Hand the owner the accountant's step.** Tell the owner: the chartered accountant reads `servabo.app/trinetra` and the in-app
+    TDS credit pages (about an hour; `docs/trinetra/USER-GUIDE.md` is the guide to give them), then the owner enrols customers or sets
+    `TRINETRA_MODE=on` (launch checklist step 13). Do not set the mode to `on` yourself and do not change the website to "available".
 
 ## 22. Finish line
 

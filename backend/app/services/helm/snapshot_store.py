@@ -430,6 +430,8 @@ def take(db: Session, book: HelmBook, *, as_of: Optional[date] = None) -> snap.S
                 status=promise.status, counterparty_key=promise.counterparty_key,
                 counterparty_name=promise.counterparty_name, document_title=details.get("document_title")))
 
+    receivables = _with_withholding(db, book, receivables)
+
     settled_keys: set[str] = set()
     reminders: dict[str, list[int]] = {}
     for key, state, kind, promise_id, params in db.execute(
@@ -541,3 +543,27 @@ def _visibility(payables: list[snap.Payable], promises: list[HelmPromise]) -> di
 
 
 __all__ = ["account_state", "cash_history", "cash_positions", "holidays_for", "settings_for", "take"]
+
+
+def _with_withholding(db: Session, book: HelmBook, receivables: list) -> list:
+    """TRINETRA (Final 2T): mark each INR receivable whose tax a customer withheld and a person reviewed, so the plan
+    chases the cash still owed and never the tax. One batched read; it does not depend on TRINETRA being switched on,
+    because a recorded confirmation must keep holding after a flag change or a plan downgrade."""
+    from dataclasses import replace
+
+    from app.services.trinetra.helm_adapter import withholding_for
+
+    ids = [uuid.UUID(r.work_item_id) for r in receivables if r.work_item_id and r.currency == "INR"]
+    found = withholding_for(db, book.organization_id, ids) if ids else {}
+    if not found:
+        return receivables
+    out = []
+    for r in receivables:
+        w = found.get(uuid.UUID(r.work_item_id)) if r.work_item_id and r.currency == "INR" else None
+        if w is None:
+            out.append(r)
+        elif w.reviewed_micros is None:
+            out.append(replace(r, withholding_case_id=w.case_id, withholding_hold="UNKNOWN_AMOUNT"))
+        else:
+            out.append(replace(r, withheld_micros=w.reviewed_micros, withholding_case_id=w.case_id))
+    return out

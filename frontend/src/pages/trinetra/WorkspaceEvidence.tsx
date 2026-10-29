@@ -44,6 +44,7 @@ export default function WorkspaceEvidence({ workspaceId }: { workspaceId: string
           tan: value("tan"),
           amount: value("amount"),
           source_confirmation: value("reason"),
+          seller_name_confirmed: form.get("sellerName") === "on",
         });
       }
       const parsed = rows
@@ -211,6 +212,11 @@ export default function WorkspaceEvidence({ workspaceId }: { workspaceId: string
                     pattern="[0-9]+(\.[0-9]{1,2})?"
                     className={`${INPUT} mt-1`}
                   />
+                </label>
+                <label className="flex items-start gap-2 text-sm sm:col-span-2">
+                  <input type="checkbox" name="sellerName" />
+                  The seller's name on the invoice is a different spelling of this legal entity, and
+                  I checked it is the same. Servabo asks for this only when the names differ.
                 </label>
                 <label className="text-sm sm:col-span-2">
                   Evidence and reason

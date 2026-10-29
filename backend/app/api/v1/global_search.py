@@ -2,7 +2,7 @@
 
     GET /organizations/{organization_id}/search?q=...&limit=...   [any member]
 
-Documents, entities, cases, GST suppliers and invoices, and automation rules from every workspace of the
+Documents, entities, cases, GST suppliers and invoices, TDS credit cases and automation rules from every workspace of the
 organization the caller may open (app/services/global_search_service.py), each with the workspace it lives in so the
 console can open it there. A result the person's role or the plan would lock is not returned.
 """
@@ -40,6 +40,7 @@ class SearchResponse(BaseModel):
     cases: list[SearchHitOut]
     suppliers: list[SearchHitOut] = []
     gst_invoices: list[SearchHitOut] = []
+    tds_cases: list[SearchHitOut] = []
     rules: list[SearchHitOut] = []
 
 
@@ -76,5 +77,6 @@ def global_search(
         cases=[SearchHitOut(**vars(h)) for h in results.cases],
         suppliers=[SearchHitOut(**vars(h)) for h in results.suppliers],
         gst_invoices=[SearchHitOut(**vars(h)) for h in results.gst_invoices],
+        tds_cases=[SearchHitOut(**vars(h)) for h in results.tds_cases],
         rules=[SearchHitOut(**vars(h)) for h in results.rules],
     )
