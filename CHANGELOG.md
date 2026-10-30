@@ -17,6 +17,7 @@ All notable changes to this project will be documented here.
 ### Fixed
 
 - TRINETRA said "1 days open"; it says "1 day open" (and "1 day old" for a statement).
+- The organization console's sidebar and the workspace switcher's list showed a first letter instead of the Servabo logo (F-653).
 
 ### Added — TRINETRA (TDS credit) finished for Business and Enterprise (Final session 2T, 2026-10-28)
 

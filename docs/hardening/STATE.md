@@ -9,7 +9,7 @@ Branch `hardening/trinetra-pilot-console` from `main` at `23a082e` (PR #44 merge
 superadmin on an Enterprise organization, saw "TRINETRA is in a pilot, and your organization is not enrolled yet" and had no button to
 enrol it. **F-652:** Platform → TRINETRA pilot (`/admin/trinetra`), an operator line and button on the organization's TRINETRA page, the
 list carries slug and plan, "1 day open". Vitest and typecheck pass here; the backend test and browser spec 141 run on the PR's CI (this
-sandbox could not install pgvector 0.8). `campaign_slices.py --check all` exits 0. Next free: **N-211**, **F-653**, browser spec **145**.
+sandbox could not install pgvector 0.8). `campaign_slices.py --check all` exits 0. Also F-653 (the organization console showed a letter, not the Servabo logo). Next free: **N-211**, **F-654**, browser spec **145**.
 
 - **Next action:** unchanged: Final session 2B (`docs/sessions/FINAL-2-LIVE.md`). Its Phase 18 step 1 may use the new console.
 

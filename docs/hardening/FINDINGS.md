@@ -3947,3 +3947,12 @@ button with that organization chosen; a customer sees exactly what they saw befo
 and browser spec 141 ("the platform administrator enrols an organization from the console…") run on the PR's CI (this sandbox could
 not install pgvector 0.8). The page is in the platform route catalogue, so specs 72 (axe) and 74 (layout) open it too, and spec 03
 checks a tenant owner and admin are not shown it.
+
+## F-653 — The organization console still showed a letter instead of the Servabo logo (P3)
+
+**Found:** by the owner on 2026-10-30. Every page of the organization console (General, Members, Audit log, …) showed a purple square
+with the organization's first letter at the top of the sidebar, and the workspace switcher's list showed each workspace's first letter;
+the workspace pages show the Servabo logo (or the workspace's own) since the rebrand. **Fix:** the organization console's header shows
+the Servabo logo; the switcher's list shows each workspace's logo, or the Servabo logo when it has none (`WorkspaceLogo`).
+**Proof:** `src/components/branding/noInitialsTiles.test.ts` failed first, naming exactly `OrgWorkspaceSwitcher.tsx` and
+`OrganizationSidebarNavigation.tsx`, and passes now; it keeps any component from drawing a name's first letter as a logo again.
