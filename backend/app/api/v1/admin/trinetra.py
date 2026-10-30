@@ -32,8 +32,12 @@ class ReasonIn(BaseModel):
 
 
 def _entry(db: Session, row: TrinetraPilot) -> dict:
+    """One enrolled organization. The slug tells two of the same name apart; `entitled` says whether its plan includes TRINETRA
+    (an enrolled Starter organization stays on the examples)."""
     organization = db.get(Organization, row.organization_id)
     return {"organization_id": str(row.organization_id), "name": organization.name if organization else None,
+            "slug": organization.slug if organization else None,
+            "entitled": mode.state(db, row.organization_id).entitled,
             "reason": row.reason, "enrolled_by": str(row.enrolled_by) if row.enrolled_by else None,
             "enrolled_at": row.created_at.isoformat()}
 

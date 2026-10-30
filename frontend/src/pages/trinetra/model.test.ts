@@ -186,3 +186,35 @@ describe("the first-run tutorial", () => {
     ).toBe(true);
   });
 });
+
+describe("how long a case has been open, in words", () => {
+  it("says 1 day, not 1 days", async () => {
+    const { daysOpen } = await import("./model");
+    expect(daysOpen(0)).toBe("0 days open");
+    expect(daysOpen(1)).toBe("1 day open");
+    expect(daysOpen(2)).toBe("2 days open");
+    expect(daysOpen(40)).toBe("40 days open");
+  });
+});
+
+describe("the platform administrator's note under the access notice", () => {
+  const closed = { live_enabled: false, mode: "pilot", enrolled: false, entitled: true };
+  it("tells a platform administrator how to enrol an organization that is waiting for the pilot", async () => {
+    const { operatorHint } = await import("./model");
+    const hint = operatorHint(closed, true);
+    expect(hint?.kind).toBe("enrol");
+    expect(hint?.message).toContain("TRINETRA pilot console");
+  });
+  it("says the server setting is off when the mode is off", async () => {
+    const { operatorHint } = await import("./model");
+    const hint = operatorHint({ ...closed, mode: "off" }, true);
+    expect(hint?.kind).toBe("mode_off");
+    expect(hint?.message).toContain("TRINETRA_MODE");
+  });
+  it("says nothing to a customer, to an open organization, or where only the plan is missing", async () => {
+    const { operatorHint } = await import("./model");
+    expect(operatorHint(closed, false)).toBeNull();
+    expect(operatorHint({ ...closed, live_enabled: true }, true)).toBeNull();
+    expect(operatorHint({ ...closed, entitled: false }, true)).toBeNull();
+  });
+});

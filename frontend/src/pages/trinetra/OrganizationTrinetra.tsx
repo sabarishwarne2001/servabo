@@ -100,6 +100,7 @@ export default function OrganizationTrinetra() {
         <AccessNotice
           access={access.data}
           billingPath={organizationBillingPath(organization.organization_slug)}
+          organizationId={organizationId}
         />
       )}
       {live && !enterprise && !capabilities.isLoading && (

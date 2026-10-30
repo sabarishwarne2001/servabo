@@ -88,6 +88,7 @@ import {
   platformSovereignPath,
   platformRevopsPath,
   platformJobsPath,
+  platformTrinetraPilotPath,
   organizationEgressPath,
   organizationGstPath,
   organizationTrinetraPath,
@@ -775,6 +776,11 @@ export const buildPlatformNavigationItems = (
       name: "Background jobs",
       path: platformJobsPath(),
       icon: Activity,
+    },
+    {
+      name: "TRINETRA pilot",
+      path: platformTrinetraPilotPath(),
+      icon: ReceiptIndianRupee,
     },
   ];
 };

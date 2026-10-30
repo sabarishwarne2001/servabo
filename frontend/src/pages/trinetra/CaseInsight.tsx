@@ -14,6 +14,7 @@ import {
   CONFIDENCE_HINTS,
   CONFIDENCE_WORDS,
   confidenceOf,
+  daysOpen,
   evidenceChecklist,
   statusTone,
   statusWords,
@@ -65,7 +66,7 @@ export default function CaseInsight({
           label={statusWords(data.status)}
         />
         <span className="text-xs text-muted-foreground">
-          {data.age_days} days open · revision {data.revision}
+          {daysOpen(data.age_days)} · revision {data.revision}
         </span>
       </div>
       <Waterfall item={data} />

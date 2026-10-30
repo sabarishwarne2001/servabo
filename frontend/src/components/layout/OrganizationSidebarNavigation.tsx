@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { ServaboMark } from "@/components/branding/ServaboMark";
 import { Link, NavLink } from "react-router-dom";
 import { ArrowLeft, LayoutGrid, Lock } from "lucide-react";
 
@@ -123,12 +124,7 @@ const OrganizationSidebarNavigation: React.FC<
     <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground" aria-label="Organization Navigation">
       <div className="shrink-0 space-y-2 border-b border-border/70 px-2.5 pb-3 pt-3">
         <div className="flex items-center gap-2.5 px-2 py-1">
-          <span
-            aria-hidden="true"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-primary to-violet-500 text-xs font-semibold text-white shadow-inner-highlight"
-          >
-            {organization.organization_name.charAt(0).toUpperCase()}
-          </span>
+          <ServaboMark className="h-8 w-8 shrink-0" />
           <span className="min-w-0">
             <span className="block truncate text-[13px] font-semibold leading-5 text-foreground">
               {organization.organization_name}

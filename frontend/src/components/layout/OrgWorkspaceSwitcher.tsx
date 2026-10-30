@@ -234,12 +234,7 @@ export const OrgWorkspaceSwitcher: React.FC<OrgWorkspaceSwitcherProps> = ({
                               isCurrent ? "bg-accent text-foreground" : "text-foreground/85 hover:bg-accent/70 hover:text-foreground"
                             }`}
                           >
-                            <span
-                              aria-hidden="true"
-                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border-strong/60 bg-muted text-[10px] font-semibold text-muted-foreground"
-                            >
-                              {ws.workspace_name.charAt(0).toUpperCase()}
-                            </span>
+                            <WorkspaceLogo workspace={ws} className="h-6 w-6 shrink-0 rounded-md object-cover" />
                             <span className="min-w-0 flex-1 truncate font-medium">{ws.workspace_name}</span>
                             <span
                               className={`shrink-0 rounded border px-1.5 text-[10px] font-medium uppercase leading-4 tracking-wide ${

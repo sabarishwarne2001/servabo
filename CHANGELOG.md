@@ -6,6 +6,19 @@ All notable changes to this project will be documented here.
 
 ## [Unreleased]
 
+### Added — TRINETRA pilot console (2026-10-30, F-652)
+
+- **Platform → TRINETRA pilot**: a platform administrator enrols an organization in the TRINETRA pilot, or withdraws it, from the
+  browser, with a reason kept in that organization's audit log. It shows the server's mode and every enrolled organization (slug,
+  reason, date, and a warning when its plan has no TRINETRA). The command line still works.
+- A platform administrator who opens an organization's TRINETRA page while it waits for the pilot sees how to open it, with a button to
+  the console. Customers see the same sentence as before.
+
+### Fixed
+
+- TRINETRA said "1 days open"; it says "1 day open" (and "1 day old" for a statement).
+- The organization console's sidebar and the workspace switcher's list showed a first letter instead of the Servabo logo (F-653).
+
 ### Added — TRINETRA (TDS credit) finished for Business and Enterprise (Final session 2T, 2026-10-28)
 
 - **TRINETRA** checks whether the tax a customer withheld from your invoice reached your tax statement, invoice by invoice, and shows

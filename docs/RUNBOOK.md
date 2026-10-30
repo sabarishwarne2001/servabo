@@ -1022,7 +1022,10 @@ python scripts/trinetra_pilot.py enrol --organization acme-inc --reason "Pilot w
 python scripts/trinetra_pilot.py withdraw --organization acme-inc --reason "Pilot over; the customer asked to stop"
 ```
 
-The same is available to a platform administrator over the API (`GET /api/v1/admin/trinetra/pilot`,
+Or, signed in as a platform administrator, open **Platform → TRINETRA pilot** (`/admin/trinetra`; added 2026-10-30): find the
+organization by name or slug, write the reason, press "Enrol in the pilot"; "Withdraw" asks for a reason too. The organization's own
+TRINETRA page shows a platform administrator an "Open the pilot console" button with that organization chosen.
+The same is available over the API (`GET /api/v1/admin/trinetra/pilot`,
 `PUT /api/v1/admin/trinetra/pilot/{organization_id}`, `POST .../withdraw`, each with a `reason`). The organization's own TRINETRA page
 shows "in a pilot, not enrolled yet" until you do, and the live page after. A 409 `TRINETRA_NOT_ENROLLED` is that; a 409
 `TRINETRA_SOURCE_REVIEW_REQUIRED` means the mode is `off`.

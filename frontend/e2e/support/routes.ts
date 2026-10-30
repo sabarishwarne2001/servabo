@@ -95,4 +95,5 @@ export const PLATFORM_PAGES = [
   { id: "/admin/margins", path: "/admin/margins", title: /Unit economics/, navId: "platform:margins" },
   { id: "/admin/sovereign", path: "/admin/sovereign", title: /Sovereign edition/, navId: "platform:sovereign" },
   { id: "/admin/revops", path: "/admin/revops", title: /Revenue operations/, navId: "platform:revops" },
+  { id: "/admin/trinetra", path: "/admin/trinetra", title: /TRINETRA pilot/, navId: "platform:trinetra" },
 ] as const;

@@ -765,6 +765,8 @@ tax**, and (optional) the customer's TDS advice and a Zoho Books organization wi
    python scripts/trinetra_pilot.py enrol --organization <the owner's slug> --reason "Final 2B, real statements"
    ```
 
+   Or, signed in as the platform administrator, use **Platform → TRINETRA pilot** in the app (the same enrolment, audited; also
+   check the "Open the pilot console" button on the organization's TRINETRA page takes you there with it chosen).
    Run `python scripts/preflight.py`: it must show the mode, one organization enrolled, and the official readers as unverified.
 2. **The legal entity.** Create the owner's profile (real PAN, typed by the owner). Check it is shown masked everywhere, that a
    second profile for the same PAN in another workspace is refused with a message naming the first, and that the browser's address
