@@ -2,7 +2,17 @@
 
 _FlowPilot AI was renamed Servabo on 2026-10-16. Entries below that date keep the old name._
 
-_Last updated: 2026-10-28 (Final session 2T finished; PR #44 ready; next: Final session 2B)_
+_Last updated: 2026-10-30 (TRINETRA pilot console, F-652; next: Final session 2B)_
+
+## Small fix — TRINETRA pilot console (2026-10-30)
+Branch `hardening/trinetra-pilot-console` from `main` at `23a082e` (PR #44 merged; main CI run #547 green). The owner, as platform
+superadmin on an Enterprise organization, saw "TRINETRA is in a pilot, and your organization is not enrolled yet" and had no button to
+enrol it. **F-652:** Platform → TRINETRA pilot (`/admin/trinetra`), an operator line and button on the organization's TRINETRA page, the
+list carries slug and plan, "1 day open". Vitest and typecheck pass here; the backend test and browser spec 141 run on the PR's CI (this
+sandbox could not install pgvector 0.8). `campaign_slices.py --check all` exits 0. Next free: **N-211**, **F-653**, browser spec **145**.
+
+- **Next action:** unchanged: Final session 2B (`docs/sessions/FINAL-2-LIVE.md`). Its Phase 18 step 1 may use the new console.
+
 
 ## Current phase — Final session 2T (TRINETRA finished for Business and Enterprise) (2026-10-28)
 Branch `claude/new-session-9f51dc` (the session's assigned branch; CLAUDE.md says `hardening/<topic>`, the brief says "use the assigned branch"),
@@ -35,7 +45,7 @@ UI work owed to Phase 8 by Phase 1: a checkbox for `seller_name_confirmed` (crea
 - [x] 9. Phase 8 DONE: the screens for every capability, USER-GUIDE, browser specs 141 to 144 by role (owner, workspace admin, viewer) and plan (Starter, Business, Enterprise), axe in light and dark, 390 px; spec 136 enrols its own organization. 141 to 144, 135 and 136 pass.
 - [x] 10. Phase 9 DONE: performance budgets (F-650), hostile-file corpus, isolation sweep over every route (`test_isolation_sweep.py`), prompt-injection entries, privacy journey, TAN scrubber pattern, threat model.
 - [x] 11. Phase 10 DONE: docs/trinetra/* final (COMPLETION has no row pending), HANDOFF (launch checklist step 13, "Final session 2T to Final session 2B"), CHANGELOG, RUNBOOK, PRODUCT-NEXT, NEEDS-OWNER N-210, FINDINGS, website ("Business and Enterprise", "rolling out" from `PUBLIC_TRINETRA_STATUS`), `scripts/trinetra_pilot.py`, FINAL-2-LIVE.md Phase 18, FINAL-SESSIONS.md.
-- [ ] 12. Finish line: frontend (typecheck, lint, check:self, 313 unit tests, build) and website checks pass; backend suites run locally: tests/trinetra, isolation, infra, scripts, security, core, models, performance, templates, operational (2,947 passed; the failures were the sandbox's blocked model download, a speed budget missed under load and passing alone, and the lock check fixed in this session); `campaign_slices.py --check all` exits 0; one Alembic head `tr2t10_recoveries_tds_kind`, populated down/up/up test passes; PR #44 marked ready. **Open: CI on the ready PR (the full backend shards and the full browser suite run there), then the owner merges.**
+- [x] 12. Finish line: frontend (typecheck, lint, check:self, 313 unit tests, build) and website checks pass; backend suites run locally: tests/trinetra, isolation, infra, scripts, security, core, models, performance, templates, operational (2,947 passed; the failures were the sandbox's blocked model download, a speed budget missed under load and passing alone, and the lock check fixed in this session); `campaign_slices.py --check all` exits 0; one Alembic head `tr2t10_recoveries_tds_kind`, populated down/up/up test passes; PR #44 marked ready. **Done: PR #44's CI run 546 green (all 11 jobs), merged; main run #547 green.**
 
 - **Next action:** Final session 2B (`docs/sessions/FINAL-2-LIVE.md`, Phase 18 is TRINETRA): read the owner's own Form 26AS / Form 168 text and AIS CSV on the owner's PC (never in the repository), prove the Zoho read and a real inbox, mark each COMPLETION row "Verified in 2B" or "Differs". Then the owner's launch checklist step 13 (the CA's read, then the mode "on"). Local notes: this sandbox has no paddle, so the browser specs that read documents ran with a worker started without the heavy-image import check (a scratchpad launcher); one pre-existing order-dependent failure: `test_error_tracking_live` fails when run directly after `tests/infra/test_error_tracking.py` in one process, with or without these changes.
 

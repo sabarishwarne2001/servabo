@@ -5,7 +5,7 @@ real file or service can prove; then the owner's chartered accountant reads the 
 
 **Release status: finished in code and tests, in pilot mode; not approved for open release.**
 `TRINETRA_MODE=pilot` is the default in code, the examples and the production compose: an organization is live only when a platform
-administrator enrolls it (`/admin/trinetra/pilot`, with a reason, audited). Do not set `on` merely because the tests pass.
+administrator enrolls it (Platform → TRINETRA pilot in the app, `scripts/trinetra_pilot.py`, or `/admin/trinetra/pilot`; with a reason, audited). Do not set `on` merely because the tests pass.
 `TRINETRA_LIVE_ENABLED` is the old on/off setting, kept as an alias that wins when it is set; leave it unset.
 
 ## What is proven, and what only a real file or service can prove
