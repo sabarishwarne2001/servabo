@@ -272,7 +272,7 @@ export const freshness = (
     );
   }
   if (days > STALE_AFTER_DAYS) {
-    parts.push(`The statement is ${days} days old; a later posting needs a new import.`);
+    parts.push(`The statement is ${days} ${days === 1 ? "day" : "days"} old; a later posting needs a new import.`);
   }
   return parts.length
     ? { level: "attention", message: parts.join(" ") }
@@ -318,6 +318,9 @@ export const accessNotice = (access: {
       "Explore the synthetic examples. Servabo will open it to Business and Enterprise organizations when the pilot ends.",
   };
 };
+
+/** "1 day open", "2 days open". */
+export const daysOpen = (days: number): string => `${days} ${days === 1 ? "day" : "days"} open`;
 
 export interface TutorialStep {
   readonly key: "profile" | "case" | "statement" | "decide";

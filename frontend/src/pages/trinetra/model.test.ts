@@ -186,3 +186,13 @@ describe("the first-run tutorial", () => {
     ).toBe(true);
   });
 });
+
+describe("how long a case has been open, in words", () => {
+  it("says 1 day, not 1 days", async () => {
+    const { daysOpen } = await import("./model");
+    expect(daysOpen(0)).toBe("0 days open");
+    expect(daysOpen(1)).toBe("1 day open");
+    expect(daysOpen(2)).toBe("2 days open");
+    expect(daysOpen(40)).toBe("40 days open");
+  });
+});

@@ -26,7 +26,7 @@ import Exceptions from "./Exceptions";
 import FreshnessBanner from "./FreshnessBanner";
 import ImportStatement from "./ImportStatement";
 import Kpis from "./Kpis";
-import { statusTone, statusWords } from "./model";
+import { daysOpen, statusTone, statusWords } from "./model";
 import Suggestions from "./Suggestions";
 import Tutorial from "./Tutorial";
 import Waterfall from "./Waterfall";
@@ -269,7 +269,7 @@ function Cockpit() {
                       </span>
                       <span className="text-sm text-muted-foreground">
                         {statusWords(r.status)}
-                        <span className="block text-xs">{r.age_days} days open</span>
+                        <span className="block text-xs">{daysOpen(r.age_days)}</span>
                       </span>
                       <span className="text-sm font-semibold tabular-nums">
                         {rupees(r.gap_micros)}
