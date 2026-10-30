@@ -82,6 +82,7 @@ const AdminMarginsHub = lazy(() => import("@/pages/admin/AdminMarginsHub"));
 const SovereignConsole = lazy(() => import("@/pages/admin/SovereignConsole"));
 const RevOpsConsole = lazy(() => import("@/pages/admin/RevOpsConsole"));
 const JobsConsole = lazy(() => import("@/pages/admin/JobsConsole"));
+const TrinetraPilotConsole = lazy(() => import("@/pages/admin/TrinetraPilotConsole"));
 const OrganizationEgress = lazy(() => import("@/pages/organization/OrganizationEgress"));
 const PlatformLayout = lazy(() => import("@/layouts/PlatformLayout"));
 // §B.1 (session 4): lazy like PlatformLayout. Their sidebars, menus and banners (with the
@@ -459,6 +460,10 @@ function AppRoutes() {
                 <Route
                   path={ROUTE_PATTERNS.platformJobs}
                   element={<JobsConsole />}
+                />
+                <Route
+                  path={ROUTE_PATTERNS.platformTrinetraPilot}
+                  element={<TrinetraPilotConsole />}
                 />
               </Route>
             </Route>

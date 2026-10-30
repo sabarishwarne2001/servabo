@@ -119,12 +119,12 @@ test.describe("platform pages reject tenant admins", () => {
   for (const user of ["C.owner", "C.admin", "A.owner"] as const) {
     test.describe(user, () => {
       test.use({ user });
-      for (const path of ["/admin/margins", "/admin/sovereign", "/admin/revops"]) {
+      for (const path of ["/admin/margins", "/admin/sovereign", "/admin/revops", "/admin/trinetra"]) {
         test(`${path} is not shown to ${user}`, async ({ page }) => {
           await page.goto(path);
           await settle(page);
           await expect(page).not.toHaveURL(new RegExp(`${path}$`));
-          await expect(page.locator("body")).not.toContainText(/Unit economics|Sovereign edition|Revenue operations/);
+          await expect(page.locator("body")).not.toContainText(/Unit economics|Sovereign edition|Revenue operations|TRINETRA pilot/);
         });
       }
     });

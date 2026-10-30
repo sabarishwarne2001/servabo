@@ -424,6 +424,7 @@ function Cockpit() {
         <AccessNotice
           access={access.data}
           billingPath={organizationBillingPath(organization.organization_slug)}
+          organizationId={organization.organization_id}
         />
       )}
       {access.isError && (

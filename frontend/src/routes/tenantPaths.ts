@@ -125,6 +125,8 @@ export const ROUTE_PATTERNS = {
   platformRevops: "revops",
   // Campaign session 2: background jobs and the dead-letter queue.
   platformJobs: "jobs",
+  // TRINETRA pilot enrolment (the server's /admin/trinetra/pilot).
+  platformTrinetraPilot: "trinetra",
 
   // ARCH-27 partner portal. A sibling of the organization shell, never a child
   // of it — the same decision ARCH-18 made for /admin. A partner principal
@@ -308,6 +310,7 @@ export const platformMarginsPath = (): string => "/admin/margins";
 export const platformSovereignPath = (): string => "/admin/sovereign";
 export const platformRevopsPath = (): string => "/admin/revops";
 export const platformJobsPath = (): string => "/admin/jobs";
+export const platformTrinetraPilotPath = (): string => "/admin/trinetra";
 export const organizationEgressPath = (orgSlug: string): string => `${organizationPath(orgSlug)}/egress`;
 export const organizationGstPath = (orgSlug: string): string => `${organizationPath(orgSlug)}/gst`;
 export const organizationTrinetraPath = (orgSlug: string): string => `${organizationPath(orgSlug)}/trinetra`;

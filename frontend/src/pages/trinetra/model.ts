@@ -322,6 +322,43 @@ export const accessNotice = (access: {
 /** "1 day open", "2 days open". */
 export const daysOpen = (days: number): string => `${days} ${days === 1 ? "day" : "days"} open`;
 
+export interface OperatorHint {
+  readonly kind: "enrol" | "mode_off";
+  readonly message: string;
+}
+
+/**
+ * The extra line a platform administrator sees under the access notice: the customer's sentence does not say how to open
+ * TRINETRA, the operator needs to know. Null for everyone else, for an open organization, and where only the plan is missing
+ * (enrolment would not help). The server still decides: the console's endpoints are superadmin-only.
+ */
+export const operatorHint = (
+  access: { live_enabled: boolean; mode: string; enrolled: boolean; entitled: boolean },
+  isSuperAdmin: boolean,
+): OperatorHint | null => {
+  if (!isSuperAdmin || (access.live_enabled && access.entitled)) {
+    return null;
+  }
+  if (access.mode === "off") {
+    return {
+      kind: "mode_off",
+      message:
+        "Platform administrator: this server runs with TRINETRA_MODE=off, so nobody is live. Set it to pilot in the backend's .env and restart the API and workers; then enrol organizations from the TRINETRA pilot console.",
+    };
+  }
+  if (!access.entitled) {
+    return null;
+  }
+  if (access.mode === "pilot" && !access.enrolled) {
+    return {
+      kind: "enrol",
+      message:
+        "Platform administrator: enrol this organization from the TRINETRA pilot console. A reason is required and kept in the audit log.",
+    };
+  }
+  return null;
+};
+
 export interface TutorialStep {
   readonly key: "profile" | "case" | "statement" | "decide";
   readonly title: string;
