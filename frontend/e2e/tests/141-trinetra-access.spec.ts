@@ -92,11 +92,11 @@ test.describe("TRINETRA pilot console", () => {
     const console_ = page.getByTestId("trinetra-pilot-console");
     await expect(console_.getByRole("heading", { level: 1, name: "TRINETRA pilot" })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("trinetra-pilot-mode")).toHaveText("pilot");
-    await page.getByLabel("Find by name or slug").fill(customer.orgSlug);
-    await expect(page.getByLabel("Organization")).toHaveValue(customer.orgId);
+    await page.getByLabel("Find by name or slug", { exact: true }).fill(customer.orgSlug);
+    await expect(page.getByLabel("Organization", { exact: true })).toHaveValue(customer.orgId);
     const enrolButton = page.getByRole("button", { name: "Enrol in the pilot" });
     await expect(enrolButton).toBeDisabled();
-    await page.getByLabel("Reason for enrolling").fill("Browser specs: enrolled from the pilot console.");
+    await page.getByLabel("Reason for enrolling", { exact: true }).fill("Browser specs: enrolled from the pilot console.");
     await enrolButton.click();
     const row = page.getByTestId("trinetra-pilot-row").filter({ hasText: customer.orgSlug });
     await expect(row).toHaveCount(1, { timeout: 15_000 });
@@ -104,7 +104,7 @@ test.describe("TRINETRA pilot console", () => {
     expect(await access()).toMatchObject({ enrolled: true, live_enabled: true });
 
     await row.getByRole("button", { name: /^Withdraw / }).click();
-    await row.getByLabel("Reason for withdrawing").fill("Browser specs: withdrawn from the pilot console.");
+    await row.getByLabel("Reason for withdrawing", { exact: true }).fill("Browser specs: withdrawn from the pilot console.");
     await row.getByRole("button", { name: "Confirm withdrawal" }).click();
     await expect(row).toHaveCount(0, { timeout: 15_000 });
     expect(await access()).toMatchObject({ enrolled: false, live_enabled: false });
