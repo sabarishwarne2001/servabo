@@ -127,3 +127,18 @@ def test_platform_administrators_enrol_with_a_reason_and_it_is_audited(client, t
     assert gone.status_code == 200 and not mode.live_for(db_session, tenant.organization.id)
     entries = db_session.query(AuditLog).filter(AuditLog.organization_id == tenant.organization.id).all()
     assert any((e.details or {}).get("operation") == "trinetra.pilot_withdrawn" for e in entries)
+
+
+def test_the_pilot_console_names_each_enrolled_organization_by_slug_and_plan(client, tenant, world, db_session, monkeypatch):
+    """The console's list shows the slug (names can repeat) and the plan (a Starter organization stays on the examples)."""
+    set_mode(monkeypatch, "pilot")
+    admin = tenant.org_admin
+    admin.user.is_superuser = True
+    db_session.commit()
+    org = tenant.organization
+    ok = client.put(f"/api/v1/admin/trinetra/pilot/{org.id}", headers=admin.headers,
+                    json={"reason": "The owner's own organization for the pilot."})
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["slug"] == org.slug
+    listed = client.get("/api/v1/admin/trinetra/pilot", headers=admin.headers).json()["items"]
+    assert [(e["slug"], e["entitled"]) for e in listed] == [(org.slug, mode.state(db_session, org.id).entitled)]
